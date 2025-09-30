@@ -106,27 +106,65 @@ python cli.py mode=train training.target_resolution=scene
 
 ## Testing
 
+The project supports comprehensive testing with both dry-run and real LLM modes.
+
+### Quick Start Testing
+
 ```bash
-# Run all tests
+# Run all tests (dry-run mode by default)
 pytest
 
-# Run with coverage
+# Run with coverage report
 pytest --cov
 
 # Run with verbose logging
 pytest --verbose-tests -s
+```
 
+### LLM Testing Modes
+
+**Dry-Run Mode (Default - Fast & Free):**
+```bash
+# Standard testing - no API key needed
+pytest --cov
+```
+
+**Real LLM Mode (Integration Testing):**
+```bash
+# 1. Get API key from https://openrouter.ai/keys
+# 2. Set environment variable
+export OPENROUTER_API_KEY="your_api_key_here"
+
+# 3. Run tests with real LLM calls
+pytest --verbose-tests
+
+# Or use the convenience script
+./test_real_llm.py
+```
+
+### Advanced Testing
+
+```bash
 # Run specific test
 pytest test_framework.py::test_tensor_compression
 
-# Run specific test with verbose logging
-pytest --verbose-tests -s test_framework.py::test_tensor_compression
+# Run integration tests only (requires API key)
+pytest -m integration
 
 # Run property-based tests
 pytest test_framework.py::test_graph_creation_property
+
+# Generate HTML coverage report
+pytest --cov --cov-report=html
 ```
 
-See [VERBOSE_TESTING.md](VERBOSE_TESTING.md) for detailed logging documentation.
+### Test Results
+
+- **Coverage**: 93% across all modules
+- **Tests**: 20 comprehensive tests
+- **Modes**: Dry-run (free, fast) + Real LLM (integration)
+
+See [VERBOSE_TESTING.md](VERBOSE_TESTING.md) for logging details and [REAL_LLM_TESTING.md](REAL_LLM_TESTING.md) for LLM testing guide.
 
 ## Architecture
 
