@@ -1,0 +1,2 @@
+- mode=autopilot
+- llm.dry_run=true

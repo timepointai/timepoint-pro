@@ -1,0 +1,18 @@
+database:
+  url: sqlite:///timepoint.db
+llm:
+  api_key: ${oc.env:OPENROUTER_API_KEY,test}
+  base_url: https://openrouter.ai/api/v1
+  dry_run: true
+mode: train
+seed: 42
+autopilot:
+  depth: standard
+  graph_sizes:
+  - 10
+  - 50
+  - 100
+training:
+  graph_size: 3
+  target_resolution: tensor_only
+  context: ''

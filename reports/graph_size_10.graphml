@@ -1,0 +1,111 @@
+<?xml version='1.0' encoding='utf-8'?>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">
+  <key id="d5" for="edge" attr.name="strength" attr.type="double" />
+  <key id="d4" for="edge" attr.name="relationship" attr.type="string" />
+  <key id="d3" for="node" attr.name="query_count" attr.type="long" />
+  <key id="d2" for="node" attr.name="training_count" attr.type="long" />
+  <key id="d1" for="node" attr.name="age" attr.type="long" />
+  <key id="d0" for="node" attr.name="entity_type" attr.type="string" />
+  <graph edgedefault="undirected">
+    <node id="entity_0">
+      <data key="d0">person</data>
+      <data key="d1">58</data>
+      <data key="d2">0</data>
+      <data key="d3">0</data>
+    </node>
+    <node id="entity_1">
+      <data key="d0">person</data>
+      <data key="d1">71</data>
+      <data key="d2">0</data>
+      <data key="d3">0</data>
+    </node>
+    <node id="entity_2">
+      <data key="d0">person</data>
+      <data key="d1">48</data>
+      <data key="d2">0</data>
+      <data key="d3">0</data>
+    </node>
+    <node id="entity_3">
+      <data key="d0">person</data>
+      <data key="d1">34</data>
+      <data key="d2">0</data>
+      <data key="d3">0</data>
+    </node>
+    <node id="entity_4">
+      <data key="d0">person</data>
+      <data key="d1">62</data>
+      <data key="d2">0</data>
+      <data key="d3">0</data>
+    </node>
+    <node id="entity_5">
+      <data key="d0">person</data>
+      <data key="d1">27</data>
+      <data key="d2">0</data>
+      <data key="d3">0</data>
+    </node>
+    <node id="entity_6">
+      <data key="d0">person</data>
+      <data key="d1">40</data>
+      <data key="d2">0</data>
+      <data key="d3">0</data>
+    </node>
+    <node id="entity_7">
+      <data key="d0">person</data>
+      <data key="d1">58</data>
+      <data key="d2">0</data>
+      <data key="d3">0</data>
+    </node>
+    <node id="entity_8">
+      <data key="d0">person</data>
+      <data key="d1">77</data>
+      <data key="d2">0</data>
+      <data key="d3">0</data>
+    </node>
+    <node id="entity_9">
+      <data key="d0">person</data>
+      <data key="d1">38</data>
+      <data key="d2">0</data>
+      <data key="d3">0</data>
+    </node>
+    <edge source="entity_1" target="entity_3">
+      <data key="d4">knows</data>
+      <data key="d5">0.056411579027100256</data>
+    </edge>
+    <edge source="entity_1" target="entity_4">
+      <data key="d4">knows</data>
+      <data key="d5">0.9385527090157502</data>
+    </edge>
+    <edge source="entity_2" target="entity_4">
+      <data key="d4">knows</data>
+      <data key="d5">0.6174815096277165</data>
+    </edge>
+    <edge source="entity_2" target="entity_5">
+      <data key="d4">knows</data>
+      <data key="d5">0.007066305219717406</data>
+    </edge>
+    <edge source="entity_3" target="entity_5">
+      <data key="d4">knows</data>
+      <data key="d5">0.3998609717152555</data>
+    </edge>
+    <edge source="entity_4" target="entity_5">
+      <data key="d4">knows</data>
+      <data key="d5">0.23277134043030423</data>
+    </edge>
+    <edge source="entity_4" target="entity_7">
+      <data key="d4">knows</data>
+      <data key="d5">0.38246199126716274</data>
+    </edge>
+    <edge source="entity_5" target="entity_6">
+      <data key="d4">knows</data>
+      <data key="d5">0.4667628932479799</data>
+    </edge>
+    <edge source="entity_5" target="entity_7">
+      <data key="d4">knows</data>
+      <data key="d5">0.6803075385877797</data>
+    </edge>
+    <edge source="entity_6" target="entity_8">
+      <data key="d4">knows</data>
+      <data key="d5">0.5632882178455393</data>
+    </edge>
+  </graph>
+</graphml>

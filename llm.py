@@ -39,7 +39,7 @@ class LLMClient:
         else:
             self.client = None
     
-    def populate_entity(self, entity_schema: Dict, context: Dict, model: str = "meta-llama/llama-3.1-405b") -> EntityPopulation:
+    def populate_entity(self, entity_schema: Dict, context: Dict, model: str = "openai/gpt-4o-mini") -> EntityPopulation:
         """Populate entity with structured output"""
         if self.dry_run:
             return self._mock_entity_population(entity_schema)
@@ -58,7 +58,7 @@ Provide knowledge state, energy budget (0-100), personality traits (5 floats -1 
         self.cost += 0.01  # Estimate
         return response
     
-    def validate_consistency(self, entities: List[Dict], timepoint: datetime, model: str = "meta-llama/llama-3.1-405b") -> ValidationResult:
+    def validate_consistency(self, entities: List[Dict], timepoint: datetime, model: str = "openai/gpt-4o-mini") -> ValidationResult:
         """Validate temporal consistency"""
         if self.dry_run:
             return ValidationResult(is_valid=True, violations=[], confidence=1.0, reasoning="Dry run mock")

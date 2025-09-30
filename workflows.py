@@ -27,10 +27,12 @@ def create_entity_training_workflow(llm_client: LLMClient, store: GraphStore):
     workflow = StateGraph(WorkflowState)
     
     def load_graph(state: WorkflowState) -> WorkflowState:
-        graph = store.load_graph(state["timepoint"])
-        if graph is None:
-            graph = create_test_graph()
-        state["graph"] = graph
+        # Only create/load a graph if one doesn't already exist in state
+        if state["graph"] is None or state["graph"].number_of_nodes() == 0:
+            graph = store.load_graph(state["timepoint"])
+            if graph is None:
+                graph = create_test_graph()
+            state["graph"] = graph
         return state
     
     def populate_entities(state: WorkflowState) -> WorkflowState:

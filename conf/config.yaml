@@ -4,7 +4,7 @@ database:
 llm:
   api_key: ${oc.env:OPENROUTER_API_KEY,test}
   base_url: https://openrouter.ai/api/v1
-  dry_run: true
+  dry_run: false
 
 mode: autopilot
 seed: 42
@@ -16,3 +16,4 @@ autopilot:
 training:
   graph_size: 50
   target_resolution: tensor_only
+  context: founding_fathers_1789  # or renaissance_florence_1504

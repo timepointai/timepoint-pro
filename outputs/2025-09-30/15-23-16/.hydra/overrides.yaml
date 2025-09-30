@@ -1,0 +1,3 @@
+- mode=train
+- training.graph_size=1
+- training.context=

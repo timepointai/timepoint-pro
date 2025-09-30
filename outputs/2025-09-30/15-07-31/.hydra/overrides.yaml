@@ -1,0 +1,2 @@
+- mode=train
+- training.graph_size=1

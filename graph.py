@@ -60,3 +60,38 @@ def compute_centralities(G: nx.Graph) -> Dict[str, Dict[str, float]]:
         "pagerank": nx.pagerank(G),
         "degree": dict(G.degree())
     }
+
+def export_graph_data(graph: nx.Graph, filename: str):
+    """Export graph in multiple formats for visualization"""
+    import json
+    from pathlib import Path
+
+    # Create directory if it doesn't exist
+    Path(filename).parent.mkdir(parents=True, exist_ok=True)
+
+    # Node-link format for D3.js
+    data = nx.node_link_data(graph)
+
+    with open(filename + '.json', 'w') as f:
+        json.dump(data, f, indent=2)
+
+    # GraphML for Gephi/Cytoscape
+    nx.write_graphml(graph, filename + '.graphml')
+
+    print(f"Graph exported: {filename}.json, {filename}.graphml")
+
+def print_graph_summary(graph: nx.Graph):
+    """Print ASCII summary of graph structure"""
+    print(f"\nGraph Summary:")
+    print(f"  Nodes: {graph.number_of_nodes()}")
+    print(f"  Edges: {graph.number_of_edges()}")
+    print(f"  Density: {nx.density(graph):.4f}")
+    print(f"  Connected: {nx.is_connected(graph)}")
+
+    if graph.number_of_nodes() > 0:
+        degrees = dict(graph.degree())
+        avg_degree = sum(degrees.values()) / len(degrees)
+        max_degree_node = max(degrees, key=degrees.get)
+
+        print(f"  Average degree: {avg_degree:.2f}")
+        print(f"  Most connected: {max_degree_node} ({degrees[max_degree_node]} connections)")
