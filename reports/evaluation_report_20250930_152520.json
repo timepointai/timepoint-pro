@@ -1,0 +1,14 @@
+{
+  "timestamp": "2025-09-30T15:25:20.817619",
+  "mode": "evaluation",
+  "results": {
+    "entities_evaluated": 9,
+    "cost": 0.0,
+    "tokens": 0
+  },
+  "summary": {
+    "total_cost": 0.0,
+    "total_tokens": 0,
+    "success": true
+  }
+}

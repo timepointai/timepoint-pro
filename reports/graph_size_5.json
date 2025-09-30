@@ -1,0 +1,62 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {
+      "entity_type": "person",
+      "age": 58,
+      "training_count": 0,
+      "query_count": 0,
+      "id": "entity_0"
+    },
+    {
+      "entity_type": "person",
+      "age": 71,
+      "training_count": 0,
+      "query_count": 0,
+      "id": "entity_1"
+    },
+    {
+      "entity_type": "person",
+      "age": 48,
+      "training_count": 0,
+      "query_count": 0,
+      "id": "entity_2"
+    },
+    {
+      "entity_type": "person",
+      "age": 34,
+      "training_count": 0,
+      "query_count": 0,
+      "id": "entity_3"
+    },
+    {
+      "entity_type": "person",
+      "age": 62,
+      "training_count": 0,
+      "query_count": 0,
+      "id": "entity_4"
+    }
+  ],
+  "links": [
+    {
+      "relationship": "knows",
+      "strength": 0.596850157946487,
+      "source": "entity_0",
+      "target": "entity_1"
+    },
+    {
+      "relationship": "knows",
+      "strength": 0.056411579027100256,
+      "source": "entity_2",
+      "target": "entity_3"
+    },
+    {
+      "relationship": "knows",
+      "strength": 0.9385527090157502,
+      "source": "entity_2",
+      "target": "entity_4"
+    }
+  ]
+}

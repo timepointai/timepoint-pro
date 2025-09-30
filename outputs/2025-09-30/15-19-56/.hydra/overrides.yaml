@@ -1,0 +1,2 @@
+- mode=train
+- training.context=renaissance_florence_1504
