@@ -70,54 +70,133 @@ Extract:
             return self._parse_query_simple(query)
 
     def _parse_query_simple(self, query: str) -> QueryIntent:
-        """Simple rule-based parsing fallback"""
+        """Improved rule-based parsing fallback"""
         query_lower = query.lower()
-
-        # Extract target entity (simple name matching)
         entities = self._get_all_entity_names()
-        target_entity = None
-        for entity_name in entities:
-            if entity_name.lower() in query_lower:
-                target_entity = entity_name
-                break
+        timepoints = self.store.get_all_timepoints()
 
-        # Extract timepoint hints
-        timepoint_hints = ["today", "yesterday", "after", "during", "before"]
+        # Improved entity detection - handle partial names and variations
+        entity_mappings = {
+            # Full names
+            "george washington": "george_washington",
+            "john adams": "john_adams",
+            "thomas jefferson": "thomas_jefferson",
+            "alexander hamilton": "alexander_hamilton",
+            "james madison": "james_madison",
+            # Partial names and common variations
+            "washington": "george_washington",
+            "adams": "john_adams",
+            "jefferson": "thomas_jefferson",
+            "hamilton": "alexander_hamilton",
+            "madison": "james_madison",
+            "president": "george_washington",  # Context-dependent but common
+        }
+
+        # Find all mentioned entities
+        target_entity = None
+        context_entities = []
+        found_entities = []
+
+        # Sort by length (longest first) to match full names before partials
+        sorted_mappings = sorted(entity_mappings.items(), key=lambda x: len(x[0]), reverse=True)
+
+        for name_variant, entity_id in sorted_mappings:
+            if name_variant in query_lower and entity_id not in found_entities:
+                found_entities.append(entity_id)
+
+        if found_entities:
+            target_entity = found_entities[0]  # Primary entity
+            context_entities = found_entities[1:]  # Additional entities
+
+        # Event/timepoint detection
         target_timepoint = None
-        for hint in timepoint_hints:
-            if hint in query_lower:
-                # Find most recent timepoint containing this hint
-                timepoints = self.store.get_all_timepoints()
+        event_keywords = {
+            "inauguration": ["inauguration", "swearing in", "oath"],
+            "cabinet meeting": ["cabinet meeting", "cabinet"],
+            "congressional": ["congressional", "congress", "legislative"],
+            "diplomatic": ["diplomatic", "reception", "international"]
+        }
+
+        for event_type, keywords in event_keywords.items():
+            if any(keyword in query_lower for keyword in keywords):
+                # Find matching timepoint
                 for tp in timepoints:
-                    if hint in tp.event_description.lower():
+                    if any(keyword in tp.event_description.lower() for keyword in keywords):
                         target_timepoint = tp.timepoint_id
                         break
                 break
 
-        # Determine information type
-        if any(word in query_lower for word in ["think", "feel", "believe", "opinion"]):
+        # Improved information type detection
+        info_type = "general"
+        confidence = 0.5  # Start lower, build up
+
+        # Knowledge/thoughts queries
+        if any(word in query_lower for word in ["think", "feel", "believe", "opinion", "thought", "felt", "concerned"]):
             info_type = "knowledge"
-        elif any(word in query_lower for word in ["talk", "say", "speak", "conversation"]):
+            confidence += 0.2
+
+        # Dialog/conversation queries
+        elif any(word in query_lower for word in ["talk", "say", "said", "speak", "conversation", "told", "spoke"]):
             info_type = "dialog"
-        elif any(word in query_lower for word in ["do", "action", "activity"]):
+            confidence += 0.2
+
+        # Action/behavior queries
+        elif any(word in query_lower for word in ["do", "did", "action", "activity", "perform", "take", "took"]):
             info_type = "actions"
-        else:
+            confidence += 0.2
+
+        # Relationship queries
+        elif any(word in query_lower for word in ["interact", "relationship", "work with", "together", "alliance"]):
+            info_type = "relationships"
+            confidence += 0.2
+
+        # Description/event queries (like "describe the cabinet meeting")
+        elif any(word in query_lower for word in ["describe", "what happened", "during", "at the"]):
             info_type = "general"
+            confidence += 0.1
+
+        # Boost confidence based on entity detection quality
+        if target_entity:
+            confidence += 0.3
+        if context_entities:
+            confidence += 0.1
+        if target_timepoint:
+            confidence += 0.2
+
+        # Cap confidence
+        confidence = min(confidence, 1.0)
+
+        reasoning_parts = []
+        if target_entity:
+            reasoning_parts.append(f"Found primary entity: {target_entity}")
+        if context_entities:
+            reasoning_parts.append(f"Found context entities: {', '.join(context_entities)}")
+        if target_timepoint:
+            reasoning_parts.append(f"Detected timepoint: {target_timepoint}")
+        reasoning_parts.append(f"Info type: {info_type}")
 
         return QueryIntent(
             target_entity=target_entity,
             target_timepoint=target_timepoint,
             information_type=info_type,
-            confidence=0.7,
-            reasoning="Simple rule-based parsing"
+            context_entities=context_entities,
+            confidence=confidence,
+            reasoning="; ".join(reasoning_parts)
         )
 
     def synthesize_response(self, query_intent: QueryIntent) -> str:
         """Generate answer from entity states with lazy resolution elevation and attribution"""
 
-        # Find target entity
+        # Handle different query types
         if not query_intent.target_entity:
-            return "I couldn't identify which entity you're asking about. Available entities: " + ", ".join(self._get_all_entity_names())
+            # Check if this is an event/timepoint-focused query
+            if query_intent.target_timepoint:
+                return self._synthesize_timepoint_response(query_intent)
+            # Check if this is a multi-entity relationship query
+            elif query_intent.context_entities:
+                return self._synthesize_relationship_response(query_intent)
+            else:
+                return "I couldn't identify which entity you're asking about. Available entities: " + ", ".join(self._get_all_entity_names())
 
         entity = self.store.get_entity(query_intent.target_entity)
         if not entity:
@@ -296,6 +375,84 @@ Extract:
             return [k for k, s in scored_knowledge[:3]]  # Return top 3 regardless of score
         else:
             return [k for k, s in scored_knowledge if s > 0][:5]  # Top 5 with any relevance
+
+    def _synthesize_timepoint_response(self, query_intent: QueryIntent) -> str:
+        """Generate response for timepoint-focused queries (e.g., 'Describe the cabinet meeting')"""
+        timepoint = self.store.get_timepoint(query_intent.target_timepoint)
+        if not timepoint:
+            return f"I don't have information about timepoint {query_intent.target_timepoint}."
+
+        # Get all entities present at this timepoint
+        entities_at_timepoint = []
+        for entity_id in timepoint.entities_present:
+            entity = self.store.get_entity(entity_id)
+            if entity:
+                entities_at_timepoint.append(entity)
+
+        response_parts = [f"During the {timepoint.event_description.lower()}:"]
+        response_parts.append("")
+
+        # Show what each entity experienced/learned
+        for entity in entities_at_timepoint:
+            knowledge_state = entity.entity_metadata.get("knowledge_state", [])
+            # Filter knowledge relevant to this timepoint
+            timepoint_knowledge = []
+            exposure_events = self.store.get_exposure_events(entity.entity_id)
+            for event in exposure_events:
+                if event.timepoint_id == query_intent.target_timepoint:
+                    timepoint_knowledge.append(event.information)
+
+            if timepoint_knowledge:
+                response_parts.append(f"• {entity.entity_id.replace('_', ' ').title()}:")
+                for knowledge in timepoint_knowledge[:2]:  # Show up to 2 items per entity
+                    response_parts.append(f"  - {knowledge}")
+                response_parts.append("")
+
+        if len(response_parts) == 2:  # Only the header
+            response_parts.append("No specific details available about this event.")
+
+        response_parts.append(f"[Timepoint: {query_intent.target_timepoint}, Confidence: {query_intent.confidence:.1f}]")
+
+        return "\n".join(response_parts)
+
+    def _synthesize_relationship_response(self, query_intent: QueryIntent) -> str:
+        """Generate response for multi-entity relationship queries (e.g., 'How did Hamilton and Jefferson interact?')"""
+        if not query_intent.context_entities:
+            return "I need more specific information about which entities you're asking about."
+
+        # For now, focus on the primary entity and mention relationships with context entities
+        # This is a simplified approach - could be expanded for more complex relationship analysis
+        primary_entity_id = query_intent.context_entities[0]  # Use first context entity as primary
+        primary_entity = self.store.get_entity(primary_entity_id)
+
+        if not primary_entity:
+            return f"I don't have information about {primary_entity_id}."
+
+        # Get knowledge that might relate to interactions
+        knowledge_state = primary_entity.entity_metadata.get("knowledge_state", [])
+        relevant_knowledge = []
+
+        # Look for knowledge that might indicate relationships or interactions
+        for knowledge in knowledge_state:
+            knowledge_lower = knowledge.lower()
+            # Check if knowledge mentions other entities from context
+            for other_entity in query_intent.context_entities[1:]:
+                other_name = other_entity.replace('_', ' ')
+                if other_name.lower() in knowledge_lower:
+                    relevant_knowledge.append(knowledge)
+                    break
+
+        response_parts = [f"Based on {primary_entity_id.replace('_', ' ').title()}'s knowledge of interactions:"]
+
+        if relevant_knowledge:
+            for knowledge in relevant_knowledge[:3]:
+                response_parts.append(f"• {knowledge}")
+        else:
+            response_parts.append(f"• {primary_entity_id.replace('_', ' ').title()} doesn't have specific knowledge about interactions with others in this context.")
+
+        response_parts.append(f"\n[Entity: {primary_entity_id}, Confidence: {query_intent.confidence:.1f}]")
+
+        return "\n".join(response_parts)
 
     def _get_all_entity_names(self) -> List[str]:
         """Get list of all entity IDs from database"""
