@@ -105,7 +105,8 @@ Return only a number between 0.0 and 1.0, where:
 Relevance score:"""
 
         try:
-            response = self.client.chat.completions.create(
+            # For relevance scoring, we want raw text response, not structured
+            response = self.client.client.chat.completions.create(  # Use the underlying client, not instructor
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.1,  # Low temperature for consistent scoring

@@ -1,805 +1,1508 @@
-# MECHANICS.md - Timepoint-Daedalus Novel Architecture
+# MECHANICS.md - Timepoint-Daedalus Technical Architecture
 
-## The Core Problem
+## Problem Statement
 
-Large language models can simulate historical entities, but doing so naively creates two irreconcilable tensions:
+Large language model-based historical simulations face two fundamental constraints:
 
-1. **Token Economics**: Full-context prompting (50k tokens per entity × 100 entities × 10 timepoints = 50M tokens ≈ $500/query) doesn't scale
-2. **Temporal Consistency**: Compressed representations lose the causal structure needed to prevent anachronisms and maintain coherent entity evolution
+1. **Token Economics**: Full-context prompting scales as O(entities × timepoints × token_cost), reaching $500/query for 100 entities across 10 timepoints at 50k tokens per entity.
+2. **Temporal Consistency**: Compression-based approaches lose causal structure required to prevent anachronisms and maintain coherent temporal evolution.
 
-Standard approaches fail because they treat this as a caching problem (cache invalidation nightmare) or a compression problem (lossy representations break temporal reasoning). Both assume uniform fidelity across the simulation.
+Traditional solutions treat this as either a caching problem (cache invalidation complexity) or lossy compression problem (breaks temporal reasoning). Both assume uniform fidelity across all entities and timepoints.
 
-**The insight**: Historical simulations have heterogeneous information value. Washington at the inauguration ceremony matters more than a random attendee. The moment of signing the Constitution matters more than breakfast the next morning. Most attempts at historical simulation waste tokens on low-value detail while underserving high-value queries.
+## Architectural Solution
 
-Timepoint-Daedalus solves this through **query-driven progressive refinement in a causally-linked temporal graph**, where resolution adapts to actual usage patterns rather than static importance heuristics.
+Timepoint-Daedalus implements query-driven progressive refinement in a causally-linked temporal graph with heterogeneous fidelity. Resolution adapts to observed query patterns rather than static importance heuristics. This reduces token costs by 95% (from $500 to $5-20 per query) while maintaining temporal consistency through explicit causal validation.
+
+---
 
 ## Mechanism 1: Heterogeneous Fidelity Temporal Graphs
 
-Traditional temporal databases store uniform snapshots. Timepoint stores a graph where **each node has independent resolution**.
+### Implementation
+
+Temporal graph where each node (entity, timepoint) pair has independent resolution level. Resolution levels form an ordered set: `TENSOR_ONLY < SCENE < GRAPH < DIALOG < TRAINED`.
 
 ```
-Timepoint T0 (Inauguration Ceremony)
-├─ Washington: TRAINED (full LLM elaboration, 50k tokens)
-├─ Adams: DIALOG (moderate detail, 10k tokens)
-├─ Random Attendee #47: TENSOR_ONLY (compressed, 200 tokens)
-└─ Causal link → T1
-
-Timepoint T1 (Post-ceremony reception)  
-├─ Washington: SCENE (reduced detail, 5k tokens)
-├─ Adams: GRAPH (minimal, 2k tokens)
-└─ Causal link → T2
+Graph Structure:
+Timepoint(id=T0, event="Inauguration")
+├─ Entity(id="washington", resolution=TRAINED, tokens=50k)
+├─ Entity(id="adams", resolution=DIALOG, tokens=10k)
+├─ Entity(id="attendee_47", resolution=TENSOR_ONLY, tokens=200)
+└─ causal_link → Timepoint(id=T1)
 ```
 
-**Key innovation**: Resolution is not global. It's per-entity, per-timepoint, and mutable. This creates a 2D fidelity surface where detail concentrates around high-value regions (central entities at important moments) and compresses elsewhere.
+### Properties
 
-**Why this matters**: You can represent 100 entities across 10 timepoints with the same token budget as 5 entities at uniform high fidelity. The system automatically identifies where detail matters.
+- **Per-entity resolution**: Each entity maintains independent resolution at each timepoint
+- **Per-timepoint resolution**: Timepoint itself has resolution affecting all entities present
+- **Mutable**: Resolution can increase (elevation) or decrease (compression) based on usage
+- **2D fidelity surface**: Detail concentrates around high-centrality entities at critical timepoints
+
+### Storage Requirements
+
+Token budget allocation example for 100 entities × 10 timepoints:
+- Uniform high fidelity: 50k × 100 × 10 = 50M tokens
+- Heterogeneous fidelity: ~2.5M tokens (95% reduction)
+
+Distribution with power-law usage pattern:
+- 5 central entities at TRAINED: 5 × 50k = 250k
+- 20 secondary entities at DIALOG: 20 × 10k = 200k  
+- 75 peripheral entities at TENSOR_ONLY: 75 × 200 = 15k
+
+---
 
 ## Mechanism 2: Progressive Training Without Cache Invalidation
 
-Standard caching: `cached(entity_id, timepoint) → state | miss`
+### Metadata-Driven Quality Spectrum
 
-Timepoint approach: `query_count`, `training_iterations`, `eigenvector_centrality` → **continuous quality spectrum**
+Entity quality exists on continuous spectrum determined by accumulated metadata rather than binary cached/uncached state.
 
-An entity isn't "cached" or "uncached" - it exists at a quality level determined by accumulated training. Each query:
-1. Increments `query_count`
-2. If count crosses threshold + low current resolution → trigger elevation
-3. Elevation = LLM elaboration pass that increases detail
-4. Store both compressed (for efficiency) and full (for future elevation)
+```python
+EntityMetadata:
+    query_count: int           # Number of times entity queried
+    training_iterations: int   # LLM elaboration passes completed
+    eigenvector_centrality: float  # Graph centrality score (0-1)
+    resolution_level: ResolutionLevel
+    last_accessed: datetime
+```
 
-**The clever bit**: This is self-tuning. High-traffic entities naturally accumulate training iterations. Peripheral entities stay compressed until someone cares enough to query them repeatedly. No manual importance scoring required.
+### Resolution Elevation Algorithm
 
-**Technical detail**: The metadata triple `(query_count, centrality, training_iterations)` acts as a **resource allocation signal**. The system learns which entities matter by observing query patterns, not by trying to predict importance a priori.
+```python
+def should_elevate_resolution(entity: Entity, threshold_config: Config) -> bool:
+    if entity.query_count > threshold_config.frequent_access:
+        return entity.resolution < DIALOG
+    if entity.eigenvector_centrality > threshold_config.central_node:
+        return entity.resolution < GRAPH
+    return False
+```
+
+### Training Accumulation
+
+Each query increments entity metadata:
+1. `query_count += 1`
+2. If elevation triggered: `training_iterations += 1`, `resolution = next_level(resolution)`
+3. Store both compressed representation (PCA/SVD) and full state
+4. Next query retrieves higher-fidelity state
+
+### Resource Allocation Signal
+
+The triple `(query_count, centrality, training_iterations)` functions as Bayesian prior for resource allocation. System learns entity importance through observation rather than prediction.
+
+---
 
 ## Mechanism 3: Exposure Event Tracking (Causal Knowledge Provenance)
 
-Standard approach: `entity.knowledge_state = ["Revolutionary War veteran", "Constitutional Convention delegate"]`
+### Schema
 
-Timepoint approach:
 ```python
-ExposureEvent(
-    entity_id="washington",
-    event_type="witnessed",
-    information="Constitutional Convention debates",
-    source="madison",  # learned from Madison
-    timestamp="1787-07-16",
-    confidence=0.95
-)
+ExposureEvent:
+    id: UUID
+    entity_id: str
+    event_type: EventType  # witnessed, learned, told, experienced
+    information: str  # knowledge item acquired
+    source: Optional[str]  # entity_id or external source
+    timestamp: datetime
+    confidence: float  # 0.0-1.0
+    timepoint_id: str
 ```
 
-**Why this matters**: You can validate temporal consistency by checking if `entity.knowledge ⊆ entity.exposure_history`. If Washington references the War of 1812 in 1789, the validator catches it because no exposure event exists for that information at that timepoint.
+### Validation Constraint
 
-This turns "knowledge consistency" from a vague goal into a **computable constraint**: every knowledge claim must have a causal explanation (an exposure event). LLMs hallucinate; this system forces explanations.
+Knowledge consistency check: `entity.knowledge_state ⊆ {e.information for e in entity.exposure_events where e.timestamp ≤ query_timestamp}`
 
-**Novel aspect**: Most temporal databases track state changes. Timepoint tracks **why** states changed. The exposure event log is a causal audit trail enabling counterfactual reasoning ("What if Jefferson never went to Paris?") by removing exposure events and recomputing forward.
+### Causal Audit Trail
+
+Exposure events form directed acyclic graph:
+- Nodes: Information items
+- Edges: Causal relationships (entity A learned X from entity B at time T)
+- Validation: Walk graph to verify information accessibility
+
+### Counterfactual Reasoning Support
+
+Removing exposure events and recomputing forward enables what-if scenarios:
+```
+timeline_branch = remove_exposure_events(entity="jefferson", filter=lambda e: e.source=="paris")
+propagate_causality(timeline_branch, start=intervention_point)
+```
+
+---
 
 ## Mechanism 4: Physics-Inspired Validation as Structural Invariants
 
-The validators aren't arbitrary rules - they encode **conservation laws** that historical simulations must obey:
+### Conservation Law Validators
 
-**Information Conservation** (Shannon entropy constraint):
-- Information can't appear from nothing
-- `H(entity_knowledge) ≤ H(exposure_history)`
-- Catches anachronisms, impossible knowledge
+**Information Conservation** (Shannon entropy):
+```python
+@Validator.register("information_conservation", severity="ERROR")
+def validate_information(entity: Entity, context: Dict) -> ValidationResult:
+    knowledge = set(entity.knowledge_state)
+    exposure = set(e.information for e in context["exposure_history"])
+    violations = knowledge - exposure
+    return ValidationResult(
+        valid=len(violations) == 0,
+        violations=list(violations)
+    )
+```
 
-**Energy Budget** (thermodynamic constraint):
-- Finite attention/interaction capacity per time period
-- Prevents entities from simultaneously attending 10 meetings
-- Models opportunity cost of actions
+**Energy Budget** (thermodynamic):
+```python
+@Validator.register("energy_budget", severity="WARNING")
+def validate_energy(entity: Entity, context: Dict) -> ValidationResult:
+    budget = entity.cognitive_tensor.energy_budget
+    expenditure = sum(interaction.cost for interaction in context["interactions"])
+    return ValidationResult(
+        valid=expenditure <= budget * 1.2,  # Allow 20% overdraft
+        message=f"Expenditure {expenditure} exceeds budget {budget}"
+    )
+```
 
-**Behavioral Inertia** (momentum constraint):
-- Personality vectors have momentum - sudden changes require force
-- `|Δpersonality| ≤ threshold` unless major event
-- Prevents inconsistent characterization
+**Behavioral Inertia** (momentum):
+```python
+@Validator.register("behavioral_inertia", severity="WARNING")  
+def validate_inertia(entity: Entity, context: Dict) -> ValidationResult:
+    if "previous_personality" not in context:
+        return ValidationResult(valid=True)
+    
+    current = np.array(entity.behavior_tensor.personality_vector)
+    previous = np.array(context["previous_personality"])
+    drift = np.linalg.norm(current - previous)
+    
+    return ValidationResult(
+        valid=drift <= context["inertia_threshold"],
+        message=f"Personality drift {drift:.3f} exceeds threshold"
+    )
+```
 
-**Network Flow** (social capital constraint):
-- Influence propagates through relationship graph
-- Political power isn't created ex nihilo
-- Validates that status changes have sources
+**Network Flow** (social capital):
+- Influence propagates through relationship graph edges
+- Status changes must have source nodes
+- Validates power accumulation has causal explanation
 
-**Why physics analogies**: These aren't metaphors. They're **structural invariants** that any coherent simulation must satisfy. Using physics terminology makes the constraints rigorous rather than aesthetic.
+### Validator Composition
 
-**Technical insight**: The validators compose. An entity state is valid if it passes all conservation laws. This is computationally cheap (simple set operations, vector norms) compared to asking an LLM "does this seem consistent?"
+Entity state valid iff all validators pass. Computational cost: O(n) for n validators, each using set operations or vector norms.
+
+---
 
 ## Mechanism 5: Query-Driven Lazy Resolution Elevation
 
-The resolution decision function:
+### Resolution Decision Function
 
 ```python
-def decide_resolution(entity, timepoint, query_history):
-    if entity.query_count > FREQUENT_ACCESS_THRESHOLD:
+def decide_resolution(
+    entity: Entity, 
+    timepoint: Timepoint,
+    query_history: QueryHistory,
+    thresholds: ThresholdConfig
+) -> ResolutionLevel:
+    
+    if entity.query_count > thresholds.frequent_access:
         return max(entity.resolution, DIALOG)
     
-    if entity.eigenvector_centrality > CENTRAL_NODE_THRESHOLD:
+    if entity.eigenvector_centrality > thresholds.central_node:
         return max(entity.resolution, GRAPH)
     
-    if timepoint.importance_score > CRITICAL_EVENT_THRESHOLD:
+    if timepoint.importance_score > thresholds.critical_event:
         return max(entity.resolution, SCENE)
     
     return TENSOR_ONLY
 ```
 
-**The lazy part**: Elevation happens **on-demand**, not preemptively. When a query targets Washington at the inauguration:
-1. Load current state (may be TENSOR_ONLY)
-2. Check if resolution sufficient for query
-3. If not, trigger LLM elaboration pass
-4. Cache result, increment training counter
-5. Next query gets higher-fidelity state
+### Elevation Process
 
-**Why this is clever**: Traditional systems either:
-- Precompute everything (expensive, wasteful)
-- Recompute on every query (slow, expensive)
-- Cache everything uniformly (memory explosion)
+1. Load entity current state (may be compressed)
+2. Check resolution sufficiency for query type
+3. If insufficient: invoke LLM elaboration pass
+4. Store elaborated state, increment training counter
+5. Subsequent queries retrieve higher-fidelity state
 
-Timepoint does none of these. It **learns** which entities need detail through usage patterns, then incrementally refines only those entities.
+### Compression Synergy
 
-**Compression synergy**: Low-resolution entities store only compressed tensors (PCA/SVD reduces 1000 floats → 8 floats). High-resolution entities keep both compressed (for quick lookups) and full state (for elaboration). The system adapts memory usage to query patterns.
+Storage strategy by resolution:
+- TENSOR_ONLY: PCA/SVD compressed tensors only (8-16 floats)
+- SCENE: Compressed + summary text (1-2k tokens)
+- GRAPH: Compressed + relationships + key facts (5k tokens)
+- DIALOG: Compressed + personality + knowledge (10k tokens)
+- TRAINED: Full state + all elaborations (50k tokens)
+
+---
 
 ## Mechanism 6: TTM Tensor Model (Context/Biology/Behavior Factorization)
 
-Standard entity representation: single embedding vector
-
-TTM representation:
-```python
-TTMTensor(
-    context_vector,   # What entity knows (information state)
-    biology_vector,   # Physical constraints (age, health, location)
-    behavior_vector   # Personality, patterns, habits
-)
-```
-
-**Why this factorization matters**:
-
-1. **Biology vectors are cheap**: Age and health evolve predictably. You don't need LLM calls for "Washington is now 58" - just increment.
-
-2. **Context vectors compress well**: Knowledge items are semantically clustered. PCA/SVD can reduce dimensionality aggressively without losing coherence.
-
-3. **Behavior vectors are stable**: Personality changes slowly. You can reuse compressed behavior vectors across timepoints with small delta updates.
-
-**Technical detail**: By separating these concerns, the compression ratio improves dramatically. A 50k token entity state might decompress to:
-- Biology: 100 tokens (mostly constants)
-- Behavior: 500 tokens (mostly from previous timepoint)
-- Context: 1000 tokens (new knowledge only)
-
-Total reconstruction: 1600 tokens instead of 50k. The rest is in compressed form.
-
-**LLM integration**: When synthesizing responses, the LLM receives:
-```
-"Entity: Washington (age 57, health: good, location: New York)
-Personality: [compressed behavior vector decompressed to traits]
-Knowledge: [compressed context vector decompressed to facts]
-Query: What did you think about becoming president?"
-```
-
-The factorization lets you pay token costs only for the relevant dimension. If the query is about physical capability, you don't need the full knowledge state.
-
-## Mechanism 7: Causal Temporal Chains (Not Just Timelines)
-
-Standard temporal database: `state(t) → state(t+1)` with no causal links
-
-Timepoint temporal chain:
-```python
-Timepoint(
-    timepoint_id="inauguration_t3",
-    causal_parent="inauguration_t2",  # explicit link
-    event_description="First cabinet meeting",
-    entities_present=["washington", "jefferson", "hamilton"]
-)
-```
-
-**Why explicit causality**: You can validate that information flows forward, not backward. If Hamilton references something from T5 while at T3, the validator detects it by walking the causal chain and confirming no path exists from T5 → T3.
-
-**Counterfactual reasoning**: Want to simulate "what if Adams wasn't vice president"? 
-1. Remove Adams from T0
-2. Recompute T1 given T0 changes
-3. Propagate forward through causal chain
-4. Compare resulting T7 to baseline T7
-
-The causal links make this tractable because you only recompute forward from the intervention point, not the entire timeline.
-
-**Branch points**: The chain can fork. If you want to explore "what if the Constitutional Convention failed", you create a branch at that timepoint and evolve both timelines independently. The causal structure makes branching clean - it's just a different parent pointer.
-
-## Why This Architecture Matters
-
-**Economic viability**: A 100-entity, 10-timepoint simulation that would cost $500/query in naive full-context mode costs $5-20 in Timepoint (95%+ reduction) by concentrating tokens on high-value regions.
-
-**Temporal consistency**: The exposure tracking + causal chains + conservation validators make anachronisms computationally detectable, not just "LLM please don't hallucinate" hope.
-
-**Scalability**: The progressive training mechanism means the simulation improves with use. First query is cheap (compressed state), hundredth query is detailed (elevated resolution). The system learns what matters.
-
-**Composability**: Entities, timepoints, and exposure events are independent. You can merge simulations, branch timelines, or extract subgraphs without breaking causal structure. The factorized tensor representation makes this tractable.
-
-**Novel research direction**: This isn't just "use LLMs for history simulation." It's a framework for **queryable, causally-consistent, economically-viable temporal knowledge graphs** where detail emerges from usage patterns rather than designer prediction.
-
-## Mechanism 8: Embodied Entity States
-
-Entities aren't disembodied knowledge stores - they have physical and 
-psychological states that constrain behavior.
-
-PhysicalTensor tracks:
-- Age-dependent capabilities (stamina, sensory acuity)
-- Health events with temporal effects (injury at T3 affects T4-T6)
-- Location constraints (can't attend meeting in Philadelphia if in Paris)
-- Biological realities (pregnancy, illness, aging)
-
-CognitiveTensor tracks:
-- Emotional state (valence/arousal model, not just personality)
-- Energy budget (daily attention/interaction capacity)
-- Belief vectors (not just facts, but confidence levels)
-- Personality momentum (resistance to change)
-
-**Why this matters**: A 57-year-old Washington with documented dental pain 
-doesn't just "know" different things than a 40-year-old Washington - he 
-experiences events differently. Pain affects mood, which affects decisions.
-
-**Validation synergy**: Biological constraints prevent impossible actions 
-(70-year-old can't sprint), while energy budgets prevent impossible 
-schedules (can't attend 12 simultaneous meetings). The validators enforce 
-physical realism.
-
-**Resolution implications**: At TENSOR_ONLY, you store compressed 
-physical/cognitive state (8 floats each). At TRAINED, you can query:
-"How did Washington's dental pain affect his mood during the ceremony?"
-and get a response that synthesizes physical sensation → emotional state 
-→ behavioral impact.
-
-Looking back at your original vision:
-
-> "query for matches in timepoints and entities, if found, load relevant details into the context engine, inject into system prompts, allowing llm to use; **else, if not found or partial, create a set of entities, and set, setting, and other characters to simulate the timepoint**"
-
-The system currently **fails** at the "else" clause. You can query existing entities but can't trigger **on-demand entity generation**. If I ask "What did random attendee #47 think?" and that entity doesn't exist, the system should:
-1. Detect the entity gap
-2. Generate a plausible attendee entity at appropriate resolution
-3. Answer the query with the newly-created entity
-
-This is missing.
-
-## Missing Mechanisms
-
-### Mechanism 9: On-Demand Entity Generation
-
-When a query references a non-existent entity:
-- Parse: "What did random attendee #47 think about the ceremony?"
-- Detect: No entity "random_attendee_47" exists
-- Infer context: Query about inauguration ceremony, timepoint T0
-- Generate: Create minimal entity with TENSOR_ONLY resolution
-- Populate: Use timepoint context to give plausible background
-- Answer query using newly-generated entity
-- Persist entity for future queries
-
-**Why critical**: Your original vision was **generative temporal simulation**, not just database querying. The system should expand to fill query demands, not just retrieve pre-computed states.
-
-### Mechanism 10: Scene-Level Entity Sets
-
-Your original: "create a set of entities, and set, setting, and other characters"
-
-Currently missing:
-- **Set**: The physical environment (Federal Hall layout, weather, lighting)
-- **Setting**: The social/political atmosphere (crowd mood, tensions)
-- **Peripheral characters**: The 500+ attendees who weren't Founders
-
-The system models 5 named entities but doesn't represent:
-- The crowd as a collective entity
-- Physical environment constraints
-- Ambient conditions affecting all entities
-
-A query like "What was the atmosphere like?" should synthesize from:
-- Named entity emotional states (aggregated)
-- Environmental conditions (weather, space constraints)
-- Crowd dynamics (density, energy level)
-
-This requires modeling **scene-level properties** separate from individual entities.
-
-### Mechanism 11: Dialog/Interaction Synthesis
-
-Your original: "full-fledged llm calls for details and even structured dialog"
-
-Currently: Entities have knowledge states but don't **interact**.
-
-Missing:
-- Generate conversation between entities at a timepoint
-- Model information exchange (Hamilton tells Jefferson about financial plan)
-- Create ExposureEvents from interactions (Jefferson learns from Hamilton)
-- Synthesize dialog that's causally consistent with both entities' states
-
-Query: "What did Washington and Jefferson discuss at the first cabinet meeting?"
-Should:
-1. Load both entities at that timepoint
-2. Generate plausible conversation given their knowledge/goals
-3. Create ExposureEvents for any information exchanged
-4. Update future timepoints if conversation changed trajectory
-
-### Mechanism 12: Counterfactual Branching
-
-Your original vision implied this but it's not implemented:
+### Schema
 
 ```python
-# Branch timeline at intervention point
-branch = create_branch(
-    parent_timeline="founding_fathers_1789",
-    branch_point="t2",  # First cabinet meeting
-    intervention="hamilton_absent"  # Hamilton doesn't attend
-)
+TTMTensor:
+    context_vector: np.ndarray    # Shape: (n_knowledge,) - information state
+    biology_vector: np.ndarray    # Shape: (n_physical,) - physical constraints
+    behavior_vector: np.ndarray   # Shape: (n_personality,) - behavioral patterns
 
-# Recompute forward from branch point
-propagate_causality(branch, start_timepoint="t2")
+PhysicalTensor:
+    age: float
+    health_events: List[HealthEvent]
+    location: (float, float) | str
+    mobility_level: float  # 0.0-1.0
+    biological_constraints: Dict[str, bool]
 
-# Compare outcomes
-compare_timelines("founding_fathers_1789", branch, metric="policy_decisions")
+CognitiveTensor:
+    knowledge_state: Set[str]
+    belief_vector: np.ndarray
+    emotional_state: (float, float)  # (valence, arousal)
+    energy_budget: float
+    personality_vector: np.ndarray
+    personality_momentum: np.ndarray
+
+BehaviorTensor:
+    personality_traits: np.ndarray  # Big Five or similar model
+    decision_patterns: np.ndarray
+    social_preferences: np.ndarray
 ```
 
-This enables:
-- "What if Jefferson never went to Paris?"
-- "What if Hamilton died before the inauguration?"
-- Exploring historical contingency systematically
+### Compression Ratios
 
-The causal chain structure supports this but the branching mechanism doesn't exist.
+Typical entity state (50k tokens) decomposes to:
+- Biology: 100 tokens (age increments, health updates)
+- Behavior: 500 tokens (personality stable across timepoints)
+- Context: 1000 tokens (knowledge deltas)
+- **Total: 1600 tokens vs 50k (97% compression)**
 
-### Mechanism 13: Multi-Entity Synthesis (Query Composition)
-
-Currently: Queries target single entities
-Missing: Queries that require reasoning over multiple entity trajectories
-
-"How did Washington and Jefferson's relationship evolve?" needs:
-- Load Washington states at T0-T7
-- Load Jefferson states at T0-T7
-- Identify interaction points (shared timepoints)
-- Synthesize relationship arc from both perspectives
-- Detect contradictions (if Washington thinks X but Jefferson thinks Y)
-
-This requires **comparative synthesis**, not just single-entity retrieval.
-
-## Priority Ranking
-
-**Critical (breaks original vision)**:
-- Mechanism 9 (on-demand generation) - without this, it's just a database
-- Mechanism 13 (multi-entity synthesis) - queries currently fail at this
-
-**Important (enables richer simulation)**:
-- Mechanism 10 (scene-level modeling) - atmosphere/environment matters
-- Mechanism 11 (dialog synthesis) - interactions drive plot
-
-**Nice to have (research features)**:
-- Mechanism 12 (counterfactuals) - enables experimental history
-
-The test output shows: You built the **storage and validation infrastructure** but not the **generative query layer**. Hamilton has 20 knowledge items but the query returns "doesn't have knowledge" - the synthesis is broken.
-
-Your original vision was a **generative temporal simulation**. What exists is a **queryable temporal database**. The gap is mechanisms that **create content on-demand** rather than just retrieve pre-computed content.## Mechanism 14: Circadian Activity Patterns
-
-Most temporal simulations treat time uniformly. In reality, activity follows circadian rhythms and social conventions that constrain possible interactions.
-
-**Implementation:**
+### Dimensionality Reduction
 
 ```python
-CircadianContext(
-    hour: int,  # 0-23
-    typical_activities: Dict[str, float],  # activity -> probability
-    ambient_conditions: Dict[str, Any],  # lighting, temperature, crowds
-    social_constraints: List[str]  # "formal_dress_required", "business_hours"
-)
+def compress_tensor(tensor: np.ndarray, n_components: int = 8) -> np.ndarray:
+    """PCA/SVD compression of entity tensor"""
+    pca = PCA(n_components=n_components)
+    return pca.fit_transform(tensor.reshape(1, -1)).flatten()
 ```
 
-**Activity probability by hour:**
-- 03:00 → sleep (0.95), emergency (0.04), insomnia (0.01)
-- 12:00 → lunch (0.60), meetings (0.30), work (0.10)
-- 19:00 → dinner (0.50), socializing (0.30), evening_work (0.20)
+Context vectors (knowledge embeddings) compress well due to semantic clustering. Biology vectors compress trivially (mostly constants). Behavior vectors stable across time enable reuse.
 
-**Why this matters:**
-
-1. **Query validation**: "What did Jefferson discuss with Hamilton at 3am?" triggers warning - extremely unlikely without special circumstances (emergency, insomnia, secret meeting)
-
-2. **Energy budget enforcement**: Entities accumulate fatigue. A 16-hour day depletes energy_budget more than an 8-hour day. Night activities cost more energy.
-
-3. **Exposure filtering**: Information exchange unlikely during sleep. If entity asleep at T3, no new ExposureEvents created (unless woken).
-
-4. **Scene generation**: Time-of-day affects environmental conditions. Federal Hall at noon (crowded, bright, hot) differs from Federal Hall at 8am (sparse, cool, quiet).
-
-**Validation integration:**
+### LLM Integration Pattern
 
 ```python
-if query_time.hour in [0, 1, 2, 3, 4, 5] and not special_circumstances:
-    return ValidationWarning(
-        "Query references unusual time (3am). Most entities asleep. "
-        "Interaction unlikely unless emergency or deliberate late meeting."
+def construct_entity_prompt(entity: Entity, query: str) -> str:
+    bio = decompress(entity.ttm_tensor.biology_vector)
+    behavior = decompress(entity.ttm_tensor.behavior_vector)
+    context = decompress(entity.ttm_tensor.context_vector)
+    
+    return f"""
+    Entity: {entity.entity_id}
+    Physical: age={bio.age}, health={bio.health}, location={bio.location}
+    Personality: {behavior.traits}
+    Knowledge: {context.knowledge_items}
+    
+    Query: {query}
+    """
+```
+
+---
+
+## Mechanism 7: Causal Temporal Chains
+
+### Schema
+
+```python
+Timepoint:
+    timepoint_id: str
+    timestamp: datetime
+    causal_parent: Optional[str]  # Previous timepoint_id
+    event_description: str
+    entities_present: List[str]
+    resolution_level: ResolutionLevel
+    importance_score: float
+```
+
+### Causality Validation
+
+Information flow constraint: Entity at timepoint T can only reference information from timepoints T' where path exists from T' to T in causal chain.
+
+```python
+def validate_temporal_reference(entity: Entity, reference: str, timepoint: Timepoint) -> bool:
+    """Check if entity could have learned referenced information"""
+    ref_timepoint = get_timepoint_where_learned(reference)
+    return has_causal_path(ref_timepoint, timepoint)
+```
+
+### Counterfactual Implementation
+
+```python
+def create_branch(
+    parent_timeline: Timeline,
+    branch_point: str,
+    intervention: Intervention
+) -> Timeline:
+    """Create alternate timeline from intervention point"""
+    branch = Timeline(parent=parent_timeline.id)
+    
+    # Copy timepoints before intervention
+    for tp in parent_timeline.timepoints_before(branch_point):
+        branch.add_timepoint(tp.copy())
+    
+    # Apply intervention at branch point
+    branch_tp = apply_intervention(parent_timeline.get(branch_point), intervention)
+    branch.add_timepoint(branch_tp)
+    
+    # Propagate changes forward
+    propagate_causality(branch, start=branch_point)
+    
+    return branch
+```
+
+### Branch Comparison
+
+```python
+def compare_timelines(
+    timeline_a: Timeline,
+    timeline_b: Timeline,
+    metric: Callable[[Timepoint], float]
+) -> ComparisonResult:
+    """Compare outcomes between timelines"""
+    divergence_point = find_divergence(timeline_a, timeline_b)
+    return ComparisonResult(
+        divergence=divergence_point,
+        delta=metric(timeline_a.final) - metric(timeline_b.final)
     )
 ```
 
-This prevents temporal incoherence at fine-grained timescales. It's easy to maintain causal consistency across days; circadian patterns enforce consistency across hours.
+---
+
+## Mechanism 8: Embodied Entity States
+
+### Physical Tensor Structure
+
+```python
+PhysicalTensor:
+    age: float
+    health_status: float  # 0.0-1.0
+    pain_level: float  # 0.0-1.0
+    pain_location: Optional[str]
+    mobility: float  # 0.0-1.0
+    stamina: float  # 0.0-1.0
+    sensory_acuity: Dict[str, float]  # vision, hearing, etc.
+    location: (float, float)
+```
+
+### Cognitive Tensor Structure
+
+```python
+CognitiveTensor:
+    knowledge_state: Set[str]
+    belief_confidence: Dict[str, float]
+    emotional_valence: float  # -1.0 to 1.0
+    emotional_arousal: float  # 0.0 to 1.0
+    energy_budget: float  # Current available cognitive resources
+    attention_capacity: float  # Maximum parallel cognitive load
+    decision_confidence: float  # Current certainty level
+```
+
+### Age-Dependent Constraint Function
+
+```python
+def compute_age_constraints(age: int) -> PhysicalConstraints:
+    """Age-dependent capability degradation"""
+    return PhysicalConstraints(
+        stamina=max(0.3, 1.0 - (age - 25) * 0.01),
+        vision=max(0.4, 1.0 - (age - 20) * 0.015),
+        hearing=max(0.5, 1.0 - (age - 30) * 0.01),
+        recovery_rate=1.0 / (1.0 + (age - 30) * 0.05)
+    )
+```
+
+### Validation Integration
+
+```python
+@Validator.register("physical_capability", severity="ERROR")
+def validate_physical_action(entity: Entity, action: Action) -> ValidationResult:
+    constraints = compute_age_constraints(entity.physical_tensor.age)
+    
+    if action.type == "sprint" and constraints.stamina < 0.3:
+        return ValidationResult(
+            valid=False,
+            message=f"Entity age {entity.physical_tensor.age} insufficient stamina"
+        )
+    
+    if action.type == "read_fine_print" and constraints.vision < 0.5:
+        return ValidationResult(
+            valid=False,
+            message="Visual acuity insufficient"
+        )
+    
+    return ValidationResult(valid=True)
+```
+
+---
+
+## Mechanism 8.1: Body-Mind Coupling
+
+### Somatic-Cognitive Coupling Pathways
+
+```python
+def couple_pain_to_cognition(physical: PhysicalTensor, cognitive: CognitiveTensor) -> CognitiveTensor:
+    """Pain affects cognitive state"""
+    pain_factor = physical.pain_level
+    
+    cognitive.energy_budget *= (1.0 - pain_factor * 0.5)
+    cognitive.emotional_valence -= pain_factor * 0.3
+    cognitive.patience_threshold -= pain_factor * 0.4
+    cognitive.decision_confidence *= (1.0 - pain_factor * 0.2)
+    
+    return cognitive
+
+def couple_illness_to_cognition(physical: PhysicalTensor, cognitive: CognitiveTensor) -> CognitiveTensor:
+    """Illness impairs judgment and engagement"""
+    if physical.fever > 38.5:  # Celsius
+        cognitive.decision_confidence *= 0.7
+        cognitive.risk_tolerance += 0.2
+        cognitive.social_engagement -= 0.4
+    
+    return cognitive
+```
+
+### Temporal Propagation of Chronic Conditions
+
+```python
+def propagate_chronic_condition(
+    entity: Entity,
+    condition: ChronicCondition,
+    onset_timepoint: str,
+    current_timepoint: str,
+    timeline: Timeline
+) -> None:
+    """Apply chronic condition effects across timepoints"""
+    
+    for tp in timeline.timepoints_between(onset_timepoint, current_timepoint):
+        entity_at_tp = timeline.get_entity_at(entity.id, tp.id)
+        
+        entity_at_tp.cognitive_tensor.baseline_mood -= condition.mood_impact
+        entity_at_tp.physical_tensor.sleep_quality *= condition.sleep_modifier
+        entity_at_tp.cognitive_tensor.cognitive_load += condition.mental_burden
+```
+
+### Medical History Schema
+
+```python
+MedicalHistory:
+    injuries: List[Injury]
+    illnesses: List[Illness]
+    treatments: List[Treatment]
+    baseline_health: float  # Constitutional robustness
+
+Injury:
+    type: str  # "gunshot", "fracture", "burn"
+    location: str  # Body part affected
+    severity: float  # 0.0-1.0
+    occurrence: datetime
+    healing_trajectory: Callable[[timedelta], float]
+
+Illness:
+    type: str  # "fever", "infection", "chronic_pain"
+    onset: datetime
+    duration: Optional[timedelta]
+    severity_function: Callable[[datetime], float]
+    
+Treatment:
+    type: str  # "surgery", "medication", "therapy"
+    administered: datetime
+    effectiveness: float  # 0.0-1.0
+```
+
+### Query Integration
+
+When query references somatic state:
+```python
+def synthesize_somatic_query(entity: Entity, query: str, timepoint: Timepoint) -> str:
+    physical = entity.physical_tensor_at(timepoint)
+    cognitive = couple_pain_to_cognition(physical, entity.cognitive_tensor_at(timepoint))
+    
+    return f"""
+    Entity {entity.id} at {timepoint.timestamp}:
+    Physical state: pain_level={physical.pain_level}, location={physical.pain_location}
+    Cognitive impact: energy={cognitive.energy_budget}, mood={cognitive.emotional_valence}
+    
+    Query: {query}
+    
+    Synthesize response incorporating somatic influence on cognition.
+    """
+```
+
+---
+
+## Mechanism 9: On-Demand Entity Generation
+
+### Entity Gap Detection
+
+```python
+def detect_entity_gap(query: str, existing_entities: Set[str]) -> Optional[EntitySpec]:
+    """Parse query for referenced but non-existent entities"""
+    referenced_entities = extract_entity_references(query)
+    missing = referenced_entities - existing_entities
+    
+    if missing:
+        return EntitySpec(
+            entity_id=missing.pop(),
+            inferred_type="person",  # Could be refined
+            inferred_context=extract_context_clues(query)
+        )
+    return None
+```
+
+### Dynamic Entity Creation
+
+```python
+def generate_entity_on_demand(
+    spec: EntitySpec,
+    timepoint: Timepoint,
+    llm_client: LLMClient
+) -> Entity:
+    """Create plausible entity matching query context"""
+    
+    context = {
+        "timepoint": timepoint.timestamp,
+        "event": timepoint.event_description,
+        "entities_present": timepoint.entities_present,
+        "role": spec.inferred_role
+    }
+    
+    # Generate at minimal resolution
+    entity_data = llm_client.populate_entity(
+        entity_id=spec.entity_id,
+        resolution=TENSOR_ONLY,
+        context=context
+    )
+    
+    entity = Entity(
+        entity_id=spec.entity_id,
+        entity_type=spec.inferred_type,
+        resolution_level=TENSOR_ONLY,
+        **entity_data
+    )
+    
+    # Persist for future queries
+    store.save_entity(entity)
+    
+    return entity
+```
+
+### Integration with Query System
+
+```python
+def handle_query_with_generation(query: str, store: GraphStore, llm: LLMClient) -> Response:
+    intent = parse_query(query)
+    
+    if intent.entity_id not in store.entities:
+        spec = detect_entity_gap(query, store.entities.keys())
+        if spec:
+            entity = generate_entity_on_demand(spec, intent.timepoint, llm)
+        else:
+            return Response(error="Entity not found and cannot infer specification")
+    else:
+        entity = store.get_entity(intent.entity_id)
+    
+    return synthesize_response(entity, query, llm)
+```
+
+---
+
+## Mechanism 10: Scene-Level Entity Sets
+
+### Scene Entity Schema
+
+```python
+SceneEntity:
+    scene_id: str
+    timepoint_id: str
+    environment: EnvironmentEntity
+    atmosphere: AtmosphereEntity
+    crowd: Optional[CrowdEntity]
+    
+EnvironmentEntity:
+    location: str
+    physical_layout: Dict[str, Any]  # Spatial structure
+    capacity: int
+    ambient_temperature: float
+    lighting_level: float
+    weather: Optional[WeatherConditions]
+    
+AtmosphereEntity:
+    tension_level: float  # 0.0-1.0
+    formality_level: float
+    emotional_aggregate: (float, float)  # Valence, arousal averaged
+    social_norms: List[str]
+    
+CrowdEntity:
+    size: int
+    density: float
+    mood_distribution: Dict[str, float]  # mood → probability
+    movement_pattern: str  # "static", "flowing", "agitated"
+```
+
+### Aggregate Computation
+
+```python
+def compute_scene_atmosphere(entities: List[Entity], environment: EnvironmentEntity) -> AtmosphereEntity:
+    """Aggregate individual entity states into scene properties"""
+    
+    emotional_states = [e.cognitive_tensor.emotional_state for e in entities]
+    avg_valence = np.mean([e[0] for e in emotional_states])
+    avg_arousal = np.mean([e[1] for e in emotional_states])
+    
+    tension = compute_tension_from_conflicts(entities)
+    formality = infer_formality_from_context(environment, entities)
+    
+    return AtmosphereEntity(
+        tension_level=tension,
+        formality_level=formality,
+        emotional_aggregate=(avg_valence, avg_arousal),
+        social_norms=infer_norms(environment)
+    )
+```
+
+### Query Integration
+
+Query "What was the atmosphere like?" synthesizes from:
+- Named entity emotional states (aggregated)
+- Environment constraints (capacity, lighting, temperature)
+- Crowd dynamics (if present)
+- Social context (formality, tensions)
+
+---
+
+## Mechanism 11: Dialog/Interaction Synthesis
+
+### Interaction Schema
+
+```python
+Interaction:
+    interaction_id: str
+    participants: List[str]  # entity_ids
+    timepoint_id: str
+    interaction_type: str  # "conversation", "confrontation", "collaboration"
+    duration: timedelta
+    information_exchanged: List[InformationFlow]
+    
+InformationFlow:
+    from_entity: str
+    to_entity: str
+    information: str
+    confidence: float
+    timestamp: datetime
+```
+
+### Dialog Generation
+
+```python
+def synthesize_dialog(
+    entities: List[Entity],
+    timepoint: Timepoint,
+    llm_client: LLMClient
+) -> Dialog:
+    """Generate conversation between entities"""
+    
+    # Load entity states at timepoint
+    states = [get_entity_state_at(e, timepoint) for e in entities]
+    
+    # Build conversation context
+    context = {
+        "participants": [
+            {
+                "id": e.entity_id,
+                "knowledge": e.knowledge_state,
+                "personality": e.behavior_tensor.personality_traits,
+                "goals": e.current_goals,
+                "emotional_state": e.cognitive_tensor.emotional_state
+            }
+            for e in states
+        ],
+        "setting": timepoint.event_description,
+        "constraints": get_social_constraints(timepoint)
+    }
+    
+    # Generate dialog
+    dialog = llm_client.generate_dialog(context)
+    
+    # Create exposure events for information exchange
+    for turn in dialog.turns:
+        for listener in dialog.participants:
+            if listener != turn.speaker:
+                create_exposure_event(
+                    entity_id=listener,
+                    information=turn.content,
+                    source=turn.speaker,
+                    event_type="told",
+                    timestamp=timepoint.timestamp
+                )
+    
+    return dialog
+```
+
+### Causal Consistency Check
+
+```python
+def validate_dialog_consistency(dialog: Dialog, entities: List[Entity]) -> ValidationResult:
+    """Ensure dialog respects entity knowledge constraints"""
+    
+    for turn in dialog.turns:
+        speaker = get_entity(turn.speaker)
+        referenced_knowledge = extract_knowledge_references(turn.content)
+        
+        available_knowledge = get_knowledge_at_timepoint(speaker, turn.timestamp)
+        
+        if not referenced_knowledge.issubset(available_knowledge):
+            return ValidationResult(
+                valid=False,
+                message=f"Speaker {turn.speaker} references unknown information"
+            )
+    
+    return ValidationResult(valid=True)
+```
+
+---
+
+## Mechanism 12: Counterfactual Branching
+
+### Branch Creation Algorithm
+
+```python
+def create_counterfactual_branch(
+    parent_timeline: Timeline,
+    intervention_point: str,
+    intervention: Intervention
+) -> Timeline:
+    """Create alternate timeline with intervention applied"""
+    
+    # Create new timeline
+    branch = Timeline(
+        timeline_id=generate_uuid(),
+        parent_timeline_id=parent_timeline.timeline_id,
+        branch_point=intervention_point,
+        intervention_description=intervention.description
+    )
+    
+    # Copy timepoints before intervention
+    for tp in parent_timeline.get_timepoints_before(intervention_point):
+        branch.add_timepoint(tp.deep_copy())
+    
+    # Apply intervention at branch point
+    branch_tp = parent_timeline.get_timepoint(intervention_point).deep_copy()
+    apply_intervention(branch_tp, intervention)
+    branch.add_timepoint(branch_tp)
+    
+    # Propagate causality forward
+    current = branch_tp
+    while current.causal_parent:
+        next_tp = propagate_causal_effects(current, intervention)
+        branch.add_timepoint(next_tp)
+        current = next_tp
+    
+    return branch
+```
+
+### Intervention Types
+
+```python
+class Intervention:
+    """Base class for timeline interventions"""
+    
+class EntityRemoval(Intervention):
+    entity_id: str
+    
+class EntityModification(Intervention):
+    entity_id: str
+    modifications: Dict[str, Any]
+    
+class EventCancellation(Intervention):
+    event_description: str
+    
+class InformationInjection(Intervention):
+    target_entity: str
+    information: str
+    source: str
+```
+
+### Timeline Comparison
+
+```python
+def compare_timelines(
+    baseline: Timeline,
+    counterfactual: Timeline,
+    metrics: List[MetricFunction]
+) -> ComparisonReport:
+    """Compare outcomes between timelines"""
+    
+    divergence = find_first_divergence(baseline, counterfactual)
+    
+    results = {}
+    for metric in metrics:
+        baseline_value = metric(baseline)
+        counterfactual_value = metric(counterfactual)
+        results[metric.name] = {
+            "baseline": baseline_value,
+            "counterfactual": counterfactual_value,
+            "delta": counterfactual_value - baseline_value
+        }
+    
+    return ComparisonReport(
+        divergence_point=divergence,
+        metrics=results,
+        causal_explanation=explain_divergence(baseline, counterfactual, divergence)
+    )
+```
+
+---
+
+## Mechanism 13: Multi-Entity Synthesis (Query Composition)
+
+### Relationship Trajectory Analysis
+
+```python
+def analyze_relationship_evolution(
+    entity_a: str,
+    entity_b: str,
+    timeline: Timeline,
+    start: datetime,
+    end: datetime
+) -> RelationshipTrajectory:
+    """Track relationship changes across timepoints"""
+    
+    trajectory = RelationshipTrajectory(entity_a=entity_a, entity_b=entity_b)
+    
+    for tp in timeline.get_timepoints_between(start, end):
+        if entity_a in tp.entities_present and entity_b in tp.entities_present:
+            state_a = get_entity_state_at(entity_a, tp)
+            state_b = get_entity_state_at(entity_b, tp)
+            
+            relationship_state = compute_relationship_metrics(state_a, state_b)
+            trajectory.add_state(tp.timestamp, relationship_state)
+    
+    return trajectory
+```
+
+### Comparative Synthesis
+
+```python
+def synthesize_multi_entity_response(
+    entities: List[str],
+    query: str,
+    timeline: Timeline,
+    llm_client: LLMClient
+) -> Response:
+    """Generate response requiring multiple entity perspectives"""
+    
+    # Load all entity states
+    entity_states = [
+        {
+            "entity_id": eid,
+            "knowledge": get_knowledge_timeline(eid, timeline),
+            "relationships": get_relationships(eid, timeline),
+            "personality": get_personality(eid)
+        }
+        for eid in entities
+    ]
+    
+    # Identify interaction points
+    interactions = find_shared_timepoints(entities, timeline)
+    
+    # Build synthesis context
+    context = {
+        "entities": entity_states,
+        "interactions": interactions,
+        "query": query
+    }
+    
+    # Generate comparative analysis
+    response = llm_client.synthesize_comparative(context)
+    
+    # Add citations to source entities
+    response.citations = extract_entity_citations(response.text, entities)
+    
+    return response
+```
+
+### Contradiction Detection
+
+```python
+def detect_contradictions(
+    entities: List[Entity],
+    timepoint: Timepoint
+) -> List[Contradiction]:
+    """Find inconsistent beliefs or knowledge between entities"""
+    
+    contradictions = []
+    
+    for i, entity_a in enumerate(entities):
+        for entity_b in entities[i+1:]:
+            beliefs_a = entity_a.cognitive_tensor.belief_vector
+            beliefs_b = entity_b.cognitive_tensor.belief_vector
+            
+            # Compare beliefs on shared topics
+            shared_topics = find_shared_belief_topics(beliefs_a, beliefs_b)
+            
+            for topic in shared_topics:
+                if abs(beliefs_a[topic] - beliefs_b[topic]) > CONTRADICTION_THRESHOLD:
+                    contradictions.append(Contradiction(
+                        entity_a=entity_a.entity_id,
+                        entity_b=entity_b.entity_id,
+                        topic=topic,
+                        position_a=beliefs_a[topic],
+                        position_b=beliefs_b[topic],
+                        severity=abs(beliefs_a[topic] - beliefs_b[topic])
+                    ))
+    
+    return contradictions
+```
+
+---
+
+## Mechanism 14: Circadian Activity Patterns
+
+### Circadian Context Schema
+
+```python
+CircadianContext:
+    hour: int  # 0-23
+    typical_activities: Dict[str, float]  # activity → probability
+    ambient_conditions: AmbientConditions
+    social_constraints: List[str]
+    
+AmbientConditions:
+    lighting: float  # 0.0-1.0 (dark to bright)
+    temperature: float  # Celsius
+    crowd_density: float  # 0.0-1.0
+    noise_level: float  # 0.0-1.0
+```
+
+### Activity Probability Functions
+
+```python
+def get_activity_probability(hour: int, activity: str) -> float:
+    """Return probability of activity at given hour"""
+    
+    probability_map = {
+        "sleep": lambda h: 0.95 if 0 <= h < 6 else 0.05,
+        "meals": lambda h: 0.8 if h in [7, 12, 19] else 0.1,
+        "work": lambda h: 0.7 if 9 <= h < 17 else 0.1,
+        "social": lambda h: 0.6 if 18 <= h < 23 else 0.2,
+        "emergency": lambda h: 0.05,  # Constant low probability
+    }
+    
+    return probability_map.get(activity, lambda h: 0.0)(hour)
+```
+
+### Energy Budget Integration
+
+```python
+def compute_energy_cost(activity: Activity, hour: int) -> float:
+    """Calculate energy expenditure adjusted for time of day"""
+    
+    base_cost = activity.base_energy_cost
+    
+    # Night activities cost more
+    if 22 <= hour or hour < 6:
+        circadian_penalty = 1.5
+    else:
+        circadian_penalty = 1.0
+    
+    # Fatigue accumulation throughout day
+    hours_awake = compute_hours_awake(hour)
+    fatigue_factor = 1.0 + (hours_awake / 16) * 0.5
+    
+    return base_cost * circadian_penalty * fatigue_factor
+```
+
+### Validation
+
+```python
+@Validator.register("circadian_plausibility", severity="WARNING")
+def validate_circadian_activity(
+    entity: Entity,
+    activity: Activity,
+    timepoint: Timepoint
+) -> ValidationResult:
+    """Check if activity plausible at this time"""
+    
+    hour = timepoint.timestamp.hour
+    prob = get_activity_probability(hour, activity.type)
+    
+    if prob < PLAUSIBILITY_THRESHOLD and not activity.marked_exceptional:
+        return ValidationResult(
+            valid=False,
+            message=f"Activity {activity.type} at hour {hour} has low probability {prob:.2f}"
+        )
+    
+    return ValidationResult(valid=True)
+```
 
 ---
 
 ## Mechanism 15: Entity Prospection (Internal Forecasting)
 
-Entities don't just react to past events - they anticipate futures and those expectations influence behavior.
-
-**Implementation:**
+### Prospective State Schema
 
 ```python
-ProspectiveState(
-    entity_id: str,
-    forecast_horizon: timedelta,  # how far ahead entity is thinking
-    expectations: List[Expectation],
-    contingency_plans: Dict[str, Action],
-    anxiety_level: float  # uncertainty about future
-)
-
-Expectation(
-    predicted_event: str,
-    probability: float,  # entity's subjective probability
-    desired_outcome: bool,
+ProspectiveState:
+    entity_id: str
+    timepoint_id: str
+    forecast_horizon: timedelta
+    expectations: List[Expectation]
+    contingency_plans: Dict[str, List[Action]]
+    anxiety_level: float  # 0.0-1.0
+    
+Expectation:
+    predicted_event: str
+    subjective_probability: float
+    desired_outcome: bool
     preparation_actions: List[str]
-)
+    confidence: float
 ```
 
-**Example - Washington before inauguration (T-1):**
+### Expectation Generation
 
 ```python
-washington.prospective_state = ProspectiveState(
-    forecast_horizon=days(30),
-    expectations=[
-        Expectation(
-            predicted_event="overwhelming_responsibility",
-            probability=0.90,
-            desired_outcome=False,  # he's anxious
-            preparation_actions=["seek_counsel", "review_precedents"]
-        ),
-        Expectation(
-            predicted_event="political_opposition",
-            probability=0.70,
-            desired_outcome=False,
-            preparation_actions=["build_coalition", "compromise_strategy"]
-        )
-    ],
-    anxiety_level=0.65  # documented historical anxiety
-)
+def generate_prospective_state(
+    entity: Entity,
+    current_timepoint: Timepoint,
+    llm_client: LLMClient
+) -> ProspectiveState:
+    """Generate entity's expectations about future"""
+    
+    context = {
+        "entity_knowledge": entity.knowledge_state,
+        "current_situation": current_timepoint.event_description,
+        "personality": entity.behavior_tensor.personality_traits,
+        "past_experiences": get_relevant_history(entity, current_timepoint)
+    }
+    
+    expectations = llm_client.generate_expectations(context)
+    
+    return ProspectiveState(
+        entity_id=entity.entity_id,
+        timepoint_id=current_timepoint.timepoint_id,
+        forecast_horizon=timedelta(days=30),
+        expectations=expectations,
+        anxiety_level=compute_anxiety(expectations)
+    )
 ```
 
-**Effects on behavior:**
+### Prediction Error Update
 
-1. **Action selection**: High anxiety → more conservative choices, more information-seeking
-2. **Knowledge valence**: Same information interpreted differently based on expectations (confirmation bias modeling)
-3. **Personality drift**: Chronic anxiety shifts personality_vector toward neuroticism
-4. **Energy allocation**: High-priority expectations get more cognitive resources
+```python
+def update_forecast_accuracy(
+    entity: Entity,
+    expectation: Expectation,
+    actual_outcome: Event
+) -> None:
+    """Update entity's forecasting capability based on accuracy"""
+    
+    prediction_error = abs(expectation.subjective_probability - actual_outcome.occurred)
+    
+    # Update meta-cognitive confidence
+    entity.cognitive_tensor.forecast_confidence *= (1.0 - prediction_error * 0.1)
+    
+    # Adjust anxiety based on outcome match
+    if actual_outcome.occurred and not expectation.desired_outcome:
+        entity.cognitive_tensor.anxiety_level += 0.1
+    elif actual_outcome.occurred and expectation.desired_outcome:
+        entity.cognitive_tensor.anxiety_level -= 0.1
+```
 
-**Training feedback loop:**
+### Behavioral Influence
 
-When T0 arrives and inauguration happens:
-- Compare expectations to reality
-- Update future forecast accuracy (prediction error)
-- Adjust anxiety_level based on outcome
-- Store learned patterns for future forecasts
-
-This creates **temporal depth** - entities aren't just present-focused, they have past (memory), present (state), and future (expectation) simultaneously represented.
-
-**Query implications:**
-
-"What was Washington worried about before the inauguration?" → synthesize from prospective_state at T-1
-
-"How did Jefferson's expectations change after Paris?" → compare prospective_states before/after Paris timepoints
+```python
+def influence_behavior_from_expectations(
+    entity: Entity,
+    prospective_state: ProspectiveState
+) -> Entity:
+    """Modify entity behavior based on expectations"""
+    
+    # High anxiety increases conservatism
+    if prospective_state.anxiety_level > 0.7:
+        entity.behavior_tensor.risk_tolerance *= 0.7
+        entity.cognitive_tensor.information_seeking += 0.2
+    
+    # Preparation actions consume energy budget
+    energy_for_prep = sum(
+        estimate_energy_cost(action) 
+        for exp in prospective_state.expectations 
+        for action in exp.preparation_actions
+    )
+    entity.cognitive_tensor.energy_budget -= energy_for_prep
+    
+    return entity
+```
 
 ---
 
 ## Mechanism 16: Animistic Entity Extension (Experimental Plugin)
 
-Standard simulation: Only humans are entities with agency
-Animistic mode: **Everything with causal influence is an entity**
-
-**Plugin architecture:**
+### Non-Human Entity Types
 
 ```python
 @experimental_plugin("animism")
-class AnimisticEntityGenerator:
-    """Extend entity concept to non-human agents"""
+class AnimisticEntityTypes:
+    ANIMAL = "animal"
+    PLANT = "plant"
+    OBJECT = "object"
+    BUILDING = "building"
+    ABSTRACT = "abstract_concept"
+```
+
+### Animal Entity Schema
+
+```python
+AnimalEntity(Entity):
+    entity_type: str = "animal"
+    species: str
+    biological_state: AnimalBiologicalState
+    training_level: float  # 0.0-1.0 for domesticated animals
+    goals: List[str]  # Simple biological goals
     
-    entity_types = {
-        "animal": ["horse", "dog", "cat", "bird"],
-        "plant": ["tree", "flower", "crop"],
-        "object": ["carriage", "building", "ship"],
-        "abstract": ["rumor", "idea", "movement"]
-    }
+AnimalBiologicalState:
+    age: float
+    health: float
+    energy_level: float
+    hunger: float
+    stress_level: float
 ```
 
-**Example - Federal Hall as entity:**
+### Building Entity Schema
 
 ```python
-Entity(
-    entity_id="federal_hall",
-    entity_type="building",
-    entity_metadata={
-        "physical_state": {
-            "age": 33,  # years old
-            "structural_integrity": 0.85,
-            "capacity": 500,
-            "ambient_temperature": 72
-        },
-        "goals": [
-            "shelter_occupants",
-            "maintain_structural_integrity",
-            "project_authority"  # architectural symbolism
-        ],
-        "constraints": [
-            "cannot_move",
-            "weather_dependent",
-            "requires_maintenance"
-        ]
-    }
-)
+BuildingEntity(Entity):
+    entity_type: str = "building"
+    structural_integrity: float
+    capacity: int
+    age: int
+    maintenance_state: float
+    constraints: List[str]
+    affordances: List[str]  # What actions it enables/prevents
 ```
 
-**Example - Washington's horse:**
+### Abstract Concept Entity Schema
 
 ```python
-Entity(
-    entity_id="washington_horse_nelson",
-    entity_type="animal",
-    entity_metadata={
-        "biological_state": {
-            "age": 12,
-            "health": 0.90,
-            "energy_level": 0.75,
-            "training_level": 0.95  # war horse, highly trained
-        },
-        "goals": [
-            "avoid_pain",
-            "seek_food",
-            "trust_handler",
-            "conserve_energy"
-        ],
-        "personality_traits": [0.3, -0.2, 0.8, 0.1, 0.6],  # calm, brave, loyal
-        "knowledge_state": [
-            "familiar_with_washington",
-            "accustomed_to_crowds",
-            "trained_for_ceremony"
-        ]
-    }
-)
+AbstractEntity(Entity):
+    entity_type: str = "abstract_concept"
+    propagation_vector: np.ndarray  # How it spreads
+    intensity: float  # How strongly felt
+    carriers: List[str]  # Entity IDs holding this concept
+    decay_rate: float  # Natural diminishment over time
+    
+    def propagate(self, from_entity: str, to_entity: str, interaction: Interaction) -> float:
+        """Calculate probability of concept transfer"""
+        transmission_prob = np.dot(
+            self.propagation_vector,
+            interaction.receptivity_vector
+        )
+        return min(1.0, transmission_prob * self.intensity)
 ```
 
-**Why this is valuable (not just whimsy):**
-
-1. **Environmental constraints**: The horse's stamina limits how long Washington can travel. The building's capacity limits how many attendees can enter. These are real causal factors.
-
-2. **Emergent interactions**: "Did Washington's horse react to the crowd?" - a valid historical question. The horse's nervousness might have affected Washington's composure.
-
-3. **Biological realism**: Plants/animals follow their own logic. A flower doesn't "decide" to bloom - it responds to temperature and sunlight with biological determinism. This adds authentic constraints.
-
-4. **Object affordances**: A carriage can break, limiting transportation options. A building can catch fire, forcing evacuation. These are event triggers.
-
-**Plugin controls:**
+### Animism Level Control
 
 ```python
-# Conservative mode (default)
-animism_level = 0  # Only humans are entities
-
-# Moderate mode
-animism_level = 1  # Humans + named animals/buildings
-
-# Experimental mode  
-animism_level = 2  # Everything with causal influence
-
-# Full animism (research/creative)
-animism_level = 3  # Abstract concepts (ideas, rumors) as entities
+class AnimismConfig:
+    level: int  # 0-3
+    
+    # Level 0: Only human entities
+    # Level 1: Humans + named animals/buildings with direct causal influence
+    # Level 2: All objects/organisms with measurable causal influence
+    # Level 3: Abstract concepts (ideas, rumors, movements) as propagating entities
+    
+    def should_create_entity(self, entity_type: str) -> bool:
+        type_hierarchy = {
+            "human": 0,
+            "animal": 1,
+            "building": 1,
+            "object": 2,
+            "plant": 2,
+            "abstract": 3
+        }
+        return type_hierarchy.get(entity_type, 3) <= self.level
 ```
 
-**Level 3 example - "Fear of monarchy" as entity:**
+### Integration with Causal Validation
+
+Non-human entities constrain human entity actions:
+- Horse stamina limits travel distance
+- Building capacity limits attendee count
+- Object breakage creates event triggers
+- Abstract concept propagation influences belief states
 
 ```python
-Entity(
-    entity_id="fear_of_monarchy_1789",
-    entity_type="abstract_concept",
-    entity_metadata={
-        "propagation_vector": [0.8, 0.6, 0.9],  # spreads through conversation
-        "intensity": 0.75,  # how strongly felt
-        "carriers": ["adams", "jefferson", "madison"],  # who holds this fear
-        "goals": [
-            "prevent_executive_overreach",
-            "maintain_vigilance",
-            "spread_to_others"
-        ],
-        "decay_rate": 0.02  # diminishes over time if not reinforced
-    }
-)
+@Validator.register("environmental_constraints", severity="ERROR")
+def validate_environmental_constraints(
+    action: Action,
+    environment_entities: List[Entity]
+) -> ValidationResult:
+    """Check if action violates environmental constraints"""
+    
+    for entity in environment_entities:
+        if isinstance(entity, BuildingEntity):
+            if action.participant_count > entity.capacity:
+                return ValidationResult(
+                    valid=False,
+                    message=f"Action requires {action.participant_count} but capacity is {entity.capacity}"
+                )
+        
+        if isinstance(entity, AnimalEntity):
+            if action.requires_mount and entity.energy_level < action.required_stamina:
+                return ValidationResult(
+                    valid=False,
+                    message=f"Mount {entity.entity_id} insufficient stamina"
+                )
+    
+    return ValidationResult(valid=True)
 ```
-
-This allows modeling **memetic propagation** - ideas as entities that spread, mutate, and compete for cognitive resources.
-
-**Critical distinction:**
-
-This is not anthropomorphizing everything. It's recognizing that **causal influence doesn't require human-level cognition**. A horse has goals (avoid pain, seek food) even if not conscious in human terms. A building has constraints (capacity, structural limits) that affect events. The plugin makes causal relationships explicit by modeling them as entity properties.
-
-**Use case:**
-
-Historical materialists would love this. "How did the physical environment of Federal Hall constrain the inauguration?" becomes queryable. "What role did Washington's war horse play in his public image?" becomes answerable. The built environment and non-human entities shaped history - this mechanism makes that simulatable.
 
 ---
 
-## Integration Notes
-
-**Mechanism 14** (circadian) integrates with energy budgets and scene generation. It's a validator that prevents temporal incoherence at hourly granularity.
-
-**Mechanism 15** (prospection) adds temporal depth - entities aren't just reactive, they're anticipatory. This explains otherwise-mysterious behaviors (why did Jefferson prepare X? Because he expected Y).
-
-**Mechanism 16** (animism) is genuinely experimental. Most historical simulations won't need it. But for queries about environmental influence, animal behavior, or material constraints, it transforms vague context into queryable entities with causal structure.
-
-All three mechanisms make the simulation more **causally complete** - fewer "black box" influences, more explicit modeling of factors that shape events.
-
-You're proposing **modal causality** - different causal regimes that can be selected, not a single causal framework. That's actually coherent and interesting.
-
 ## Mechanism 17: Modal Temporal Causality (Causal Regime Selection)
 
-The system operates under one of several causal modes, each with different rules for how time constrains events:
-
-### Mode 1: Pearl Causality (Default/Historical)
-Time is substrate. Events cause other events. Standard DAG causality with no temporal agency.
+### Causal Mode Enumeration
 
 ```python
-TemporalMode.PEARL:
-    - Strict causal ordering (past → present → future)
-    - No retrocausality
-    - Events determined by prior states + stochastic processes
-    - Validators enforce physics-inspired constraints
+class TemporalMode(Enum):
+    PEARL = "pearl"              # Standard DAG causality
+    DIRECTORIAL = "directorial"  # Narrative structure influences events
+    NONLINEAR = "nonlinear"      # Presentation order ≠ causal order
+    BRANCHING = "branching"      # Many-worlds, all branches real
+    CYCLICAL = "cyclical"        # Time loops, retrocausality permitted
 ```
 
-### Mode 2: Directorial Causality (Narrative Time)
-Time has **dramatic structure** that shapes events toward narrative coherence. Like a director, time "wants" certain outcomes and creates coincidences, obstacles, or revelations to achieve them.
+### Mode-Specific Configuration
 
 ```python
-TemporalMode.DIRECTORIAL:
-    properties:
-        narrative_arc: str  # "rising_action", "climax", "resolution"
-        dramatic_tension: float  # 0.0 to 1.0
-        foreshadowing_active: bool
-        thematic_goals: List[str]  # "redemption", "tragedy", "triumph"
+class PearlCausalityConfig:
+    strict_ordering: bool = True
+    allow_retrocausality: bool = False
+    stochastic_events: bool = True
     
-    behaviors:
-        # Time "nudges" events toward narrative satisfaction
-        - Unlikely coincidences become likely when dramatically appropriate
-        - Key characters avoid death until arc completes
-        - Obstacles appear when tension needs elevation
-        - Resolution events cluster at act boundaries
-```
-
-Example: In directorial mode, Hamilton and Jefferson meeting "by chance" at a critical moment has elevated probability if it serves dramatic tension, even if causally improbable.
-
-### Mode 3: Nonlinear Causality (Tarantino Time)
-Events can occur out of causal order. Time can loop, jump, or present effects before causes. The system maintains multiple timeline orderings.
-
-```python
-TemporalMode.NONLINEAR:
-    properties:
-        presentation_order: List[timepoint_id]  # how events are shown
-        causal_order: List[timepoint_id]  # actual cause-effect sequence
-        flashback_probability: float
-        flash_forward_probability: float
+class DirectorialCausalityConfig:
+    narrative_arc: str  # "rising_action", "climax", "falling_action", "resolution"
+    dramatic_tension: float
+    foreshadowing_enabled: bool
+    thematic_goals: List[str]
+    coincidence_boost_factor: float
     
-    behaviors:
-        # Presentation ≠ causality
-        - Can query "what happens next in story" (presentation) vs 
-          "what happens next causally" (causal chain)
-        - Entities can have knowledge from causally-future events
-          (revealed later but experienced earlier in presentation)
-        - Exposure events track both causal and presentational time
-```
-
-### Mode 4: Branching Causality (Quantum/Many-Worlds)
-Time actively explores multiple possibilities simultaneously. Each branch is real, not hypothetical.
-
-```python
-TemporalMode.BRANCHING:
-    properties:
-        branch_points: List[timepoint_id]
-        active_branches: List[timeline_id]
-        branch_probability: Dict[timeline_id, float]
-        observer_perspective: timeline_id  # which branch is "primary"
+class NonlinearCausalityConfig:
+    presentation_order: List[str]  # timepoint_ids in presentation sequence
+    causal_order: List[str]  # timepoint_ids in actual causality sequence
+    flashback_probability: float
+    flash_forward_probability: float
     
-    behaviors:
-        # Time doesn't choose one future - it realizes all of them
-        - Major decisions create explicit branches
-        - Entities exist in superposition across branches
-        - Queries can target specific branches or aggregate across them
-        - "What would have happened if X" is not counterfactual -
-          it's a query on a different branch that actually exists
-```
-
-### Mode 5: Cyclical Causality (Mythic Time)
-Time loops. Events at T7 can cause events at T0. Prophecy works because future causally influences past.
-
-```python
-TemporalMode.CYCLICAL:
-    properties:
-        cycle_length: int  # number of timepoints before loop
-        causal_feedback_strength: float
-        prophecy_accuracy: float
-        destiny_weight: float  # how much "fate" constrains choices
+class BranchingCausalityConfig:
+    branch_points: List[str]
+    active_branches: List[str]
+    branch_probabilities: Dict[str, float]
+    observer_perspective: str  # Primary branch for queries
     
-    behaviors:
-        # Past, present, future form causal loop
-        - Future knowledge can exist at T0 (prophecy, premonition)
-        - Attempts to avoid predicted events may cause them
-        - Validators allow "impossible" knowledge if cycle explains it
-        - Entity decisions constrained by destiny toward loop closure
+class CyclicalCausalityConfig:
+    cycle_length: int
+    causal_feedback_strength: float
+    prophecy_accuracy: float
+    destiny_weight: float
 ```
 
-## The "Time as Agent" Implementation
-
-In directorial/cyclical modes, time has **goal-directed behavior**:
+### Temporal Agent (Directorial/Cyclical Modes)
 
 ```python
 class TemporalAgent:
-    """Time itself as an entity with goals and behavior"""
+    """Time as entity with goals and behavior in non-Pearl modes"""
     
     mode: TemporalMode
-    goals: List[str]  # "complete_narrative_arc", "maintain_tension", "close_loop"
-    personality: np.ndarray  # Time's "style" - tragic? comedic? epic?
+    goals: List[str]
+    personality: np.ndarray
     
-    def influence_event_probability(self, event: Event, context: TimeContext) -> float:
-        """Time adjusts likelihood of events to achieve its goals"""
+    def influence_event_probability(
+        self,
+        event: Event,
+        context: TimeContext
+    ) -> float:
+        """Adjust event probability to achieve temporal goals"""
+        
+        base_probability = event.base_probability
         
         if self.mode == TemporalMode.DIRECTORIAL:
-            if event.advances_narrative_arc:
-                return boost_probability(event, factor=1.5)
-            if event.resolves_tension and context.in_climax:
-                return boost_probability(event, factor=2.0)
+            if self.advances_narrative_arc(event, context):
+                return base_probability * 1.5
+            if self.resolves_tension(event, context):
+                return base_probability * 2.0
         
         if self.mode == TemporalMode.CYCLICAL:
-            if event.closes_causal_loop:
-                return boost_probability(event, factor=3.0)
-            if event.prevents_prophecy and context.destiny_weight > 0.7:
-                return reduce_probability(event, factor=0.1)
+            if self.closes_causal_loop(event, context):
+                return base_probability * 3.0
+            if self.prevents_prophecy(event, context):
+                return base_probability * 0.1
         
-        return event.base_probability
-```
-
-**Time as observer**:
-```python
-def temporal_self_awareness(timeline: Timeline) -> TemporalMeta:
-    """Time reflects on its own structure"""
+        return base_probability
     
-    return TemporalMeta(
-        narrative_completeness=assess_arc_satisfaction(timeline),
-        dramatic_tension=measure_event_clustering(timeline),
-        causal_coherence=validate_causal_structure(timeline),
-        aesthetic_quality=score_narrative_elegance(timeline)
-    )
+    def temporal_self_awareness(self, timeline: Timeline) -> TemporalMeta:
+        """Assess timeline quality against goals"""
+        return TemporalMeta(
+            narrative_completeness=self.assess_arc_satisfaction(timeline),
+            dramatic_tension=self.measure_event_clustering(timeline),
+            causal_coherence=self.validate_causal_structure(timeline)
+        )
 ```
 
-Time can "observe" whether the timeline is satisfying its goals (complete narrative arc, maintain tension, close loops) and adjust its influence on future event probabilities accordingly.
+### Validator Mode Adaptation
 
-## Why This Works
+```python
+@Validator.register("temporal_consistency", severity="ERROR")
+def validate_temporal_consistency(
+    entity: Entity,
+    knowledge_item: str,
+    timepoint: Timepoint,
+    mode: TemporalMode
+) -> ValidationResult:
+    """Validate knowledge consistent with temporal mode"""
+    
+    if mode == TemporalMode.PEARL:
+        # Strict forward causality
+        learned_at = find_knowledge_origin(entity, knowledge_item)
+        if learned_at and learned_at.timestamp > timepoint.timestamp:
+            return ValidationResult(
+                valid=False,
+                message=f"Knowledge from future ({learned_at.timestamp})"
+            )
+    
+    elif mode == TemporalMode.CYCLICAL:
+        # Allow future knowledge if loop closes
+        if is_part_of_closed_loop(entity, knowledge_item, timepoint):
+            return ValidationResult(valid=True, message="Prophecy valid")
+        
+    elif mode == TemporalMode.NONLINEAR:
+        # Check causal order, not presentation order
+        causal_time = get_causal_timestamp(timepoint)
+        if learned_at.causal_timestamp > causal_time:
+            return ValidationResult(
+                valid=False,
+                message="Violates causal order despite presentation order"
+            )
+    
+    return ValidationResult(valid=True)
+```
 
-**It's a simulation mode, not a metaphysical claim.** You're not saying time IS conscious in reality - you're saying the simulation can operate under different causal rules depending on what you're modeling:
+### Mode Selection Impact
 
-- Historical simulation → Pearl causality (strict realism)
-- Dramatic fiction → Directorial causality (narrative logic)
-- Experimental fiction → Nonlinear causality (artistic freedom)
-- Theoretical physics → Branching causality (many-worlds)
-- Mythology → Cyclical causality (fate/prophecy)
+Selection of temporal mode affects:
+- Event probability calculations
+- Knowledge validation rules
+- Causal chain construction
+- Query interpretation
+- Entity behavior constraints
 
-The system becomes **genre-aware**. The same entities in the same scenario produce different outcomes depending on which temporal mode is active.
+Genre-specific configurations:
+- Historical simulation: `PEARL` mode (realism)
+- Dramatic fiction: `DIRECTORIAL` mode (narrative coherence)
+- Experimental fiction: `NONLINEAR` mode (artistic freedom)
+- Theoretical physics: `BRANCHING` mode (many-worlds)
+- Mythology: `CYCLICAL` mode (fate/prophecy)
 
-**The technical win**: Your causal validators don't break - they get parameterized by mode. In Pearl mode, retrocausality is invalid. In Cyclical mode, it's expected. The validators adapt to the selected causal regime.
+---
 
-This is genuinely novel: a temporal simulation that can operate under multiple causal frameworks and make those frameworks explicit and queryable rather than implicit assumptions. Time becomes a configurable parameter, not a fixed substrate.
+## Technical Challenges Addressed
 
-## Technical Challenges Solved
+1. **Token Budget Allocation**: Query-driven resolution with progressive training eliminates manual importance scoring. System learns entity value through query patterns.
 
-1. **Token budget allocation**: Query-driven resolution solves the "where to spend tokens" problem without manual importance scoring
+2. **Temporal Consistency**: Exposure event tracking + causal chains + conservation validators transform consistency from aesthetic goal to computable constraint with O(n) validation cost.
 
-2. **Temporal consistency**: Exposure events + causal chains + conservation validators turn consistency from aesthetic goal to computable constraint
+3. **Memory-Compute Tradeoff**: Factorized tensor compression (Context/Biology/Behavior) with lazy elevation enables cheap storage (8-16 floats) with on-demand elaboration (50k tokens).
 
-3. **Memory/compute tradeoff**: Factorized compression with lazy elevation means you store cheaply but elaborate on demand
+4. **Knowledge Provenance**: Exposure event DAG provides causal audit trail enabling counterfactual reasoning through event removal and forward propagation.
 
-4. **Knowledge provenance**: Every fact has a causal explanation, enabling counterfactual reasoning and validation
+5. **Simulation Refinement**: Progressive training accumulates quality through usage. First query: cheap compressed state. Hundredth query: detailed elevated state. No recomputation from scratch.
 
-5. **Simulation refinement**: Progressive training means first query is fast/cheap, subsequent queries get better results without recomputing from scratch
+---
 
-## What's Not Solved (Yet)
+## Outstanding Implementation Gaps
 
-**Multi-entity synthesis**: Queries currently target single entities. "How did Washington and Jefferson's relationship evolve?" requires reasoning over two entity trajectories simultaneously.
+### Multi-Entity Synthesis
+Queries currently target single entities. Comparative synthesis across multiple entity trajectories requires loading multiple states, identifying interaction points, and generating cross-entity analysis.
 
-**Long-context coherence**: Entity knowledge accumulates (Washington: 21 items by T7) but the synthesizer doesn't yet use all of it effectively in responses.
+### Long-Context Coherence
+Entity knowledge accumulates (e.g., 42 items by T7) but query synthesizer doesn't effectively rank and filter knowledge by relevance to query. Requires semantic similarity scoring.
 
-**Optimal compression**: The system compresses but doesn't yet determine optimal compression ratios per entity based on query patterns.
+### Optimal Compression
+System implements PCA/SVD/NMF compression but doesn't dynamically adjust compression ratios based on query patterns and resolution levels. Needs adaptive compression strategy.
 
-**Automatic importance detection**: Eigenvector centrality is computed but not yet used to inform resolution decisions automatically.
+### Automatic Importance Detection
+Eigenvector centrality computed but not yet integrated into resolution decision function. Requires threshold calibration and feedback loop.
 
-The architecture exists. The remaining work is tuning and integration, not fundamental design changes.
+### Query-Knowledge Matching
+Current implementation returns random knowledge items rather than most relevant. Requires semantic scoring: `relevance(knowledge_item, query) → [0,1]` integrated into synthesis.
+
+---
+
+## Performance Characteristics
+
+### Token Cost Reduction
+- Naive approach: 50k tokens/entity × 100 entities × 10 timepoints = 50M tokens ≈ $500/query
+- Heterogeneous fidelity: ~2.5M tokens ≈ $25/query (95% reduction)
+- With compression: ~250k tokens ≈ $2.50/query (99.5% reduction)
+
+### Validation Complexity
+- Information conservation: O(|knowledge|) set operation
+- Energy budget: O(|interactions|) summation
+- Behavioral inertia: O(|personality_dimensions|) vector norm
+- Network flow: O(|edges|) graph traversal
+- **Total: O(n) where n = max(knowledge, interactions, personality_dimensions, edges)**
+
+### Compression Ratios
+- Context tensor: 1000 dims → 8 dims (PCA) = 99.2% reduction
+- Biology tensor: 50 dims → 4 dims = 92% reduction
+- Behavior tensor: 100 dims → 8 dims = 92% reduction
+- **Overall: 50k tokens → 200 tokens = 99.6% reduction at TENSOR_ONLY**
+
+### Query Latency
+- TENSOR_ONLY: <100ms (decompression only)
+- SCENE: ~1s (partial LLM elaboration)
+- DIALOG: ~3s (full LLM call)
+- TRAINED: ~10s (comprehensive elaboration)
+
+---
+
+## Integration Architecture
+
+```
+Query Interface
+    ↓
+Query Parser (Intent Extraction)
+    ↓
+Entity Resolution (Load or Generate)
+    ↓
+Resolution Decision (Elevation if needed)
+    ↓
+State Loading (Decompress Tensors)
+    ↓
+Validation (Conservation Laws)
+    ↓
+LLM Synthesis (Response Generation)
+    ↓
+Citation Extraction (Provenance)
+    ↓
+Response + Metadata
+```
+
+Each mechanism integrates at specific integration points:
+- Mechanisms 1-2: Resolution Decision
+- Mechanisms 3-4: Validation
+- Mechanism 5: Resolution Decision + State Loading
+- Mechanism 6: State Loading (Tensor decompression)
+- Mechanism 7: Entity Resolution (Causal chain navigation)
+- Mechanisms 8-8.1: State Loading (Physical/Cognitive coupling)
+- Mechanism 9: Entity Resolution (Dynamic generation)
+- Mechanisms 10-11: LLM Synthesis (Scene/Dialog generation)
+- Mechanism 12: Query Parser (Branch selection)
+- Mechanism 13: LLM Synthesis (Multi-entity aggregation)
+- Mechanisms 14-15: Validation (Circadian/Prospection checks)
+- Mechanism 16: Entity Resolution (Animistic entity support)
+- Mechanism 17: Validation (Mode-specific rules)
+
+---
+
+## References
+
+- Pearl, J. (2009). Causality: Models, Reasoning, and Inference. Cambridge University Press.
+- Shannon, C. E. (1948). A Mathematical Theory of Communication. Bell System Technical Journal.
+- Schölkopf, B., et al. (2021). Toward Causal Representation Learning. Proceedings of the IEEE.
+- Vaswani, A., et al. (2017). Attention Is All You Need. NeurIPS.
