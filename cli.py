@@ -13,8 +13,10 @@ from llm import LLMClient
 from workflows import create_entity_training_workflow, WorkflowState
 from graph import create_test_graph, export_graph_data, print_graph_summary
 from evaluation import EvaluationMetrics
-from schemas import ResolutionLevel, Entity
+from schemas import ResolutionLevel, Entity, ExposureEvent, Timepoint
 from reporting import generate_report, generate_markdown_report
+from temporal_chain import build_temporal_chain
+from query_interface import QueryInterface
 
 
 @hydra.main(version_base=None, config_path="conf", config_name="config")
@@ -46,58 +48,90 @@ def main(cfg: DictConfig) -> None:
             run_historical_training(cfg, store, llm_client)
         else:
             run_training(cfg, store, llm_client)
+    elif cfg.mode == "temporal_train":
+        run_temporal_training(cfg, store, llm_client)
+    elif cfg.mode == "interactive":
+        run_interactive(cfg, store, llm_client)
     else:
         print(f"Unknown mode: {cfg.mode}")
 
 def run_autopilot(cfg: DictConfig, store: GraphStore, llm_client: LLMClient):
-    """Autopilot self-testing mode"""
+    """Autopilot self-testing mode - now tests temporal chains"""
     print(f"\n{'='*70}")
-    print(f"AUTOPILOT MODE: {cfg.autopilot.depth}")
+    print(f"AUTOPILOT MODE: Temporal Chain Testing")
     print(f"{'='*70}\n")
 
-    graph_sizes = cfg.autopilot.graph_sizes
+    # Test temporal chains of different lengths
+    temporal_lengths = cfg.autopilot.get("temporal_lengths", [3, 5, 7])
     results = []
 
-    for idx, size in enumerate(graph_sizes, 1):
-        print(f"[{idx}/{len(graph_sizes)}] Testing graph size: {size} entities")
+    for idx, length in enumerate(temporal_lengths, 1):
+        print(f"[{idx}/{len(temporal_lengths)}] Testing temporal chain: {length} timepoints")
         print("-" * 70)
 
-        graph = create_test_graph(n_entities=size, seed=cfg.seed)
-        print(f"  Graph created: {graph.number_of_nodes()} nodes, {graph.number_of_edges()} edges")
+        # Clean database for each test
+        store._clear_database()
 
-        # Export graph for visualization
-        export_graph_data(graph, f"reports/graph_size_{size}")
+        print(f"  Building temporal chain with {length} timepoints...")
+        timepoints = build_temporal_chain("founding_fathers_1789", length)
+        print(f"  Created {len(timepoints)} timepoints with causal links")
 
-        workflow = create_entity_training_workflow(llm_client, store)
-
-        state = WorkflowState(
-            graph=graph,
-            entities=[],
-            timepoint=datetime.now().isoformat(),
-            resolution=ResolutionLevel.TENSOR_ONLY,
-            violations=[],
-            results={}
+        # Run temporal training
+        print(f"  Running temporal training...")
+        run_temporal_training(
+            DictConfig({"training": {"context": "founding_fathers_1789", "num_timepoints": length}}),
+            store, llm_client
         )
 
-        print(f"  Running workflow...")
-        final_state = workflow.invoke(state)
+        # Run evaluation
+        print(f"  Running evaluation...")
+        evaluator = EvaluationMetrics(store)
+        entities = store.get_all_entities()
 
-        # Analyze results
-        violations = final_state["violations"]
-        populations = final_state.get("results", {}).get("populations", [])
+        # Compute aggregate metrics
+        total_coherence = 0
+        total_consistency = 0
+        total_plausibility = 0
 
-        print(f"  Entities populated: {len(populations)}")
-        print(f"  Violations detected: {len(violations)}")
+        for entity in entities:
+            coherence = evaluator.temporal_coherence_score(entity, [datetime.now()])
+            consistency = evaluator.knowledge_consistency_score(entity, {})
+            plausibility = evaluator.biological_plausibility_score(entity, [])
+            total_coherence += coherence
+            total_consistency += consistency
+            total_plausibility += plausibility
 
-        if violations:
-            print(f"  Violation types:")
-            for v in violations[:3]:  # Show first 3
-                print(f"    - [{v['severity']}] {v['validator']}: {v['message']}")
+        avg_coherence = total_coherence / len(entities) if entities else 0
+        avg_consistency = total_consistency / len(entities) if entities else 0
+        avg_plausibility = total_plausibility / len(entities) if entities else 0
+
+        # Check causal consistency (timepoints should have proper causal links)
+        causal_violations = 0
+        for i, tp in enumerate(timepoints[1:], 1):  # Skip first timepoint
+            if tp.causal_parent != timepoints[i-1].timepoint_id:
+                causal_violations += 1
+
+        # Count exposure events per entity
+        exposure_counts = {}
+        for entity in entities:
+            exposure_counts[entity.entity_id] = len(store.get_exposure_events(entity.entity_id))
+
+        print(f"  Entities: {len(entities)}")
+        print(f"  Timepoints: {len(timepoints)}")
+        print(f"  Avg Temporal Coherence: {avg_coherence:.2f}")
+        print(f"  Avg Knowledge Consistency: {avg_consistency:.2f}")
+        print(f"  Causal Chain Violations: {causal_violations}")
+        print(f"  Exposure Events per Entity: {list(exposure_counts.values())[:3]}...")  # Show first 3
 
         result = {
-            "graph_size": size,
-            "entities": len(populations),
-            "violations": len(violations),
+            "temporal_length": length,
+            "entities": len(entities),
+            "timepoints": len(timepoints),
+            "avg_temporal_coherence": avg_coherence,
+            "avg_knowledge_consistency": avg_consistency,
+            "avg_biological_plausibility": avg_plausibility,
+            "causal_violations": causal_violations,
+            "total_exposure_events": sum(exposure_counts.values()),
             "cost": llm_client.cost,
             "tokens": llm_client.token_count
         }
@@ -107,26 +141,30 @@ def run_autopilot(cfg: DictConfig, store: GraphStore, llm_client: LLMClient):
 
     # Summary
     print("="*70)
-    print("AUTOPILOT SUMMARY")
+    print("AUTOPILOT SUMMARY: Temporal Chain Testing")
     print("="*70)
-    print(f"{'Size':<10} {'Entities':<12} {'Violations':<15} {'Cost':<15} {'Tokens'}")
+    print(f"{'Length':<10} {'Entities':<12} {'Coherence':<12} {'Consistency':<14} {'Cost':<10}")
     print("-" * 70)
 
     for result in results:
-        print(f"{result['graph_size']:<10} {result['entities']:<12} {result['violations']:<15} "
-              f"${result['cost']:<14.4f} {result['tokens']}")
+        print(f"{result['temporal_length']:<10} {result['entities']:<12} {result['avg_temporal_coherence']:<12.2f} "
+              f"{result['avg_knowledge_consistency']:<14.2f} ${result['cost']:<9.4f}")
 
-    total_cost = llm_client.cost
-    total_tokens = llm_client.token_count
+    total_cost = sum(r['cost'] for r in results)
+    total_tokens = sum(r['tokens'] for r in results)
+    avg_coherence = sum(r['avg_temporal_coherence'] for r in results) / len(results) if results else 0
+    avg_consistency = sum(r['avg_knowledge_consistency'] for r in results) / len(results) if results else 0
     print("-" * 70)
-    print(f"{'TOTAL':<10} {'':<12} {'':<15} ${total_cost:<14.4f} {total_tokens}")
+    print(f"{'AVERAGE':<10} {'':<12} {avg_coherence:<12.2f} {avg_consistency:<14.2f} ${total_cost:<9.4f}")
     print("="*70 + "\n")
 
     # Generate reports
     report_results = {
         "runs": results,
-        "cost": total_cost,
-        "tokens": total_tokens,
+        "total_cost": total_cost,
+        "total_tokens": total_tokens,
+        "avg_coherence": avg_coherence,
+        "avg_consistency": avg_consistency,
         "timestamp": datetime.now().isoformat()
     }
     generate_report("autopilot", report_results)
@@ -162,9 +200,17 @@ def run_evaluation(cfg: DictConfig, store: GraphStore, llm_client: LLMClient):
         print(f"    Biological Plausibility: {plausibility:.2f}")
         print()
 
+    # Compute resolution distribution
+    resolution_counts = {}
+    from schemas import ResolutionLevel
+    for entity in entities:
+        res_level = entity.resolution_level.value
+        resolution_counts[res_level] = resolution_counts.get(res_level, 0) + 1
+
     # Generate reports
     eval_results = {
         "entities_evaluated": len(entities),
+        "resolution_distribution": resolution_counts,
         "cost": llm_client.cost,
         "tokens": llm_client.token_count
     }
@@ -304,8 +350,25 @@ def run_historical_training(cfg: DictConfig, store: GraphStore, llm_client: LLMC
                 "historical_context": context["event"]
             }
         )
-        
+
         store.save_entity(entity)
+
+        # Record exposure events for each knowledge item
+        exposure_events = []
+        for knowledge_item in population.knowledge_state:
+            exposure_event = ExposureEvent(
+                entity_id=entity_id,
+                event_type="witnessed",  # Historical figures witnessed the events
+                information=knowledge_item,
+                source=context["event"],  # The historical event was the source
+                timestamp=datetime.fromisoformat(context["timepoint"]),
+                confidence=population.confidence,
+                timepoint_id=f"{context_name}_{context['timepoint']}"
+            )
+            exposure_events.append(exposure_event)
+
+        # Batch insert exposure events
+        store.save_exposure_events(exposure_events)
         print(f"  ✓ {entity_id} ({entity_data['role']})")
         print(f"    Age: {entity_data['age']}, Location: {entity_data['location']}")
         print(f"    Knowledge items: {len(population.knowledge_state)}")
@@ -314,6 +377,234 @@ def run_historical_training(cfg: DictConfig, store: GraphStore, llm_client: LLMC
     print(f"\nTraining complete!")
     print(f"Total cost: ${llm_client.cost:.4f}")
     print(f"Tokens used: {llm_client.token_count}")
+
+def run_temporal_training(cfg: DictConfig, store: GraphStore, llm_client: LLMClient):
+    """Train entities across a temporal chain with causal evolution"""
+    from entity_templates import HISTORICAL_CONTEXTS, get_context_prompt
+
+    context_name = cfg.training.get("context", "founding_fathers_1789")
+    num_timepoints = cfg.training.get("num_timepoints", 5)
+
+    print(f"\n{'='*70}")
+    print(f"TEMPORAL TRAINING: {context_name}")
+    print(f"Timepoints: {num_timepoints}")
+    print(f"{'='*70}\n")
+
+    # Build temporal chain
+    print("Building temporal chain...")
+    timepoints = build_temporal_chain(context_name, num_timepoints)
+    print(f"Created {len(timepoints)} timepoints with causal links")
+
+    # Save timepoints to database
+    for timepoint in timepoints:
+        store.save_timepoint(timepoint)
+        print(f"  ✓ {timepoint.timepoint_id}: {timepoint.event_description[:60]}...")
+
+    print()
+
+    # Process each timepoint in sequence
+    context = HISTORICAL_CONTEXTS[context_name]
+    entities_data = context["entities"]
+
+    for i, timepoint in enumerate(timepoints):
+        print(f"Timepoint {i+1}/{len(timepoints)}: {timepoint.timepoint_id}")
+        print(f"  Event: {timepoint.event_description}")
+        print(f"  Timestamp: {timepoint.timestamp}")
+        print(f"  Resolution: {timepoint.resolution_level.value}")
+        print(f"  Entities: {len(timepoint.entities_present)}")
+        print()
+
+        # Populate each entity at this timepoint
+        for entity_data in entities_data:
+            entity_id = entity_data["entity_id"]
+
+            # Get previous knowledge state (causal propagation)
+            previous_knowledge = None
+            if timepoint.causal_parent:
+                previous_knowledge = store.get_entity_knowledge_at_timepoint(entity_id, timepoint.causal_parent)
+
+            # Enhanced context for this timepoint
+            enhanced_context = {
+                "historical_context": get_context_prompt(context_name),
+                "entity_role": entity_data["role"],
+                "entity_age": entity_data["age"],
+                "entity_location": entity_data["location"],
+                "timepoint": timepoint.timestamp.isoformat(),
+                "event": timepoint.event_description,
+                "timepoint_id": timepoint.timepoint_id,
+                "relationships": [r for s, t, r in context["relationships"] if s == entity_id or t == entity_id]
+            }
+
+            # Populate entity with causal context
+            population = llm_client.populate_entity(
+                {"entity_id": entity_id, "timestamp": timepoint.timestamp.isoformat()},
+                enhanced_context,
+                previous_knowledge
+            )
+
+            # Update or create entity record (only create if this is the first timepoint)
+            entity = store.get_entity(entity_id)
+            if entity is None:
+                # First timepoint - create new entity
+                entity = Entity(
+                    entity_id=entity_id,
+                    entity_type="historical_person",
+                    temporal_span_start=timepoint.timestamp,
+                    entity_metadata={
+                        "role": entity_data["role"],
+                        "age": entity_data["age"],
+                        "location": entity_data["location"],
+                        "knowledge_state": population.knowledge_state,
+                        "energy_budget": population.energy_budget,
+                        "personality_traits": population.personality_traits,
+                        "temporal_awareness": population.temporal_awareness,
+                        "confidence": population.confidence,
+                        "historical_context": context["event"]
+                    }
+                )
+                store.save_entity(entity)
+            else:
+                # Subsequent timepoint - update knowledge state
+                current_knowledge = set(entity.entity_metadata.get("knowledge_state", []))
+                new_knowledge = set(population.knowledge_state)
+                # Only add truly new knowledge
+                added_knowledge = new_knowledge - current_knowledge
+                if added_knowledge:
+                    updated_knowledge = entity.entity_metadata["knowledge_state"] + list(added_knowledge)
+                    entity.entity_metadata["knowledge_state"] = updated_knowledge
+                    store.save_entity(entity)
+
+            # Record exposure events for new knowledge
+            exposure_events = []
+            for knowledge_item in population.knowledge_state:
+                # Only create exposure event if this is new knowledge or first timepoint
+                if (previous_knowledge is None or
+                    knowledge_item not in previous_knowledge):
+                    exposure_event = ExposureEvent(
+                        entity_id=entity_id,
+                        event_type="experienced",  # They experienced the event at this timepoint
+                        information=knowledge_item,
+                        source=timepoint.event_description,
+                        timestamp=timepoint.timestamp,
+                        confidence=population.confidence,
+                        timepoint_id=timepoint.timepoint_id
+                    )
+                    exposure_events.append(exposure_event)
+
+            if exposure_events:
+                store.save_exposure_events(exposure_events)
+
+            knowledge_growth = len(population.knowledge_state) - (len(previous_knowledge) if previous_knowledge else 0)
+            print(f"  ✓ {entity_id}: +{knowledge_growth} knowledge items")
+
+        print()
+
+    print(f"Temporal training complete!")
+    print(f"Total cost: ${llm_client.cost:.4f}")
+    print(f"Timepoints processed: {len(timepoints)}")
+
+def run_interactive(cfg: DictConfig, store: GraphStore, llm_client: LLMClient):
+    """Interactive query REPL for the temporal simulation"""
+    query_interface = QueryInterface(store, llm_client)
+
+    print(f"\n{'='*70}")
+    print("TEMPORAL SIMULATION INTERACTIVE QUERY INTERFACE")
+    print(f"{'='*70}")
+    print("\nYou can ask questions about entities in the temporal simulation.")
+    print("Examples:")
+    print("  'What did George Washington think about becoming president?'")
+    print("  'How did Thomas Jefferson feel about the inauguration?'")
+    print("  'What actions did Alexander Hamilton take during the ceremony?'")
+    print("\nType 'help' for more examples, 'exit' or 'quit' to leave.\n")
+
+    while True:
+        try:
+            query = input("Query: ").strip()
+
+            if not query:
+                continue
+
+            if query.lower() in ['exit', 'quit', 'q']:
+                print("\nGoodbye! 👋")
+                break
+
+            if query.lower() in ['help', 'h', '?']:
+                _show_interactive_help()
+                continue
+
+            if query.lower() == 'status':
+                _show_simulation_status(store, llm_client)
+                continue
+
+            # Parse and respond to query
+            print("  Parsing query...")
+            intent = query_interface.parse_query(query)
+            print(f"  Intent: {intent.information_type} about {intent.target_entity or 'unknown'} (confidence: {intent.confidence:.1f})")
+
+            print("  Synthesizing response...")
+            response = query_interface.synthesize_response(intent)
+
+            print(f"\nResponse:\n{response}")
+            print(f"\nCost so far: ${llm_client.cost:.4f}\n")
+
+        except KeyboardInterrupt:
+            print("\n\nInterrupted. Type 'exit' to quit or continue asking questions.")
+        except Exception as e:
+            print(f"Error processing query: {e}")
+            print("Try again or type 'help' for guidance.\n")
+
+def _show_interactive_help():
+    """Show help text for interactive mode"""
+    help_text = """
+Available commands:
+  help, h, ?     Show this help
+  status         Show simulation status and statistics
+  exit, quit, q  Leave the interactive interface
+
+Query examples:
+  "What did George Washington think about becoming president?"
+  "How did Thomas Jefferson feel during the inauguration?"
+  "What actions did Alexander Hamilton take after the ceremony?"
+  "Tell me about James Madison's thoughts on the new government"
+  "What was John Adams' reaction to the presidential oath?"
+
+The system will automatically:
+- Parse your natural language query
+- Identify relevant entities and timepoints
+- Elevate resolution if needed for detailed responses
+- Provide attribution showing knowledge sources
+- Track query history for better future responses
+
+Note: The system uses causal temporal simulation where entities evolve over timepoints.
+"""
+    print(help_text)
+
+def _show_simulation_status(store: GraphStore, llm_client):
+    """Show current simulation status"""
+    entities = store.get_all_entities() if hasattr(store, 'get_all_entities') else []
+    timepoints = store.get_all_timepoints()
+
+    print(f"\nSimulation Status:")
+    print(f"  Entities: {len(entities)}")
+    print(f"  Timepoints: {len(timepoints)}")
+    print(f"  Total cost: ${llm_client.cost:.4f}")
+    print(f"  Tokens used: {llm_client.token_count}")
+
+    if timepoints:
+        print(f"  Latest timepoint: {timepoints[-1].timepoint_id}")
+        print(f"    Event: {timepoints[-1].event_description[:60]}...")
+
+    if entities:
+        resolution_counts = {}
+        for entity in entities:
+            res = entity.resolution_level.value
+            resolution_counts[res] = resolution_counts.get(res, 0) + 1
+
+        print(f"  Resolution distribution:")
+        for res, count in resolution_counts.items():
+            print(f"    {res}: {count} entities")
+
+    print()
 
 if __name__ == "__main__":
     main()

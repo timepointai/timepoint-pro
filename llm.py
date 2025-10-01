@@ -39,13 +39,18 @@ class LLMClient:
         else:
             self.client = None
     
-    def populate_entity(self, entity_schema: Dict, context: Dict, model: str = "openai/gpt-4o-mini") -> EntityPopulation:
+    def populate_entity(self, entity_schema: Dict, context: Dict, previous_knowledge: List[str] = None, model: str = "openai/gpt-4o-mini") -> EntityPopulation:
         """Populate entity with structured output"""
         if self.dry_run:
-            return self._mock_entity_population(entity_schema)
-        
+            return self._mock_entity_population(entity_schema, previous_knowledge)
+
+        # Include previous knowledge in the prompt for causal evolution
+        previous_context = ""
+        if previous_knowledge:
+            previous_context = f"\nPrevious knowledge state: {previous_knowledge}\nGenerate how this entity has evolved - what new information they've acquired and how their state has changed."
+
         prompt = f"""Generate entity information for {entity_schema['entity_id']}.
-Context: {context}
+Context: {context}{previous_context}
 Provide knowledge state, energy budget (0-100), personality traits (5 floats -1 to 1), temporal awareness, and confidence (0-1)."""
         
         response = self.client.chat.completions.create(
@@ -77,15 +82,24 @@ Check for: anachronisms, biological impossibilities, knowledge contradictions.""
         self.cost += 0.008
         return response
     
-    def _mock_entity_population(self, entity_schema: Dict) -> EntityPopulation:
+    def _mock_entity_population(self, entity_schema: Dict, previous_knowledge: List[str] = None) -> EntityPopulation:
         """Deterministic mock for dry-run mode"""
         import hashlib
         seed = int(hashlib.md5(entity_schema['entity_id'].encode()).hexdigest(), 16) % 10000
         np.random.seed(seed)
-        
+
+        # If previous knowledge exists, generate evolved state
+        if previous_knowledge:
+            # Add some new knowledge while keeping some old
+            existing_count = len(previous_knowledge)
+            new_facts = [f"fact_{existing_count + i}" for i in range(3)]  # Add 3 new facts
+            knowledge_state = previous_knowledge + new_facts
+        else:
+            knowledge_state = [f"fact_{i}" for i in range(5)]
+
         return EntityPopulation(
             entity_id=entity_schema['entity_id'],
-            knowledge_state=[f"fact_{i}" for i in range(5)],
+            knowledge_state=knowledge_state,
             energy_budget=np.random.uniform(50, 100),
             personality_traits=np.random.uniform(-1, 1, 5).tolist(),
             temporal_awareness=f"Aware of events up to {entity_schema.get('timestamp', 'unknown')}",

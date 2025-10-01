@@ -11,9 +11,10 @@ seed: 42
 
 autopilot:
   depth: standard
-  graph_sizes: [10, 50, 100]
+  temporal_lengths: [3, 5, 7]
 
 training:
   graph_size: 50
   target_resolution: tensor_only
   context: founding_fathers_1789  # or renaissance_florence_1504
+  num_timepoints: 5

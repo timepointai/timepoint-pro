@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, List, Callable
 import numpy as np
 
-from schemas import Entity
+from schemas import Entity, ExposureEvent
 
 class Validator(ABC):
     """Base validator with plugin registry"""
@@ -32,11 +32,18 @@ class Validator(ABC):
         return violations
 
 @Validator.register("information_conservation", "ERROR")
-def validate_information_conservation(entity: Entity, context: Dict) -> Dict:
+def validate_information_conservation(entity: Entity, context: Dict, store=None) -> Dict:
     """Validate knowledge ⊆ exposure history"""
-    exposure = set(context.get("exposure_history", []))
+    # If store is provided, query actual exposure events from database
+    if store:
+        exposure_events = store.get_exposure_events(entity.entity_id)
+        exposure = set(event.information for event in exposure_events)
+    else:
+        # Fallback to context-based validation for backward compatibility
+        exposure = set(context.get("exposure_history", []))
+
     knowledge = set(entity.entity_metadata.get("knowledge_state", []))
-    
+
     unknown = knowledge - exposure
     if unknown:
         return {"valid": False, "message": f"Entity knows about {unknown} without exposure"}

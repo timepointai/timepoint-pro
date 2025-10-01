@@ -55,15 +55,33 @@ def create_entity_training_workflow(llm_client: LLMClient, store: GraphStore):
         return state
     
     def compress_tensors(state: WorkflowState) -> WorkflowState:
+        from schemas import ResolutionLevel
+
         for entity in state["entities"]:
             if entity.tensor:
                 ttm = TTMTensor(**json.loads(entity.tensor))
                 context, biology, behavior = ttm.to_arrays()
-                compressed = {
-                    "pca": TensorCompressor.compress(context, "pca"),
-                    "svd": TensorCompressor.compress(context, "svd")
-                }
-                entity.entity_metadata["compressed"] = {k: v.tolist() for k, v in compressed.items()}
+
+                # Apply compression based on resolution level
+                if entity.resolution_level == ResolutionLevel.TENSOR_ONLY:
+                    # TENSOR_ONLY: Store ONLY compressed representation
+                    compressed = {
+                        "pca": TensorCompressor.compress(context, "pca"),
+                        "svd": TensorCompressor.compress(context, "svd")
+                    }
+                    entity.entity_metadata["compressed"] = {k: v.tolist() for k, v in compressed.items()}
+                    # Remove full tensor data to save space
+                    entity.tensor = None
+
+                else:
+                    # Higher resolutions: Keep full tensor but also store compressed version
+                    compressed = {
+                        "pca": TensorCompressor.compress(context, "pca"),
+                        "svd": TensorCompressor.compress(context, "svd")
+                    }
+                    entity.entity_metadata["compressed"] = {k: v.tolist() for k, v in compressed.items()}
+                    # Keep full tensor for detailed operations
+
         return state
     
     workflow.add_node("load_graph", load_graph)

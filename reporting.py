@@ -46,12 +46,25 @@ def generate_markdown_report(mode: str, results: Dict, output_dir: str = "report
         f"- **Cost:** ${results.get('cost', 0):.4f}",
         f"- **Tokens:** {results.get('tokens', 0)}",
         f"- **Violations:** {results.get('violations', 0)}",
+        f"- **Entities Evaluated:** {results.get('entities_evaluated', 0)}",
+    ]
+
+    # Add resolution distribution if available
+    if "resolution_distribution" in results:
+        lines.extend([
+            "",
+            "## Resolution Distribution",
+        ])
+        for res_level, count in results["resolution_distribution"].items():
+            lines.append(f"- **{res_level}:** {count} entities")
+
+    lines.extend([
         "",
         "## Details",
         "```json",
         json.dumps(results, indent=2),
         "```"
-    ]
+    ])
 
     with open(filename, 'w') as f:
         f.write('\n'.join(lines))

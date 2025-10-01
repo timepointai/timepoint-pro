@@ -72,3 +72,22 @@ class ValidationRule(SQLModel, table=True):
     rule_type: str  # energy, temporal, biological, information
     severity: str  # ERROR, WARNING, INFO
     config: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+
+class ExposureEvent(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    entity_id: str = Field(foreign_key="entity.entity_id", index=True)
+    event_type: str  # witnessed, learned, told, experienced
+    information: str  # what was learned
+    source: Optional[str] = None  # who/what provided the information
+    timestamp: datetime
+    confidence: float = Field(default=1.0)
+    timepoint_id: Optional[str] = Field(default=None, index=True)  # link to timepoint
+
+class Timepoint(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    timepoint_id: str = Field(unique=True, index=True)
+    timestamp: datetime
+    event_description: str
+    entities_present: List[str] = Field(default_factory=list, sa_column=Column(JSON))
+    causal_parent: Optional[str] = Field(default=None, index=True)  # previous timepoint_id
+    resolution_level: ResolutionLevel = Field(default=ResolutionLevel.SCENE)

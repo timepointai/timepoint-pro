@@ -33,7 +33,7 @@ class EvaluationMetrics:
     
     def knowledge_consistency_score(self, entity: Entity, context: Dict) -> float:
         """Information conservation compliance"""
-        result = validate_information_conservation(entity, context)
+        result = validate_information_conservation(entity, context, self.store)
         return 1.0 if result["valid"] else 0.0
     
     def biological_plausibility_score(self, entity: Entity, actions: List[str]) -> float:

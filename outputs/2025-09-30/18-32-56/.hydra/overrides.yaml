@@ -1,0 +1,4 @@
+- llm.dry_run=true
+- mode=temporal_train
+- training.context=founding_fathers_1789
+- training.num_timepoints=3
