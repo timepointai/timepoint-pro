@@ -463,30 +463,67 @@ llm_client = LLMClient(
 query_interface = QueryInterface(store, llm_client)
 
 print("="*70)
-print("TEMPORAL SIMULATION AUTOMATED QUERY TESTING")
+print("TEMPORAL SIMULATION INTERACTIVE QUERY INTERFACE")
 print("="*70)
 print("")
-print("Running automated test queries instead of interactive mode...")
+print("You can ask questions about entities in the temporal simulation.")
+print("Examples:")
+print("  'What did George Washington think about becoming president?'")
+print("  'How did Thomas Jefferson feel about the inauguration?'")
+print("  'What actions did Alexander Hamilton take during the ceremony?'")
 print("")
-
-# Define test queries to run automatically
-test_queries = [
-    "What did George Washington think about becoming president?",
-    "How did Thomas Jefferson feel about the inauguration?",
-    "What actions did Alexander Hamilton take during the ceremony?",
-    "What was Washington thinking during the inauguration?",
-    "How did Hamilton and Jefferson interact?",
-    "What concerns did Adams have?",
-    "Describe the cabinet meeting",
-    "What did Jefferson think about the new government?"
-]
+print("Type 'help' for more examples, 'dump' to see knowledge, 'exit' or 'quit' to leave.")
+print("")
 
 query_log = []
 total_query_cost = 0.0
 
-for i, query in enumerate(test_queries, 1):
-    print(f"Query {i}/{len(test_queries)}: {query}")
-    print("-" * 50)
+while True:
+    query = input("Query: ").strip()
+
+    if not query:
+        continue
+
+    if query.lower() in ['exit', 'quit', 'q']:
+        break
+
+    if query.lower() == 'help':
+        print("\nExample queries:")
+        print("  - What was Washington thinking during the inauguration?")
+        print("  - How did Hamilton and Jefferson interact?")
+        print("  - What concerns did Adams have?")
+        print("  - Describe the cabinet meeting")
+        print("")
+        continue
+
+    if query.lower() == 'dump':
+        print("\nDumping current knowledge state...")
+        entities = store.get_all_entities()
+        for entity in entities:
+            knowledge = entity.entity_metadata.get("knowledge_state", [])
+            print(f"\n{entity.entity_id}:")
+            print(f"  Resolution: {entity.resolution_level.value}")
+            print(f"  Knowledge items: {len(knowledge)}")
+            if knowledge:
+                for i, k in enumerate(knowledge[:3]):
+                    print(f"    [{i}] {k[:100]}...")
+        print("")
+        continue
+
+    if query.lower() == 'status':
+        print("\nSimulation Status:")
+        entities = store.get_all_entities()
+        timepoints = store.get_all_timepoints()
+        print(f"  Entities: {len(entities)}")
+        print(f"  Timepoints: {len(timepoints)}")
+        print(f"  Total query cost: ${total_query_cost:.4f}")
+
+        if timepoints:
+            latest = timepoints[-1]
+            print(f"  Latest timepoint: {latest.timepoint_id}")
+            print(f"    Event: {latest.event_description[:60]}...")
+        print("")
+        continue
 
     # Parse query
     print("  Parsing query...")
@@ -504,8 +541,8 @@ for i, query in enumerate(test_queries, 1):
 
             if knowledge_before:
                 print(f"     Sample items:")
-                for j, k in enumerate(knowledge_before[:3]):
-                    print(f"       [{j}] {k[:80]}...")
+                for i, k in enumerate(knowledge_before[:3]):
+                    print(f"       [{i}] {k[:80]}...")
         else:
             print(f"  ⚠️  Entity not found: {entity_id}")
             knowledge_before = []
@@ -546,11 +583,7 @@ for i, query in enumerate(test_queries, 1):
     print(f"Cost so far: ${total_query_cost:.4f}")
     print("")
 
-    # Add small delay between queries for readability
-    import time
-    time.sleep(0.5)
-
-print("\nAutomated testing complete! ✅")
+print("\nGoodbye! 👋")
 print("")
 
 # Final summary
@@ -570,7 +603,7 @@ print("")
 print(f"📁 All query logs saved to: {Path(output_dir, 'logs')}/query_log.jsonl")
 print(f"💾 Final state in: {output_dir}/")
 print("")
-print(f"Total query cost: ${total_query_cost:.4f}")
+print(f"Estimated total cost: ~${total_query_cost:.2f}")
 PYEOF
 
     # Run the query script with environment variables
