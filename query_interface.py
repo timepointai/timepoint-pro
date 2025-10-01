@@ -175,7 +175,7 @@ Extract:
             reasoning_parts.append(f"Detected timepoint: {target_timepoint}")
         reasoning_parts.append(f"Info type: {info_type}")
 
-        return QueryIntent(
+        intent = QueryIntent(
             target_entity=target_entity,
             target_timepoint=target_timepoint,
             information_type=info_type,
@@ -183,6 +183,9 @@ Extract:
             confidence=confidence,
             reasoning="; ".join(reasoning_parts)
         )
+        # Store original query for relevance scoring
+        intent._original_query = query
+        return intent
 
     def synthesize_response(self, query_intent: QueryIntent) -> str:
         """Generate answer from entity states with lazy resolution elevation and attribution"""
@@ -214,24 +217,31 @@ Extract:
         # Record this query for future resolution decisions
         self.resolution_engine.record_query(entity.entity_id)
 
-        # Get relevant knowledge based on query intent
+        # Get temporally filtered knowledge based on query intent
         knowledge_state = entity.entity_metadata.get("knowledge_state", [])
-        relevant_knowledge = self._filter_relevant_knowledge(knowledge_state, query_intent)
+        temporally_filtered_knowledge = self._filter_knowledge_by_time(knowledge_state, query_intent, entity.entity_id)
+        relevant_knowledge = self._filter_relevant_knowledge(temporally_filtered_knowledge, query_intent)
 
         # Build response with attribution
         response_parts = []
 
         if relevant_knowledge:
-            # Group knowledge by exposure source for better attribution
+            # Group knowledge by exposure source and timestamp for better attribution
             exposure_events = self.store.get_exposure_events(entity.entity_id)
-            source_map = {event.information: event.source for event in exposure_events}
+            source_map = {event.information: (event.source, event.timestamp) for event in exposure_events}
 
             response_parts.append(f"Based on {entity.entity_id}'s knowledge from the temporal simulation:")
 
             for i, knowledge in enumerate(relevant_knowledge[:3]):  # Limit to 3 most relevant
-                source = source_map.get(knowledge, "personal experience")
+                source_info = source_map.get(knowledge, ("personal experience", None))
+                source, learned_at = source_info
+
                 response_parts.append(f"• {knowledge}")
-                if source != "personal experience":
+                if source != "personal experience" and learned_at:
+                    # Format timestamp nicely
+                    time_str = learned_at.strftime("%Y-%m-%d")
+                    response_parts.append(f"  (learned {time_str} from: {source})")
+                elif source != "personal experience":
                     response_parts.append(f"  (learned from: {source})")
 
             if len(relevant_knowledge) > 3:
@@ -302,6 +312,16 @@ Extract:
                 current_knowledge  # Pass current knowledge for evolution
             )
 
+            # Show LLM response snippets based on resolution level
+            if target_resolution.value == "scene":
+                print(f"  📝 Scene LLM Response: {population.knowledge_state[0][:200]}..." if population.knowledge_state else "  📝 Scene LLM Response: (no knowledge generated)")
+            elif target_resolution.value == "dialog":
+                # Show the dialog context being sent to LLM
+                dialog_context = f"Entity: {entity.entity_id}, Role: {enhanced_context['entity_role']}, Timepoint: {enhanced_context['timepoint']}, Event: {enhanced_context['event']}"
+                print(f"  💬 Dialog LLM Context: {dialog_context[:500]}...")
+                if population.knowledge_state:
+                    print(f"  💬 Dialog LLM Response: {population.knowledge_state[0][:200]}..." if population.knowledge_state else "  💬 Dialog LLM Response: (no knowledge generated)")
+
             # Update entity with enhanced knowledge
             all_knowledge = list(set(current_knowledge + population.knowledge_state))
             entity.entity_metadata["knowledge_state"] = all_knowledge
@@ -336,45 +356,78 @@ Extract:
             return False
 
     def _filter_relevant_knowledge(self, knowledge_state: List[str], query_intent: QueryIntent) -> List[str]:
-        """Filter knowledge items based on query intent"""
+        """Filter knowledge items based on semantic relevance to query using LLM scoring"""
         if not knowledge_state:
             return []
 
-        query_lower = " ".join([getattr(query_intent, attr, "") or "" for attr in ["target_entity", "information_type"]]).lower()
+        # Reconstruct the original query for relevance scoring
+        original_query = getattr(query_intent, '_original_query', None)
+        if not original_query:
+            # Fallback: reconstruct from intent attributes
+            query_parts = []
+            if query_intent.target_entity:
+                query_parts.append(query_intent.target_entity.replace('_', ' '))
+            if query_intent.information_type:
+                query_parts.append(query_intent.information_type)
+            original_query = " ".join(query_parts)
 
-        # Score each knowledge item based on relevance
+        # Score each knowledge item using LLM relevance scoring
         scored_knowledge = []
         for knowledge in knowledge_state:
-            score = 0
+            relevance_score = self.llm_client.score_relevance(original_query, knowledge)
+            scored_knowledge.append((knowledge, relevance_score))
 
-            # Information type matching
-            knowledge_lower = knowledge.lower()
-            if query_intent.information_type == "knowledge":
-                if any(word in knowledge_lower for word in ["think", "believe", "feel", "opinion", "thought"]):
-                    score += 2
-            elif query_intent.information_type == "actions":
-                if any(word in knowledge_lower for word in ["do", "did", "action", "activity", "perform"]):
-                    score += 2
-            elif query_intent.information_type == "dialog":
-                if any(word in knowledge_lower for word in ["say", "said", "talk", "speak", "conversation"]):
-                    score += 2
-
-            # Keyword matching
-            query_words = query_lower.split()
-            for word in query_words:
-                if word in knowledge_lower:
-                    score += 1
-
-            scored_knowledge.append((knowledge, score))
-
-        # Sort by relevance and return top matches
+        # Sort by relevance score (highest first)
         scored_knowledge.sort(key=lambda x: x[1], reverse=True)
 
-        # For general queries, return some knowledge even if relevance is low
+        # Return top knowledge items based on relevance
+        # For general queries, return top 3; for specific queries, return top 5 with relevance > 0.3
         if query_intent.information_type == "general":
-            return [k for k, s in scored_knowledge[:3]]  # Return top 3 regardless of score
+            return [k for k, s in scored_knowledge[:3]]
         else:
-            return [k for k, s in scored_knowledge if s > 0][:5]  # Top 5 with any relevance
+            return [k for k, s in scored_knowledge if s > 0.3][:5]  # Only highly relevant items
+
+    def _filter_knowledge_by_time(self, knowledge_state: List[str], query_intent: QueryIntent, entity_id: str) -> List[str]:
+        """Filter knowledge items to only those available at the query timepoint"""
+        if not knowledge_state:
+            return []
+
+        # Determine query timepoint
+        query_timepoint = None
+        if query_intent.target_timepoint:
+            # Use specified timepoint
+            timepoint_obj = self.store.get_timepoint(query_intent.target_timepoint)
+            if timepoint_obj:
+                query_timepoint = timepoint_obj.timestamp
+        else:
+            # Use latest timepoint as default (what entity currently knows)
+            timepoints = self.store.get_all_timepoints()
+            if timepoints:
+                query_timepoint = max(tp.timestamp for tp in timepoints)
+
+        if not query_timepoint:
+            # Fallback to all knowledge if no timepoint determined
+            return knowledge_state
+
+        # Get exposure events to determine when knowledge was learned
+        exposure_events = self.store.get_exposure_events(entity_id)
+
+        # Create mapping of knowledge item to when it was learned
+        knowledge_timestamps = {}
+        for event in exposure_events:
+            knowledge_timestamps[event.information] = event.timestamp
+
+        # Filter knowledge to only items learned before or at query timepoint
+        filtered_knowledge = []
+        for knowledge_item in knowledge_state:
+            learned_at = knowledge_timestamps.get(knowledge_item)
+            if learned_at and learned_at <= query_timepoint:
+                filtered_knowledge.append(knowledge_item)
+            elif not learned_at:
+                # If no timestamp available, include it (legacy knowledge)
+                filtered_knowledge.append(knowledge_item)
+
+        return filtered_knowledge
 
     def _synthesize_timepoint_response(self, query_intent: QueryIntent) -> str:
         """Generate response for timepoint-focused queries (e.g., 'Describe the cabinet meeting')"""
@@ -417,40 +470,60 @@ Extract:
 
     def _synthesize_relationship_response(self, query_intent: QueryIntent) -> str:
         """Generate response for multi-entity relationship queries (e.g., 'How did Hamilton and Jefferson interact?')"""
-        if not query_intent.context_entities:
-            return "I need more specific information about which entities you're asking about."
+        if not query_intent.context_entities or len(query_intent.context_entities) < 2:
+            return "I need more specific information about which entities you're asking about their relationship."
 
-        # For now, focus on the primary entity and mention relationships with context entities
-        # This is a simplified approach - could be expanded for more complex relationship analysis
-        primary_entity_id = query_intent.context_entities[0]  # Use first context entity as primary
-        primary_entity = self.store.get_entity(primary_entity_id)
+        # For multi-entity queries, analyze relationships from all mentioned entities
+        entity_knowledge = {}
+        relevant_interactions = []
 
-        if not primary_entity:
-            return f"I don't have information about {primary_entity_id}."
+        # Collect knowledge from all mentioned entities
+        for entity_id in query_intent.context_entities:
+            entity = self.store.get_entity(entity_id)
+            if entity:
+                knowledge_state = entity.entity_metadata.get("knowledge_state", [])
+                entity_knowledge[entity_id] = knowledge_state
 
-        # Get knowledge that might relate to interactions
-        knowledge_state = primary_entity.entity_metadata.get("knowledge_state", [])
-        relevant_knowledge = []
+                # Look for knowledge that mentions other entities in the query
+                for knowledge in knowledge_state:
+                    knowledge_lower = knowledge.lower()
+                    # Check if this knowledge mentions other entities from the context
+                    mentions_others = False
+                    mentioned_entities = []
+                    for other_entity_id in query_intent.context_entities:
+                        if other_entity_id != entity_id:
+                            other_name = other_entity_id.replace('_', ' ')
+                            if other_name.lower() in knowledge_lower:
+                                mentions_others = True
+                                mentioned_entities.append(other_entity_id)
+                                break
 
-        # Look for knowledge that might indicate relationships or interactions
-        for knowledge in knowledge_state:
-            knowledge_lower = knowledge.lower()
-            # Check if knowledge mentions other entities from context
-            for other_entity in query_intent.context_entities[1:]:
-                other_name = other_entity.replace('_', ' ')
-                if other_name.lower() in knowledge_lower:
-                    relevant_knowledge.append(knowledge)
-                    break
+                    if mentions_others:
+                        relevant_interactions.append({
+                            'knowledge': knowledge,
+                            'source_entity': entity_id,
+                            'mentioned_entities': mentioned_entities
+                        })
 
-        response_parts = [f"Based on {primary_entity_id.replace('_', ' ').title()}'s knowledge of interactions:"]
+        # Build response showing interactions from multiple perspectives
+        response_parts = ["Based on the temporal simulation's knowledge of interactions between these entities:"]
 
-        if relevant_knowledge:
-            for knowledge in relevant_knowledge[:3]:
-                response_parts.append(f"• {knowledge}")
+        if relevant_interactions:
+            # Group by source entity and show diverse perspectives
+            shown_knowledge = set()
+            for interaction in relevant_interactions[:5]:  # Limit to 5 most relevant
+                if interaction['knowledge'] not in shown_knowledge:
+                    source_name = interaction['source_entity'].replace('_', ' ').title()
+                    response_parts.append(f"• {source_name}'s perspective: {interaction['knowledge']}")
+                    shown_knowledge.add(interaction['knowledge'])
         else:
-            response_parts.append(f"• {primary_entity_id.replace('_', ' ').title()} doesn't have specific knowledge about interactions with others in this context.")
+            # If no direct interactions found, show general relationship context
+            entity_names = [eid.replace('_', ' ').title() for eid in query_intent.context_entities]
+            response_parts.append(f"• The simulation shows {', '.join(entity_names)} were contemporaries during the founding era, though specific interaction details are limited in the current temporal context.")
 
-        response_parts.append(f"\n[Entity: {primary_entity_id}, Confidence: {query_intent.confidence:.1f}]")
+        # Add metadata about the relationship analysis
+        entity_list = ', '.join(query_intent.context_entities)
+        response_parts.append(f"\n[Multi-entity relationship analysis: {entity_list}, Confidence: {query_intent.confidence:.1f}]")
 
         return "\n".join(response_parts)
 

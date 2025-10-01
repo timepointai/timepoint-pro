@@ -571,6 +571,60 @@ print(f"📁 All query logs saved to: {Path(output_dir, 'logs')}/query_log.jsonl
 print(f"💾 Final state in: {output_dir}/")
 print("")
 print(f"Total query cost: ${total_query_cost:.4f}")
+
+# Add temporal validation tests
+print("\n" + "="*70)
+print("TEMPORAL VALIDATION TESTS")
+print("="*70)
+
+# Test 1: Washington should have inauguration knowledge
+test_query = "What did Washington think about his inauguration?"
+print(f"\nTest 1: {test_query}")
+intent = query_interface.parse_query(test_query)
+if intent.target_entity == "george_washington":
+    response = query_interface.synthesize_response(intent)
+    inauguration_keywords = ["inauguration", "presidential", "swearing", "oath"]
+    has_inauguration_knowledge = any(keyword in response.lower() for keyword in inauguration_keywords)
+    print(f"✅ PASS: Washington has inauguration knowledge" if has_inauguration_knowledge else f"❌ FAIL: Washington lacks inauguration knowledge")
+else:
+    print("❌ FAIL: Query not parsed correctly for Washington")
+
+# Test 2: Jefferson at T0 should reference Paris
+test_query = "Where is Jefferson during the inauguration?"
+print(f"\nTest 2: {test_query}")
+intent = query_interface.parse_query(test_query)
+if intent.target_entity == "thomas_jefferson":
+    response = query_interface.synthesize_response(intent)
+    has_paris_reference = "paris" in response.lower()
+    print(f"✅ PASS: Jefferson references Paris" if has_paris_reference else f"❌ FAIL: Jefferson doesn't reference Paris")
+else:
+    print("❌ FAIL: Query not parsed correctly for Jefferson")
+
+# Test 3: Hamilton actions should be Treasury-related
+test_query = "What actions did Hamilton take?"
+print(f"\nTest 3: {test_query}")
+intent = query_interface.parse_query(test_query)
+if intent.target_entity == "alexander_hamilton":
+    response = query_interface.synthesize_response(intent)
+    treasury_keywords = ["treasury", "financial", "bank", "debt", "currency"]
+    has_treasury_content = any(keyword in response.lower() for keyword in treasury_keywords)
+    print(f"✅ PASS: Hamilton has Treasury-related responses" if has_treasury_content else f"❌ FAIL: Hamilton lacks Treasury content")
+else:
+    print("❌ FAIL: Query not parsed correctly for Hamilton")
+
+# Test 4: Post-1789 queries should be rejected by temporal validation
+test_query = "What did Washington think about the War of 1812?"
+print(f"\nTest 4: {test_query}")
+intent = query_interface.parse_query(test_query)
+if intent.target_entity == "george_washington":
+    response = query_interface.synthesize_response(intent)
+    temporal_rejection_keywords = ["doesn't have", "not available", "temporal", "time period"]
+    rejected_temporally = any(keyword in response.lower() for keyword in temporal_rejection_keywords)
+    print(f"✅ PASS: Query properly rejected for temporal reasons" if rejected_temporally else f"❌ FAIL: Query not rejected for temporal reasons")
+else:
+    print("❌ FAIL: Query not parsed correctly for Washington")
+
+print("\nTemporal validation tests complete!")
 PYEOF
 
     # Run the query script with environment variables

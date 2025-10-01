@@ -1,0 +1,852 @@
+{
+  "george_washington": {
+    "resolution": "tensor_only",
+    "knowledge_count": 23,
+    "query_count": 0,
+    "knowledge_items": [
+      "fact_15",
+      "fact_21",
+      "fact_6",
+      "fact_20",
+      "fact_22",
+      "fact_7",
+      "fact_3",
+      "fact_1",
+      "fact_4",
+      "fact_17",
+      "fact_16",
+      "fact_10",
+      "fact_2",
+      "fact_18",
+      "fact_0",
+      "fact_9",
+      "fact_11",
+      "fact_14",
+      "fact_13",
+      "fact_19",
+      "fact_12",
+      "fact_5",
+      "fact_8"
+    ],
+    "exposure_events": [
+      {
+        "information": "fact_0",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "fact_1",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "fact_2",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "fact_3",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "fact_4",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "fact_5",
+        "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
+        "timestamp": "1789-04-30T01:00:00",
+        "timepoint_id": "founding_fathers_1789_t1"
+      },
+      {
+        "information": "fact_6",
+        "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
+        "timestamp": "1789-04-30T01:00:00",
+        "timepoint_id": "founding_fathers_1789_t1"
+      },
+      {
+        "information": "fact_7",
+        "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
+        "timestamp": "1789-04-30T01:00:00",
+        "timepoint_id": "founding_fathers_1789_t1"
+      },
+      {
+        "information": "fact_8",
+        "source": "First cabinet meeting the next day - establishing government operations",
+        "timestamp": "1789-05-01T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t2"
+      },
+      {
+        "information": "fact_9",
+        "source": "First cabinet meeting the next day - establishing government operations",
+        "timestamp": "1789-05-01T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t2"
+      },
+      {
+        "information": "fact_10",
+        "source": "First cabinet meeting the next day - establishing government operations",
+        "timestamp": "1789-05-01T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t2"
+      },
+      {
+        "information": "fact_11",
+        "source": "Early policy discussions in the following week - setting precedents for the new republic",
+        "timestamp": "1789-05-06T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t3"
+      },
+      {
+        "information": "fact_12",
+        "source": "Early policy discussions in the following week - setting precedents for the new republic",
+        "timestamp": "1789-05-06T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t3"
+      },
+      {
+        "information": "fact_13",
+        "source": "Early policy discussions in the following week - setting precedents for the new republic",
+        "timestamp": "1789-05-06T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t3"
+      },
+      {
+        "information": "fact_14",
+        "source": "First congressional session convening - legislative work beginning",
+        "timestamp": "1789-05-08T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t4"
+      },
+      {
+        "information": "fact_15",
+        "source": "First congressional session convening - legislative work beginning",
+        "timestamp": "1789-05-08T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t4"
+      },
+      {
+        "information": "fact_16",
+        "source": "First congressional session convening - legislative work beginning",
+        "timestamp": "1789-05-08T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t4"
+      },
+      {
+        "information": "fact_17",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-10T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t5"
+      },
+      {
+        "information": "fact_18",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-10T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t5"
+      },
+      {
+        "information": "fact_19",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-10T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t5"
+      },
+      {
+        "information": "fact_20",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-12T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t6"
+      },
+      {
+        "information": "fact_21",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-12T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t6"
+      },
+      {
+        "information": "fact_22",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-12T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t6"
+      }
+    ]
+  },
+  "john_adams": {
+    "resolution": "tensor_only",
+    "knowledge_count": 23,
+    "query_count": 0,
+    "knowledge_items": [
+      "fact_15",
+      "fact_21",
+      "fact_6",
+      "fact_20",
+      "fact_22",
+      "fact_7",
+      "fact_3",
+      "fact_1",
+      "fact_4",
+      "fact_17",
+      "fact_16",
+      "fact_10",
+      "fact_2",
+      "fact_18",
+      "fact_0",
+      "fact_9",
+      "fact_11",
+      "fact_14",
+      "fact_13",
+      "fact_19",
+      "fact_12",
+      "fact_5",
+      "fact_8"
+    ],
+    "exposure_events": [
+      {
+        "information": "fact_0",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "fact_1",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "fact_2",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "fact_3",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "fact_4",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "fact_5",
+        "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
+        "timestamp": "1789-04-30T01:00:00",
+        "timepoint_id": "founding_fathers_1789_t1"
+      },
+      {
+        "information": "fact_6",
+        "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
+        "timestamp": "1789-04-30T01:00:00",
+        "timepoint_id": "founding_fathers_1789_t1"
+      },
+      {
+        "information": "fact_7",
+        "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
+        "timestamp": "1789-04-30T01:00:00",
+        "timepoint_id": "founding_fathers_1789_t1"
+      },
+      {
+        "information": "fact_8",
+        "source": "First cabinet meeting the next day - establishing government operations",
+        "timestamp": "1789-05-01T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t2"
+      },
+      {
+        "information": "fact_9",
+        "source": "First cabinet meeting the next day - establishing government operations",
+        "timestamp": "1789-05-01T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t2"
+      },
+      {
+        "information": "fact_10",
+        "source": "First cabinet meeting the next day - establishing government operations",
+        "timestamp": "1789-05-01T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t2"
+      },
+      {
+        "information": "fact_11",
+        "source": "Early policy discussions in the following week - setting precedents for the new republic",
+        "timestamp": "1789-05-06T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t3"
+      },
+      {
+        "information": "fact_12",
+        "source": "Early policy discussions in the following week - setting precedents for the new republic",
+        "timestamp": "1789-05-06T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t3"
+      },
+      {
+        "information": "fact_13",
+        "source": "Early policy discussions in the following week - setting precedents for the new republic",
+        "timestamp": "1789-05-06T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t3"
+      },
+      {
+        "information": "fact_14",
+        "source": "First congressional session convening - legislative work beginning",
+        "timestamp": "1789-05-08T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t4"
+      },
+      {
+        "information": "fact_15",
+        "source": "First congressional session convening - legislative work beginning",
+        "timestamp": "1789-05-08T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t4"
+      },
+      {
+        "information": "fact_16",
+        "source": "First congressional session convening - legislative work beginning",
+        "timestamp": "1789-05-08T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t4"
+      },
+      {
+        "information": "fact_17",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-10T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t5"
+      },
+      {
+        "information": "fact_18",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-10T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t5"
+      },
+      {
+        "information": "fact_19",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-10T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t5"
+      },
+      {
+        "information": "fact_20",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-12T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t6"
+      },
+      {
+        "information": "fact_21",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-12T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t6"
+      },
+      {
+        "information": "fact_22",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-12T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t6"
+      }
+    ]
+  },
+  "thomas_jefferson": {
+    "resolution": "tensor_only",
+    "knowledge_count": 23,
+    "query_count": 0,
+    "knowledge_items": [
+      "fact_15",
+      "fact_21",
+      "fact_6",
+      "fact_20",
+      "fact_22",
+      "fact_7",
+      "fact_3",
+      "fact_1",
+      "fact_4",
+      "fact_17",
+      "fact_16",
+      "fact_10",
+      "fact_2",
+      "fact_18",
+      "fact_0",
+      "fact_9",
+      "fact_11",
+      "fact_14",
+      "fact_13",
+      "fact_19",
+      "fact_12",
+      "fact_5",
+      "fact_8"
+    ],
+    "exposure_events": [
+      {
+        "information": "fact_0",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "fact_1",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "fact_2",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "fact_3",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "fact_4",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "fact_5",
+        "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
+        "timestamp": "1789-04-30T01:00:00",
+        "timepoint_id": "founding_fathers_1789_t1"
+      },
+      {
+        "information": "fact_6",
+        "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
+        "timestamp": "1789-04-30T01:00:00",
+        "timepoint_id": "founding_fathers_1789_t1"
+      },
+      {
+        "information": "fact_7",
+        "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
+        "timestamp": "1789-04-30T01:00:00",
+        "timepoint_id": "founding_fathers_1789_t1"
+      },
+      {
+        "information": "fact_8",
+        "source": "First cabinet meeting the next day - establishing government operations",
+        "timestamp": "1789-05-01T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t2"
+      },
+      {
+        "information": "fact_9",
+        "source": "First cabinet meeting the next day - establishing government operations",
+        "timestamp": "1789-05-01T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t2"
+      },
+      {
+        "information": "fact_10",
+        "source": "First cabinet meeting the next day - establishing government operations",
+        "timestamp": "1789-05-01T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t2"
+      },
+      {
+        "information": "fact_11",
+        "source": "Early policy discussions in the following week - setting precedents for the new republic",
+        "timestamp": "1789-05-06T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t3"
+      },
+      {
+        "information": "fact_12",
+        "source": "Early policy discussions in the following week - setting precedents for the new republic",
+        "timestamp": "1789-05-06T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t3"
+      },
+      {
+        "information": "fact_13",
+        "source": "Early policy discussions in the following week - setting precedents for the new republic",
+        "timestamp": "1789-05-06T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t3"
+      },
+      {
+        "information": "fact_14",
+        "source": "First congressional session convening - legislative work beginning",
+        "timestamp": "1789-05-08T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t4"
+      },
+      {
+        "information": "fact_15",
+        "source": "First congressional session convening - legislative work beginning",
+        "timestamp": "1789-05-08T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t4"
+      },
+      {
+        "information": "fact_16",
+        "source": "First congressional session convening - legislative work beginning",
+        "timestamp": "1789-05-08T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t4"
+      },
+      {
+        "information": "fact_17",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-10T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t5"
+      },
+      {
+        "information": "fact_18",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-10T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t5"
+      },
+      {
+        "information": "fact_19",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-10T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t5"
+      },
+      {
+        "information": "fact_20",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-12T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t6"
+      },
+      {
+        "information": "fact_21",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-12T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t6"
+      },
+      {
+        "information": "fact_22",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-12T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t6"
+      }
+    ]
+  },
+  "alexander_hamilton": {
+    "resolution": "tensor_only",
+    "knowledge_count": 23,
+    "query_count": 0,
+    "knowledge_items": [
+      "fact_15",
+      "fact_21",
+      "fact_6",
+      "fact_20",
+      "fact_22",
+      "fact_7",
+      "fact_3",
+      "fact_1",
+      "fact_4",
+      "fact_17",
+      "fact_16",
+      "fact_10",
+      "fact_2",
+      "fact_18",
+      "fact_0",
+      "fact_9",
+      "fact_11",
+      "fact_14",
+      "fact_13",
+      "fact_19",
+      "fact_12",
+      "fact_5",
+      "fact_8"
+    ],
+    "exposure_events": [
+      {
+        "information": "fact_0",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "fact_1",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "fact_2",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "fact_3",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "fact_4",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "fact_5",
+        "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
+        "timestamp": "1789-04-30T01:00:00",
+        "timepoint_id": "founding_fathers_1789_t1"
+      },
+      {
+        "information": "fact_6",
+        "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
+        "timestamp": "1789-04-30T01:00:00",
+        "timepoint_id": "founding_fathers_1789_t1"
+      },
+      {
+        "information": "fact_7",
+        "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
+        "timestamp": "1789-04-30T01:00:00",
+        "timepoint_id": "founding_fathers_1789_t1"
+      },
+      {
+        "information": "fact_8",
+        "source": "First cabinet meeting the next day - establishing government operations",
+        "timestamp": "1789-05-01T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t2"
+      },
+      {
+        "information": "fact_9",
+        "source": "First cabinet meeting the next day - establishing government operations",
+        "timestamp": "1789-05-01T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t2"
+      },
+      {
+        "information": "fact_10",
+        "source": "First cabinet meeting the next day - establishing government operations",
+        "timestamp": "1789-05-01T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t2"
+      },
+      {
+        "information": "fact_11",
+        "source": "Early policy discussions in the following week - setting precedents for the new republic",
+        "timestamp": "1789-05-06T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t3"
+      },
+      {
+        "information": "fact_12",
+        "source": "Early policy discussions in the following week - setting precedents for the new republic",
+        "timestamp": "1789-05-06T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t3"
+      },
+      {
+        "information": "fact_13",
+        "source": "Early policy discussions in the following week - setting precedents for the new republic",
+        "timestamp": "1789-05-06T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t3"
+      },
+      {
+        "information": "fact_14",
+        "source": "First congressional session convening - legislative work beginning",
+        "timestamp": "1789-05-08T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t4"
+      },
+      {
+        "information": "fact_15",
+        "source": "First congressional session convening - legislative work beginning",
+        "timestamp": "1789-05-08T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t4"
+      },
+      {
+        "information": "fact_16",
+        "source": "First congressional session convening - legislative work beginning",
+        "timestamp": "1789-05-08T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t4"
+      },
+      {
+        "information": "fact_17",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-10T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t5"
+      },
+      {
+        "information": "fact_18",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-10T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t5"
+      },
+      {
+        "information": "fact_19",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-10T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t5"
+      },
+      {
+        "information": "fact_20",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-12T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t6"
+      },
+      {
+        "information": "fact_21",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-12T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t6"
+      },
+      {
+        "information": "fact_22",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-12T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t6"
+      }
+    ]
+  },
+  "james_madison": {
+    "resolution": "tensor_only",
+    "knowledge_count": 23,
+    "query_count": 0,
+    "knowledge_items": [
+      "fact_15",
+      "fact_21",
+      "fact_6",
+      "fact_20",
+      "fact_22",
+      "fact_7",
+      "fact_3",
+      "fact_1",
+      "fact_4",
+      "fact_17",
+      "fact_16",
+      "fact_10",
+      "fact_2",
+      "fact_18",
+      "fact_0",
+      "fact_9",
+      "fact_11",
+      "fact_14",
+      "fact_13",
+      "fact_19",
+      "fact_12",
+      "fact_5",
+      "fact_8"
+    ],
+    "exposure_events": [
+      {
+        "information": "fact_0",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "fact_1",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "fact_2",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "fact_3",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "fact_4",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "fact_5",
+        "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
+        "timestamp": "1789-04-30T01:00:00",
+        "timepoint_id": "founding_fathers_1789_t1"
+      },
+      {
+        "information": "fact_6",
+        "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
+        "timestamp": "1789-04-30T01:00:00",
+        "timepoint_id": "founding_fathers_1789_t1"
+      },
+      {
+        "information": "fact_7",
+        "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
+        "timestamp": "1789-04-30T01:00:00",
+        "timepoint_id": "founding_fathers_1789_t1"
+      },
+      {
+        "information": "fact_8",
+        "source": "First cabinet meeting the next day - establishing government operations",
+        "timestamp": "1789-05-01T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t2"
+      },
+      {
+        "information": "fact_9",
+        "source": "First cabinet meeting the next day - establishing government operations",
+        "timestamp": "1789-05-01T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t2"
+      },
+      {
+        "information": "fact_10",
+        "source": "First cabinet meeting the next day - establishing government operations",
+        "timestamp": "1789-05-01T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t2"
+      },
+      {
+        "information": "fact_11",
+        "source": "Early policy discussions in the following week - setting precedents for the new republic",
+        "timestamp": "1789-05-06T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t3"
+      },
+      {
+        "information": "fact_12",
+        "source": "Early policy discussions in the following week - setting precedents for the new republic",
+        "timestamp": "1789-05-06T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t3"
+      },
+      {
+        "information": "fact_13",
+        "source": "Early policy discussions in the following week - setting precedents for the new republic",
+        "timestamp": "1789-05-06T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t3"
+      },
+      {
+        "information": "fact_14",
+        "source": "First congressional session convening - legislative work beginning",
+        "timestamp": "1789-05-08T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t4"
+      },
+      {
+        "information": "fact_15",
+        "source": "First congressional session convening - legislative work beginning",
+        "timestamp": "1789-05-08T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t4"
+      },
+      {
+        "information": "fact_16",
+        "source": "First congressional session convening - legislative work beginning",
+        "timestamp": "1789-05-08T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t4"
+      },
+      {
+        "information": "fact_17",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-10T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t5"
+      },
+      {
+        "information": "fact_18",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-10T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t5"
+      },
+      {
+        "information": "fact_19",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-10T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t5"
+      },
+      {
+        "information": "fact_20",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-12T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t6"
+      },
+      {
+        "information": "fact_21",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-12T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t6"
+      },
+      {
+        "information": "fact_22",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-12T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t6"
+      }
+    ]
+  }
+}

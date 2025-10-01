@@ -1,0 +1,352 @@
+[
+  {
+    "timepoint_id": "founding_fathers_1789_t0",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 5,
+        "query_count": 0,
+        "knowledge_sample": [
+          "First Presidential Inauguration",
+          "First President of the United States"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 3,
+        "query_count": 0,
+        "knowledge_sample": [
+          "First Presidential Inauguration",
+          "Vice Presidency"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 3,
+        "query_count": 0,
+        "knowledge_sample": [
+          "historical context",
+          "political landscape of the U.S."
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 5,
+        "query_count": 0,
+        "knowledge_sample": [
+          "First Presidential Inauguration",
+          "Treasury Secretary"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 5,
+        "query_count": 0,
+        "knowledge_sample": [
+          "First Presidential Inauguration",
+          "Congressman"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t1",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 8,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Formation of Political Parties",
+          "Leadership"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 6,
+        "query_count": 0,
+        "knowledge_sample": [
+          "First Presidential Inauguration",
+          "Emergence of Political Parties"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 6,
+        "query_count": 0,
+        "knowledge_sample": [
+          "dynamics of political rivalry",
+          "historical context"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 8,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Treasury Secretary",
+          "First Presidential Inauguration"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 7,
+        "query_count": 0,
+        "knowledge_sample": [
+          "First Presidential Inauguration",
+          "Date: 1789-04-30"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t2",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 11,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Formation of Political Parties",
+          "Emergence of Political Divisions"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 8,
+        "query_count": 0,
+        "knowledge_sample": [
+          "First Presidential Inauguration",
+          "Emergence of Political Parties"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 9,
+        "query_count": 0,
+        "knowledge_sample": [
+          "dynamics of political rivalry",
+          "effects of the First Cabinet Meeting"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 11,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Cabinet Dynamics",
+          "Treasury Secretary"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 9,
+        "query_count": 0,
+        "knowledge_sample": [
+          "First cabinet meeting the next day - establishing government operations",
+          "First Presidential Inauguration"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t3",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 15,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Formation of Political Parties",
+          "Emergence of Political Divisions"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 11,
+        "query_count": 0,
+        "knowledge_sample": [
+          "First Presidential Inauguration",
+          "Emergence of Political Parties"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 12,
+        "query_count": 0,
+        "knowledge_sample": [
+          "impact of foreign relations on domestic affairs",
+          "settling domestic policy debates"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 13,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Cabinet Dynamics",
+          "Treasury Secretary"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 13,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Date: 1789-05-06",
+          "First cabinet meeting"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t4",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 23,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Leadership",
+          "First Congressional Session Convening"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 16,
+        "query_count": 0,
+        "knowledge_sample": [
+          "International Relations",
+          "First Presidential Inauguration"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 13,
+        "query_count": 0,
+        "knowledge_sample": [
+          "impact of foreign relations on domestic affairs",
+          "settling domestic policy debates"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 17,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Domestic and Foreign Financial Policies",
+          "Cabinet Dynamics"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 20,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Date: 1789-05-06",
+          "First cabinet meeting the next day - establishing government operations"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t5",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 25,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Leadership",
+          "First Congressional Session Convening"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 20,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Challenges of the New Republic",
+          "Role in Constitution Ratification"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 17,
+        "query_count": 0,
+        "knowledge_sample": [
+          "impact of foreign relations on domestic affairs",
+          "settling domestic policy debates"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 24,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Political Rivals",
+          "Policy Implementation Challenges"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 22,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Date: 1789-05-06",
+          "First cabinet meeting the next day - establishing government operations"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t6",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 28,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Leadership",
+          "First Congressional Session Convening"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 23,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Challenges of the New Republic",
+          "Role in Constitution Ratification"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 20,
+        "query_count": 0,
+        "knowledge_sample": [
+          "administrative challenges of the new government",
+          "strategies for establishing international relations"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 28,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Political Rivals",
+          "Policy Implementation Challenges"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 22,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Date: 1789-05-06",
+          "First cabinet meeting the next day - establishing government operations"
+        ]
+      }
+    }
+  }
+]

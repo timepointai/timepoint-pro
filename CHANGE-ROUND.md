@@ -387,4 +387,4 @@ The system's **causal infrastructure is sound**. Temporal chains work, exposure 
 
 Fix priority: Repair query synthesis first (unblocks everything), then implement compression (reduces costs), then extend to multi-entity/scene-level (reaches original vision), then add advanced mechanisms (research features).
 
-**Bottom line**: You built an excellent library but forgot the card catalog. Fix that, and 9 of 17 mechanisms become functional. The remaining 8 are enhancements, not prerequisites for core functionality.clear
+**Bottom line**: You built an excellent library but forgot the card catalog. Fix that, and 9 of 17 mechanisms become functional. The remaining 8 are enhancements, not prerequisites for core functionality.

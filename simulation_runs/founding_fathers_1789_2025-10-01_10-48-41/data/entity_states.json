@@ -1,0 +1,352 @@
+[
+  {
+    "timepoint_id": "founding_fathers_1789_t0",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 5,
+        "query_count": 0,
+        "knowledge_sample": [
+          "historical context",
+          "role as president"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 3,
+        "query_count": 0,
+        "knowledge_sample": [
+          "First Presidential Inauguration",
+          "role as vice president"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 6,
+        "query_count": 0,
+        "knowledge_sample": [
+          "First Presidential Inauguration",
+          "secretary_of_state"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 5,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Key figure in the founding of the United States",
+          "First Secretary of the Treasury"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 5,
+        "query_count": 0,
+        "knowledge_sample": [
+          "First Presidential Inauguration",
+          "Congressman Role"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t1",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 10,
+        "query_count": 0,
+        "knowledge_sample": [
+          "immediate aftermath of the inauguration",
+          "age"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 6,
+        "query_count": 0,
+        "knowledge_sample": [
+          "political strategies post-inauguration",
+          "First Presidential Inauguration"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 10,
+        "query_count": 0,
+        "knowledge_sample": [
+          "First Presidential Inauguration",
+          "political rivalry"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 8,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Advocate for a strong central government",
+          "Proponent of the national bank"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 9,
+        "query_count": 0,
+        "knowledge_sample": [
+          "First Presidential Inauguration",
+          "Location New York"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t2",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 14,
+        "query_count": 0,
+        "knowledge_sample": [
+          "immediate aftermath of the inauguration",
+          "age"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 10,
+        "query_count": 0,
+        "knowledge_sample": [
+          "influence on future presidencies",
+          "political strategies post-inauguration"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 13,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Third President of the United States",
+          "First Presidential Inauguration"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 11,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Advocate for a strong central government",
+          "Developed a complex political legacy influencing modern American government"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 12,
+        "query_count": 0,
+        "knowledge_sample": [
+          "First Cabinet Meeting",
+          "First Presidential Inauguration"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t3",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 17,
+        "query_count": 0,
+        "knowledge_sample": [
+          "immediate aftermath of the inauguration",
+          "age"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 12,
+        "query_count": 0,
+        "knowledge_sample": [
+          "influence on future presidencies",
+          "political strategies post-inauguration"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 17,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Initiated the Louisiana Purchase negotiations",
+          "Third President of the United States"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 13,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Pioneered early policy discussions that set precedents for the new republic",
+          "Advocate for a strong central government"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 15,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Early policy discussions",
+          "First Cabinet Meeting"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t4",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 21,
+        "query_count": 0,
+        "knowledge_sample": [
+          "impact of foreign relations on early America",
+          "political alliances formed during presidency"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 16,
+        "query_count": 0,
+        "knowledge_sample": [
+          "influence on future presidencies",
+          "political strategies post-inauguration"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 20,
+        "query_count": 0,
+        "knowledge_sample": [
+          "political rivalry",
+          "location in Paris"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 15,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Pioneered early policy discussions that set precedents for the new republic",
+          "Advocate for a strong central government"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 19,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Location New York",
+          "Close Friendship"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t5",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 24,
+        "query_count": 0,
+        "knowledge_sample": [
+          "impact of foreign relations on early America",
+          "political alliances formed during presidency"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 28,
+        "query_count": 0,
+        "knowledge_sample": [
+          "historical significance of 1789",
+          "public perception during early presidency"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 24,
+        "query_count": 0,
+        "knowledge_sample": [
+          "political rivalry",
+          "location in Paris"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 17,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Pioneered early policy discussions that set precedents for the new republic",
+          "Advocate for a strong central government"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 23,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Continued influence on government operations",
+          "Location New York"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t6",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 25,
+        "query_count": 0,
+        "knowledge_sample": [
+          "impact of foreign relations on early America",
+          "political alliances formed during presidency"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 31,
+        "query_count": 0,
+        "knowledge_sample": [
+          "historical significance of 1789",
+          "public perception during early presidency"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 26,
+        "query_count": 0,
+        "knowledge_sample": [
+          "political rivalry",
+          "location in Paris"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 19,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Advocate for a strong central government",
+          "Proponent of the national bank"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 30,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Continued influence on government operations",
+          "Broader diplomatic engagements"
+        ]
+      }
+    }
+  }
+]

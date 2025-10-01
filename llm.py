@@ -81,6 +81,57 @@ Check for: anachronisms, biological impossibilities, knowledge contradictions.""
         self.token_count += 800
         self.cost += 0.008
         return response
+
+    def score_relevance(self, query: str, knowledge_item: str, model: str = "openai/gpt-4o-mini") -> float:
+        """Score how relevant a knowledge item is to a query (0.0-1.0)"""
+        if self.dry_run:
+            # Simple heuristic scoring for dry run
+            query_words = set(query.lower().split())
+            knowledge_words = set(knowledge_item.lower().split())
+            overlap = len(query_words.intersection(knowledge_words))
+            total_words = len(query_words.union(knowledge_words))
+            return min(1.0, overlap / max(1, total_words / 2))  # Scale to 0-1
+
+        prompt = f"""Rate how relevant this knowledge item is to the query on a scale of 0.0 to 1.0.
+
+Query: "{query}"
+Knowledge: "{knowledge_item}"
+
+Return only a number between 0.0 and 1.0, where:
+- 1.0 = Perfectly relevant and directly answers the query
+- 0.5 = Somewhat relevant but not central to the query
+- 0.0 = Completely irrelevant to the query
+
+Relevance score:"""
+
+        try:
+            response = self.client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1,  # Low temperature for consistent scoring
+                max_tokens=10
+            )
+
+            score_text = response.choices[0].message.content.strip()
+            # Extract numeric score
+            try:
+                score = float(score_text)
+                return max(0.0, min(1.0, score))  # Clamp to 0-1
+            except ValueError:
+                # Fallback to heuristic if LLM returns non-numeric
+                return self._heuristic_relevance_score(query, knowledge_item)
+
+        except Exception as e:
+            print(f"LLM relevance scoring failed: {e}")
+            return self._heuristic_relevance_score(query, knowledge_item)
+
+    def _heuristic_relevance_score(self, query: str, knowledge_item: str) -> float:
+        """Fallback heuristic relevance scoring"""
+        query_words = set(query.lower().split())
+        knowledge_words = set(knowledge_item.lower().split())
+        overlap = len(query_words.intersection(knowledge_words))
+        total_words = len(query_words.union(knowledge_words))
+        return min(1.0, overlap / max(1, total_words / 2))
     
     def _mock_entity_population(self, entity_schema: Dict, previous_knowledge: List[str] = None) -> EntityPopulation:
         """Deterministic mock for dry-run mode"""

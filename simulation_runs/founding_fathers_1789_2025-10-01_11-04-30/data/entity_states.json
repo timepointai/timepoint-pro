@@ -1,0 +1,352 @@
+[
+  {
+    "timepoint_id": "founding_fathers_1789_t0",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 3,
+        "query_count": 0,
+        "knowledge_sample": [
+          "first_presidential_inauguration",
+          "presidential_role"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 5,
+        "query_count": 0,
+        "knowledge_sample": [
+          "First Presidential Inauguration",
+          "vice president"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 4,
+        "query_count": 0,
+        "knowledge_sample": [
+          "First Presidential Inauguration",
+          "Secretary of State"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 2,
+        "query_count": 0,
+        "knowledge_sample": [
+          "First Presidential Inauguration",
+          "Treasury Secretary"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 5,
+        "query_count": 0,
+        "knowledge_sample": [
+          "historical significance of the First Presidential Inauguration",
+          "role in developing the U.S. Constitution"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t1",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 6,
+        "query_count": 0,
+        "knowledge_sample": [
+          "first_presidential_inauguration",
+          "challenges_of_presidency"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 8,
+        "query_count": 0,
+        "knowledge_sample": [
+          "vice president",
+          "crowds dispersing"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 6,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Emerging Political Landscape",
+          "Diplomatic Relations with France"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 5,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Public perception and response to policies",
+          "Immediate aftermath of the inauguration"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 10,
+        "query_count": 0,
+        "knowledge_sample": [
+          "impact on early American politics",
+          "implications of his friendships on political alliances"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t2",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 10,
+        "query_count": 0,
+        "knowledge_sample": [
+          "political_alliances",
+          "first_presidential_inauguration"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 12,
+        "query_count": 0,
+        "knowledge_sample": [
+          "vice president",
+          "First cabinet meeting"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 10,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Influence on Early Political Parties",
+          "Emerging Political Landscape"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 10,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Public perception and response to policies",
+          "Debates over state debt assumption"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 20,
+        "query_count": 0,
+        "knowledge_sample": [
+          "understanding the long-term significance of his friendships and alliances",
+          "expanded knowledge of the First Presidential Inauguration and its historical context"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t3",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 12,
+        "query_count": 0,
+        "knowledge_sample": [
+          "political_alliances",
+          "setting_precedents"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 18,
+        "query_count": 0,
+        "knowledge_sample": [
+          "vice president",
+          "First cabinet meeting"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 15,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Influence on Early Political Parties",
+          "Emerging Political Landscape"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 15,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Long-term impacts of fiscal policies on the nation",
+          "Public perception and response to policies"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 23,
+        "query_count": 0,
+        "knowledge_sample": [
+          "understanding the long-term significance of his friendships and alliances",
+          "expanded knowledge of the First Presidential Inauguration and its historical context"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t4",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 16,
+        "query_count": 0,
+        "knowledge_sample": [
+          "political_alliances",
+          "setting_precedents"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 21,
+        "query_count": 0,
+        "knowledge_sample": [
+          "federal governance",
+          "cabinets functions"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 18,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Influence on Early Political Parties",
+          "Emerging Political Landscape"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 17,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Long-term impacts of fiscal policies on the nation",
+          "Public perception and response to policies"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 25,
+        "query_count": 0,
+        "knowledge_sample": [
+          "insights into the debates surrounding the First Congress and its lasting impact on governance",
+          "understanding the long-term significance of his friendships and alliances"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t5",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 18,
+        "query_count": 0,
+        "knowledge_sample": [
+          "political_alliances",
+          "setting_precedents"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 23,
+        "query_count": 0,
+        "knowledge_sample": [
+          "diplomatic reception preparations",
+          "federal governance"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 22,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Emerging Political Landscape",
+          "Legislative work impacts"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 20,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Building alliances with international diplomats",
+          "Responses to opposition parties"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 35,
+        "query_count": 0,
+        "knowledge_sample": [
+          "insights into the debates surrounding the First Congress and its lasting impact on governance",
+          "understanding the long-term significance of his friendships and alliances"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t6",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 21,
+        "query_count": 0,
+        "knowledge_sample": [
+          "early_policy_discussions",
+          "first_cabinet_meeting"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 26,
+        "query_count": 0,
+        "knowledge_sample": [
+          "diplomatic reception preparations",
+          "federal governance"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 28,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Emerging Political Landscape",
+          "Legislative work impacts"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 22,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Building alliances with international diplomats",
+          "Responses to opposition parties"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 42,
+        "query_count": 0,
+        "knowledge_sample": [
+          "insights into the debates surrounding the First Congress and its lasting impact on governance",
+          "understanding the long-term significance of his friendships and alliances"
+        ]
+      }
+    }
+  }
+]

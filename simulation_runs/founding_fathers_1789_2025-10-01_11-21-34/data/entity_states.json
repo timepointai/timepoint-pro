@@ -1,0 +1,352 @@
+[
+  {
+    "timepoint_id": "founding_fathers_1789_t0",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 3,
+        "query_count": 0,
+        "knowledge_sample": [
+          "First Presidential Inauguration",
+          "Political leadership"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 3,
+        "query_count": 0,
+        "knowledge_sample": [
+          "First Presidential Inauguration",
+          "Vice President"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 5,
+        "query_count": 0,
+        "knowledge_sample": [
+          "First Presidential Inauguration",
+          "Secretary of State role"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 4,
+        "query_count": 0,
+        "knowledge_sample": [
+          "First Presidential Inauguration",
+          "Treasury Secretary"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 3,
+        "query_count": 0,
+        "knowledge_sample": [
+          "historical_significance_of_inaugurations",
+          "role_in_first_congress"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t1",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 6,
+        "query_count": 0,
+        "knowledge_sample": [
+          "First Presidential Inauguration",
+          "Public perception and legacy"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 6,
+        "query_count": 0,
+        "knowledge_sample": [
+          "First Presidential Inauguration",
+          "Federalist principles"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 8,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Political rivalry with John Adams",
+          "Navigating the complexities of diplomatic relations from Paris"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 7,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Treasury Secretary",
+          "Political Rivalry"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 5,
+        "query_count": 0,
+        "knowledge_sample": [
+          "role_in_first_congress",
+          "insights_on_governance"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t2",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 9,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Establishment of the executive branch",
+          "First Presidential Inauguration"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 8,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Importance of government operations",
+          "First Presidential Inauguration"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 12,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Attending the first cabinet meeting and its implications for governance",
+          "Understanding the legislative challenges ahead for the new administration"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 10,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Development of Fiscal Policies",
+          "Treasury Secretary"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 8,
+        "query_count": 0,
+        "knowledge_sample": [
+          "strategies_for_legislative_effectiveness",
+          "perspectives_on_partisan_divide"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t3",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 11,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Establishment of the executive branch",
+          "First Presidential Inauguration"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 11,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Importance of government operations",
+          "First Presidential Inauguration"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 22,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Analyzing the impact of domestic policies on international relations",
+          "Navigating the complexities of diplomatic relations from Paris"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 12,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Development of Fiscal Policies",
+          "Early Policy Discussions"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 12,
+        "query_count": 0,
+        "knowledge_sample": [
+          "perspectives_on_federalism",
+          "strategies_for_legislative_effectiveness"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t4",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 15,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Evolution of political dynamics in the early republic",
+          "Establishment of the executive branch"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 16,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Conflict with Thomas Jefferson",
+          "Importance of government operations"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 27,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Analyzing the impact of domestic policies on international relations",
+          "Navigating the complexities of diplomatic relations from Paris"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 16,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Development of Fiscal Policies",
+          "Early Policy Discussions"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 17,
+        "query_count": 0,
+        "knowledge_sample": [
+          "impact_of_state_interests_on_federal_legislation",
+          "insights_on_executive_power"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t5",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 16,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Evolution of political dynamics in the early republic",
+          "Establishment of the executive branch"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 20,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Importance of government operations",
+          "First Presidential Inauguration"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 30,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Analyzing the impact of domestic policies on international relations",
+          "Navigating the complexities of diplomatic relations from Paris"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 18,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Development of Fiscal Policies",
+          "Early Policy Discussions"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 19,
+        "query_count": 0,
+        "knowledge_sample": [
+          "insights_on_executive_power",
+          "perspectives_on_federalism"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t6",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 19,
+        "query_count": 0,
+        "knowledge_sample": [
+          "First Presidential Inauguration",
+          "Setting precedents for the new republic"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 25,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Building relationships with European powers",
+          "Understanding of the impact of early foreign policies"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 35,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Analyzing the impact of domestic policies on international relations",
+          "Navigating the complexities of diplomatic relations from Paris"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 21,
+        "query_count": 0,
+        "knowledge_sample": [
+          "First Presidential Inauguration",
+          "Innovations in Fiscal Policy"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 21,
+        "query_count": 0,
+        "knowledge_sample": [
+          "insights_on_executive_power",
+          "perspectives_on_federalism"
+        ]
+      }
+    }
+  }
+]
