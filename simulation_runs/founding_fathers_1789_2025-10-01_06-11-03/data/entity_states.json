@@ -1,0 +1,352 @@
+[
+  {
+    "timepoint_id": "founding_fathers_1789_t0",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 5,
+        "query_count": 0,
+        "knowledge_sample": [
+          "historical importance",
+          "leadership"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 4,
+        "query_count": 0,
+        "knowledge_sample": [
+          "First Presidential Inauguration",
+          "Role as Vice President"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 5,
+        "query_count": 0,
+        "knowledge_sample": [
+          "First Presidential Inauguration",
+          "First Secretary of State"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 4,
+        "query_count": 0,
+        "knowledge_sample": [
+          "First Presidential Inauguration",
+          "Treasury Secretary"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 5,
+        "query_count": 0,
+        "knowledge_sample": [
+          "First Presidential Inauguration",
+          "Role as congressman"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t1",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 8,
+        "query_count": 0,
+        "knowledge_sample": [
+          "challenges of governance",
+          "political impact"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 6,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Challenges Faced in Establishing the Executive Office",
+          "Key Contributions in Early US Politics"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 8,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Author of the Declaration of Independence",
+          "Leader of the Democratic-Republican Party"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 7,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Influence on Modern Finance",
+          "Treasury Secretary"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 8,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Formation of political parties",
+          "Role as congressman"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t2",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 11,
+        "query_count": 0,
+        "knowledge_sample": [
+          "challenges of governance",
+          "political impact"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 9,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Challenges Faced in Establishing the Executive Office",
+          "Key Contributions in Early US Politics"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 10,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Author of the Declaration of Independence",
+          "Leader of the Democratic-Republican Party"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 11,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Influence on Modern Finance",
+          "Role in the First Cabinet Meeting"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 10,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Formation of political parties",
+          "Role as congressman"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t3",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 15,
+        "query_count": 0,
+        "knowledge_sample": [
+          "importance of a balanced government",
+          "management of political alliances"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 11,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Early Policy Discussions and Precedents",
+          "Challenges Faced in Establishing the Executive Office"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 13,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Author of the Declaration of Independence",
+          "Formation of the Bill of Rights"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 15,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Influence on Modern Finance",
+          "Role in the First Cabinet Meeting"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 12,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Formation of political parties",
+          "Role as congressman"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t4",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 20,
+        "query_count": 0,
+        "knowledge_sample": [
+          "difficulties of partisan politics",
+          "role in shaping executive power"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 13,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Early Policy Discussions and Precedents",
+          "Challenges Faced in Establishing the Executive Office"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 16,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Author of the Declaration of Independence",
+          "Contextual Understanding of Early American Politics"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 18,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Formation of the Federalist Party",
+          "Influence on Modern Finance"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 15,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Formation of political parties",
+          "Role as congressman"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t5",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 27,
+        "query_count": 0,
+        "knowledge_sample": [
+          "presidential precedents",
+          "difficulties of partisan politics"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 15,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Early Policy Discussions and Precedents",
+          "Challenges Faced in Establishing the Executive Office"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 19,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Diplomatic reception preparations",
+          "Establishment of Government Operations"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 19,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Formation of the Federalist Party",
+          "Influence on Modern Finance"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 19,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Formation of political parties",
+          "First cabinet meeting"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t6",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 32,
+        "query_count": 0,
+        "knowledge_sample": [
+          "building global alliances",
+          "presidential precedents"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 19,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Early Policy Discussions and Precedents",
+          "Key Contributions in Early US Politics"
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 21,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Diplomatic reception preparations",
+          "Establishment of Government Operations"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 21,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Formation of the Federalist Party",
+          "Influence on Modern Finance"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 22,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Formation of political parties",
+          "First cabinet meeting"
+        ]
+      }
+    }
+  }
+]

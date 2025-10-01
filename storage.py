@@ -16,8 +16,11 @@ class GraphStore:
         SQLModel.metadata.create_all(self.engine)
     
     def save_entity(self, entity: Entity) -> Entity:
+        from sqlalchemy.orm.attributes import flag_modified
         with Session(self.engine) as session:
             session.add(entity)
+            # Mark entity_metadata as modified since it's a JSON column
+            flag_modified(entity, "entity_metadata")
             session.commit()
             session.refresh(entity)
             return entity
