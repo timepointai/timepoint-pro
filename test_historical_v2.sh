@@ -20,24 +20,35 @@ echo ""
 
 # Configuration
 SCENARIO="founding_fathers_1789"
-OUTPUT_DIR="test_output_$(date +%Y%m%d_%H%M%S)"
 
-# Create output directory
+# Create human-readable timestamp and output directory
+TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
+RUN_LABEL="${SCENARIO}_${TIMESTAMP}"
+OUTPUT_DIR="simulation_runs/${RUN_LABEL}"
+
+# Create output directory and subfolders
 mkdir -p "${OUTPUT_DIR}"
+mkdir -p "${OUTPUT_DIR}/data"
+mkdir -p "${OUTPUT_DIR}/database"
+mkdir -p "${OUTPUT_DIR}/logs"
 
 echo "Output directory: ${OUTPUT_DIR}"
 echo ""
 
 # Check for API configuration
+DRY_RUN=false
 if [[ -z "${OPENROUTER_API_KEY}" ]]; then
-    echo "ERROR: OPENROUTER_API_KEY not set"
-    exit 1
+    echo "⚠️  OPENROUTER_API_KEY not set - running in DRY RUN mode"
+    DRY_RUN=true
+    echo "============================================================"
+    echo "DRY RUN MODE - No API calls will be made"
+    echo "============================================================"
+else
+    echo "============================================================"
+    echo "REAL LLM MODE ACTIVE - API calls will incur costs"
+    echo "API: https://openrouter.ai/api/v1"
+    echo "============================================================"
 fi
-
-echo "============================================================"
-echo "REAL LLM MODE ACTIVE - API calls will incur costs"
-echo "API: https://openrouter.ai/api/v1"
-echo "============================================================"
 echo ""
 
 echo "======================================================================="
@@ -51,6 +62,7 @@ cat > /tmp/temporal_train_$.py << 'PYEOF'
 import sys
 import json
 import os
+import pickle
 from pathlib import Path
 from datetime import datetime, timedelta
 
@@ -65,21 +77,27 @@ from entity_templates import HISTORICAL_CONTEXTS
 output_dir = os.environ.get("OUTPUT_DIR", "test_output")
 scenario = os.environ.get("SCENARIO", "founding_fathers_1789")
 
-# Ensure output directory exists
+# Ensure output directory and subfolders exist
 Path(output_dir).mkdir(parents=True, exist_ok=True)
+Path(output_dir, "data").mkdir(exist_ok=True)
+Path(output_dir, "database").mkdir(exist_ok=True)
+Path(output_dir, "logs").mkdir(exist_ok=True)
 
 print(f"Output directory: {output_dir}")
 print("✓ Successfully imported all modules")
 print("")
 
-# Initialize components
-store = GraphStore("sqlite:///:memory:")
+# Initialize components - use file-based DB for persistence
+output_dir = os.environ.get("OUTPUT_DIR", "test_output")
+db_path = Path(output_dir) / "database" / "simulation.db"
+store = GraphStore(f"sqlite:///{db_path}")
 
 # Create LLM client directly (no LLMConfig needed)
+dry_run = os.environ.get("DRY_RUN", "false").lower() == "true"
 llm_client = LLMClient(
-    api_key=os.environ.get("OPENROUTER_API_KEY"),
+    api_key=os.environ.get("OPENROUTER_API_KEY", "dummy_key"),
     base_url="https://openrouter.ai/api/v1",
-    dry_run=False
+    dry_run=dry_run
 )
 
 print(f"✓ LLM client initialized (dry_run={llm_client.dry_run})")
@@ -135,25 +153,29 @@ for i, timepoint in enumerate(timepoints, 1):
     print(f"  Resolution: {timepoint.resolution_level.value}")
     print(f"  Entities: {len(timepoint.entities_present)}")
     print("")
-    
+
     # Capture knowledge counts before
     prev_counts = {}
     for entity_id in timepoint.entities_present:
         entity = store.get_entity(entity_id)
-        prev_counts[entity_id] = len(entity.entity_metadata.get("knowledge_state", []))
-    
+        prev_count = len(entity.entity_metadata.get("knowledge_state", []))
+        prev_counts[entity_id] = prev_count
+        if i == 1 and entity_id == "george_washington":
+            print(f"    DEBUG: Timepoint {i}, {entity_id} prev_count: {prev_count}")
+            print(f"    DEBUG: Current metadata: {entity.entity_metadata.get('knowledge_state', [])}")
+
     # Process each entity at this timepoint
     for entity_data in entities_data:
         entity_id = entity_data["entity_id"]
-        
+
         # Get previous knowledge for causal evolution
         previous_knowledge = None
         if timepoint.causal_parent:
             previous_knowledge = store.get_entity_knowledge_at_timepoint(
-                entity_id, 
+                entity_id,
                 timepoint.causal_parent
             )
-        
+
         # Build context for LLM
         enhanced_context = {
             "historical_context": context["event"],
@@ -164,30 +186,30 @@ for i, timepoint in enumerate(timepoints, 1):
             "event": timepoint.event_description,
             "timepoint_id": timepoint.timepoint_id,
             "relationships": [
-                r for s, t, r in context["relationships"] 
+                r for s, t, r in context["relationships"]
                 if s == entity_id or t == entity_id
             ]
         }
-        
+
         # Populate entity with LLM
         entity_schema = {
             "entity_id": entity_id,
             "timestamp": timepoint.timestamp.isoformat()
         }
-        
+
         # DEBUG: Show what we're sending to LLM
         if i == 1 and entity_id == "george_washington":
             print(f"\n  DEBUG: First LLM call for {entity_id}")
             print(f"    Schema: {entity_schema}")
             print(f"    Context keys: {list(enhanced_context.keys())}")
             print(f"    Previous knowledge: {previous_knowledge}")
-        
+
         population = llm_client.populate_entity(
             entity_schema,
             enhanced_context,
             previous_knowledge
         )
-        
+
         # DEBUG: Show what LLM returned
         if i == 1 and entity_id == "george_washington":
             print(f"    LLM Response:")
@@ -197,49 +219,56 @@ for i, timepoint in enumerate(timepoints, 1):
             print(f"      Confidence: {population.confidence}")
             print(f"      LLM cost so far: ${llm_client.cost:.4f}")
             print("")
-        
+
         # Update entity with new knowledge
         entity = store.get_entity(entity_id)
-        
+
         # DEBUG: Show entity state before merge
         if i == 1 and entity_id == "george_washington":
             print(f"    Entity BEFORE merge:")
             print(f"      Current knowledge_state: {entity.entity_metadata.get('knowledge_state', [])}")
             print(f"      Previous knowledge param: {previous_knowledge}")
-        
+
         current_knowledge = set(entity.entity_metadata.get("knowledge_state", []))
         new_knowledge = set(population.knowledge_state)
-        
+
         # DEBUG: Show sets
         if i == 1 and entity_id == "george_washington":
             print(f"      current_knowledge set: {current_knowledge}")
             print(f"      new_knowledge set: {new_knowledge}")
-        
-        # Merge knowledge
+
+        # Merge knowledge - always update since each timepoint should add new knowledge
         if previous_knowledge:
-            added_knowledge = new_knowledge - current_knowledge
-            if added_knowledge:
-                updated_knowledge = list(current_knowledge | new_knowledge)
-                entity.entity_metadata["knowledge_state"] = updated_knowledge
+            # Combine previous knowledge with new knowledge
+            updated_knowledge = list(set(previous_knowledge + population.knowledge_state))
+            entity.entity_metadata["knowledge_state"] = updated_knowledge
         else:
+            # First timepoint - just set the knowledge
             entity.entity_metadata["knowledge_state"] = population.knowledge_state
-            
+
         # DEBUG: Show entity state after merge
         if i == 1 and entity_id == "george_washington":
             print(f"    Entity AFTER merge:")
             print(f"      knowledge_state: {entity.entity_metadata.get('knowledge_state', [])}")
             print(f"      Should be: {population.knowledge_state}")
             print("")
-        
+
         entity.entity_metadata.update({
             "energy_budget": population.energy_budget,
             "personality_traits": population.personality_traits,
             "temporal_awareness": population.temporal_awareness,
             "confidence": population.confidence
         })
-        
+
         store.save_entity(entity)
-        
+
+        # DEBUG: Verify entity was saved correctly
+        if i == 1 and entity_id == "george_washington":
+            saved_entity = store.get_entity(entity_id)
+            print(f"    DEBUG: After save, {entity_id} knowledge: {len(saved_entity.entity_metadata.get('knowledge_state', []))}")
+            print(f"    DEBUG: Saved metadata: {saved_entity.entity_metadata.get('knowledge_state', [])}")
+            print("")
+
         # Create exposure events
         exposure_events = []
         for knowledge_item in population.knowledge_state:
@@ -254,10 +283,10 @@ for i, timepoint in enumerate(timepoints, 1):
                     timepoint_id=timepoint.timepoint_id
                 )
                 exposure_events.append(exposure_event)
-        
+
         if exposure_events:
             store.save_exposure_events(exposure_events)
-    
+
     # Show knowledge changes
     for entity_id in timepoint.entities_present:
         entity = store.get_entity(entity_id)
@@ -265,15 +294,15 @@ for i, timepoint in enumerate(timepoints, 1):
         delta = new_count - prev_counts[entity_id]
         delta_str = f"+{delta}" if delta >= 0 else str(delta)
         print(f"  ✓ {entity_id}: {delta_str} knowledge items (total: {new_count})")
-    
+
     total_cost += llm_client.cost
-    
+
     # Capture state
     state_entry = {
         "timepoint_id": timepoint.timepoint_id,
         "entities": {}
     }
-    
+
     for entity_id in timepoint.entities_present:
         entity = store.get_entity(entity_id)
         knowledge = entity.entity_metadata.get("knowledge_state", [])
@@ -283,7 +312,7 @@ for i, timepoint in enumerate(timepoints, 1):
             "query_count": entity.query_count,
             "knowledge_sample": knowledge[:2] if knowledge else []
         }
-    
+
     entity_states_log.append(state_entry)
     print("")
 
@@ -293,7 +322,7 @@ print(f"Timepoints processed: {len(timepoints)}")
 print("")
 
 # Save progression log
-states_file = Path(output_dir) / "entity_states.json"
+states_file = Path(output_dir, "data") / "entity_states.json"
 with open(states_file, 'w') as f:
     json.dump(entity_states_log, f, indent=2, default=str)
 print(f"📊 Entity states saved to: {states_file}")
@@ -311,7 +340,7 @@ knowledge_dump = {}
 for entity in all_entities:
     knowledge_items = entity.entity_metadata.get("knowledge_state", [])
     exposure_events = store.get_exposure_events(entity.entity_id)
-    
+
     knowledge_dump[entity.entity_id] = {
         "resolution": entity.resolution_level.value,
         "knowledge_count": len(knowledge_items),
@@ -329,7 +358,7 @@ for entity in all_entities:
     }
 
 # Save knowledge dump
-dump_file = Path(output_dir) / "knowledge_dump.json"
+dump_file = Path(output_dir, "data") / "knowledge_dump.json"
 with open(dump_file, 'w') as f:
     json.dump(knowledge_dump, f, indent=2)
 print(f"📊 Knowledge dump saved to: {dump_file}")
@@ -343,7 +372,7 @@ for entity_id, data in knowledge_dump.items():
     print(f"  Resolution: {data['resolution']}")
     print(f"  Knowledge items: {data['knowledge_count']}")
     print(f"  Exposure events: {len(data['exposure_events'])}")
-    
+
     if data['knowledge_items']:
         print(f"  Sample knowledge:")
         for i, item in enumerate(data['knowledge_items'][:3]):
@@ -362,18 +391,18 @@ if washington:
     print(f"Resolution: {washington.resolution_level.value}")
     print(f"Query count: {washington.query_count}")
     print(f"Training count: {washington.training_count}")
-    
+
     knowledge = washington.entity_metadata.get("knowledge_state", [])
     print(f"\nKnowledge items: {len(knowledge)}")
-    
+
     if knowledge:
         print("\nAll knowledge items:")
         for i, item in enumerate(knowledge):
             print(f"  [{i}] {item}")
-    
+
     exposure_events = store.get_exposure_events("george_washington")
     print(f"\nExposure events: {len(exposure_events)}")
-    
+
     if exposure_events:
         print("\nExposure timeline:")
         for event in exposure_events[:5]:
@@ -382,40 +411,13 @@ if washington:
 print("="*70)
 print("")
 
-# Save database file instead of pickling store
-# Since we're using in-memory DB, we need to use a file-based DB for persistence
-print("Note: Using in-memory database - data available for current session only")
-print("For persistent storage, initialize GraphStore with a file path")
-print("")
-
 print(f"✅ Training phase complete. Total cost: ${total_cost:.4f}")
 print(f"📁 All outputs in: {output_dir}/")
 print("")
-
-# Important discovery: Write analysis of the empty knowledge issue
-print("="*70)
-print("CRITICAL ISSUE IDENTIFIED")
-print("="*70)
-print("")
-print("🔍 LLM calls successful: ${:.2f} spent on {} API calls".format(total_cost, len(timepoints) * len(entities_data)))
-print("⚠️  Knowledge items stored: 0")
-print("✓ Exposure events created: {} total".format(sum(len(store.get_exposure_events(e)) for e in entities.keys())))
-print("")
-print("The disconnect:")
-print("  - ExposureEvents are being created with information content")
-print("  - But entity.entity_metadata['knowledge_state'] remains empty")
-print("  - This suggests populate_entity() returns knowledge in knowledge_state")
-print("  - But the merging logic isn't adding it to entity_metadata")
-print("")
-print("Check the debug output above for the first LLM call to see:")
-print("  1. What populate_entity() actually returned")
-print("  2. Whether knowledge_state was populated in the LLM response")
-print("  3. Where the knowledge gets lost in the merge logic")
-print("="*70)
 PYEOF
 
 # Run the Python script with environment variables
-OUTPUT_DIR="${OUTPUT_DIR}" SCENARIO="${SCENARIO}" OPENROUTER_API_KEY="${OPENROUTER_API_KEY}" python3 /tmp/temporal_train_$.py
+OUTPUT_DIR="${OUTPUT_DIR}" SCENARIO="${SCENARIO}" OPENROUTER_API_KEY="${OPENROUTER_API_KEY}" DRY_RUN="${DRY_RUN}" PYTHONPATH="$(pwd)" poetry run python3 /tmp/temporal_train_$.py
 
 # Clean up temp file
 rm /tmp/temporal_train_$.py
@@ -426,32 +428,35 @@ echo "QUERY PHASE WITH ENHANCED LOGGING"
 echo "============================================================"
 echo ""
 
-# Create temporary Python script for query phase
+# Skip query phase in dry run mode (no persistent state)
+if [[ "${DRY_RUN}" == "true" ]]; then
+    echo "⚠️  Skipping query phase in dry run mode (no persistent simulation state)"
+    echo ""
+else
+    # Create temporary Python script for query phase
 cat > /tmp/temporal_query_$.py << 'PYEOF'
 import sys
 import json
 import os
-import pickle
 from pathlib import Path
 from datetime import datetime
 
 # Import modules
-from schemas import LLMConfig
 from llm import LLMClient
 from query_interface import QueryInterface
+from storage import GraphStore
 
-# Load simulation
+# Load simulation from database
 output_dir = os.environ.get("OUTPUT_DIR", "test_output")
-sim_file = Path(output_dir) / "simulation_state.pkl"
-
-with open(sim_file, 'rb') as f:
-    store = pickle.load(f)
+db_path = Path(output_dir, "database") / "simulation.db"
+store = GraphStore(f"sqlite:///{db_path}")
 
 # Create LLM client (no LLMConfig class exists, use direct params)
+dry_run = os.environ.get("DRY_RUN", "false").lower() == "true"
 llm_client = LLMClient(
-    api_key=os.environ.get("OPENROUTER_API_KEY"),
+    api_key=os.environ.get("OPENROUTER_API_KEY", "dummy_key"),
     base_url="https://openrouter.ai/api/v1",
-    dry_run=False
+    dry_run=dry_run
 )
 
 # Create query interface
@@ -475,13 +480,13 @@ total_query_cost = 0.0
 
 while True:
     query = input("Query: ").strip()
-    
+
     if not query:
         continue
-    
+
     if query.lower() in ['exit', 'quit', 'q']:
         break
-    
+
     if query.lower() == 'help':
         print("\nExample queries:")
         print("  - What was Washington thinking during the inauguration?")
@@ -490,7 +495,7 @@ while True:
         print("  - Describe the cabinet meeting")
         print("")
         continue
-    
+
     if query.lower() == 'dump':
         print("\nDumping current knowledge state...")
         entities = store.get_all_entities()
@@ -504,7 +509,7 @@ while True:
                     print(f"    [{i}] {k[:100]}...")
         print("")
         continue
-    
+
     if query.lower() == 'status':
         print("\nSimulation Status:")
         entities = store.get_all_entities()
@@ -512,28 +517,28 @@ while True:
         print(f"  Entities: {len(entities)}")
         print(f"  Timepoints: {len(timepoints)}")
         print(f"  Total query cost: ${total_query_cost:.4f}")
-        
+
         if timepoints:
             latest = timepoints[-1]
             print(f"  Latest timepoint: {latest.timepoint_id}")
             print(f"    Event: {latest.event_description[:60]}...")
         print("")
         continue
-    
+
     # Parse query
     print("  Parsing query...")
     intent = query_interface.parse_query(query)
-    
+
     entity_id = intent.target_entity
     print(f"  Intent: {intent.information_type} about {entity_id or 'unknown'} (confidence: {intent.confidence:.1f})")
-    
+
     # Get entity before query
     if entity_id:
         entity = store.get_entity(entity_id)
         if entity:
             knowledge_before = entity.entity_metadata.get("knowledge_state", [])
             print(f"  📚 Knowledge before query: {len(knowledge_before)} items")
-            
+
             if knowledge_before:
                 print(f"     Sample items:")
                 for i, k in enumerate(knowledge_before[:3]):
@@ -544,16 +549,16 @@ while True:
     else:
         print(f"  ⚠️  No entity identified in query")
         knowledge_before = []
-    
+
     # Synthesize response
     print("  Synthesizing response...")
     response = query_interface.synthesize_response(intent)
-    
+
     print("")
     print("Response:")
     print(response)
     print("")
-    
+
     # Log query
     query_entry = {
         "timestamp": datetime.now().isoformat(),
@@ -564,17 +569,17 @@ while True:
         "knowledge_count_before": len(knowledge_before),
         "response": response[:200]
     }
-    
+
     query_log.append(query_entry)
-    
+
     # Save query log
-    log_file = Path(output_dir) / "query_log.jsonl"
+    log_file = Path(output_dir, "logs") / "query_log.jsonl"
     with open(log_file, 'a') as f:
         f.write(json.dumps(query_entry) + "\n")
-    
+
     cost = llm_client.cost - total_query_cost
     total_query_cost = llm_client.cost
-    
+
     print(f"Cost so far: ${total_query_cost:.4f}")
     print("")
 
@@ -595,17 +600,18 @@ for entity in entities:
     print(f"  Knowledge items: {len(knowledge)}")
 
 print("")
-print(f"📁 All query logs saved to: {output_dir}/query_log.jsonl")
+print(f"📁 All query logs saved to: {Path(output_dir, 'logs')}/query_log.jsonl")
 print(f"💾 Final state in: {output_dir}/")
 print("")
 print(f"Estimated total cost: ~${total_query_cost:.2f}")
 PYEOF
 
-# Run the query script with environment variables
-OUTPUT_DIR="${OUTPUT_DIR}" OPENROUTER_API_KEY="${OPENROUTER_API_KEY}" python3 /tmp/temporal_query_$.py
+    # Run the query script with environment variables
+    OUTPUT_DIR="${OUTPUT_DIR}" OPENROUTER_API_KEY="${OPENROUTER_API_KEY}" DRY_RUN="${DRY_RUN}" PYTHONPATH="$(pwd)" poetry run python3 /tmp/temporal_query_$.py
 
-# Clean up temp file
-rm /tmp/temporal_query_$.py
+    # Clean up temp file
+    rm /tmp/temporal_query_$.py
+fi
 
 echo ""
 echo "============================================================"
@@ -615,8 +621,13 @@ echo ""
 echo "All outputs saved to: ${OUTPUT_DIR}/"
 echo ""
 echo "Files generated:"
-echo "  - knowledge_dump.json          # Knowledge after training"
-echo "  - entity_states.json           # State progression through timepoints"
-echo "  - query_log.jsonl              # All queries with detailed info"
-echo "  - simulation_state.pkl         # Pickled simulation object"
+echo "  data/"
+echo "    - knowledge_dump.json        # Knowledge after training"
+echo "    - entity_states.json         # State progression through timepoints"
+echo "  database/"
+echo "    - simulation.db              # SQLite database with full simulation state"
+if [[ "${DRY_RUN}" != "true" ]]; then
+    echo "  logs/"
+    echo "    - query_log.jsonl            # All queries with detailed info"
+fi
 echo ""

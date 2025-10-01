@@ -1,239 +1,132 @@
 {
   "george_washington": {
     "resolution": "tensor_only",
-    "knowledge_count": 0,
+    "knowledge_count": 32,
     "query_count": 0,
-    "knowledge_items": [],
+    "knowledge_items": [
+      "building global alliances",
+      "presidential precedents",
+      "difficulties of partisan politics",
+      "role in shaping executive power",
+      "government stability",
+      "importance of bipartisanship",
+      "economic policy considerations",
+      "public expectations of the presidency",
+      "state sovereignty",
+      "first presidential duties",
+      "precedents of governance",
+      "vision for America",
+      "management of political alliances",
+      "role in establishing a federal government",
+      "political factions",
+      "importance of a balanced government",
+      "diplomatic relations",
+      "establishment of international relations",
+      "management of foreign affairs",
+      "political impact",
+      "foreign policy challenges",
+      "historical importance",
+      "policy formulation",
+      "preparation for diplomatic engagements",
+      "leadership",
+      "legacy",
+      "international alliances",
+      "challenges of governance",
+      "congressional dynamics",
+      "public sentiment",
+      "importance of unity",
+      "emerging national identity"
+    ],
     "exposure_events": [
       {
-        "information": "First President of the United States",
+        "information": "historical importance",
         "source": "First Presidential Inauguration",
         "timestamp": "1789-04-30T00:00:00",
         "timepoint_id": "founding_fathers_1789_t0"
       },
       {
-        "information": "Leader of the Continental Army during the American Revolutionary War",
+        "information": "leadership",
         "source": "First Presidential Inauguration",
         "timestamp": "1789-04-30T00:00:00",
         "timepoint_id": "founding_fathers_1789_t0"
       },
       {
-        "information": "Key figure in the drafting of the Constitution",
+        "information": "political impact",
         "source": "First Presidential Inauguration",
         "timestamp": "1789-04-30T00:00:00",
         "timepoint_id": "founding_fathers_1789_t0"
       },
       {
-        "information": "Established the protocols for the new government",
+        "information": "vision for America",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "legacy",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "challenges of governance",
         "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
         "timestamp": "1789-04-30T01:00:00",
         "timepoint_id": "founding_fathers_1789_t1"
       },
       {
-        "information": "Facilitated the formation of a stable executive branch",
+        "information": "public sentiment",
         "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
         "timestamp": "1789-04-30T01:00:00",
         "timepoint_id": "founding_fathers_1789_t1"
       },
       {
-        "information": "Inaugurated in New York City on April 30, 1789",
-        "source": "First cabinet meeting the next day - establishing government operations",
-        "timestamp": "1789-05-01T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t2"
-      },
-      {
-        "information": "Called for the first cabinet meeting establishing government operations",
-        "source": "First cabinet meeting the next day - establishing government operations",
-        "timestamp": "1789-05-01T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t2"
-      },
-      {
-        "information": "Navigated early challenges in governance",
-        "source": "First cabinet meeting the next day - establishing government operations",
-        "timestamp": "1789-05-01T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t2"
-      },
-      {
-        "information": "Set precedents for future presidents",
-        "source": "First cabinet meeting the next day - establishing government operations",
-        "timestamp": "1789-05-01T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t2"
-      },
-      {
-        "information": "Engaged in early policy discussions that shaped the new republic",
-        "source": "Early policy discussions in the following week - setting precedents for the new republic",
-        "timestamp": "1789-05-06T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t3"
-      },
-      {
-        "information": "Fostered political alliances crucial for governing",
-        "source": "Early policy discussions in the following week - setting precedents for the new republic",
-        "timestamp": "1789-05-06T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t3"
-      },
-      {
-        "information": "Mentored future leaders and statesmen",
-        "source": "Early policy discussions in the following week - setting precedents for the new republic",
-        "timestamp": "1789-05-06T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t3"
-      },
-      {
-        "information": "Oversaw the establishment of a functioning federal government",
-        "source": "First congressional session convening - legislative work beginning",
-        "timestamp": "1789-05-08T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t4"
-      },
-      {
-        "information": "Promoted national unity in a divided political landscape",
-        "source": "First congressional session convening - legislative work beginning",
-        "timestamp": "1789-05-08T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t4"
-      },
-      {
-        "information": "Handled foreign relations that set the tone for future diplomacy",
-        "source": "First congressional session convening - legislative work beginning",
-        "timestamp": "1789-05-08T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t4"
-      },
-      {
-        "information": "Strengthened international relations through diplomatic receptions",
-        "source": "Diplomatic reception preparations - establishing international relations",
-        "timestamp": "1789-05-10T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t5"
-      },
-      {
-        "information": "Expanded the role and influence of the presidency in foreign affairs",
-        "source": "Diplomatic reception preparations - establishing international relations",
-        "timestamp": "1789-05-10T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t5"
-      },
-      {
-        "information": "Developed strategies for early American foreign policy",
-        "source": "Diplomatic reception preparations - establishing international relations",
-        "timestamp": "1789-05-12T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t6"
-      },
-      {
-        "information": "Enhanced legislative relations with Congress to pass key laws",
-        "source": "Diplomatic reception preparations - establishing international relations",
-        "timestamp": "1789-05-12T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t6"
-      }
-    ]
-  },
-  "john_adams": {
-    "resolution": "tensor_only",
-    "knowledge_count": 0,
-    "query_count": 0,
-    "knowledge_items": [],
-    "exposure_events": [
-      {
-        "information": "first presidential inauguration",
-        "source": "First Presidential Inauguration",
-        "timestamp": "1789-04-30T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t0"
-      },
-      {
-        "information": "vice president",
-        "source": "First Presidential Inauguration",
-        "timestamp": "1789-04-30T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t0"
-      },
-      {
-        "information": "political alliance",
-        "source": "First Presidential Inauguration",
-        "timestamp": "1789-04-30T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t0"
-      },
-      {
-        "information": "1789",
-        "source": "First Presidential Inauguration",
-        "timestamp": "1789-04-30T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t0"
-      },
-      {
-        "information": "new york",
-        "source": "First Presidential Inauguration",
-        "timestamp": "1789-04-30T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t0"
-      },
-      {
-        "information": "crowd dynamics",
+        "information": "political factions",
         "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
         "timestamp": "1789-04-30T01:00:00",
         "timepoint_id": "founding_fathers_1789_t1"
       },
       {
-        "information": "official duties",
-        "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
-        "timestamp": "1789-04-30T01:00:00",
-        "timepoint_id": "founding_fathers_1789_t1"
-      },
-      {
-        "information": "early American governance",
-        "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
-        "timestamp": "1789-04-30T01:00:00",
-        "timepoint_id": "founding_fathers_1789_t1"
-      },
-      {
-        "information": "civic responsibility",
+        "information": "role in establishing a federal government",
         "source": "First cabinet meeting the next day - establishing government operations",
         "timestamp": "1789-05-01T00:00:00",
         "timepoint_id": "founding_fathers_1789_t2"
       },
       {
-        "information": "formation of the cabinet",
+        "information": "importance of unity",
         "source": "First cabinet meeting the next day - establishing government operations",
         "timestamp": "1789-05-01T00:00:00",
         "timepoint_id": "founding_fathers_1789_t2"
       },
       {
-        "information": "executive authority",
+        "information": "difficulties of partisan politics",
         "source": "First cabinet meeting the next day - establishing government operations",
         "timestamp": "1789-05-01T00:00:00",
         "timepoint_id": "founding_fathers_1789_t2"
       },
       {
-        "information": "early policy discussions",
+        "information": "precedents of governance",
         "source": "Early policy discussions in the following week - setting precedents for the new republic",
         "timestamp": "1789-05-06T00:00:00",
         "timepoint_id": "founding_fathers_1789_t3"
       },
       {
-        "information": "setting precedents for the new republic",
+        "information": "management of political alliances",
         "source": "Early policy discussions in the following week - setting precedents for the new republic",
         "timestamp": "1789-05-06T00:00:00",
         "timepoint_id": "founding_fathers_1789_t3"
       },
       {
-        "information": "early governance strategies",
-        "source": "First congressional session convening - legislative work beginning",
-        "timestamp": "1789-05-08T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t4"
+        "information": "policy formulation",
+        "source": "Early policy discussions in the following week - setting precedents for the new republic",
+        "timestamp": "1789-05-06T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t3"
       },
       {
-        "information": "relationship-building in politics",
-        "source": "First congressional session convening - legislative work beginning",
-        "timestamp": "1789-05-08T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t4"
-      },
-      {
-        "information": "importance of legislative work",
-        "source": "First congressional session convening - legislative work beginning",
-        "timestamp": "1789-05-08T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t4"
-      },
-      {
-        "information": "1789 in American history",
-        "source": "First congressional session convening - legislative work beginning",
-        "timestamp": "1789-05-08T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t4"
-      },
-      {
-        "information": "New York political scene",
-        "source": "First congressional session convening - legislative work beginning",
-        "timestamp": "1789-05-08T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t4"
+        "information": "importance of a balanced government",
+        "source": "Early policy discussions in the following week - setting precedents for the new republic",
+        "timestamp": "1789-05-06T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t3"
       },
       {
         "information": "congressional dynamics",
@@ -242,73 +135,239 @@
         "timepoint_id": "founding_fathers_1789_t4"
       },
       {
-        "information": "development of political parties",
+        "information": "importance of bipartisanship",
         "source": "First congressional session convening - legislative work beginning",
         "timestamp": "1789-05-08T00:00:00",
         "timepoint_id": "founding_fathers_1789_t4"
       },
       {
-        "information": "impact of early legislation",
+        "information": "role in shaping executive power",
         "source": "First congressional session convening - legislative work beginning",
         "timestamp": "1789-05-08T00:00:00",
         "timepoint_id": "founding_fathers_1789_t4"
+      },
+      {
+        "information": "public expectations of the presidency",
+        "source": "First congressional session convening - legislative work beginning",
+        "timestamp": "1789-05-08T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t4"
+      },
+      {
+        "information": "foreign policy challenges",
+        "source": "First congressional session convening - legislative work beginning",
+        "timestamp": "1789-05-08T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t4"
+      },
+      {
+        "information": "diplomatic relations",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-10T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t5"
+      },
+      {
+        "information": "international alliances",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-10T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t5"
+      },
+      {
+        "information": "state sovereignty",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-10T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t5"
       },
       {
         "information": "emerging national identity",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-10T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t5"
+      },
+      {
+        "information": "presidential precedents",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-10T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t5"
+      },
+      {
+        "information": "government stability",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-10T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t5"
+      },
+      {
+        "information": "economic policy considerations",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-10T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t5"
+      },
+      {
+        "information": "establishment of international relations",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-12T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t6"
+      },
+      {
+        "information": "preparation for diplomatic engagements",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-12T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t6"
+      },
+      {
+        "information": "building global alliances",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-12T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t6"
+      },
+      {
+        "information": "management of foreign affairs",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-12T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t6"
+      },
+      {
+        "information": "first presidential duties",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-12T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t6"
+      }
+    ]
+  },
+  "john_adams": {
+    "resolution": "tensor_only",
+    "knowledge_count": 19,
+    "query_count": 0,
+    "knowledge_items": [
+      "Early Policy Discussions and Precedents",
+      "Key Contributions in Early US Politics",
+      "Influence on Legislative Processes",
+      "Challenges Faced in Establishing the Executive Office",
+      "Diplomatic Reception Preparedness",
+      "Strategies for Establishing International Relations",
+      "Navigating Political Opposition",
+      "Foundational Role in New Republic's Governance",
+      "Social Dynamics of Early Governance",
+      "Legislative Achievements in the First Congressional Session",
+      "Diplomatic Engagements and Outcomes",
+      "Strengthening International Alliances",
+      "Impact of Political Alliances on Early Governance",
+      "Establishing Government Operations",
+      "First Presidential Inauguration",
+      "Emerging Political Divisions in the Early Republic",
+      "First Cabinet Meeting Outcomes",
+      "Role as Vice President",
+      "Political Alliances"
+    ],
+    "exposure_events": [
+      {
+        "information": "First Presidential Inauguration",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "Role as Vice President",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "Key Contributions in Early US Politics",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "Political Alliances",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "Challenges Faced in Establishing the Executive Office",
+        "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
+        "timestamp": "1789-04-30T01:00:00",
+        "timepoint_id": "founding_fathers_1789_t1"
+      },
+      {
+        "information": "Emerging Political Divisions in the Early Republic",
+        "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
+        "timestamp": "1789-04-30T01:00:00",
+        "timepoint_id": "founding_fathers_1789_t1"
+      },
+      {
+        "information": "Establishing Government Operations",
+        "source": "First cabinet meeting the next day - establishing government operations",
+        "timestamp": "1789-05-01T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t2"
+      },
+      {
+        "information": "First Cabinet Meeting Outcomes",
+        "source": "First cabinet meeting the next day - establishing government operations",
+        "timestamp": "1789-05-01T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t2"
+      },
+      {
+        "information": "Influence on Legislative Processes",
+        "source": "First cabinet meeting the next day - establishing government operations",
+        "timestamp": "1789-05-01T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t2"
+      },
+      {
+        "information": "Early Policy Discussions and Precedents",
+        "source": "Early policy discussions in the following week - setting precedents for the new republic",
+        "timestamp": "1789-05-06T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t3"
+      },
+      {
+        "information": "Foundational Role in New Republic's Governance",
+        "source": "Early policy discussions in the following week - setting precedents for the new republic",
+        "timestamp": "1789-05-06T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t3"
+      },
+      {
+        "information": "Legislative Achievements in the First Congressional Session",
         "source": "First congressional session convening - legislative work beginning",
         "timestamp": "1789-05-08T00:00:00",
         "timepoint_id": "founding_fathers_1789_t4"
       },
       {
-        "information": "public expectations from officeholders",
+        "information": "Impact of Political Alliances on Early Governance",
         "source": "First congressional session convening - legislative work beginning",
         "timestamp": "1789-05-08T00:00:00",
         "timepoint_id": "founding_fathers_1789_t4"
       },
       {
-        "information": "diplomatic reception preparations",
+        "information": "Diplomatic Reception Preparedness",
         "source": "Diplomatic reception preparations - establishing international relations",
         "timestamp": "1789-05-10T00:00:00",
         "timepoint_id": "founding_fathers_1789_t5"
       },
       {
-        "information": "establishing international relations",
+        "information": "Strategies for Establishing International Relations",
         "source": "Diplomatic reception preparations - establishing international relations",
         "timestamp": "1789-05-10T00:00:00",
         "timepoint_id": "founding_fathers_1789_t5"
       },
       {
-        "information": "importance of international diplomacy",
-        "source": "Diplomatic reception preparations - establishing international relations",
-        "timestamp": "1789-05-10T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t5"
-      },
-      {
-        "information": "diplomatic strategies in political relations",
+        "information": "Diplomatic Engagements and Outcomes",
         "source": "Diplomatic reception preparations - establishing international relations",
         "timestamp": "1789-05-12T00:00:00",
         "timepoint_id": "founding_fathers_1789_t6"
       },
       {
-        "information": "collaboration with foreign diplomats",
+        "information": "Strengthening International Alliances",
         "source": "Diplomatic reception preparations - establishing international relations",
         "timestamp": "1789-05-12T00:00:00",
         "timepoint_id": "founding_fathers_1789_t6"
       },
       {
-        "information": "cultural understanding in diplomacy",
+        "information": "Navigating Political Opposition",
         "source": "Diplomatic reception preparations - establishing international relations",
         "timestamp": "1789-05-12T00:00:00",
         "timepoint_id": "founding_fathers_1789_t6"
       },
       {
-        "information": "strengthening alliances through receptions",
-        "source": "Diplomatic reception preparations - establishing international relations",
-        "timestamp": "1789-05-12T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t6"
-      },
-      {
-        "information": "protocol and etiquette in diplomacy",
+        "information": "Social Dynamics of Early Governance",
         "source": "Diplomatic reception preparations - establishing international relations",
         "timestamp": "1789-05-12T00:00:00",
         "timepoint_id": "founding_fathers_1789_t6"
@@ -317,9 +376,31 @@
   },
   "thomas_jefferson": {
     "resolution": "tensor_only",
-    "knowledge_count": 0,
+    "knowledge_count": 21,
     "query_count": 0,
-    "knowledge_items": [],
+    "knowledge_items": [
+      "Diplomatic reception preparations",
+      "Establishment of Government Operations",
+      "Champion of the Louisiana Purchase",
+      "Influence on American Foreign Policy",
+      "Establishing international relations",
+      "Significance of the First Cabinet Meeting",
+      "Advancements in Foreign Diplomatic Strategies",
+      "Author of the Declaration of Independence",
+      "Advocate for States' Rights",
+      "First Secretary of State",
+      "Role in the First Congressional Session",
+      "Influential Founding Father",
+      "Political Rivalry with Alexander Hamilton",
+      "Engagement in foreign diplomacy",
+      "Contextual Understanding of Early American Politics",
+      "Formation of the Bill of Rights",
+      "Leader of the Democratic-Republican Party",
+      "Insights on Legislative Work",
+      "First Presidential Inauguration",
+      "Strengthened International Alliances",
+      "Early Policy Discussions with George Washington"
+    ],
     "exposure_events": [
       {
         "information": "First Presidential Inauguration",
@@ -328,381 +409,91 @@
         "timepoint_id": "founding_fathers_1789_t0"
       },
       {
-        "information": "secretary_of_state",
+        "information": "First Secretary of State",
         "source": "First Presidential Inauguration",
         "timestamp": "1789-04-30T00:00:00",
         "timepoint_id": "founding_fathers_1789_t0"
       },
       {
-        "information": "paris",
+        "information": "Influential Founding Father",
         "source": "First Presidential Inauguration",
         "timestamp": "1789-04-30T00:00:00",
         "timepoint_id": "founding_fathers_1789_t0"
       },
       {
-        "information": "age_46",
+        "information": "Author of the Declaration of Independence",
         "source": "First Presidential Inauguration",
         "timestamp": "1789-04-30T00:00:00",
         "timepoint_id": "founding_fathers_1789_t0"
       },
       {
-        "information": "Secretary of State",
-        "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
-        "timestamp": "1789-04-30T01:00:00",
-        "timepoint_id": "founding_fathers_1789_t1"
-      },
-      {
-        "information": "Paris",
-        "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
-        "timestamp": "1789-04-30T01:00:00",
-        "timepoint_id": "founding_fathers_1789_t1"
-      },
-      {
-        "information": "Age 46",
-        "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
-        "timestamp": "1789-04-30T01:00:00",
-        "timepoint_id": "founding_fathers_1789_t1"
-      },
-      {
-        "information": "Immediate aftermath of the inauguration",
-        "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
-        "timestamp": "1789-04-30T01:00:00",
-        "timepoint_id": "founding_fathers_1789_t1"
-      },
-      {
-        "information": "Crowds dispersing",
-        "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
-        "timestamp": "1789-04-30T01:00:00",
-        "timepoint_id": "founding_fathers_1789_t1"
-      },
-      {
-        "information": "Officials returning to duties",
-        "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
-        "timestamp": "1789-04-30T01:00:00",
-        "timepoint_id": "founding_fathers_1789_t1"
-      },
-      {
-        "information": "Close friendship",
-        "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
-        "timestamp": "1789-04-30T01:00:00",
-        "timepoint_id": "founding_fathers_1789_t1"
-      },
-      {
-        "information": "Political rivalry",
-        "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
-        "timestamp": "1789-04-30T01:00:00",
-        "timepoint_id": "founding_fathers_1789_t1"
-      },
-      {
-        "information": "First cabinet meeting",
-        "source": "First cabinet meeting the next day - establishing government operations",
-        "timestamp": "1789-05-01T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t2"
-      },
-      {
-        "information": "establishing government operations",
-        "source": "First cabinet meeting the next day - establishing government operations",
-        "timestamp": "1789-05-01T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t2"
-      },
-      {
-        "information": "Early policy discussions following the inauguration",
-        "source": "Early policy discussions in the following week - setting precedents for the new republic",
-        "timestamp": "1789-05-06T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t3"
-      },
-      {
-        "information": "Setting precedents for the new republic",
-        "source": "Early policy discussions in the following week - setting precedents for the new republic",
-        "timestamp": "1789-05-06T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t3"
-      },
-      {
-        "information": "Influencing early foreign policy",
-        "source": "Early policy discussions in the following week - setting precedents for the new republic",
-        "timestamp": "1789-05-06T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t3"
-      },
-      {
-        "information": "Building alliances in the new government",
-        "source": "Early policy discussions in the following week - setting precedents for the new republic",
-        "timestamp": "1789-05-06T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t3"
-      },
-      {
-        "information": "First congressional session convening",
-        "source": "First congressional session convening - legislative work beginning",
-        "timestamp": "1789-05-08T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t4"
-      },
-      {
-        "information": "legislative work beginning",
-        "source": "First congressional session convening - legislative work beginning",
-        "timestamp": "1789-05-08T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t4"
-      },
-      {
-        "information": "Confirming alliances with key figures",
-        "source": "First congressional session convening - legislative work beginning",
-        "timestamp": "1789-05-08T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t4"
-      },
-      {
-        "information": "Documenting early foreign policies",
-        "source": "First congressional session convening - legislative work beginning",
-        "timestamp": "1789-05-08T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t4"
-      },
-      {
-        "information": "Navigating through close friendships and political rivalries",
-        "source": "First congressional session convening - legislative work beginning",
-        "timestamp": "1789-05-08T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t4"
-      },
-      {
-        "information": "Influencing the structure of the new government",
-        "source": "First congressional session convening - legislative work beginning",
-        "timestamp": "1789-05-08T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t4"
-      },
-      {
-        "information": "Establishing priorities for national governance",
-        "source": "First congressional session convening - legislative work beginning",
-        "timestamp": "1789-05-08T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t4"
-      },
-      {
-        "information": "Foundational role in shaping the early republic",
-        "source": "First congressional session convening - legislative work beginning",
-        "timestamp": "1789-05-08T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t4"
-      },
-      {
-        "information": "Building coalitions among Federalists and Anti-Federalists",
-        "source": "First congressional session convening - legislative work beginning",
-        "timestamp": "1789-05-08T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t4"
-      },
-      {
-        "information": "Diplomatic reception preparations - establishing international relations",
-        "source": "Diplomatic reception preparations - establishing international relations",
-        "timestamp": "1789-05-10T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t5"
-      },
-      {
-        "information": "close_friendship",
-        "source": "Diplomatic reception preparations - establishing international relations",
-        "timestamp": "1789-05-10T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t5"
-      },
-      {
-        "information": "political_rivalry",
-        "source": "Diplomatic reception preparations - establishing international relations",
-        "timestamp": "1789-05-10T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t5"
-      },
-      {
-        "information": "Establishing alliances with foreign powers",
-        "source": "Diplomatic reception preparations - establishing international relations",
-        "timestamp": "1789-05-10T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t5"
-      },
-      {
-        "information": "Foundations of diplomatic engagements",
-        "source": "Diplomatic reception preparations - establishing international relations",
-        "timestamp": "1789-05-10T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t5"
-      },
-      {
-        "information": "emerging diplomatic strategies",
-        "source": "Diplomatic reception preparations - establishing international relations",
-        "timestamp": "1789-05-12T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t6"
-      },
-      {
-        "information": "forming treaties",
-        "source": "Diplomatic reception preparations - establishing international relations",
-        "timestamp": "1789-05-12T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t6"
-      },
-      {
-        "information": "building alliances with foreign powers",
-        "source": "Diplomatic reception preparations - establishing international relations",
-        "timestamp": "1789-05-12T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t6"
-      },
-      {
-        "information": "navigating foreign diplomatic landscapes",
-        "source": "Diplomatic reception preparations - establishing international relations",
-        "timestamp": "1789-05-12T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t6"
-      },
-      {
-        "information": "influencing legislative frameworks",
-        "source": "Diplomatic reception preparations - establishing international relations",
-        "timestamp": "1789-05-12T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t6"
-      },
-      {
-        "information": "Adapting to the challenges of governance",
-        "source": "Diplomatic reception preparations - establishing international relations",
-        "timestamp": "1789-05-12T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t6"
-      },
-      {
-        "information": "collaborating with international leaders",
-        "source": "Diplomatic reception preparations - establishing international relations",
-        "timestamp": "1789-05-12T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t6"
-      },
-      {
-        "information": "Engagement with European powers",
-        "source": "Diplomatic reception preparations - establishing international relations",
-        "timestamp": "1789-05-12T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t6"
-      },
-      {
-        "information": "shaping the future of foreign relations",
-        "source": "Diplomatic reception preparations - establishing international relations",
-        "timestamp": "1789-05-12T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t6"
-      },
-      {
-        "information": "Understanding cultural nuances in diplomacy",
-        "source": "Diplomatic reception preparations - establishing international relations",
-        "timestamp": "1789-05-12T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t6"
-      }
-    ]
-  },
-  "alexander_hamilton": {
-    "resolution": "tensor_only",
-    "knowledge_count": 0,
-    "query_count": 0,
-    "knowledge_items": [],
-    "exposure_events": [
-      {
-        "information": "First Presidential Inauguration",
+        "information": "Political Rivalry with Alexander Hamilton",
         "source": "First Presidential Inauguration",
         "timestamp": "1789-04-30T00:00:00",
         "timepoint_id": "founding_fathers_1789_t0"
       },
       {
-        "information": "Treasury Secretary",
-        "source": "First Presidential Inauguration",
-        "timestamp": "1789-04-30T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t0"
-      },
-      {
-        "information": "Age 34",
-        "source": "First Presidential Inauguration",
-        "timestamp": "1789-04-30T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t0"
-      },
-      {
-        "information": "Location New York",
-        "source": "First Presidential Inauguration",
-        "timestamp": "1789-04-30T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t0"
-      },
-      {
-        "information": "Event Date 1789-04-30",
-        "source": "First Presidential Inauguration",
-        "timestamp": "1789-04-30T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t0"
-      },
-      {
-        "information": "Crowds dispersing",
+        "information": "Advocate for States' Rights",
         "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
         "timestamp": "1789-04-30T01:00:00",
         "timepoint_id": "founding_fathers_1789_t1"
       },
       {
-        "information": "Officials returning to duties",
+        "information": "Leader of the Democratic-Republican Party",
         "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
         "timestamp": "1789-04-30T01:00:00",
         "timepoint_id": "founding_fathers_1789_t1"
       },
       {
-        "information": "Mentorship dynamics",
+        "information": "Champion of the Louisiana Purchase",
         "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
         "timestamp": "1789-04-30T01:00:00",
         "timepoint_id": "founding_fathers_1789_t1"
       },
       {
-        "information": "Political rivalries",
-        "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
-        "timestamp": "1789-04-30T01:00:00",
-        "timepoint_id": "founding_fathers_1789_t1"
-      },
-      {
-        "information": "Event Date 1789-05-01",
+        "information": "Establishment of Government Operations",
         "source": "First cabinet meeting the next day - establishing government operations",
         "timestamp": "1789-05-01T00:00:00",
         "timepoint_id": "founding_fathers_1789_t2"
       },
       {
-        "information": "First cabinet meeting",
+        "information": "Significance of the First Cabinet Meeting",
         "source": "First cabinet meeting the next day - establishing government operations",
         "timestamp": "1789-05-01T00:00:00",
         "timepoint_id": "founding_fathers_1789_t2"
       },
       {
-        "information": "Establishing government operations",
-        "source": "First cabinet meeting the next day - establishing government operations",
-        "timestamp": "1789-05-01T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t2"
-      },
-      {
-        "information": "Formation of the financial system",
-        "source": "First cabinet meeting the next day - establishing government operations",
-        "timestamp": "1789-05-01T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t2"
-      },
-      {
-        "information": "Economic policy discussions",
-        "source": "First cabinet meeting the next day - establishing government operations",
-        "timestamp": "1789-05-01T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t2"
-      },
-      {
-        "information": "Influence on national debt management",
-        "source": "First cabinet meeting the next day - establishing government operations",
-        "timestamp": "1789-05-01T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t2"
-      },
-      {
-        "information": "Event Date 1789-05-06",
+        "information": "Early Policy Discussions with George Washington",
         "source": "Early policy discussions in the following week - setting precedents for the new republic",
         "timestamp": "1789-05-06T00:00:00",
         "timepoint_id": "founding_fathers_1789_t3"
       },
       {
-        "information": "Early policy discussions",
+        "information": "Formation of the Bill of Rights",
         "source": "Early policy discussions in the following week - setting precedents for the new republic",
         "timestamp": "1789-05-06T00:00:00",
         "timepoint_id": "founding_fathers_1789_t3"
       },
       {
-        "information": "Setting precedents for the new republic",
+        "information": "Influence on American Foreign Policy",
         "source": "Early policy discussions in the following week - setting precedents for the new republic",
         "timestamp": "1789-05-06T00:00:00",
         "timepoint_id": "founding_fathers_1789_t3"
       },
       {
-        "information": "Influence on economic policy formation",
-        "source": "Early policy discussions in the following week - setting precedents for the new republic",
-        "timestamp": "1789-05-06T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t3"
-      },
-      {
-        "information": "First congressional session convening",
+        "information": "Role in the First Congressional Session",
         "source": "First congressional session convening - legislative work beginning",
         "timestamp": "1789-05-08T00:00:00",
         "timepoint_id": "founding_fathers_1789_t4"
       },
       {
-        "information": "Advancing legislative work",
+        "information": "Insights on Legislative Work",
+        "source": "First congressional session convening - legislative work beginning",
+        "timestamp": "1789-05-08T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t4"
+      },
+      {
+        "information": "Contextual Understanding of Early American Politics",
         "source": "First congressional session convening - legislative work beginning",
         "timestamp": "1789-05-08T00:00:00",
         "timepoint_id": "founding_fathers_1789_t4"
@@ -720,54 +511,52 @@
         "timepoint_id": "founding_fathers_1789_t5"
       },
       {
-        "information": "Influence on global economic policy",
+        "information": "Engagement in foreign diplomacy",
         "source": "Diplomatic reception preparations - establishing international relations",
         "timestamp": "1789-05-10T00:00:00",
         "timepoint_id": "founding_fathers_1789_t5"
       },
       {
-        "information": "Event Date 1789-05-10",
-        "source": "Diplomatic reception preparations - establishing international relations",
-        "timestamp": "1789-05-10T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t5"
-      },
-      {
-        "information": "Relationships: mentor-protege and political rivalry",
-        "source": "Diplomatic reception preparations - establishing international relations",
-        "timestamp": "1789-05-10T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t5"
-      },
-      {
-        "information": "Diplomatic engagement",
+        "information": "Advancements in Foreign Diplomatic Strategies",
         "source": "Diplomatic reception preparations - establishing international relations",
         "timestamp": "1789-05-12T00:00:00",
         "timepoint_id": "founding_fathers_1789_t6"
       },
       {
-        "information": "Introduced financial reforms",
-        "source": "Diplomatic reception preparations - establishing international relations",
-        "timestamp": "1789-05-12T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t6"
-      },
-      {
-        "information": "Influenced foreign partnerships",
-        "source": "Diplomatic reception preparations - establishing international relations",
-        "timestamp": "1789-05-12T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t6"
-      },
-      {
-        "information": "Formulated strategies for economic stability",
+        "information": "Strengthened International Alliances",
         "source": "Diplomatic reception preparations - establishing international relations",
         "timestamp": "1789-05-12T00:00:00",
         "timepoint_id": "founding_fathers_1789_t6"
       }
     ]
   },
-  "james_madison": {
+  "alexander_hamilton": {
     "resolution": "tensor_only",
-    "knowledge_count": 0,
+    "knowledge_count": 21,
     "query_count": 0,
-    "knowledge_items": [],
+    "knowledge_items": [
+      "Formation of the Federalist Party",
+      "Influence on Modern Finance",
+      "Treasury Secretary",
+      "Mentor-Prot\u00e9g\u00e9 Relationship",
+      "Interplay of Federal and State Powers",
+      "Establishment of Government Operations",
+      "Diplomatic Reception for International Relations",
+      "Impact of Financial Policies on Economic Development",
+      "Constitutional Interpretation",
+      "Role in the First Cabinet Meeting",
+      "Strategies for National Debt Management",
+      "Implementation of the Report on a National Bank",
+      "Influence on the Ratification of the Constitution",
+      "Political Rivalry",
+      "Economic Policies",
+      "Founding Principles of the U.S.",
+      "Building Strategic Alliances with European Powers",
+      "Early Policy Discussions",
+      "Setting Precedents for the New Republic",
+      "Engagement in War Bond Sales",
+      "First Presidential Inauguration"
+    ],
     "exposure_events": [
       {
         "information": "First Presidential Inauguration",
@@ -776,34 +565,209 @@
         "timepoint_id": "founding_fathers_1789_t0"
       },
       {
-        "information": "Congressman role",
+        "information": "Treasury Secretary",
         "source": "First Presidential Inauguration",
         "timestamp": "1789-04-30T00:00:00",
         "timepoint_id": "founding_fathers_1789_t0"
       },
       {
-        "information": "Historical significance of Madison",
+        "information": "Political Rivalry",
         "source": "First Presidential Inauguration",
         "timestamp": "1789-04-30T00:00:00",
         "timepoint_id": "founding_fathers_1789_t0"
       },
       {
-        "information": "Impact on U.S. Constitution",
+        "information": "Mentor-Prot\u00e9g\u00e9 Relationship",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "Economic Policies",
         "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
         "timestamp": "1789-04-30T01:00:00",
         "timepoint_id": "founding_fathers_1789_t1"
       },
       {
-        "information": "Political Ideologies",
+        "information": "Influence on Modern Finance",
         "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
         "timestamp": "1789-04-30T01:00:00",
         "timepoint_id": "founding_fathers_1789_t1"
       },
       {
-        "information": "Key role in the formation of political parties",
+        "information": "Founding Principles of the U.S.",
         "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
         "timestamp": "1789-04-30T01:00:00",
         "timepoint_id": "founding_fathers_1789_t1"
+      },
+      {
+        "information": "Establishment of Government Operations",
+        "source": "First cabinet meeting the next day - establishing government operations",
+        "timestamp": "1789-05-01T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t2"
+      },
+      {
+        "information": "Role in the First Cabinet Meeting",
+        "source": "First cabinet meeting the next day - establishing government operations",
+        "timestamp": "1789-05-01T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t2"
+      },
+      {
+        "information": "Strategies for National Debt Management",
+        "source": "First cabinet meeting the next day - establishing government operations",
+        "timestamp": "1789-05-01T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t2"
+      },
+      {
+        "information": "Constitutional Interpretation",
+        "source": "First cabinet meeting the next day - establishing government operations",
+        "timestamp": "1789-05-01T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t2"
+      },
+      {
+        "information": "Early Policy Discussions",
+        "source": "Early policy discussions in the following week - setting precedents for the new republic",
+        "timestamp": "1789-05-06T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t3"
+      },
+      {
+        "information": "Setting Precedents for the New Republic",
+        "source": "Early policy discussions in the following week - setting precedents for the new republic",
+        "timestamp": "1789-05-06T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t3"
+      },
+      {
+        "information": "Impact of Financial Policies on Economic Development",
+        "source": "Early policy discussions in the following week - setting precedents for the new republic",
+        "timestamp": "1789-05-06T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t3"
+      },
+      {
+        "information": "Interplay of Federal and State Powers",
+        "source": "Early policy discussions in the following week - setting precedents for the new republic",
+        "timestamp": "1789-05-06T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t3"
+      },
+      {
+        "information": "Implementation of the Report on a National Bank",
+        "source": "First congressional session convening - legislative work beginning",
+        "timestamp": "1789-05-08T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t4"
+      },
+      {
+        "information": "Formation of the Federalist Party",
+        "source": "First congressional session convening - legislative work beginning",
+        "timestamp": "1789-05-08T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t4"
+      },
+      {
+        "information": "Engagement in War Bond Sales",
+        "source": "First congressional session convening - legislative work beginning",
+        "timestamp": "1789-05-08T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t4"
+      },
+      {
+        "information": "Diplomatic Reception for International Relations",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-10T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t5"
+      },
+      {
+        "information": "Building Strategic Alliances with European Powers",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-12T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t6"
+      },
+      {
+        "information": "Influence on the Ratification of the Constitution",
+        "source": "Diplomatic reception preparations - establishing international relations",
+        "timestamp": "1789-05-12T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t6"
+      }
+    ]
+  },
+  "james_madison": {
+    "resolution": "tensor_only",
+    "knowledge_count": 22,
+    "query_count": 0,
+    "knowledge_items": [
+      "Formation of political parties",
+      "First cabinet meeting",
+      "Understanding of the nuances in political negotiations",
+      "Influence on the Constitution",
+      "Growing tensions with European powers",
+      "Role as congressman",
+      "Involvement in drafting the Bill of Rights",
+      "Early policy discussions",
+      "Growing political rivalry with Hamilton's Federalists",
+      "Development of foreign alliances",
+      "Close friendship with other founding fathers",
+      "Recognition as 'Father of the Constitution'",
+      "Experience in diplomatic reception preparations",
+      "Establishment of government operations",
+      "Participation in early foreign policy discussions",
+      "Advocacy for individual rights",
+      "Location in New York",
+      "Age 38",
+      "First Presidential Inauguration",
+      "Expansion of political ideologies",
+      "Skills in establishing international relations",
+      "Setting precedents for the new republic"
+    ],
+    "exposure_events": [
+      {
+        "information": "First Presidential Inauguration",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "Role as congressman",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "Age 38",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "Location in New York",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "Close friendship with other founding fathers",
+        "source": "First Presidential Inauguration",
+        "timestamp": "1789-04-30T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t0"
+      },
+      {
+        "information": "Influence on the Constitution",
+        "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
+        "timestamp": "1789-04-30T01:00:00",
+        "timepoint_id": "founding_fathers_1789_t1"
+      },
+      {
+        "information": "Formation of political parties",
+        "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
+        "timestamp": "1789-04-30T01:00:00",
+        "timepoint_id": "founding_fathers_1789_t1"
+      },
+      {
+        "information": "Advocacy for individual rights",
+        "source": "Immediate aftermath of the inauguration - crowds dispersing, officials returning to duties",
+        "timestamp": "1789-04-30T01:00:00",
+        "timepoint_id": "founding_fathers_1789_t1"
+      },
+      {
+        "information": "First cabinet meeting",
+        "source": "First cabinet meeting the next day - establishing government operations",
+        "timestamp": "1789-05-01T00:00:00",
+        "timepoint_id": "founding_fathers_1789_t2"
       },
       {
         "information": "Establishment of government operations",
@@ -812,97 +776,73 @@
         "timepoint_id": "founding_fathers_1789_t2"
       },
       {
-        "information": "Role in first cabinet meeting",
-        "source": "First cabinet meeting the next day - establishing government operations",
-        "timestamp": "1789-05-01T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t2"
-      },
-      {
-        "information": "Close friendships among Founding Fathers",
-        "source": "First cabinet meeting the next day - establishing government operations",
-        "timestamp": "1789-05-01T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t2"
-      },
-      {
-        "information": "Early policy discussions in the new republic",
+        "information": "Early policy discussions",
         "source": "Early policy discussions in the following week - setting precedents for the new republic",
         "timestamp": "1789-05-06T00:00:00",
         "timepoint_id": "founding_fathers_1789_t3"
       },
       {
-        "information": "Setting precedents for future governance",
+        "information": "Setting precedents for the new republic",
         "source": "Early policy discussions in the following week - setting precedents for the new republic",
         "timestamp": "1789-05-06T00:00:00",
         "timepoint_id": "founding_fathers_1789_t3"
       },
       {
-        "information": "Evolution of U.S. political system",
-        "source": "Early policy discussions in the following week - setting precedents for the new republic",
-        "timestamp": "1789-05-06T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t3"
-      },
-      {
-        "information": "Development of checks and balances",
+        "information": "Involvement in drafting the Bill of Rights",
         "source": "First congressional session convening - legislative work beginning",
         "timestamp": "1789-05-08T00:00:00",
         "timepoint_id": "founding_fathers_1789_t4"
       },
       {
-        "information": "Influence of Federalist Papers",
+        "information": "Growing political rivalry with Hamilton's Federalists",
         "source": "First congressional session convening - legislative work beginning",
         "timestamp": "1789-05-08T00:00:00",
         "timepoint_id": "founding_fathers_1789_t4"
       },
       {
-        "information": "Contributions to Bill of Rights",
+        "information": "Recognition as 'Father of the Constitution'",
         "source": "First congressional session convening - legislative work beginning",
         "timestamp": "1789-05-08T00:00:00",
         "timepoint_id": "founding_fathers_1789_t4"
       },
       {
-        "information": "Role in War of 1812",
-        "source": "First congressional session convening - legislative work beginning",
-        "timestamp": "1789-05-08T00:00:00",
-        "timepoint_id": "founding_fathers_1789_t4"
-      },
-      {
-        "information": "Experience in international diplomacy",
+        "information": "Participation in early foreign policy discussions",
         "source": "Diplomatic reception preparations - establishing international relations",
         "timestamp": "1789-05-10T00:00:00",
         "timepoint_id": "founding_fathers_1789_t5"
       },
       {
-        "information": "Developed relationships with foreign diplomats",
+        "information": "Development of foreign alliances",
         "source": "Diplomatic reception preparations - establishing international relations",
         "timestamp": "1789-05-10T00:00:00",
         "timepoint_id": "founding_fathers_1789_t5"
       },
       {
-        "information": "Preparation for diplomatic receptions in the new republic",
+        "information": "Growing tensions with European powers",
         "source": "Diplomatic reception preparations - establishing international relations",
         "timestamp": "1789-05-10T00:00:00",
         "timepoint_id": "founding_fathers_1789_t5"
       },
       {
-        "information": "Learned importance of establishing international relations",
+        "information": "Expansion of political ideologies",
         "source": "Diplomatic reception preparations - establishing international relations",
         "timestamp": "1789-05-10T00:00:00",
         "timepoint_id": "founding_fathers_1789_t5"
       },
       {
-        "information": "Recent developments in diplomatic relations",
+        "information": "Experience in diplomatic reception preparations",
         "source": "Diplomatic reception preparations - establishing international relations",
         "timestamp": "1789-05-12T00:00:00",
         "timepoint_id": "founding_fathers_1789_t6"
       },
       {
-        "information": "Challenges faced in foreign policy",
+        "information": "Skills in establishing international relations",
         "source": "Diplomatic reception preparations - establishing international relations",
         "timestamp": "1789-05-12T00:00:00",
         "timepoint_id": "founding_fathers_1789_t6"
       },
       {
-        "information": "Insights from diplomatic receptions",
+        "information": "Understanding of the nuances in political negotiations",
         "source": "Diplomatic reception preparations - establishing international relations",
         "timestamp": "1789-05-12T00:00:00",
         "timepoint_id": "founding_fathers_1789_t6"
