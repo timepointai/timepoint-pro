@@ -1,0 +1,352 @@
+[
+  {
+    "timepoint_id": "founding_fathers_1789_t0",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 5,
+        "query_count": 0,
+        "knowledge_sample": [
+          "historical_leader",
+          "founding_father"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 3,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Participated in the first presidential inauguration.",
+          "Served as vice president under George Washington."
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 5,
+        "query_count": 0,
+        "knowledge_sample": [
+          "First Presidential Inauguration",
+          "Secretary of State role"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 5,
+        "query_count": 0,
+        "knowledge_sample": [
+          "key architect of the financial system",
+          "advocate for a strong central government"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 3,
+        "query_count": 0,
+        "knowledge_sample": [
+          "historical significance of the first presidential inauguration",
+          "role in the establishment of the U.S. government"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t1",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 7,
+        "query_count": 0,
+        "knowledge_sample": [
+          "statesman",
+          "independence_figured"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 5,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Served as vice president under George Washington.",
+          "Reflected on the importance of the inaugural event for the future of the nation."
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 8,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Evolution of the Secretary of State role",
+          "Personal philosophies on governance"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 9,
+        "query_count": 0,
+        "knowledge_sample": [
+          "advocate for the establishment of a national bank",
+          "played a key role in the establishment of fiscal policies for the new government"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 6,
+        "query_count": 0,
+        "knowledge_sample": [
+          "contributions to the Federalist Papers",
+          "friendship with key figures like Thomas Jefferson"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t2",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 9,
+        "query_count": 0,
+        "knowledge_sample": [
+          "statesman",
+          "government_establisher"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 7,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Served as vice president under George Washington.",
+          "Reflected on the importance of the inaugural event for the future of the nation."
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 12,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Evolution of the Secretary of State role",
+          "Personal philosophies on governance"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 12,
+        "query_count": 0,
+        "knowledge_sample": [
+          "advocate for the establishment of a national bank",
+          "played a key role in the establishment of fiscal policies for the new government"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 10,
+        "query_count": 0,
+        "knowledge_sample": [
+          "contributions to the Federalist Papers",
+          "establishment of the Bill of Rights"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t3",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 12,
+        "query_count": 0,
+        "knowledge_sample": [
+          "statesman",
+          "government_establisher"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 12,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Served as vice president under George Washington.",
+          "Studied the dynamics of power-sharing between the presidency and congress."
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 16,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Evolution of the Secretary of State role",
+          "Setting precedents for the new republic"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 14,
+        "query_count": 0,
+        "knowledge_sample": [
+          "advocate for the establishment of a national bank",
+          "played a key role in the establishment of fiscal policies for the new government"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 14,
+        "query_count": 0,
+        "knowledge_sample": [
+          "insights from early policy discussions setting precedents for governance",
+          "contributions to the Federalist Papers"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t4",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 15,
+        "query_count": 0,
+        "knowledge_sample": [
+          "statesman",
+          "government_establisher"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 15,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Served as vice president under George Washington.",
+          "Studied the dynamics of power-sharing between the presidency and congress."
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 19,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Challenges faced as Secretary of State",
+          "Growth in the role of the Secretary of State"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 16,
+        "query_count": 0,
+        "knowledge_sample": [
+          "advocate for the establishment of a national bank",
+          "played a key role in the establishment of fiscal policies for the new government"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 24,
+        "query_count": 0,
+        "knowledge_sample": [
+          "establishment of the Bill of Rights",
+          "recognition of the importance of compromise in governance"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t5",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 17,
+        "query_count": 0,
+        "knowledge_sample": [
+          "statesman",
+          "government_establisher"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 16,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Served as vice president under George Washington.",
+          "Studied the dynamics of power-sharing between the presidency and congress."
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 21,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Understanding of international diplomacy",
+          "Challenges faced as Secretary of State"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 17,
+        "query_count": 0,
+        "knowledge_sample": [
+          "advocate for the establishment of a national bank",
+          "played a key role in the establishment of fiscal policies for the new government"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 27,
+        "query_count": 0,
+        "knowledge_sample": [
+          "establishment of the Bill of Rights",
+          "recognition of the importance of compromise in governance"
+        ]
+      }
+    }
+  },
+  {
+    "timepoint_id": "founding_fathers_1789_t6",
+    "entities": {
+      "george_washington": {
+        "resolution": "tensor_only",
+        "knowledge_count": 21,
+        "query_count": 0,
+        "knowledge_sample": [
+          "national_symbol",
+          "executive_delegator"
+        ]
+      },
+      "john_adams": {
+        "resolution": "tensor_only",
+        "knowledge_count": 18,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Served as vice president under George Washington.",
+          "Studied the dynamics of power-sharing between the presidency and congress."
+        ]
+      },
+      "thomas_jefferson": {
+        "resolution": "tensor_only",
+        "knowledge_count": 24,
+        "query_count": 0,
+        "knowledge_sample": [
+          "Understanding of international diplomacy",
+          "Reflections on the balance between state and federal powers"
+        ]
+      },
+      "alexander_hamilton": {
+        "resolution": "tensor_only",
+        "knowledge_count": 20,
+        "query_count": 0,
+        "knowledge_sample": [
+          "advocate for the establishment of a national bank",
+          "established the groundwork for modern taxation systems"
+        ]
+      },
+      "james_madison": {
+        "resolution": "tensor_only",
+        "knowledge_count": 32,
+        "query_count": 0,
+        "knowledge_sample": [
+          "establishment of the Bill of Rights",
+          "recognition of the importance of compromise in governance"
+        ]
+      }
+    }
+  }
+]

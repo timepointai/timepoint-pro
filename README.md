@@ -1,16 +1,17 @@
-# timepoint-daedalus
+# Timepoint-Daedalus
 
-Temporal entity simulation with LLM-driven training and tensor compression.
+**Interactive Temporal Knowledge Graph** - A fully functional system for simulating historical entities across time with causal evolution, variable resolution, and natural language queries.
 
 ## Overview
 
-Timepoint-Daedalus is a framework for simulating temporal entities with:
-- **LLM-driven entity population** using Instructor for structured outputs
-- **Graph-based entity relationships** using NetworkX
-- **Tensor compression** (PCA, SVD, NMF) for efficient entity representation
-- **Temporal validation** ensuring biological plausibility and information conservation
-- **LangGraph workflows** for parallel entity training
-- **SQLModel persistence** for entities, timelines, and graphs
+Timepoint-Daedalus creates **queryable temporal simulations** where historical entities evolve causally through time. The system generates entities at multiple timepoints with exposure tracking, applies variable resolution based on query patterns, and answers natural language questions about entity knowledge and experiences.
+
+**Key Features:**
+- **Temporal Chains**: Causal evolution of entities across connected timepoints
+- **Exposure Tracking**: Knowledge acquisition history with timestamps
+- **Variable Resolution**: Adaptive detail levels (tensor-only to fully trained)
+- **Interactive Queries**: Natural language questions answered from entity states
+- **Knowledge Validation**: Information conservation ensuring temporal coherence
 
 ## Installation
 
@@ -77,123 +78,105 @@ Edit `conf/config.yaml` to configure:
 
 ## Usage
 
-### Run Autopilot Mode
+### Create Temporal Simulation
 ```bash
-python cli.py mode=autopilot
-```
+# Build temporal chain with causal evolution
+python cli.py mode=temporal_train training.context=founding_fathers_1789 training.num_timepoints=3
 
-### Run Evaluation
-```bash
+# Run comprehensive evaluation
 python cli.py mode=evaluate
 ```
 
-### Run Training
+### Interactive Queries
 ```bash
-python cli.py mode=train
+# Start interactive query REPL
+python cli.py mode=interactive
+
+# Example queries:
+# "What did George Washington think about becoming president?"
+# "How did Hamilton and Jefferson's relationship evolve?"
+# "Describe the atmosphere during the inauguration ceremony"
 ```
 
-### Override Configuration
+### Configuration Options
 ```bash
-# Change graph sizes for autopilot
-python cli.py mode=autopilot autopilot.graph_sizes=[5,10,20]
+# Enable dry-run mode (no API costs)
+python cli.py mode=temporal_train llm.dry_run=true
 
-# Enable dry-run mode
-python cli.py mode=train llm.dry_run=true
+# Change context/scenario
+python cli.py mode=temporal_train training.context=renaissance_florence_1504
 
-# Change target resolution
-python cli.py mode=train training.target_resolution=scene
+# Adjust number of timepoints
+python cli.py mode=temporal_train training.num_timepoints=5
 ```
 
-## Testing
+## Architecture: File-by-File Breakdown
 
-The project supports comprehensive testing with both dry-run and real LLM modes.
+Timepoint-Daedalus consists of **23 core files** organized into a clean, modular architecture:
 
-### Quick Start Testing
+### 🎯 **Core Application**
+- **`cli.py`** - Main command-line interface with modes: `temporal_train`, `evaluate`, `interactive`
+- **`llm.py`** - OpenRouter API client with Instructor for structured LLM outputs
+- **`storage.py`** - SQLite database layer with SQLModel ORM for entities, timepoints, exposure events
+- **`schemas.py`** - Data models: Entity, Timepoint, ExposureEvent with resolution levels and temporal tracking
+
+### 🧠 **Temporal Intelligence**
+- **`temporal_chain.py`** - Builds causal chains of timepoints with historical context
+- **`resolution_engine.py`** - Adaptive resolution system (tensor-only → trained) based on query patterns
+- **`query_interface.py`** - Natural language query parsing and response synthesis
+- **`workflows.py`** - LangGraph orchestration for entity population and validation
+
+### 🔍 **Validation & Quality**
+- **`validation.py`** - Information conservation, temporal coherence, biological constraints
+- **`evaluation.py`** - Comprehensive metrics: knowledge consistency, temporal coherence, resolution distribution
+
+### 📊 **Data Processing**
+- **`tensors.py`** - TTMTensor (context/biology/behavior) compression with PCA/SVD
+- **`graph.py`** - NetworkX relationship graphs with eigenvector centrality
+- **`entity_templates.py`** - Historical context templates (Founding Fathers, Renaissance Florence)
+
+### 🛠️ **Infrastructure**
+- **`reporting.py`** - JSON/Markdown/GraphML report generation
+- **`conf/config.yaml`** - Configuration management
+- **`pyproject.toml`** - Poetry dependency management
+- **`requirements.txt`** - Alternative pip installation
+- **`poetry.lock`** - Locked dependency versions
+
+### 📜 **Documentation & Scripts**
+- **`README.md`** - This documentation
+- **`CHANGE-ROUND.md`** - Current development status
+- **`demo.sh`** - End-to-end workflow demonstration
+- **`install.sh`** - macOS-compatible installation script
+
+### Resolution Levels (Adaptive Detail)
+
+1. **TENSOR_ONLY**: Compressed tensor representation only (memory efficient)
+2. **SCENE**: Scene-level context with basic knowledge
+3. **GRAPH**: Full graph relationships and moderate detail
+4. **DIALOG**: Dialog-level detail with conversations
+5. **TRAINED**: Fully trained entity with complete knowledge state
+
+### Validation Rules (Temporal Coherence)
+
+- **Information Conservation**: Entity knowledge ⊆ exposure history (no anachronisms)
+- **Temporal Coherence**: Entity evolution follows causal chains
+- **Knowledge Consistency**: Cross-entity claims don't contradict
+- **Biological Constraints**: Age/health-appropriate capabilities
+
+## Example Workflow
 
 ```bash
-# Run all tests (dry-run mode by default)
-pytest
+# 1. Create temporal simulation
+./demo.sh
 
-# Run with coverage report
-pytest --cov
+# 2. Explore interactively
+python cli.py mode=interactive
+# Query: "What did Washington think about the presidency?"
+# Query: "How did Jefferson react to Hamilton's financial plan?"
 
-# Run with verbose logging
-pytest --verbose-tests -s
+# 3. Check evaluation metrics
+python cli.py mode=evaluate
 ```
-
-### LLM Testing Modes
-
-**Dry-Run Mode (Default - Fast & Free):**
-```bash
-# Standard testing - no API key needed
-pytest --cov
-```
-
-**Real LLM Mode (Integration Testing):**
-```bash
-# 1. Get API key from https://openrouter.ai/keys
-# 2. Set environment variable
-export OPENROUTER_API_KEY="your_api_key_here"
-
-# 3. Run tests with real LLM calls
-pytest --verbose-tests
-
-# Or use the convenience script
-./test_real_llm.py
-```
-
-### Advanced Testing
-
-```bash
-# Run specific test
-pytest test_framework.py::test_tensor_compression
-
-# Run integration tests only (requires API key)
-pytest -m integration
-
-# Run property-based tests
-pytest test_framework.py::test_graph_creation_property
-
-# Generate HTML coverage report
-pytest --cov --cov-report=html
-```
-
-### Test Results
-
-- **Coverage**: 93% across all modules
-- **Tests**: 20 comprehensive tests
-- **Modes**: Dry-run (free, fast) + Real LLM (integration)
-
-See [VERBOSE_TESTING.md](VERBOSE_TESTING.md) for logging details and [REAL_LLM_TESTING.md](REAL_LLM_TESTING.md) for LLM testing guide.
-
-## Architecture
-
-### Core Components
-
-- **schemas.py**: SQLModel schemas (Entity, Timeline, SystemPrompt, ValidationRule)
-- **storage.py**: Database and graph persistence layer
-- **llm.py**: LLM client with Instructor integration
-- **workflows.py**: LangGraph workflow definitions
-- **validation.py**: Pluggable validation framework
-- **tensors.py**: Tensor compression with plugin registry
-- **evaluation.py**: Evaluation metrics (coherence, consistency, plausibility)
-- **graph.py**: NetworkX graph creation and centrality metrics
-- **test_framework.py**: Pytest fixtures and tests
-
-### Resolution Levels
-
-1. **TENSOR_ONLY**: Compressed tensor representation only
-2. **SCENE**: Scene-level context
-3. **GRAPH**: Full graph context
-4. **DIALOG**: Dialog-level detail
-5. **TRAINED**: Fully trained entity
-
-### Validation Rules
-
-- **Information Conservation**: Knowledge ⊆ exposure history
-- **Energy Budget**: Interaction costs ≤ capacity
-- **Behavioral Inertia**: Gradual personality drift
-- **Biological Constraints**: Age-dependent capabilities
 
 ## Development
 
@@ -210,24 +193,18 @@ ruff check .
 mypy .
 ```
 
-### Adding New Validators
+### Current Status
 
-```python
-@Validator.register("custom_validator", "WARNING")
-def validate_custom(entity: Entity, context: Dict) -> Dict:
-    # Your validation logic
-    return {"valid": True, "message": "Custom validation passed"}
-```
+✅ **Fully Functional**: Interactive temporal simulation with all core features implemented
+- Temporal chains with causal evolution
+- Variable resolution system
+- Natural language queries
+- Knowledge validation and consistency
 
-### Adding New Tensor Compressors
+⏳ **Remaining**: Production optimizations (batch LLM calls, caching, error handling)
 
-```python
-@TensorCompressor.register("custom_method")
-def custom_compress(tensor: np.ndarray, n_components: int = 8) -> np.ndarray:
-    # Your compression logic
-    return compressed_tensor
-```
+See `CHANGE-ROUND.md` for detailed development progress.
 
 ## License
 
-[Your License Here]
+MIT
