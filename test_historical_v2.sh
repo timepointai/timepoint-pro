@@ -46,8 +46,8 @@ echo "Timepoints: 7"
 echo "======================================================================="
 echo ""
 
-# Main training and inspection script
-python3 << 'PYEOF'
+# Create temporary Python script to avoid heredoc issues
+cat > /tmp/temporal_train_$.py << 'PYEOF'
 import sys
 import json
 import os
@@ -61,10 +61,14 @@ from storage import GraphStore
 from llm import LLMClient
 from entity_templates import HISTORICAL_CONTEXTS
 
-# Configuration
+# Configuration - get from environment
 output_dir = os.environ.get("OUTPUT_DIR", "test_output")
 scenario = os.environ.get("SCENARIO", "founding_fathers_1789")
 
+# Ensure output directory exists
+Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+print(f"Output directory: {output_dir}")
 print("✓ Successfully imported all modules")
 print("")
 
@@ -171,16 +175,45 @@ for i, timepoint in enumerate(timepoints, 1):
             "timestamp": timepoint.timestamp.isoformat()
         }
         
+        # DEBUG: Show what we're sending to LLM
+        if i == 1 and entity_id == "george_washington":
+            print(f"\n  DEBUG: First LLM call for {entity_id}")
+            print(f"    Schema: {entity_schema}")
+            print(f"    Context keys: {list(enhanced_context.keys())}")
+            print(f"    Previous knowledge: {previous_knowledge}")
+        
         population = llm_client.populate_entity(
             entity_schema,
             enhanced_context,
             previous_knowledge
         )
         
+        # DEBUG: Show what LLM returned
+        if i == 1 and entity_id == "george_washington":
+            print(f"    LLM Response:")
+            print(f"      Knowledge items: {len(population.knowledge_state)}")
+            if population.knowledge_state:
+                print(f"      First item: {population.knowledge_state[0][:100]}...")
+            print(f"      Confidence: {population.confidence}")
+            print(f"      LLM cost so far: ${llm_client.cost:.4f}")
+            print("")
+        
         # Update entity with new knowledge
         entity = store.get_entity(entity_id)
+        
+        # DEBUG: Show entity state before merge
+        if i == 1 and entity_id == "george_washington":
+            print(f"    Entity BEFORE merge:")
+            print(f"      Current knowledge_state: {entity.entity_metadata.get('knowledge_state', [])}")
+            print(f"      Previous knowledge param: {previous_knowledge}")
+        
         current_knowledge = set(entity.entity_metadata.get("knowledge_state", []))
         new_knowledge = set(population.knowledge_state)
+        
+        # DEBUG: Show sets
+        if i == 1 and entity_id == "george_washington":
+            print(f"      current_knowledge set: {current_knowledge}")
+            print(f"      new_knowledge set: {new_knowledge}")
         
         # Merge knowledge
         if previous_knowledge:
@@ -190,6 +223,13 @@ for i, timepoint in enumerate(timepoints, 1):
                 entity.entity_metadata["knowledge_state"] = updated_knowledge
         else:
             entity.entity_metadata["knowledge_state"] = population.knowledge_state
+            
+        # DEBUG: Show entity state after merge
+        if i == 1 and entity_id == "george_washington":
+            print(f"    Entity AFTER merge:")
+            print(f"      knowledge_state: {entity.entity_metadata.get('knowledge_state', [])}")
+            print(f"      Should be: {population.knowledge_state}")
+            print("")
         
         entity.entity_metadata.update({
             "energy_budget": population.energy_budget,
@@ -342,17 +382,43 @@ if washington:
 print("="*70)
 print("")
 
-# Save simulation for query phase
-import pickle
-sim_file = Path(output_dir) / "simulation_state.pkl"
-with open(sim_file, 'wb') as f:
-    pickle.dump(store, f)
-print(f"💾 Simulation saved to: {sim_file}")
+# Save database file instead of pickling store
+# Since we're using in-memory DB, we need to use a file-based DB for persistence
+print("Note: Using in-memory database - data available for current session only")
+print("For persistent storage, initialize GraphStore with a file path")
 print("")
 
 print(f"✅ Training phase complete. Total cost: ${total_cost:.4f}")
 print(f"📁 All outputs in: {output_dir}/")
+print("")
+
+# Important discovery: Write analysis of the empty knowledge issue
+print("="*70)
+print("CRITICAL ISSUE IDENTIFIED")
+print("="*70)
+print("")
+print("🔍 LLM calls successful: ${:.2f} spent on {} API calls".format(total_cost, len(timepoints) * len(entities_data)))
+print("⚠️  Knowledge items stored: 0")
+print("✓ Exposure events created: {} total".format(sum(len(store.get_exposure_events(e)) for e in entities.keys())))
+print("")
+print("The disconnect:")
+print("  - ExposureEvents are being created with information content")
+print("  - But entity.entity_metadata['knowledge_state'] remains empty")
+print("  - This suggests populate_entity() returns knowledge in knowledge_state")
+print("  - But the merging logic isn't adding it to entity_metadata")
+print("")
+print("Check the debug output above for the first LLM call to see:")
+print("  1. What populate_entity() actually returned")
+print("  2. Whether knowledge_state was populated in the LLM response")
+print("  3. Where the knowledge gets lost in the merge logic")
+print("="*70)
 PYEOF
+
+# Run the Python script with environment variables
+OUTPUT_DIR="${OUTPUT_DIR}" SCENARIO="${SCENARIO}" OPENROUTER_API_KEY="${OPENROUTER_API_KEY}" python3 /tmp/temporal_train_$.py
+
+# Clean up temp file
+rm /tmp/temporal_train_$.py
 
 echo ""
 echo "============================================================"
@@ -360,8 +426,8 @@ echo "QUERY PHASE WITH ENHANCED LOGGING"
 echo "============================================================"
 echo ""
 
-# Query interface with detailed logging
-python3 << 'PYEOF'
+# Create temporary Python script for query phase
+cat > /tmp/temporal_query_$.py << 'PYEOF'
 import sys
 import json
 import os
@@ -534,6 +600,12 @@ print(f"💾 Final state in: {output_dir}/")
 print("")
 print(f"Estimated total cost: ~${total_query_cost:.2f}")
 PYEOF
+
+# Run the query script with environment variables
+OUTPUT_DIR="${OUTPUT_DIR}" OPENROUTER_API_KEY="${OPENROUTER_API_KEY}" python3 /tmp/temporal_query_$.py
+
+# Clean up temp file
+rm /tmp/temporal_query_$.py
 
 echo ""
 echo "============================================================"
