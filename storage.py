@@ -5,6 +5,7 @@ from sqlmodel import Session, create_engine, select, SQLModel
 from typing import Optional
 import networkx as nx
 import json
+from functools import lru_cache
 
 from schemas import Entity, Timeline, SystemPrompt, ExposureEvent, Timepoint
 
@@ -46,8 +47,9 @@ class GraphStore:
             session.refresh(timepoint)
             return timepoint
 
+    @lru_cache(maxsize=500)
     def get_timepoint(self, timepoint_id: str) -> Optional[Timepoint]:
-        """Get a timepoint by ID"""
+        """Get a timepoint by ID with LRU caching"""
         with Session(self.engine) as session:
             statement = select(Timepoint).where(Timepoint.timepoint_id == timepoint_id)
             return session.exec(statement).first()
@@ -98,7 +100,9 @@ class GraphStore:
             session.exec(text("DELETE FROM validationrule"))
             session.commit()
 
+    @lru_cache(maxsize=1000)
     def get_entity(self, entity_id: str) -> Optional[Entity]:
+        """Get entity by ID with LRU caching"""
         with Session(self.engine) as session:
             statement = select(Entity).where(Entity.entity_id == entity_id)
             return session.exec(statement).first()

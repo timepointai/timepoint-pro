@@ -3,14 +3,19 @@
 # ============================================================================
 import numpy as np
 from typing import Dict, List, Optional, Tuple
-from datetime import datetime
+from datetime import datetime, timedelta
 from pydantic import BaseModel
+import hashlib
 from schemas import Entity, Timepoint, ResolutionLevel
 from storage import GraphStore
 from llm import LLMClient
 from resolution_engine import ResolutionEngine
 from instructor import OpenAISchema
 from tensors import load_compressed_entity_data
+
+# Query response cache with TTL
+_query_cache: Dict[str, Tuple[str, datetime]] = {}
+CACHE_TTL = timedelta(hours=1)
 
 
 class QueryIntent(OpenAISchema):
@@ -30,6 +35,51 @@ class QueryInterface:
         self.store = store
         self.llm_client = llm_client
         self.resolution_engine = ResolutionEngine(store)
+
+    def _get_query_cache_key(self, query: str, query_intent: QueryIntent) -> str:
+        """Generate cache key for query based on content and intent"""
+        # Create a hash of the query and relevant intent fields
+        cache_content = f"{query}|{query_intent.target_entity}|{query_intent.target_timepoint}|{query_intent.information_type}"
+        return hashlib.md5(cache_content.encode()).hexdigest()
+
+    def _get_cached_response(self, cache_key: str) -> Optional[str]:
+        """Get cached response if it exists and hasn't expired"""
+        if cache_key in _query_cache:
+            response, timestamp = _query_cache[cache_key]
+            if datetime.now() - timestamp < CACHE_TTL:
+                return response
+            else:
+                # Expired, remove from cache
+                del _query_cache[cache_key]
+        return None
+
+    def _cache_response(self, cache_key: str, response: str) -> None:
+        """Cache a response with current timestamp"""
+        _query_cache[cache_key] = (response, datetime.now())
+
+    def clear_expired_cache(self) -> int:
+        """Remove expired cache entries, return number removed"""
+        now = datetime.now()
+        expired_keys = [
+            key for key, (_, timestamp) in _query_cache.items()
+            if now - timestamp >= CACHE_TTL
+        ]
+        for key in expired_keys:
+            del _query_cache[key]
+        return len(expired_keys)
+
+    def get_cache_stats(self) -> Dict[str, int]:
+        """Get cache statistics"""
+        total_entries = len(_query_cache)
+        now = datetime.now()
+        valid_entries = sum(1 for _, timestamp in _query_cache.values()
+                           if now - timestamp < CACHE_TTL)
+        expired_entries = total_entries - valid_entries
+        return {
+            "total_entries": total_entries,
+            "valid_entries": valid_entries,
+            "expired_entries": expired_entries
+        }
 
     def parse_query(self, query: str) -> QueryIntent:
         """Parse natural language query into structured intent using LLM"""
@@ -188,6 +238,27 @@ Extract:
         # Store original query for relevance scoring
         intent._original_query = query
         return intent
+
+    def query(self, query_text: str) -> str:
+        """Main query method with caching support"""
+        # Parse query intent
+        query_intent = self.parse_query(query_text)
+
+        # Check cache first
+        cache_key = self._get_query_cache_key(query_text, query_intent)
+        cached_response = self._get_cached_response(cache_key)
+        if cached_response:
+            print(f"  📋 Cache hit for query (TTL: {CACHE_TTL})")
+            return cached_response
+
+        # Generate response
+        response = self.synthesize_response(query_intent)
+
+        # Cache the response
+        self._cache_response(cache_key, response)
+        print(f"  💾 Response cached (key: {cache_key[:8]}...)")
+
+        return response
 
     def synthesize_response(self, query_intent: QueryIntent) -> str:
         """Generate answer from entity states with lazy resolution elevation and attribution"""

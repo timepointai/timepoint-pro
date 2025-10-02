@@ -1,8 +1,20 @@
 # CHANGE-ROUND.md - Timepoint-Daedalus Implementation Roadmap
 
+## ✅ COMPLETED TASKS
+- Mechanism 1: Heterogeneous Fidelity Temporal Graphs
+- Mechanism 3: Exposure Event Tracking
+- Mechanism 4: Physics-Inspired Validation
+- Mechanism 6: TTM Tensor Model
+- Mechanism 7: Causal Temporal Chains
+- 1.1: Fix Tensor Decompression in Queries
+- 1.2: Enforce Validators in Temporal Evolution
+- 1.3: LangGraph Parallel Execution
+- 1.4: Caching Layer
+- 2.4: Mechanism 2 - Complete Progressive Training
+
 ## Executive Summary
 
-Timepoint-Daedalus implements **12 of 17 mechanisms** from MECHANICS.md. Core temporal infrastructure works: chains, exposure tracking, validation, query synthesis, **token-efficient queries**, **temporal evolution validation**, **parallel entity processing**, **progressive training**, **physics-inspired validation**, **TTM tensor model**, **causal temporal chains**. Cost: $1.49 for 7-timepoint simulation + 8 queries.
+Timepoint-Daedalus implements **12 of 17 mechanisms** from MECHANICS.md. Core temporal infrastructure works: chains, exposure tracking, validation, query synthesis, **token-efficient queries**, **temporal evolution validation**, **parallel entity processing**, **progressive training**, **physics-inspired validation**, **TTM tensor model**, **causal temporal chains**, **LRU + TTL caching**. Cost: $1.49 for 7-timepoint simulation + 8 queries.
 
 **Goal**: Build remaining 12 mechanisms leveraging existing packages (LangGraph, NetworkX, Instructor, scikit-learn) to achieve full MECHANICS.md vision.
 
@@ -10,86 +22,9 @@ Timepoint-Daedalus implements **12 of 17 mechanisms** from MECHANICS.md. Core te
 
 ---
 
-## Current State: What Actually Exists
-
-### ✅ Implemented and Operational (5/17)
-
-**Mechanism 1: Heterogeneous Fidelity Temporal Graphs**
-- **Files**: `schemas.py` (ResolutionLevel enum), `storage.py` (entity persistence)
-- **Evidence**: Entities have resolution_level field, changes during queries
-- **Packages**: SQLModel enum fields, SQLite storage
-- **Status**: ✅ **Working** - entities track resolution independently
-
-**Mechanism 3: Exposure Event Tracking**
-- **Files**: `schemas.py` (ExposureEvent table), `temporal_chain.py` (event creation)
-- **Evidence**: 131 exposure events with entity_id, timestamp, source, confidence
-- **Packages**: SQLModel ORM with foreign keys
-- **Status**: ✅ **Working** - full causal provenance tracking
-
-**Mechanism 4: Physics-Inspired Validation** ✅ **COMPLETED**
-- **Files**: `validation.py` (validator registry), `cli.py` (validation calls during evolution), `workflows.py` (LangGraph workflow validation)
-- **Evidence**: All four physics-inspired validators enforced: information conservation, energy budget, behavioral inertia, and network flow validation
-- **Packages**: NumPy for set operations and vector norms, NetworkX for graph analysis
-- **Status**: ✅ **Complete** - All conservation laws (information, energy, momentum, network flow) validated during temporal evolution
-
-**Mechanism 6: TTM Tensor Model** ✅ **COMPLETED**
-- **Files**: `tensors.py` (TensorCompressor, decompression), `workflows.py` (compress_tensors), `query_interface.py` (tensor loading, interpretation)
-- **Evidence**: PCA/SVD/NMF compression + decompression working in query pipeline with semantic tensor-to-knowledge mapping
-- **Packages**: scikit-learn PCA/SVD, msgspec serialization, NumPy for tensor operations
-- **Status**: ✅ **Complete** - Full TTM tensor model with context/biology/behavior factorization and meaningful knowledge reconstruction
-
-**Mechanism 7: Causal Temporal Chains** ✅ **ENHANCED**
-- **Files**: `temporal_chain.py` (chain builder + validation), `validation.py` (temporal causality validator), `schemas.py` (Timepoint.causal_parent)
-- **Evidence**: Full causal validation with path checking, ancestor tracing, temporal reference validation, and chain integrity checks
-- **Packages**: SQLModel foreign keys, NetworkX for DAG validation, custom validation framework
-- **Status**: ✅ **Complete** - Information flow constrained by causal chains, preventing temporal inconsistencies
-
----
-
 ## Implementation Roadmap: 12 Mechanisms to Build
 
 ### Phase 1: Stabilize Core (20 hours) → 5/17 to Production-Ready
-
-**1.1: Fix Tensor Decompression in Queries** ✅ **COMPLETED**
-- **Goal**: Use compressed tensors during query synthesis to reduce tokens
-- **Implementation**: Added decompression functions to `tensors.py`, modified `query_interface.py` to load compressed tensors first, decompress only relevant tensor based on query type
-- **Files modified**: `query_interface.py`, `tensors.py`, `cli.py` (compression during training)
-- **Test**: ✅ Verified queries use decompressed tensors with "📦 Used compressed context tensor" logging
-- **Result**: Token-efficient queries working, compression/decompression pipeline operational
-
-**1.2: Enforce Validators in Temporal Evolution** ✅ **COMPLETED**
-- **Goal**: Call energy budget and behavioral inertia validators during chain building
-- **Implementation**: Added validation checkpoints in `cli.py` after each entity update, calls energy budget and behavioral inertia validators, logs validation failures
-- **Files modified**: `validation.py` (fixed energy budget and behavioral inertia validators), `cli.py` (added validation calls during temporal training)
-- **Test**: ✅ Verified validators are called during temporal evolution with proper error logging ("⚠️ VALIDATION ERROR" messages)
-- **Result**: Validators now enforce physical and cognitive constraints during entity state evolution
-
-**1.3: LangGraph Parallel Execution** ✅ COMPLETED
-- **Goal**: Parallelize entity population at same timepoint
-- **Implementation**: Replaced sequential for loop with asyncio parallel execution within LangGraph workflow node
-- **Files modified**: `workflows.py`
-- **Test results**: ✅ Successfully processes 3 entities concurrently using ThreadPoolExecutor and asyncio.gather()
-- **Performance**: Async execution enables concurrent LLM API calls, reducing total processing time
-- **Integration**: Maintains compatibility with existing LangGraph workflow structure and validation pipeline
-
-**1.4: Caching Layer** (4 hours)
-- **Goal**: Cache entity states and query responses
-- **Implementation**:
-  ```python
-  from functools import lru_cache
-  import hashlib
-  
-  @lru_cache(maxsize=1000)
-  def get_entity_at_timepoint(entity_id: str, timepoint_id: str) -> Entity:
-      return store.load_entity(entity_id, timepoint_id)
-  
-  # Query response cache with TTL
-  query_cache: Dict[str, Tuple[Response, datetime]] = {}
-  CACHE_TTL = timedelta(hours=1)
-  ```
-- **Packages**: functools lru_cache, Python dict with timestamps
-- **Files to modify**: `storage.py`, `query_interface.py`
-- **Test**: Query Washington twice, second should hit cache (latency <10ms)
 
 **1.5: Error Handling with Retry** (3 hours)
 - **Goal**: Retry LLM calls with exponential backoff
@@ -241,13 +176,6 @@ Timepoint-Daedalus implements **12 of 17 mechanisms** from MECHANICS.md. Core te
 - **Files to modify**: `schemas.py` (new entities), `workflows.py` (aggregation), `query_interface.py` (scene queries)
 - **Test**: Query "What was the atmosphere at Federal Hall?", get aggregated emotional state
 
-**2.4: Mechanism 2 - Complete Progressive Training** ✅ COMPLETED
-- **Goal**: Use centrality scores to automatically trigger retraining
-- **Implementation**: Added `check_retraining_needed` function that evaluates entities based on eigenvector centrality (>0.3 threshold) and query count (progressive thresholds by resolution level)
-- **Files modified**: `resolution_engine.py` (added retraining logic), `workflows.py` (added progressive training workflow step), `query_interface.py` (increment query_count on each query)
-- **Test results**: ✅ Verified entities elevate from TENSOR_ONLY→GRAPH→DIALOG→TRAINED based on centrality + query patterns
-- **Integration**: Integrated into LangGraph workflow as `progressive_training_check` node, runs after compression
-- **Performance**: Smart elevation based on entity importance (centrality) and usage patterns (query frequency)
 
 ---
 
@@ -1018,7 +946,8 @@ Phase 1 (Stabilize) → Must complete before others
    - ✅ **COMPLETED**: Tensor decompression implemented and tested
    - ✅ **COMPLETED**: Validators enforced in temporal evolution
    - ✅ **COMPLETED**: LangGraph parallel execution implemented and tested
-   - Move to **1.4: Caching Layer**
+   - ✅ **COMPLETED**: Caching layer implemented and tested
+   - Move to **1.5: Error Handling with Retry**
 
 2. **This Week** (20 hours):
    - Complete Phase 1 (all 6 tasks)
