@@ -1,13 +1,52 @@
 # ============================================================================
 # llm.py - LLM integration with Instructor for structured outputs
 # ============================================================================
-from typing import List, Dict
+from typing import List, Dict, Callable, TypeVar
 from datetime import datetime
 from pydantic import BaseModel
 import instructor
 from openai import OpenAI
 import numpy as np
 import hashlib
+import time
+
+T = TypeVar('T')
+
+def retry_with_backoff(func: Callable[..., T], max_retries: int = 3, base_delay: float = 1.0) -> T:
+    """
+    Retry a function with exponential backoff.
+
+    Args:
+        func: Function to retry
+        max_retries: Maximum number of retry attempts
+        base_delay: Base delay in seconds for exponential backoff
+
+    Returns:
+        Result of the successful function call
+
+    Raises:
+        Exception: The last exception encountered if all retries fail
+    """
+    last_exception = None
+
+    for attempt in range(max_retries + 1):  # +1 for initial attempt
+        try:
+            return func()
+        except Exception as e:
+            last_exception = e
+
+            if attempt == max_retries:
+                # All retries exhausted, raise the last exception
+                print(f"❌ All {max_retries + 1} attempts failed. Final error: {e}")
+                raise e
+
+            # Calculate delay with exponential backoff
+            delay = base_delay * (2 ** attempt)
+            print(f"⚠️ Attempt {attempt + 1} failed: {e}. Retrying in {delay:.1f} seconds...")
+            time.sleep(delay)
+
+    # This should never be reached, but just in case
+    raise last_exception
 
 class EntityPopulation(BaseModel):
     """Structured output schema for entity population"""
@@ -53,12 +92,15 @@ class LLMClient:
 Context: {context}{previous_context}
 Provide knowledge state, energy budget (0-100), personality traits (5 floats -1 to 1), temporal awareness, and confidence (0-1)."""
         
-        response = self.client.chat.completions.create(
-            model=model,
-            response_model=EntityPopulation,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        
+        def _api_call():
+            return self.client.chat.completions.create(
+                model=model,
+                response_model=EntityPopulation,
+                messages=[{"role": "user", "content": prompt}]
+            )
+
+        response = retry_with_backoff(_api_call, max_retries=3, base_delay=1.0)
+
         self.token_count += 1000  # Estimate
         self.cost += 0.01  # Estimate
         return response
@@ -72,12 +114,15 @@ Provide knowledge state, energy budget (0-100), personality traits (5 floats -1 
 Entities: {entities}
 Check for: anachronisms, biological impossibilities, knowledge contradictions."""
         
-        response = self.client.chat.completions.create(
-            model=model,
-            response_model=ValidationResult,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        
+        def _api_call():
+            return self.client.chat.completions.create(
+                model=model,
+                response_model=ValidationResult,
+                messages=[{"role": "user", "content": prompt}]
+            )
+
+        response = retry_with_backoff(_api_call, max_retries=3, base_delay=1.0)
+
         self.token_count += 800
         self.cost += 0.008
         return response
@@ -104,7 +149,7 @@ Return only a number between 0.0 and 1.0, where:
 
 Relevance score:"""
 
-        try:
+        def _api_call():
             # For relevance scoring, we want raw text response, not structured
             response = self.client.client.chat.completions.create(  # Use the underlying client, not instructor
                 model=model,
@@ -112,6 +157,10 @@ Relevance score:"""
                 temperature=0.1,  # Low temperature for consistent scoring
                 max_tokens=10
             )
+            return response
+
+        try:
+            response = retry_with_backoff(_api_call, max_retries=3, base_delay=1.0)
 
             score_text = response.choices[0].message.content.strip()
             # Extract numeric score
@@ -123,7 +172,7 @@ Relevance score:"""
                 return self._heuristic_relevance_score(query, knowledge_item)
 
         except Exception as e:
-            print(f"LLM relevance scoring failed: {e}")
+            print(f"LLM relevance scoring failed after retries: {e}")
             return self._heuristic_relevance_score(query, knowledge_item)
 
     def _heuristic_relevance_score(self, query: str, knowledge_item: str) -> float:
