@@ -5,6 +5,8 @@ llm:
   api_key: ${oc.env:OPENROUTER_API_KEY,test}
   base_url: https://openrouter.ai/api/v1
   dry_run: false
+  model: null  # null = auto-select Llama 70B, or specify model ID like "meta-llama/llama-3.1-70b-instruct"
+  model_cache_ttl_hours: 24  # How often to refresh available models from OpenRouter
 
 mode: autopilot
 seed: 42

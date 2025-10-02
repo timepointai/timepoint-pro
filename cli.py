@@ -68,7 +68,9 @@ def main(cfg: DictConfig) -> None:
     llm_client = LLMClient(
         api_key=cfg.llm.api_key,
         base_url=cfg.llm.base_url,
-        dry_run=cfg.llm.dry_run
+        dry_run=cfg.llm.dry_run,
+        default_model=cfg.llm.model,
+        model_cache_ttl_hours=getattr(cfg.llm, 'model_cache_ttl_hours', 24)
     )
 
     # Add cost warning for real API calls
@@ -92,8 +94,83 @@ def main(cfg: DictConfig) -> None:
         run_temporal_training(cfg, store, llm_client)
     elif cfg.mode == "interactive":
         run_interactive(cfg, store, llm_client)
+    elif cfg.mode == "models":
+        run_model_management(cfg, llm_client)
     else:
         print(f"Unknown mode: {cfg.mode}")
+
+def run_model_management(cfg: DictConfig, llm_client: LLMClient):
+    """Model management and selection interface"""
+    print(f"\n{'='*60}")
+    print("LLM MODEL MANAGEMENT")
+    print(f"{'='*60}\n")
+
+    print(f"Current model: {llm_client.default_model}")
+    print(f"Available Llama models: {len(llm_client.model_manager.get_llama_models())}")
+
+    # Show available models
+    print("\n" + llm_client.model_manager.list_models_formatted())
+
+    # Interactive model selection
+    while True:
+        print("\nModel Management Options:")
+        print("1. Refresh model list from OpenRouter")
+        print("2. Show detailed model info")
+        print("3. Switch to a different model")
+        print("4. Test current model")
+        print("5. Exit")
+
+        choice = input("\nEnter choice (1-5): ").strip()
+
+        if choice == "1":
+            print("🔄 Refreshing model list...")
+            models = llm_client.model_manager.get_llama_models(force_refresh=True)
+            print(f"✅ Refreshed {len(models)} models")
+
+        elif choice == "2":
+            model_id = input("Enter model ID to see details: ").strip()
+            models = llm_client.model_manager.get_llama_models()
+            model_info = next((m for m in models if m["id"] == model_id), None)
+            if model_info:
+                print(f"\n📋 Model Details for {model_id}:")
+                print(f"  Name: {model_info['name']}")
+                print(f"  Description: {model_info['description']}")
+                print(f"  Context Length: {model_info['context_length']:,} tokens")
+                if model_info['pricing']:
+                    print(f"  Pricing: {model_info['pricing']}")
+            else:
+                print(f"❌ Model '{model_id}' not found")
+
+        elif choice == "3":
+            model_id = input("Enter model ID to switch to: ").strip()
+            if llm_client.model_manager.is_valid_model(model_id):
+                # Update the default model
+                llm_client.default_model = model_id
+                print(f"✅ Switched to model: {model_id}")
+
+                # Show confirmation
+                print(f"🦙 Current model: {llm_client.default_model}")
+            else:
+                print(f"❌ Invalid model ID: {model_id}")
+
+        elif choice == "4":
+            if llm_client.dry_run:
+                print("ℹ️  Dry-run mode - no actual API call will be made")
+            else:
+                print("🧪 Testing model with a simple query...")
+                try:
+                    # Test with a simple relevance scoring call
+                    score = llm_client.score_relevance("test query", "test knowledge")
+                    print(f"✅ Model test successful - relevance score: {score}")
+                except Exception as e:
+                    print(f"❌ Model test failed: {e}")
+
+        elif choice == "5":
+            print("👋 Exiting model management")
+            break
+
+        else:
+            print("❌ Invalid choice. Please enter 1-5.")
 
 def run_autopilot(cfg: DictConfig, store: GraphStore, llm_client: LLMClient):
     """Autopilot self-testing mode - now tests temporal chains"""
@@ -632,6 +709,10 @@ def run_interactive(cfg: DictConfig, store: GraphStore, llm_client: LLMClient):
                 _show_simulation_status(store, llm_client)
                 continue
 
+            if query.lower() == 'models':
+                run_model_management(cfg, llm_client)
+                continue
+
             # Parse and respond to query
             print("  Parsing query...")
             intent = query_interface.parse_query(query)
@@ -655,6 +736,7 @@ def _show_interactive_help():
 Available commands:
   help, h, ?     Show this help
   status         Show simulation status and statistics
+  models         Manage LLM models (list, switch, test)
   exit, quit, q  Leave the interactive interface
 
 Query examples:

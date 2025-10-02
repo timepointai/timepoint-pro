@@ -273,7 +273,7 @@ Return only the knowledge items as a JSON array of strings."""
         try:
             # Use the raw LLM client for text generation (not structured)
             response = self.llm_client.client.client.chat.completions.create(
-                model="openai/gpt-4o-mini",
+                model=self.llm_client.default_model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.7,  # Some creativity for knowledge generation
                 max_tokens=500
