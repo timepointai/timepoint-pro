@@ -34,7 +34,7 @@ class QueryInterface:
     def __init__(self, store: GraphStore, llm_client: LLMClient):
         self.store = store
         self.llm_client = llm_client
-        self.resolution_engine = ResolutionEngine(store)
+        self.resolution_engine = ResolutionEngine(store, llm_client)
 
     def _get_query_cache_key(self, query: str, query_intent: QueryIntent) -> str:
         """Generate cache key for query based on content and intent"""

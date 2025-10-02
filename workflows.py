@@ -27,7 +27,32 @@ class WorkflowState(TypedDict):
 def create_entity_training_workflow(llm_client: LLMClient, store: GraphStore):
     """LangGraph workflow for parallel entity training"""
     workflow = StateGraph(WorkflowState)
-    
+
+    def progressive_training_check(state: WorkflowState) -> WorkflowState:
+        """Check for entities that need progressive training elevation (Mechanism 2.4)"""
+        resolution_engine = ResolutionEngine(store, llm_client)
+
+        elevation_candidates = []
+        for entity in state["entities"]:
+            if resolution_engine.check_retraining_needed(entity, state["graph"]):
+                elevation_candidates.append(entity)
+
+        if elevation_candidates:
+            print(f"🎯 Progressive training: {len(elevation_candidates)} entities need elevation")
+
+            for entity in elevation_candidates:
+                current_level_value = list(ResolutionLevel).index(entity.resolution_level)
+                if current_level_value < len(ResolutionLevel) - 1:
+                    target_level = list(ResolutionLevel)[current_level_value + 1]
+                    # Pass timepoint for knowledge enrichment context
+                    timepoint_obj = state.get("timepoint_obj")
+                    if resolution_engine.elevate_resolution(entity, target_level, timepoint_obj):
+                        print(f"⬆️ Elevated {entity.entity_id} to {target_level.value}")
+        else:
+            print("✅ No entities need progressive training elevation")
+
+        return state
+
     def load_graph(state: WorkflowState) -> WorkflowState:
         # Only create/load a graph if one doesn't already exist in state
         if state["graph"] is None or state["graph"].number_of_nodes() == 0:
@@ -118,30 +143,6 @@ def create_entity_training_workflow(llm_client: LLMClient, store: GraphStore):
 
         return state
 
-    def progressive_training_check(state: WorkflowState) -> WorkflowState:
-        """Check for entities that need progressive training elevation (Mechanism 2.4)"""
-        resolution_engine = ResolutionEngine(store)
-
-        elevation_candidates = []
-        for entity in state["entities"]:
-            if resolution_engine.check_retraining_needed(entity, state["graph"]):
-                elevation_candidates.append(entity)
-
-        if elevation_candidates:
-            print(f"🎯 Progressive training: {len(elevation_candidates)} entities need elevation")
-
-            for entity in elevation_candidates:
-                # Simple elevation logic for workflow context
-                current_level_value = list(ResolutionLevel).index(entity.resolution_level)
-                if current_level_value < len(ResolutionLevel) - 1:
-                    target_level = list(ResolutionLevel)[current_level_value + 1]
-                    if resolution_engine.elevate_resolution(entity, target_level):
-                        print(f"⬆️ Elevated {entity.entity_id} to {target_level.value}")
-        else:
-            print("✅ No entities need progressive training elevation")
-
-        return state
-    
     def populate_entities_parallel(state: WorkflowState) -> WorkflowState:
         """Populate all entities in parallel using asyncio"""
         import asyncio
@@ -194,7 +195,7 @@ def retrain_high_traffic_entities(graph: nx.Graph, store: GraphStore, llm_client
     Progressive training: Check all entities and retrain/elevate those that need it
     based on centrality scores and query patterns (Mechanism 2.4)
     """
-    resolution_engine = ResolutionEngine(store)
+    resolution_engine = ResolutionEngine(store, llm_client)
     entities = store.get_all_entities()
 
     retrained_count = 0

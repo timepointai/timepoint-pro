@@ -205,6 +205,7 @@ mypy .
 - **Parallel entity processing** for concurrent LLM calls (Mechanism 1.3)
 - **Physics-inspired validation** with conservation laws (Mechanism 4)
 - **TTM tensor model** with context/biology/behavior factorization (Mechanism 6)
+- **Knowledge enrichment on elevation** automatically adds detailed knowledge when entities elevate resolution (Mechanism 1.6)
 
 ⏳ **Remaining**: Additional production optimizations (batch LLM calls, parallel execution, error handling)
 

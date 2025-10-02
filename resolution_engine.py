@@ -4,15 +4,17 @@
 from typing import Dict, List, Optional
 from datetime import datetime, timedelta
 import networkx as nx
-from schemas import Entity, Timepoint, ResolutionLevel
+from schemas import Entity, Timepoint, ResolutionLevel, ExposureEvent
 from storage import GraphStore
+from llm import LLMClient
 
 
 class ResolutionEngine:
     """Decides optimal resolution levels for entities based on multiple factors"""
 
-    def __init__(self, store: GraphStore):
+    def __init__(self, store: GraphStore, llm_client: Optional[LLMClient] = None):
         self.store = store
+        self.llm_client = llm_client
         self.query_history: Dict[str, int] = {}  # entity_id -> access count
 
     def decide_resolution(
@@ -199,17 +201,207 @@ class ResolutionEngine:
 
         return False
 
-    def elevate_resolution(self, entity: Entity, target_resolution: ResolutionLevel) -> bool:
+    def elevate_resolution(self, entity: Entity, target_resolution: ResolutionLevel, timepoint: Optional[Timepoint] = None) -> bool:
         """
-        Attempt to elevate an entity's resolution level.
+        Attempt to elevate an entity's resolution level and enrich its knowledge.
         Returns True if elevation was successful.
         """
         current_level_value = list(ResolutionLevel).index(entity.resolution_level)
         target_level_value = list(ResolutionLevel).index(target_resolution)
 
-        if target_level_value > current_level_value:
-            entity.resolution_level = target_resolution
-            self.store.save_entity(entity)
-            return True
+        if target_level_value <= current_level_value:
+            return False  # Cannot elevate to same or lower level
 
-        return False
+        # Elevate the resolution level
+        entity.resolution_level = target_resolution
+
+        # Enrich knowledge based on the target resolution level
+        if self.llm_client and not self.llm_client.dry_run:
+            self._enrich_entity_knowledge(entity, target_resolution, timepoint)
+        elif self.llm_client and self.llm_client.dry_run:
+            # For dry-run testing, add mock knowledge items
+            self._add_mock_knowledge_for_testing(entity, target_resolution)
+
+        # Save the updated entity
+        self.store.save_entity(entity)
+        print(f"⬆️ Elevated {entity.entity_id} to {target_resolution.value} resolution")
+        return True
+
+    def _enrich_entity_knowledge(self, entity: Entity, target_resolution: ResolutionLevel, timepoint: Optional[Timepoint] = None) -> None:
+        """
+        Generate additional knowledge for an entity when it elevates to a higher resolution level.
+        """
+        existing_knowledge = entity.entity_metadata.get("knowledge_state", [])
+
+        if not existing_knowledge:
+            return  # No existing knowledge to build upon
+
+        # Determine how many new knowledge items to generate based on target resolution
+        knowledge_growth = {
+            ResolutionLevel.SCENE: 3,      # Add 3 items when going to SCENE
+            ResolutionLevel.GRAPH: 5,      # Add 5 items when going to GRAPH
+            ResolutionLevel.DIALOG: 8,     # Add 8 items when going to DIALOG
+            ResolutionLevel.TRAINED: 12    # Add 12 items when going to TRAINED
+        }
+
+        num_new_items = knowledge_growth.get(target_resolution, 3)
+
+        # Create context for LLM knowledge generation
+        context = {
+            "entity_id": entity.entity_id,
+            "role": entity.entity_metadata.get("role", "unknown"),
+            "existing_knowledge": existing_knowledge[:10],  # Use first 10 items as context
+            "target_resolution": target_resolution.value,
+            "timepoint_context": timepoint.event_description if timepoint else "general context"
+        }
+
+        # Generate enrichment prompt
+        prompt = f"""Based on the existing knowledge about {entity.entity_id} (role: {context['role']}), generate {num_new_items} additional specific knowledge items that would be appropriate for {target_resolution.value}-level detail.
+
+Existing knowledge: {', '.join(context['existing_knowledge'])}
+
+Context: {context['timepoint_context']}
+
+Generate {num_new_items} new, specific knowledge items that deepen the understanding of this entity. Each item should be:
+- Historically plausible
+- Specific and concrete (not generic)
+- Related to the entity's role and existing knowledge
+- Appropriate for the level of detail
+
+Return only the knowledge items as a JSON array of strings."""
+
+        try:
+            # Use the raw LLM client for text generation (not structured)
+            response = self.llm_client.client.client.chat.completions.create(
+                model="openai/gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7,  # Some creativity for knowledge generation
+                max_tokens=500
+            )
+
+            # Parse the response
+            import json
+            response_text = response.choices[0].message.content.strip()
+
+            # Try to extract JSON array
+            try:
+                # Look for JSON array in the response
+                start_idx = response_text.find('[')
+                end_idx = response_text.rfind(']') + 1
+                if start_idx != -1 and end_idx > start_idx:
+                    json_str = response_text[start_idx:end_idx]
+                    new_knowledge_items = json.loads(json_str)
+                else:
+                    # Fallback: split by newlines and clean up
+                    new_knowledge_items = [line.strip('- •').strip() for line in response_text.split('\n') if line.strip()]
+
+                # Filter and limit the new knowledge items
+                valid_items = [item for item in new_knowledge_items if item and len(item) > 10][:num_new_items]
+
+                if valid_items:
+                    # Add new knowledge to entity
+                    existing_knowledge.extend(valid_items)
+                    entity.entity_metadata["knowledge_state"] = existing_knowledge
+
+                    # Create exposure events for new knowledge
+                    exposure_events = []
+                    timestamp = timepoint.timestamp if timepoint else datetime.now()
+
+                    for knowledge_item in valid_items:
+                        exposure_event = ExposureEvent(
+                            entity_id=entity.entity_id,
+                            event_type="learned",
+                            information=knowledge_item,
+                            source="resolution_elevation",
+                            timestamp=timestamp
+                        )
+                        exposure_events.append(exposure_event)
+
+                    # Batch save exposure events
+                    if exposure_events:
+                        self.store.save_exposure_events(exposure_events)
+
+                    print(f"📚 Added {len(valid_items)} new knowledge items to {entity.entity_id}")
+
+            except (json.JSONDecodeError, ValueError) as e:
+                print(f"⚠️ Failed to parse LLM response for knowledge enrichment: {e}")
+
+        except Exception as e:
+            print(f"⚠️ Failed to enrich knowledge during elevation: {e}")
+            # Continue with elevation even if knowledge enrichment fails
+
+    def _add_mock_knowledge_for_testing(self, entity: Entity, target_resolution: ResolutionLevel) -> None:
+        """
+        Add mock knowledge items for testing purposes when in dry-run mode.
+        """
+        existing_knowledge = entity.entity_metadata.get("knowledge_state", [])
+
+        if not existing_knowledge:
+            return  # No existing knowledge to build upon
+
+        # Mock knowledge items based on resolution level
+        mock_knowledge_templates = {
+            ResolutionLevel.SCENE: [
+                "Led military campaigns with strategic brilliance",
+                "Established key relationships with political allies",
+                "Demonstrated leadership under pressure"
+            ],
+            ResolutionLevel.GRAPH: [
+                "Built extensive network of political connections",
+                "Influenced major historical decisions",
+                "Mentored younger leaders in the movement",
+                "Corresponded extensively with contemporaries",
+                "Developed key strategic alliances"
+            ],
+            ResolutionLevel.DIALOG: [
+                "Engaged in detailed correspondence about governance",
+                "Participated in constitutional debates",
+                "Mentored emerging political figures",
+                "Negotiated critical diplomatic arrangements",
+                "Established precedents for executive leadership",
+                "Influenced the formation of government institutions",
+                "Contributed to philosophical discussions on liberty",
+                "Maintained extensive personal library and studies"
+            ],
+            ResolutionLevel.TRAINED: [
+                "Authored significant political treatises",
+                "Established presidential traditions and protocols",
+                "Cultivated international diplomatic relationships",
+                "Influenced the development of American political parties",
+                "Promoted scientific and educational advancement",
+                "Established precedents for civilian military control",
+                "Contributed to the formation of federal judiciary",
+                "Mentored the next generation of American leaders",
+                "Developed comprehensive agricultural policies",
+                "Promoted manufacturing and industrial development",
+                "Established precedents for executive privilege",
+                "Influenced westward expansion policies"
+            ]
+        }
+
+        new_knowledge_items = mock_knowledge_templates.get(target_resolution, [])
+
+        if new_knowledge_items:
+            # Add new knowledge to entity
+            existing_knowledge.extend(new_knowledge_items)
+            entity.entity_metadata["knowledge_state"] = existing_knowledge
+
+            # Create exposure events for new knowledge (even in dry-run for testing)
+            exposure_events = []
+            timestamp = datetime.now()
+
+            for knowledge_item in new_knowledge_items:
+                exposure_event = ExposureEvent(
+                    entity_id=entity.entity_id,
+                    event_type="learned",
+                    information=knowledge_item,
+                    source="resolution_elevation_test",
+                    timestamp=timestamp
+                )
+                exposure_events.append(exposure_event)
+
+            # Batch save exposure events
+            if exposure_events:
+                self.store.save_exposure_events(exposure_events)
+
+            print(f"📚 Added {len(new_knowledge_items)} mock knowledge items to {entity.entity_id} (dry-run)")

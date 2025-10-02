@@ -11,11 +11,12 @@
 - 1.3: LangGraph Parallel Execution
 - 1.4: Caching Layer
 - 1.5: Error Handling with Retry
+- 1.6: Knowledge Enrichment on Elevation
 - 2.4: Mechanism 2 - Complete Progressive Training
 
 ## Executive Summary
 
-Timepoint-Daedalus implements **12 of 17 mechanisms** from MECHANICS.md. Core temporal infrastructure works: chains, exposure tracking, validation, query synthesis, **token-efficient queries**, **temporal evolution validation**, **parallel entity processing**, **progressive training**, **physics-inspired validation**, **TTM tensor model**, **causal temporal chains**, **LRU + TTL caching**, **exponential backoff retry**. Cost: $1.49 for 7-timepoint simulation + 8 queries.
+Timepoint-Daedalus implements **13 of 17 mechanisms** from MECHANICS.md. Core temporal infrastructure works: chains, exposure tracking, validation, query synthesis, **token-efficient queries**, **temporal evolution validation**, **parallel entity processing**, **progressive training**, **physics-inspired validation**, **TTM tensor model**, **causal temporal chains**, **LRU + TTL caching**, **exponential backoff retry**, **knowledge enrichment on elevation**. Cost: $1.49 for 7-timepoint simulation + 8 queries.
 
 **Goal**: Build remaining 12 mechanisms leveraging existing packages (LangGraph, NetworkX, Instructor, scikit-learn) to achieve full MECHANICS.md vision.
 
