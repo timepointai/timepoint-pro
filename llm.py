@@ -1,19 +1,69 @@
 # ============================================================================
-# llm.py - LLM integration with Instructor for structured outputs
+# llm.py - LLM integration with OpenRouter API (no OpenAI dependency)
 # ============================================================================
-from typing import List, Dict, Callable, TypeVar, Optional
+from typing import List, Dict, Callable, TypeVar, Optional, Any
 from datetime import datetime, timedelta
 from pydantic import BaseModel
-import instructor
-from openai import OpenAI
+import httpx
+import json
 import numpy as np
 import hashlib
 import time
-import requests
-import json
 from functools import lru_cache
 
 T = TypeVar('T')
+
+
+class OpenRouterClient:
+    """Custom HTTP client for OpenRouter API (replaces OpenAI client)"""
+
+    def __init__(self, api_key: str, base_url: str = "https://openrouter.ai/api/v1"):
+        self.api_key = api_key
+        self.base_url = base_url.rstrip('/')
+        self.client = httpx.Client(timeout=60.0)
+
+    def chat(self):
+        """Return self to mimic OpenAI client structure"""
+        return self
+
+    def completions(self):
+        """Return self to mimic OpenAI client structure"""
+        return self
+
+    def create(self, **kwargs):
+        """Make a chat completion request to OpenRouter"""
+        url = f"{self.base_url}/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://github.com/your-repo",  # Optional
+            "X-Title": "Timepoint-Daedalus"  # Optional
+        }
+
+        data = {
+            "model": kwargs.get("model"),
+            "messages": kwargs.get("messages", []),
+            "temperature": kwargs.get("temperature", 1.0),
+            "max_tokens": kwargs.get("max_tokens"),
+            "response_format": kwargs.get("response_format"),
+        }
+
+        # Remove None values
+        data = {k: v for k, v in data.items() if v is not None}
+
+        try:
+            response = self.client.post(url, headers=headers, json=data)
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            raise Exception(f"OpenRouter API error: {e.response.status_code} - {e.response.text}")
+        except Exception as e:
+            raise Exception(f"Request failed: {str(e)}")
+
+    def __del__(self):
+        """Clean up HTTP client"""
+        if hasattr(self, 'client'):
+            self.client.close()
 
 
 class ModelManager:
@@ -46,8 +96,10 @@ class ModelManager:
                 "Content-Type": "application/json"
             }
 
-            response = requests.get(f"{self.base_url}/models", headers=headers, timeout=10)
-            response.raise_for_status()
+            # Create a temporary httpx client for this request
+            with httpx.Client(timeout=10.0) as http_client:
+                response = http_client.get(f"{self.base_url}/models", headers=headers)
+                response.raise_for_status()
 
             models_data = response.json()
             all_models = models_data.get("data", [])
@@ -209,8 +261,7 @@ class LLMClient:
             print(f"📋 Available Llama models: {len(self.model_manager.get_llama_models())} cached")
 
         if not dry_run:
-            client = OpenAI(api_key=api_key, base_url=base_url)
-            self.client = instructor.from_openai(client)
+            self.client = OpenRouterClient(api_key=api_key, base_url=base_url)
         else:
             self.client = None
     
@@ -226,17 +277,34 @@ class LLMClient:
 
         prompt = f"""Generate entity information for {entity_schema['entity_id']}.
 Context: {context}{previous_context}
-Provide knowledge state, energy budget (0-100), personality traits (5 floats -1 to 1), temporal awareness, and confidence (0-1)."""
-        
+
+Return a JSON object with these exact fields:
+- knowledge_state: array of strings (3-8 knowledge items)
+- energy_budget: number between 0-100
+- personality_traits: array of exactly 5 floats between -1 and 1
+- temporal_awareness: string describing time perception
+- confidence: number between 0 and 1
+
+Return only valid JSON, no other text."""
+
         # Use provided model or default to Llama model
         selected_model = model or self.default_model
 
         def _api_call():
-            return self.client.chat.completions.create(
+            response = self.client.chat.completions.create(
                 model=selected_model,
-                response_model=EntityPopulation,
-                messages=[{"role": "user", "content": prompt}]
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7,
+                max_tokens=1000
             )
+            # Extract content from response
+            content = response["choices"][0]["message"]["content"]
+            # Parse JSON manually
+            try:
+                data = json.loads(content.strip())
+                return EntityPopulation(**data)
+            except (json.JSONDecodeError, ValueError) as e:
+                raise Exception(f"Failed to parse LLM response as JSON: {e}. Content: {content}")
 
         response = retry_with_backoff(_api_call, max_retries=3, base_delay=1.0)
 
@@ -248,20 +316,37 @@ Provide knowledge state, energy budget (0-100), personality traits (5 floats -1 
         """Validate temporal consistency"""
         if self.dry_run:
             return ValidationResult(is_valid=True, violations=[], confidence=1.0, reasoning="Dry run mock")
-        
+
         prompt = f"""Validate temporal consistency of entities at {timepoint}.
 Entities: {entities}
-Check for: anachronisms, biological impossibilities, knowledge contradictions."""
+Check for: anachronisms, biological impossibilities, knowledge contradictions.
+
+Return a JSON object with these exact fields:
+- is_valid: boolean (true if no issues found)
+- violations: array of strings (list of problems found)
+- confidence: number between 0 and 1 (confidence in validation)
+- reasoning: string explaining the validation result
+
+Return only valid JSON, no other text."""
 
         # Use provided model or default to Llama model
         selected_model = model or self.default_model
 
         def _api_call():
-            return self.client.chat.completions.create(
+            response = self.client.chat.completions.create(
                 model=selected_model,
-                response_model=ValidationResult,
-                messages=[{"role": "user", "content": prompt}]
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1,
+                max_tokens=800
             )
+            # Extract content from response
+            content = response["choices"][0]["message"]["content"]
+            # Parse JSON manually
+            try:
+                data = json.loads(content.strip())
+                return ValidationResult(**data)
+            except (json.JSONDecodeError, ValueError) as e:
+                raise Exception(f"Failed to parse LLM response as JSON: {e}. Content: {content}")
 
         response = retry_with_backoff(_api_call, max_retries=3, base_delay=1.0)
 
@@ -296,7 +381,7 @@ Relevance score:"""
 
         def _api_call():
             # For relevance scoring, we want raw text response, not structured
-            response = self.client.client.chat.completions.create(  # Use the underlying client, not instructor
+            response = self.client.chat.completions.create(
                 model=selected_model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.1,  # Low temperature for consistent scoring

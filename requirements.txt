@@ -5,7 +5,8 @@ pydantic>=2.10.0
 
 # LLM and AI
 instructor>=1.7.0
-openai>=1.57.0
+httpx>=0.27.0  # For OpenRouter API calls (replaces OpenAI client)
+# Removed OpenAI dependency - using httpx for OpenRouter API calls
 langgraph>=0.2.62
 
 # Graph and network analysis

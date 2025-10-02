@@ -10,7 +10,7 @@ from schemas import Entity, Timepoint, ResolutionLevel
 from storage import GraphStore
 from llm import LLMClient
 from resolution_engine import ResolutionEngine
-from instructor import OpenAISchema
+# Removed OpenAI/instructor dependency
 from tensors import load_compressed_entity_data
 
 # Query response cache with TTL
@@ -18,7 +18,7 @@ _query_cache: Dict[str, Tuple[str, datetime]] = {}
 CACHE_TTL = timedelta(hours=1)
 
 
-class QueryIntent(OpenAISchema):
+class QueryIntent(BaseModel):
     """Parsed intent from natural language query"""
     target_entity: Optional[str] = None
     target_timepoint: Optional[str] = None
@@ -100,23 +100,34 @@ Recent timepoints: {'; '.join(timepoint_descriptions)}
 
 Query: "{query}"
 
-Extract:
+Return a JSON object with these exact fields:
 - target_entity: Which entity is the query about? (use exact entity name or null)
 - target_timepoint: Which timepoint does this refer to? (use timepoint_id or null)
 - information_type: What type of information? (knowledge/relationships/actions/dialog/general)
-- context_entities: Other entities mentioned or relevant
+- context_entities: Other entities mentioned or relevant (array of strings)
 - confidence: How confident are you in this parsing? (0.0-1.0)
-- reasoning: Brief explanation of your parsing"""
+- reasoning: Brief explanation of your parsing
+
+Return only valid JSON, no other text."""
 
         try:
             response = self.llm_client.client.chat.completions.create(
                 model=self.llm_client.default_model,
-                response_model=QueryIntent,
-                messages=[{"role": "user", "content": prompt}]
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1,
+                max_tokens=500
             )
+            # Extract and parse JSON response manually
+            content = response["choices"][0]["message"]["content"]
+            try:
+                data = json.loads(content.strip())
+                query_intent = QueryIntent(**data)
+            except (json.JSONDecodeError, ValueError) as e:
+                raise Exception(f"Failed to parse LLM response as JSON: {e}. Content: {content}")
+
             self.llm_client.token_count += 500  # Estimate
             self.llm_client.cost += 0.005
-            return response
+            return query_intent
         except Exception as e:
             print(f"LLM parsing failed, falling back to simple parsing: {e}")
             return self._parse_query_simple(query)
