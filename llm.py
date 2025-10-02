@@ -1,16 +1,137 @@
 # ============================================================================
 # llm.py - LLM integration with Instructor for structured outputs
 # ============================================================================
-from typing import List, Dict, Callable, TypeVar
-from datetime import datetime
+from typing import List, Dict, Callable, TypeVar, Optional
+from datetime import datetime, timedelta
 from pydantic import BaseModel
 import instructor
 from openai import OpenAI
 import numpy as np
 import hashlib
 import time
+import requests
+import json
+from functools import lru_cache
 
 T = TypeVar('T')
+
+
+class ModelManager:
+    """Manages available Llama models from OpenRouter with caching"""
+
+    def __init__(self, api_key: str, cache_ttl_hours: int = 24):
+        self.api_key = api_key
+        self.base_url = "https://openrouter.ai/api/v1"
+        self.cache_ttl = timedelta(hours=cache_ttl_hours)
+        self._models_cache: Optional[Dict] = None
+        self._cache_timestamp: Optional[datetime] = None
+
+    def get_llama_models(self, force_refresh: bool = False) -> List[Dict]:
+        """
+        Get all available Llama models from OpenRouter.
+        Uses caching to avoid excessive API calls.
+        """
+        now = datetime.now()
+
+        # Check if we have valid cached data
+        if (not force_refresh and
+            self._models_cache is not None and
+            self._cache_timestamp is not None and
+            now - self._cache_timestamp < self.cache_ttl):
+            return self._models_cache
+
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
+
+            response = requests.get(f"{self.base_url}/models", headers=headers, timeout=10)
+            response.raise_for_status()
+
+            models_data = response.json()
+            all_models = models_data.get("data", [])
+
+            # Filter for Llama models (exclude non-Llama models that might have "llama" in name)
+            llama_models = []
+            for model in all_models:
+                model_id = model.get("id", "").lower()
+                # More specific filtering for actual Llama models
+                is_llama = (
+                    "meta-llama/llama" in model_id or
+                    "meta-llama/llama3" in model_id or
+                    "meta-llama/llama-3" in model_id or
+                    ("llama" in model_id and not any(skip in model_id for skip in [
+                        "deepseek", "distill", "guard", "codellama", "llama-cpp"
+                    ]))
+                )
+                if is_llama:
+                    llama_models.append({
+                        "id": model["id"],
+                        "name": model.get("name", model["id"]),
+                        "description": model.get("description", ""),
+                        "context_length": model.get("context_length", 0),
+                        "pricing": model.get("pricing", {})
+                    })
+
+            # Sort by context length (higher first) and then by name
+            llama_models.sort(key=lambda x: (-x["context_length"], x["name"]))
+
+            # Cache the results
+            self._models_cache = llama_models
+            self._cache_timestamp = now
+
+            print(f"📋 Fetched {len(llama_models)} Llama models from OpenRouter")
+            return llama_models
+
+        except Exception as e:
+            print(f"⚠️ Failed to fetch models from OpenRouter: {e}")
+            # Return cached data if available, otherwise return empty list
+            if self._models_cache is not None:
+                print("📋 Using cached model data")
+                return self._models_cache
+            return []
+
+    def get_default_model(self) -> str:
+        """Get the default Llama model (70B if available, otherwise largest context model)"""
+        models = self.get_llama_models()
+        if not models:
+            return "meta-llama/llama-3.1-8b-instruct"  # Fallback
+
+        # Look for 70B model first
+        for model in models:
+            if "70b" in model["id"].lower() and "instruct" in model["id"].lower():
+                return model["id"]
+
+        # Look for any 70B model
+        for model in models:
+            if "70b" in model["id"].lower():
+                return model["id"]
+
+        # Otherwise return the model with highest context length
+        models.sort(key=lambda x: x["context_length"], reverse=True)
+        return models[0]["id"] if models else "meta-llama/llama-3.1-8b-instruct"
+
+    def is_valid_model(self, model_id: str) -> bool:
+        """Check if a model ID is a valid Llama model"""
+        models = self.get_llama_models()
+        return any(model["id"] == model_id for model in models)
+
+    def list_models_formatted(self) -> str:
+        """Return a formatted string of available Llama models"""
+        models = self.get_llama_models()
+        if not models:
+            return "No Llama models available"
+
+        lines = ["🦙 Available Llama Models:"]
+        for i, model in enumerate(models[:10], 1):  # Show top 10
+            context_mb = model["context_length"] // 1024 if model["context_length"] else 0
+            lines.append(f"{i}. {model['id']} ({context_mb}K context)")
+
+        if len(models) > 10:
+            lines.append(f"... and {len(models) - 10} more models")
+
+        return "\n".join(lines)
 
 def retry_with_backoff(func: Callable[..., T], max_retries: int = 3, base_delay: float = 1.0) -> T:
     """
@@ -65,20 +186,35 @@ class ValidationResult(BaseModel):
     reasoning: str
 
 class LLMClient:
-    """Unified LLM client with cost tracking and dry-run support"""
-    
-    def __init__(self, api_key: str, base_url: str, dry_run: bool = False):
+    """Unified LLM client with cost tracking, dry-run support, and model selection"""
+
+    def __init__(self, api_key: str, base_url: str = "https://openrouter.ai/api/v1", dry_run: bool = False, default_model: Optional[str] = None, model_cache_ttl_hours: int = 24):
         self.dry_run = dry_run
         self.token_count = 0
         self.cost = 0.0
-        
+        self.api_key = api_key
+        self.base_url = base_url
+
+        # Initialize model manager for Llama models
+        self.model_manager = ModelManager(api_key, model_cache_ttl_hours)
+
+        # Set default model (prefer Llama 70B, fallback to first available Llama)
+        if default_model:
+            self.default_model = default_model
+        else:
+            self.default_model = self.model_manager.get_default_model()
+
+        print(f"🦙 Using LLM model: {self.default_model}")
+        if not dry_run:
+            print(f"📋 Available Llama models: {len(self.model_manager.get_llama_models())} cached")
+
         if not dry_run:
             client = OpenAI(api_key=api_key, base_url=base_url)
             self.client = instructor.from_openai(client)
         else:
             self.client = None
     
-    def populate_entity(self, entity_schema: Dict, context: Dict, previous_knowledge: List[str] = None, model: str = "openai/gpt-4o-mini") -> EntityPopulation:
+    def populate_entity(self, entity_schema: Dict, context: Dict, previous_knowledge: List[str] = None, model: Optional[str] = None) -> EntityPopulation:
         """Populate entity with structured output"""
         if self.dry_run:
             return self._mock_entity_population(entity_schema, previous_knowledge)
@@ -92,9 +228,12 @@ class LLMClient:
 Context: {context}{previous_context}
 Provide knowledge state, energy budget (0-100), personality traits (5 floats -1 to 1), temporal awareness, and confidence (0-1)."""
         
+        # Use provided model or default to Llama model
+        selected_model = model or self.default_model
+
         def _api_call():
             return self.client.chat.completions.create(
-                model=model,
+                model=selected_model,
                 response_model=EntityPopulation,
                 messages=[{"role": "user", "content": prompt}]
             )
@@ -105,7 +244,7 @@ Provide knowledge state, energy budget (0-100), personality traits (5 floats -1 
         self.cost += 0.01  # Estimate
         return response
     
-    def validate_consistency(self, entities: List[Dict], timepoint: datetime, model: str = "openai/gpt-4o-mini") -> ValidationResult:
+    def validate_consistency(self, entities: List[Dict], timepoint: datetime, model: Optional[str] = None) -> ValidationResult:
         """Validate temporal consistency"""
         if self.dry_run:
             return ValidationResult(is_valid=True, violations=[], confidence=1.0, reasoning="Dry run mock")
@@ -113,10 +252,13 @@ Provide knowledge state, energy budget (0-100), personality traits (5 floats -1 
         prompt = f"""Validate temporal consistency of entities at {timepoint}.
 Entities: {entities}
 Check for: anachronisms, biological impossibilities, knowledge contradictions."""
-        
+
+        # Use provided model or default to Llama model
+        selected_model = model or self.default_model
+
         def _api_call():
             return self.client.chat.completions.create(
-                model=model,
+                model=selected_model,
                 response_model=ValidationResult,
                 messages=[{"role": "user", "content": prompt}]
             )
@@ -127,7 +269,7 @@ Check for: anachronisms, biological impossibilities, knowledge contradictions.""
         self.cost += 0.008
         return response
 
-    def score_relevance(self, query: str, knowledge_item: str, model: str = "openai/gpt-4o-mini") -> float:
+    def score_relevance(self, query: str, knowledge_item: str, model: Optional[str] = None) -> float:
         """Score how relevant a knowledge item is to a query (0.0-1.0)"""
         if self.dry_run:
             # Simple heuristic scoring for dry run
@@ -149,10 +291,13 @@ Return only a number between 0.0 and 1.0, where:
 
 Relevance score:"""
 
+        # Use provided model or default to Llama model
+        selected_model = model or self.default_model
+
         def _api_call():
             # For relevance scoring, we want raw text response, not structured
             response = self.client.client.chat.completions.create(  # Use the underlying client, not instructor
-                model=model,
+                model=selected_model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.1,  # Low temperature for consistent scoring
                 max_tokens=10

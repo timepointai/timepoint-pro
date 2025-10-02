@@ -110,7 +110,7 @@ Extract:
 
         try:
             response = self.llm_client.client.chat.completions.create(
-                model="openai/gpt-4o-mini",
+                model=self.llm_client.default_model,
                 response_model=QueryIntent,
                 messages=[{"role": "user", "content": prompt}]
             )
