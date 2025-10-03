@@ -96,6 +96,8 @@ def main(cfg: DictConfig) -> None:
         run_interactive(cfg, store, llm_client)
     elif cfg.mode == "models":
         run_model_management(cfg, llm_client)
+    elif cfg.mode == "branch":
+        run_branching_explorer(cfg, store, llm_client)
     else:
         print(f"Unknown mode: {cfg.mode}")
 
@@ -783,6 +785,63 @@ def _show_simulation_status(store: GraphStore, llm_client):
             print(f"    {res}: {count} entities")
 
     print()
+
+def run_branching_explorer(cfg: DictConfig, store: GraphStore, llm_client: LLMClient):
+    """Interactive counterfactual branching explorer"""
+    print(f"\n{'='*60}")
+    print("COUNTERFACTUAL BRANCHING EXPLORER")
+    print("="*60)
+    print("Explore 'what-if' scenarios by creating alternate timeline branches")
+    print("Type 'help' for commands, 'quit' to exit")
+    print()
+
+    from query_interface import QueryInterface
+    query_interface = QueryInterface(store, llm_client)
+
+    while True:
+        try:
+            query = input("Branch Query> ").strip()
+            if not query:
+                continue
+
+            if query.lower() in ['quit', 'exit', 'q']:
+                break
+            elif query.lower() == 'help':
+                print("\nAvailable commands:")
+                print("  'what if [scenario]' - Create counterfactual branch")
+                print("  'quit' - Exit branching explorer")
+                print("\nExample scenarios:")
+                print("  'What if Hamilton was absent from the inauguration?'")
+                print("  'What if Jefferson arrived early?'")
+                print("  'What if the cabinet meeting was cancelled?'")
+                print()
+                continue
+
+            # Check if it's a counterfactual query
+            if any(keyword in query.lower() for keyword in ['what if', 'what would happen if', 'suppose', 'imagine if', 'if only']):
+                print(f"\n🔀 Analyzing counterfactual scenario: {query}")
+                print("-" * 50)
+
+                try:
+                    response = query_interface.query(query)
+                    print(response)
+                except Exception as e:
+                    print(f"❌ Branching analysis failed: {e}")
+                    print("The branching system may need additional integration.")
+
+                print("-" * 50)
+                print()
+            else:
+                print("❓ Please use 'what-if' phrasing for counterfactual analysis.")
+                print("Example: 'What if Hamilton was absent from the cabinet meeting?'")
+                print()
+
+        except KeyboardInterrupt:
+            print("\nExiting branching explorer...")
+            break
+        except Exception as e:
+            print(f"❌ Error: {e}")
+            continue
 
 if __name__ == "__main__":
     main()

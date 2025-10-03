@@ -2,11 +2,13 @@
 # query_interface.py - Natural language query interface with lazy resolution elevation
 # ============================================================================
 import numpy as np
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Set, Any
 from datetime import datetime, timedelta
 from pydantic import BaseModel
 import hashlib
-from schemas import Entity, Timepoint, ResolutionLevel
+import re
+import json
+from schemas import Entity, Timepoint, ResolutionLevel, EnvironmentEntity, AtmosphereEntity, CrowdEntity
 from storage import GraphStore
 from llm import LLMClient
 from resolution_engine import ResolutionEngine
@@ -22,10 +24,15 @@ class QueryIntent(BaseModel):
     """Parsed intent from natural language query"""
     target_entity: Optional[str] = None
     target_timepoint: Optional[str] = None
-    information_type: str = "general"  # knowledge, relationships, actions, dialog
+    information_type: str = "general"  # knowledge, relationships, actions, dialog, counterfactual
     context_entities: List[str] = []  # Other entities that matter
     confidence: float = 0.0
     reasoning: str = ""
+    # Counterfactual branching fields
+    is_counterfactual: bool = False
+    intervention_type: Optional[str] = None  # "entity_removal", "entity_modification", "event_cancellation"
+    intervention_target: Optional[str] = None
+    intervention_description: Optional[str] = None
 
 
 class QueryInterface:
@@ -213,10 +220,44 @@ Return only valid JSON, no other text."""
             info_type = "relationships"
             confidence += 0.2
 
+        # Scene/atmosphere queries
+        elif any(word in query_lower for word in ["atmosphere", "mood", "feeling", "vibe", "environment", "crowd", "scene"]):
+            info_type = "atmosphere"
+            confidence += 0.3
+
         # Description/event queries (like "describe the cabinet meeting")
         elif any(word in query_lower for word in ["describe", "what happened", "during", "at the"]):
             info_type = "general"
             confidence += 0.1
+
+        # Counterfactual/what-if queries
+        is_counterfactual = False
+        intervention_type = None
+        intervention_target = None
+        intervention_description = None
+
+        counterfactual_keywords = ["what if", "what would happen if", "suppose", "imagine if", "if only"]
+        if any(keyword in query_lower for keyword in counterfactual_keywords):
+            is_counterfactual = True
+            info_type = "counterfactual"
+            confidence += 0.3
+
+            # Try to detect intervention type
+            if any(word in query_lower for word in ["absent", "missing", "not present", "removed", "was absent"]):
+                intervention_type = "entity_removal"
+                # For entity removal, the target_entity is usually the one being removed
+                if target_entity:
+                    intervention_target = target_entity
+                    intervention_description = f"Remove {target_entity} from timeline"
+                elif context_entities:
+                    intervention_target = context_entities[0]
+                    intervention_description = f"Remove {intervention_target} from timeline"
+            elif any(word in query_lower for word in ["cancel", "prevent", "stop", "avoid"]):
+                intervention_type = "event_cancellation"
+                intervention_description = "Cancel the target event"
+            elif any(word in query_lower for word in ["instead", "changed", "different", "modify"]):
+                intervention_type = "entity_modification"
+                intervention_description = "Modify entity behavior or state"
 
         # Boost confidence based on entity detection quality
         if target_entity:
@@ -244,7 +285,11 @@ Return only valid JSON, no other text."""
             information_type=info_type,
             context_entities=context_entities,
             confidence=confidence,
-            reasoning="; ".join(reasoning_parts)
+            reasoning="; ".join(reasoning_parts),
+            is_counterfactual=is_counterfactual,
+            intervention_type=intervention_type,
+            intervention_target=intervention_target,
+            intervention_description=intervention_description
         )
         # Store original query for relevance scoring
         intent._original_query = query
@@ -263,7 +308,7 @@ Return only valid JSON, no other text."""
             return cached_response
 
         # Generate response
-        response = self.synthesize_response(query_intent)
+        response = self.synthesize_response(query_intent, query_text)
 
         # Cache the response
         self._cache_response(cache_key, response)
@@ -271,13 +316,21 @@ Return only valid JSON, no other text."""
 
         return response
 
-    def synthesize_response(self, query_intent: QueryIntent) -> str:
+    def synthesize_response(self, query_intent: QueryIntent, query_text: str = "") -> str:
         """Generate answer from entity states with lazy resolution elevation and attribution"""
+
+        # Handle counterfactual queries first
+        if query_intent.is_counterfactual:
+            return self._synthesize_counterfactual_response(query_intent, query_text)
 
         # Handle different query types
         if not query_intent.target_entity:
+            # Check if this is a scene/atmosphere query
+            if query_intent.information_type in ["atmosphere", "environment", "crowd"] or \
+               any(word in getattr(query_intent, '_original_query', '').lower() for word in ["atmosphere", "mood", "scene", "environment", "crowd"]):
+                return self._synthesize_scene_response(query_intent)
             # Check if this is an event/timepoint-focused query
-            if query_intent.target_timepoint:
+            elif query_intent.target_timepoint:
                 return self._synthesize_timepoint_response(query_intent)
             # Check if this is a multi-entity relationship query
             elif query_intent.context_entities:
@@ -287,7 +340,30 @@ Return only valid JSON, no other text."""
 
         entity = self.store.get_entity(query_intent.target_entity)
         if not entity:
-            return f"I don't have information about {query_intent.target_entity}."
+            # Mechanism 9: On-Demand Entity Generation
+            # Check if this might be a missing entity that should be generated
+            existing_entities = set(self._get_all_entity_names())
+            missing_entity = self.detect_entity_gap(query_text, existing_entities)
+
+            if missing_entity and missing_entity == query_intent.target_entity:
+                # Try to generate the entity on demand
+                # Find an appropriate timepoint for context
+                timepoint = None
+                if query_intent.target_timepoint:
+                    timepoint = self.store.get_timepoint(query_intent.target_timepoint)
+                else:
+                    # Use the most recent timepoint as context
+                    timepoints = self.store.get_all_timepoints()
+                    if timepoints:
+                        timepoint = max(timepoints, key=lambda tp: tp.timestamp)
+
+                if timepoint:
+                    print(f"  🔍 Entity {query_intent.target_entity} not found, generating on demand...")
+                    entity = self.generate_entity_on_demand(query_intent.target_entity, timepoint)
+                else:
+                    return f"I don't have information about {query_intent.target_entity} and cannot determine appropriate context for generation."
+            else:
+                return f"I don't have information about {query_intent.target_entity}."
 
         # Check if entity resolution is sufficient for the query
         required_resolution = self._get_required_resolution(query_intent.information_type)
@@ -725,63 +801,490 @@ Return only valid JSON, no other text."""
         return "\n".join(response_parts)
 
     def _synthesize_relationship_response(self, query_intent: QueryIntent) -> str:
-        """Generate response for multi-entity relationship queries (e.g., 'How did Hamilton and Jefferson interact?')"""
+        """Generate response for multi-entity relationship queries using Phase 3 capabilities"""
         if not query_intent.context_entities or len(query_intent.context_entities) < 2:
             return "I need more specific information about which entities you're asking about their relationship."
 
-        # For multi-entity queries, analyze relationships from all mentioned entities
-        entity_knowledge = {}
-        relevant_interactions = []
+        # Phase 3: Use comprehensive multi-entity analysis
+        entities = query_intent.context_entities
+        timeline = []  # Could be populated from available timepoints
 
-        # Collect knowledge from all mentioned entities
-        for entity_id in query_intent.context_entities:
+        # Get entity objects
+        entity_objects = []
+        for entity_id in entities:
             entity = self.store.get_entity(entity_id)
             if entity:
-                knowledge_state = entity.entity_metadata.get("knowledge_state", [])
-                entity_knowledge[entity_id] = knowledge_state
+                entity_objects.append(entity)
 
-                # Look for knowledge that mentions other entities in the query
-                for knowledge in knowledge_state:
-                    knowledge_lower = knowledge.lower()
-                    # Check if this knowledge mentions other entities from the context
-                    mentions_others = False
-                    mentioned_entities = []
-                    for other_entity_id in query_intent.context_entities:
-                        if other_entity_id != entity_id:
-                            other_name = other_entity_id.replace('_', ' ')
-                            if other_name.lower() in knowledge_lower:
-                                mentions_others = True
-                                mentioned_entities.append(other_entity_id)
-                                break
+        if not entity_objects:
+            return "Could not find the requested entities in the simulation."
 
-                    if mentions_others:
-                        relevant_interactions.append({
-                            'knowledge': knowledge,
-                            'source_entity': entity_id,
-                            'mentioned_entities': mentioned_entities
-                        })
+        # Analyze relationship trajectories
+        relationship_analysis = self._analyze_relationship_trajectories(entities, timeline)
 
-        # Build response showing interactions from multiple perspectives
-        response_parts = ["Based on the temporal simulation's knowledge of interactions between these entities:"]
+        # Detect contradictions
+        contradictions = self._detect_contradictions_in_entities(entity_objects)
 
-        if relevant_interactions:
-            # Group by source entity and show diverse perspectives
-            shown_knowledge = set()
-            for interaction in relevant_interactions[:5]:  # Limit to 5 most relevant
-                if interaction['knowledge'] not in shown_knowledge:
-                    source_name = interaction['source_entity'].replace('_', ' ').title()
-                    response_parts.append(f"• {source_name}'s perspective: {interaction['knowledge']}")
-                    shown_knowledge.add(interaction['knowledge'])
-        else:
-            # If no direct interactions found, show general relationship context
-            entity_names = [eid.replace('_', ' ').title() for eid in query_intent.context_entities]
-            response_parts.append(f"• The simulation shows {', '.join(entity_names)} were contemporaries during the founding era, though specific interaction details are limited in the current temporal context.")
+        # Check for existing dialogs
+        dialogs = self._find_relevant_dialogs(entities)
 
-        # Add metadata about the relationship analysis
+        # Build comprehensive response
+        response_parts = [f"**Relationship Analysis: {', '.join(e.replace('_', ' ').title() for e in entities)}**"]
+
+        # Add relationship trajectory summary
+        if relationship_analysis:
+            response_parts.append("\n**Relationship Evolution:**")
+            for trajectory in relationship_analysis[:3]:  # Limit to most relevant
+                trend = trajectory.get('overall_trend', 'unknown')
+                entity_a = trajectory.get('entity_a', '').replace('_', ' ').title()
+                entity_b = trajectory.get('entity_b', '').replace('_', ' ').title()
+                response_parts.append(f"• {entity_a} ↔ {entity_b}: {trend} relationship")
+
+        # Add contradiction analysis
+        if contradictions:
+            response_parts.append("\n**Identified Conflicts:**")
+            for contradiction in contradictions[:3]:
+                entity_a = contradiction.get('entity_a', '').replace('_', ' ').title()
+                entity_b = contradiction.get('entity_b', '').replace('_', ' ').title()
+                topic = contradiction.get('topic', 'unknown topic')
+                severity = contradiction.get('severity', 0)
+                response_parts.append(f"• {entity_a} and {entity_b} disagree on '{topic}' (severity: {severity:.1f})")
+
+        # Add dialog highlights
+        if dialogs:
+            response_parts.append("\n**Direct Interactions:**")
+            for dialog in dialogs[:2]:  # Limit to most recent
+                participants = json.loads(dialog.participants) if isinstance(dialog.participants, str) else dialog.participants
+                participant_names = [p.replace('_', ' ').title() for p in participants]
+                response_parts.append(f"• Conversation between {', '.join(participant_names)} at {dialog.timepoint_id}")
+
+        # Add entity perspectives
+        response_parts.append("\n**Entity Perspectives:**")
+        for entity in entity_objects[:3]:  # Limit to avoid overwhelming response
+            knowledge = entity.entity_metadata.get("knowledge_state", [])
+            relevant_knowledge = []
+
+            # Find knowledge that mentions other entities
+            for item in knowledge[:5]:  # Check first 5 knowledge items
+                item_lower = item.lower()
+                mentions_others = any(
+                    other_id.replace('_', ' ').lower() in item_lower
+                    for other_id in entities if other_id != entity.entity_id
+                )
+                if mentions_others:
+                    relevant_knowledge.append(item)
+
+            if relevant_knowledge:
+                entity_name = entity.entity_id.replace('_', ' ').title()
+                response_parts.append(f"• {entity_name}: {relevant_knowledge[0][:100]}...")
+
+        # Add metadata
         entity_list = ', '.join(query_intent.context_entities)
-        response_parts.append(f"\n[Multi-entity relationship analysis: {entity_list}, Confidence: {query_intent.confidence:.1f}]")
+        response_parts.append(f"\n[Phase 3 Multi-Entity Analysis: {entity_list}, Dialogs: {len(dialogs)}, Contradictions: {len(contradictions)}]")
 
         return "\n".join(response_parts)
+
+    def _synthesize_scene_response(self, query_intent: QueryIntent) -> str:
+        """Generate response for scene-level queries (atmosphere, environment, crowd)"""
+
+        # Find timepoint to get scene context
+        timepoint = None
+        if query_intent.target_timepoint:
+            timepoint = self.store.get_timepoint(query_intent.target_timepoint)
+        else:
+            # Find timepoint by location reference in query
+            query_lower = getattr(query_intent, '_original_query', '').lower()
+            timepoints = self.store.get_all_timepoints()
+            for tp in timepoints:
+                if any(loc.lower() in query_lower for loc in ['federal hall', 'hall', tp.event_description.lower()]):
+                    timepoint = tp
+                    break
+
+        if not timepoint:
+            return "I couldn't determine which scene or timepoint you're referring to."
+
+        # Check for scene entities (environment, atmosphere, crowd)
+        scene_entities = self._get_scene_entities(timepoint.timepoint_id)
+
+        if not scene_entities['environment']:
+            # Create scene entities on demand
+            scene_entities = self._create_scene_entities_on_demand(timepoint)
+
+        # Generate response based on query type
+        if 'atmosphere' in query_intent.information_type or 'atmosphere' in getattr(query_intent, '_original_query', '').lower():
+            return self._describe_atmosphere(scene_entities, timepoint)
+        elif 'environment' in query_intent.information_type:
+            return self._describe_environment(scene_entities, timepoint)
+        elif 'crowd' in query_intent.information_type:
+            return self._describe_crowd(scene_entities, timepoint)
+        else:
+            # General scene description
+            return self._describe_scene_overview(scene_entities, timepoint)
+
+    def _get_scene_entities(self, timepoint_id: str) -> Dict[str, Optional[Any]]:
+        """Retrieve scene entities for a timepoint"""
+        # In a real implementation, this would query the database
+        # For now, return None to trigger on-demand creation
+        return {
+            'environment': None,
+            'atmosphere': None,
+            'crowd': None
+        }
+
+    def _create_scene_entities_on_demand(self, timepoint: Timepoint) -> Dict[str, any]:
+        """Create scene entities for a timepoint on demand"""
+        from workflows import create_environment_entity, compute_scene_atmosphere, compute_crowd_dynamics
+
+        # Get entities present at this timepoint
+        entities = []
+        for entity_id in timepoint.entities_present:
+            entity = self.store.get_entity(entity_id)
+            if entity:
+                entities.append(entity)
+
+        # Create environment entity
+        environment = create_environment_entity(
+            timepoint_id=timepoint.timepoint_id,
+            location="Federal Hall",  # Could be extracted from timepoint metadata
+            capacity=500,
+            temperature=18.0,  # April in Philadelphia
+            lighting=0.9,
+            weather="clear"
+        )
+
+        # Create atmosphere entity
+        atmosphere = compute_scene_atmosphere(entities, environment)
+
+        # Create crowd entity
+        crowd = compute_crowd_dynamics(entities, environment)
+
+        # In a real implementation, these would be saved to database
+        # self.store.save_environment_entity(environment)
+        # self.store.save_atmosphere_entity(atmosphere)
+        # self.store.save_crowd_entity(crowd)
+
+        return {
+            'environment': environment,
+            'atmosphere': atmosphere,
+            'crowd': crowd
+        }
+
+    def _describe_atmosphere(self, scene_entities: Dict, timepoint: Timepoint) -> str:
+        """Describe the atmospheric conditions of a scene"""
+        atmosphere = scene_entities['atmosphere']
+        environment = scene_entities['environment']
+
+        if not atmosphere:
+            return "Atmospheric data not available for this scene."
+
+        response_parts = [f"Atmosphere at {environment.location} during {timepoint.event_description.lower()}:"]
+        response_parts.append("")
+
+        # Emotional atmosphere
+        valence_desc = "positive" if atmosphere.emotional_valence > 0.2 else "negative" if atmosphere.emotional_valence < -0.2 else "neutral"
+        arousal_desc = "high energy" if atmosphere.emotional_arousal > 0.6 else "moderate energy" if atmosphere.emotional_arousal > 0.3 else "calm"
+
+        response_parts.append(f"• Emotional tone: {valence_desc} with {arousal_desc}")
+
+        # Tension and formality
+        tension_desc = "high tension" if atmosphere.tension_level > 0.7 else "moderate tension" if atmosphere.tension_level > 0.4 else "relaxed"
+        formality_desc = "highly formal" if atmosphere.formality_level > 0.8 else "moderately formal" if atmosphere.formality_level > 0.5 else "informal"
+
+        response_parts.append(f"• Social atmosphere: {tension_desc}, {formality_desc}")
+
+        # Cohesion and energy
+        cohesion_desc = "strong social bonds" if atmosphere.social_cohesion > 0.7 else "moderate social cohesion" if atmosphere.social_cohesion > 0.4 else "social divisions"
+        energy_desc = "energetic and lively" if atmosphere.energy_level > 0.7 else "moderate energy" if atmosphere.energy_level > 0.4 else "subdued"
+
+        response_parts.append(f"• Group dynamics: {cohesion_desc}, overall feeling {energy_desc}")
+
+        # Environmental factors
+        if environment:
+            temp_desc = "comfortably cool" if environment.ambient_temperature < 20 else "warm"
+            light_desc = "brightly lit" if environment.lighting_level > 0.8 else "moderately lit" if environment.lighting_level > 0.5 else "dimly lit"
+
+            response_parts.append(f"• Physical setting: {temp_desc}, {light_desc}")
+            if environment.weather:
+                response_parts.append(f"• Weather: {environment.weather}")
+
+        response_parts.append(f"\n[Scene atmosphere analysis: {timepoint.timepoint_id}, Confidence: High]")
+
+        return "\n".join(response_parts)
+
+    def _describe_environment(self, scene_entities: Dict, timepoint: Timepoint) -> str:
+        """Describe the environmental conditions of a scene"""
+        environment = scene_entities['environment']
+
+        if not environment:
+            return "Environmental data not available for this scene."
+
+        response_parts = [f"Environment at {environment.location}:"]
+        response_parts.append("")
+
+        response_parts.append(f"• Location: {environment.location}")
+        response_parts.append(f"• Capacity: {environment.capacity} people")
+        response_parts.append(f"• Temperature: {environment.ambient_temperature:.1f}°C")
+        response_parts.append(f"• Lighting: {'bright' if environment.lighting_level > 0.7 else 'moderate' if environment.lighting_level > 0.4 else 'dim'}")
+
+        if environment.weather:
+            response_parts.append(f"• Weather: {environment.weather}")
+
+        if environment.architectural_style:
+            response_parts.append(f"• Architecture: {environment.architectural_style.replace('_', ' ')}")
+
+        if environment.acoustic_properties:
+            acoustic_desc = {
+                "reverberant": "echoing acoustics typical of large halls",
+                "muffled": "absorbing acoustics typical of furnished spaces",
+                "open": "open acoustics typical of outdoor spaces",
+                "moderate": "balanced acoustics"
+            }.get(environment.acoustic_properties, environment.acoustic_properties)
+
+            response_parts.append(f"• Acoustics: {acoustic_desc}")
+
+        response_parts.append(f"\n[Environmental analysis: {timepoint.timepoint_id}]")
+
+        return "\n".join(response_parts)
+
+    def _describe_crowd(self, scene_entities: Dict, timepoint: Timepoint) -> str:
+        """Describe the crowd composition and dynamics"""
+        crowd = scene_entities['crowd']
+
+        if not crowd:
+            return "Crowd data not available for this scene."
+
+        response_parts = [f"Crowd at {timepoint.event_description.lower()}:"]
+        response_parts.append("")
+
+        response_parts.append(f"• Size: {crowd.size} people present")
+        density_desc = "very crowded" if crowd.density > 0.8 else "crowded" if crowd.density > 0.6 else "moderately full" if crowd.density > 0.4 else "sparse"
+        response_parts.append(f"• Density: {density_desc} ({crowd.density:.1f})")
+
+        # Mood distribution
+        try:
+            mood_dist = json.loads(crowd.mood_distribution)
+            if mood_dist:
+                mood_parts = []
+                for mood, percentage in sorted(mood_dist.items(), key=lambda x: x[1], reverse=True):
+                    mood_parts.append(f"{mood} ({percentage:.1%})")
+                response_parts.append(f"• Mood distribution: {', '.join(mood_parts)}")
+        except (json.JSONDecodeError, TypeError):
+            response_parts.append("• Mood distribution: analysis unavailable")
+
+        response_parts.append(f"• Movement pattern: {crowd.movement_pattern}")
+        response_parts.append(f"• Noise level: {'loud' if crowd.noise_level > 0.7 else 'moderate' if crowd.noise_level > 0.4 else 'quiet'}")
+
+        # Demographic composition
+        try:
+            demo_comp = json.loads(crowd.demographic_composition)
+            if demo_comp and 'gender_balance' in demo_comp:
+                gender_balance = demo_comp['gender_balance']
+                male_pct = gender_balance.get('male', 0)
+                female_pct = gender_balance.get('female', 0)
+                response_parts.append(f"• Gender balance: {male_pct:.1%} male, {female_pct:.1%} female")
+        except (json.JSONDecodeError, TypeError, KeyError):
+            pass
+
+        response_parts.append(f"\n[Crowd analysis: {timepoint.timepoint_id}]")
+
+        return "\n".join(response_parts)
+
+    def _describe_scene_overview(self, scene_entities: Dict, timepoint: Timepoint) -> str:
+        """Provide overview of the entire scene"""
+        response_parts = [f"Scene overview: {timepoint.event_description}"]
+        response_parts.append("")
+
+        # Environment summary
+        if scene_entities['environment']:
+            env = scene_entities['environment']
+            response_parts.append(f"📍 Location: {env.location} ({env.architectural_style.replace('_', ' ')})")
+            response_parts.append(f"🌡️ Conditions: {env.ambient_temperature:.1f}°C, {'bright' if env.lighting_level > 0.7 else 'moderate'} lighting")
+
+        # Atmosphere summary
+        if scene_entities['atmosphere']:
+            atm = scene_entities['atmosphere']
+            valence_icon = "😊" if atm.emotional_valence > 0.2 else "😔" if atm.emotional_valence < -0.2 else "😐"
+            energy_icon = "⚡" if atm.energy_level > 0.7 else "🔋" if atm.energy_level > 0.4 else "🪫"
+
+            response_parts.append(f"{valence_icon} Atmosphere: {'positive' if atm.emotional_valence > 0.2 else 'negative' if atm.emotional_valence < -0.2 else 'neutral'} mood, {energy_icon} {'high' if atm.energy_level > 0.7 else 'moderate' if atm.energy_level > 0.4 else 'low'} energy")
+
+        # Crowd summary
+        if scene_entities['crowd']:
+            crowd = scene_entities['crowd']
+            response_parts.append(f"👥 Crowd: {crowd.size} people, {crowd.movement_pattern} movement")
+
+        response_parts.append(f"\n[Scene overview: {timepoint.timepoint_id}]")
+
+        return "\n".join(response_parts)
+
+    # ============================================================================
+    # Mechanism 9: On-Demand Entity Generation
+    # ============================================================================
+
+    def extract_entity_names(self, query: str) -> Set[str]:
+        """Extract potential entity names from natural language query using regex patterns"""
+        entity_names = set()
+
+        # Pattern for numbered entities like "attendee #47", "person #12", "member #3"
+        numbered_patterns = [
+            r'attendee\s*#?\s*(\d+)',
+            r'person\s*#?\s*(\d+)',
+            r'member\s*#?\s*(\d+)',
+            r'participant\s*#?\s*(\d+)',
+            r'guest\s*#?\s*(\d+)',
+            r'visitor\s*#?\s*(\d+)',
+            r'spectator\s*#?\s*(\d+)'
+        ]
+
+        for pattern in numbered_patterns:
+            matches = re.findall(pattern, query.lower())
+            for match in matches:
+                entity_names.add(f"attendee_{match}")
+
+        # Pattern for named entities with numbers like "attendee47", "person12"
+        named_numbered_patterns = [
+            r'\b(attendee)(\d+)\b',
+            r'\b(person)(\d+)\b',
+            r'\b(member)(\d+)\b',
+            r'\b(participant)(\d+)\b'
+        ]
+
+        for pattern in named_numbered_patterns:
+            matches = re.findall(pattern, query.lower())
+            for base_name, number in matches:
+                entity_names.add(f"{base_name}_{number}")
+
+        # Pattern for general entity references with numbers
+        general_numbered = r'\b(\w+)\s*#?\s*(\d+)\b'
+        matches = re.findall(general_numbered, query.lower())
+        for base_name, number in matches:
+            # Only include if it looks like a numbered entity reference
+            if base_name in ['attendee', 'person', 'member', 'participant', 'guest', 'visitor', 'spectator']:
+                entity_names.add(f"{base_name}_{number}")
+
+        return entity_names
+
+    def detect_entity_gap(self, query: str, existing_entities: Set[str]) -> Optional[str]:
+        """Parse query for entity mentions and return first missing entity"""
+        entities_mentioned = self.extract_entity_names(query)
+        missing = entities_mentioned - existing_entities
+        return missing.pop() if missing else None
+
+    def generate_entity_on_demand(self, entity_id: str, timepoint: Timepoint) -> Entity:
+        """Create plausible entity matching query context dynamically"""
+        context = {
+            "timepoint": timepoint.event_description,
+            "entities_present": timepoint.entities_present,
+            "role": self._infer_role_from_context(entity_id, timepoint)
+        }
+
+        # Use LLM to generate entity data
+        prompt = f"""Generate a historical entity for the following context:
+
+Timepoint: {timepoint.timestamp.strftime('%Y-%m-%d %H:%M')}
+Event: {context['timepoint']}
+Entities Present: {', '.join(context['entities_present'])}
+Inferred Role: {context['role']}
+Entity ID: {entity_id}
+
+Create a plausible historical figure who would be present at this event. Return a JSON object with:
+- name: Full name of the entity
+- age: Approximate age (integer)
+- role: Historical role or occupation
+- background: Brief background (2-3 sentences)
+- personality: Key personality traits (2-3 traits)
+- motivations: What they hope to achieve at this event
+- knowledge_state: List of 3-5 facts they would know
+- relationship_notes: How they relate to other entities present
+
+Return only valid JSON."""
+
+        try:
+            response = self.llm_client.client.chat.completions.create(
+                model=self.llm_client.default_model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7,  # Some creativity for plausible generation
+                max_tokens=800
+            )
+
+            content = response["choices"][0]["message"]["content"]
+            entity_data = json.loads(content.strip())
+
+            # Create entity with generated data
+            entity = Entity(
+                entity_id=entity_id,
+                entity_type="person",
+                resolution_level=ResolutionLevel.TENSOR_ONLY,
+                entity_metadata={
+                    "name": entity_data.get("name", entity_id.replace("_", " ").title()),
+                    "age": entity_data.get("age", 35),
+                    "role": entity_data.get("role", context["role"]),
+                    "background": entity_data.get("background", "Generated historical figure"),
+                    "personality": entity_data.get("personality", ["unknown"]),
+                    "motivations": entity_data.get("motivations", "Attend event"),
+                    "knowledge_state": entity_data.get("knowledge_state", ["Generated knowledge"]),
+                    "relationship_notes": entity_data.get("relationship_notes", "New attendee")
+                }
+            )
+
+            # Set temporal span
+            entity.temporal_span_start = timepoint.timestamp
+            entity.temporal_span_end = timepoint.timestamp
+
+            # Initialize physical and cognitive tensors
+            from schemas import PhysicalTensor, CognitiveTensor
+            entity.physical_tensor = PhysicalTensor(
+                age=entity_data.get("age", 35),
+                pain_level=0.0,
+                fever=36.5
+            )
+            entity.cognitive_tensor = CognitiveTensor(
+                knowledge_state=entity_data.get("knowledge_state", [])
+            )
+
+            # Save to database
+            self.store.save_entity(entity)
+
+            print(f"  🆕 Generated new entity: {entity_id} ({context['role']})")
+            self.llm_client.token_count += 800
+            self.llm_client.cost += 0.008
+
+            return entity
+
+        except Exception as e:
+            print(f"Failed to generate entity {entity_id}: {e}")
+            # Fallback: create minimal entity
+            entity = Entity(
+                entity_id=entity_id,
+                entity_type="person",
+                resolution_level=ResolutionLevel.TENSOR_ONLY,
+                entity_metadata={
+                    "role": context["role"],
+                    "knowledge_state": [f"Present at {timepoint.event_description}"]
+                }
+            )
+            entity.temporal_span_start = timepoint.timestamp
+            entity.temporal_span_end = timepoint.timestamp
+            self.store.save_entity(entity)
+            return entity
+
+    def _infer_role_from_context(self, entity_id: str, timepoint: Timepoint) -> str:
+        """Infer likely role for an entity based on timepoint context"""
+        event_lower = timepoint.event_description.lower()
+
+        # Check for numbered attendees
+        if entity_id.startswith("attendee_"):
+            if "inauguration" in event_lower:
+                return "ceremony attendee"
+            elif "meeting" in event_lower or "conference" in event_lower:
+                return "meeting participant"
+            elif "dinner" in event_lower or "banquet" in event_lower:
+                return "dinner guest"
+            else:
+                return "event attendee"
+
+        # Default fallback
+        return "historical figure"
 
     def _get_all_entity_names(self) -> List[str]:
         """Get list of all entity IDs from database"""
@@ -791,3 +1294,170 @@ Return only valid JSON, no other text."""
         with Session(self.store.engine) as session:
             entities = session.exec(select(Entity)).all()
             return [entity.entity_id for entity in entities]
+
+    # ============================================================================
+    # Phase 3: Multi-Entity Analysis Helper Methods
+    # ============================================================================
+
+    def _analyze_relationship_trajectories(self, entity_ids: List[str], timeline: List[Dict]) -> List[Dict]:
+        """Analyze relationship trajectories between entities"""
+        trajectories = []
+
+        # Analyze relationships between all pairs
+        for i, entity_a in enumerate(entity_ids):
+            for entity_b in entity_ids[i+1:]:
+                trajectory = self.store.get_relationship_trajectory_between(entity_a, entity_b)
+                if trajectory:
+                    trajectory_data = {
+                        "entity_a": trajectory.entity_a,
+                        "entity_b": trajectory.entity_b,
+                        "overall_trend": trajectory.overall_trend,
+                        "key_events": trajectory.key_events
+                    }
+                    trajectories.append(trajectory_data)
+
+        return trajectories
+
+    def _detect_contradictions_in_entities(self, entities: List[Entity]) -> List[Dict]:
+        """Detect contradictions between entity knowledge/beliefs"""
+        from workflows import detect_contradictions
+
+        # Get current timepoint for contradiction detection
+        timepoints = self.store.get_all_timepoints()
+        current_tp = timepoints[-1] if timepoints else None
+
+        if not current_tp:
+            return []
+
+        contradictions = detect_contradictions(entities, current_tp, self.store)
+        return [
+            {
+                "entity_a": c.entity_a,
+                "entity_b": c.entity_b,
+                "topic": c.topic,
+                "severity": c.severity,
+                "context": c.context
+            }
+            for c in contradictions
+        ]
+
+    def _find_relevant_dialogs(self, entity_ids: List[str]) -> List[Dict]:
+        """Find dialogs involving the specified entities"""
+        dialogs = self.store.get_dialogs_for_entities(entity_ids)
+
+        # Convert to dict format for easier handling
+        dialog_list = []
+        for dialog in dialogs:
+            dialog_list.append({
+                "dialog_id": dialog.dialog_id,
+                "timepoint_id": dialog.timepoint_id,
+                "participants": dialog.participants,
+                "information_transfer_count": dialog.information_transfer_count
+            })
+
+        return dialog_list
+
+    def _synthesize_counterfactual_response(self, query_intent: QueryIntent, query_text: str) -> str:
+        """Generate response for counterfactual/what-if queries using branching"""
+        from schemas import Intervention
+        from workflows import create_counterfactual_branch, compare_timelines
+
+        try:
+            # Get the baseline timeline
+            baseline_timeline = self.store.get_timeline("main_timeline")  # Assuming main timeline exists
+            if not baseline_timeline:
+                # Create a default timeline from available timepoints
+                timepoints = self.store.get_all_timepoints()
+                if not timepoints:
+                    return "No timeline data available for counterfactual analysis."
+
+                baseline_timeline = {
+                    "timeline_id": "main_timeline",
+                    "timepoints": sorted(timepoints, key=lambda tp: tp.timestamp)
+                }
+
+            # Find intervention point (use target timepoint or earliest timepoint)
+            intervention_point = query_intent.target_timepoint
+            if not intervention_point and baseline_timeline["timepoints"]:
+                intervention_point = baseline_timeline["timepoints"][0].timepoint_id
+
+            if not intervention_point:
+                return "Cannot determine intervention point for counterfactual analysis."
+
+            # Create intervention based on detected type
+            intervention = None
+            if query_intent.intervention_type == "entity_removal" and query_intent.intervention_target:
+                intervention = Intervention(
+                    type="entity_removal",
+                    target=query_intent.intervention_target,
+                    parameters={}
+                )
+            elif query_intent.intervention_type == "entity_modification":
+                # For now, create a simple modification
+                intervention = Intervention(
+                    type="entity_modification",
+                    target=query_intent.intervention_target or query_intent.target_entity,
+                    parameters={"behavior_adjustment": "more_conservative"}
+                )
+            elif query_intent.intervention_type == "event_cancellation":
+                intervention = Intervention(
+                    type="event_cancellation",
+                    target=intervention_point,
+                    parameters={}
+                )
+            else:
+                # Default to entity removal if we can detect one
+                intervention = Intervention(
+                    type="entity_removal",
+                    target=query_intent.context_entities[0] if query_intent.context_entities else "unknown_entity",
+                    parameters={}
+                )
+
+            # Create counterfactual branch
+            counterfactual_timeline = create_counterfactual_branch(
+                baseline_timeline, intervention_point, intervention, self.store
+            )
+
+            # Compare timelines
+            comparison = compare_timelines(baseline_timeline, counterfactual_timeline)
+
+            # Generate response
+            response_parts = [f"Counterfactual Analysis: {query_text}"]
+            response_parts.append("")
+
+            if intervention:
+                response_parts.append(f"Intervention: {intervention.type} on {intervention.target}")
+                if query_intent.intervention_description:
+                    response_parts.append(f"Details: {query_intent.intervention_description}")
+
+            response_parts.append("")
+            response_parts.append("Key Differences:")
+
+            if "entity_knowledge_delta" in comparison:
+                knowledge_changes = comparison["entity_knowledge_delta"]
+                if knowledge_changes:
+                    response_parts.append(f"• Knowledge changes: {len(knowledge_changes)} items affected")
+                else:
+                    response_parts.append("• Knowledge: No significant changes")
+
+            if "relationship_changes" in comparison:
+                rel_changes = comparison["relationship_changes"]
+                if rel_changes:
+                    response_parts.append(f"• Relationships: {len(rel_changes)} relationships affected")
+                else:
+                    response_parts.append("• Relationships: No significant changes")
+
+            if "event_outcomes" in comparison:
+                event_changes = comparison["event_outcomes"]
+                if event_changes:
+                    response_parts.append(f"• Events: {len(event_changes)} event outcomes changed")
+                else:
+                    response_parts.append("• Events: No significant changes")
+
+            response_parts.append("")
+            response_parts.append("[Counterfactual analysis completed. This is a simulated branching scenario.]")
+
+            return "\n".join(response_parts)
+
+        except Exception as e:
+            return f"Counterfactual analysis failed: {str(e)}. The branching system may need further integration."

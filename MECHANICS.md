@@ -1196,17 +1196,94 @@ AbstractEntity(Entity):
         return min(1.0, transmission_prob * self.intensity)
 ```
 
+### AnyEntity Schema
+
+```python
+AnyEntity(Entity):
+    entity_type: str = "any"
+    adaptability: float  # 0.0-1.0 - How easily it can adapt/become anything
+    current_form: Dict[str, Any]  # Current manifestation
+    transformation_history: List[Dict[str, Any]]  # Previous forms
+    context_sensitivity: float  # How much it adapts to context
+
+    def adapt_to_context(self, context: Dict[str, Any]) -> None:
+        """Dynamically adapt entity properties based on context"""
+        # Implementation for adaptive behavior
+```
+
+### KamiEntity Schema
+
+```python
+KamiEntity(Entity):
+    entity_type: str = "kami"
+    disclosure_level: float  # 0.0-1.0 - How visible/revealed to humans
+    force_type: str  # "visible", "invisible", "manifested", "spiritual"
+    influence_radius: float  # Spatial/temporal range of influence
+    intervention_history: List[Dict[str, Any]]  # Past interventions
+    spiritual_constraints: List[str]  # Rules governing behavior
+
+    def assess_intervention(self, situation: Dict[str, Any]) -> float:
+        """Determine probability of kami intervention"""
+        # Implementation for spiritual force behavior
+```
+
+### AIEntity Schema
+
+```python
+AIEntity(BaseModel):
+    entity_type: str = "ai"
+
+    # Core AI parameters
+    temperature: float = 0.7
+    top_p: float = 0.9
+    max_tokens: int = 1000
+    frequency_penalty: float = 0.0
+    presence_penalty: float = 0.0
+    model_name: str = "gpt-3.5-turbo"
+
+    # System prompt and context
+    system_prompt: str = ""
+    context_injection: Dict[str, Any] = {}
+    knowledge_base: List[str] = []
+    behavioral_constraints: List[str] = []
+
+    # Operational parameters
+    activation_threshold: float = 0.5
+    response_cache_ttl: int = 300
+    rate_limit_per_minute: int = 60
+    safety_level: str = "moderate"
+
+    # Integration capabilities
+    api_endpoints: Dict[str, str] = {}
+    webhook_urls: List[str] = []
+    integration_tokens: Dict[str, str] = {}
+
+    # Monitoring and control
+    performance_metrics: Dict[str, float] = {}
+    error_handling: Dict[str, str] = {}
+    fallback_responses: List[str] = []
+
+    # Safety and validation
+    input_bleaching_rules: List[str] = []
+    output_filtering_rules: List[str] = []
+    prohibited_topics: List[str] = []
+    required_disclaimers: List[str] = []
+```
+
 ### Animism Level Control
 
 ```python
 class AnimismConfig:
-    level: int  # 0-3
-    
+    level: int  # 0-6
+
     # Level 0: Only human entities
     # Level 1: Humans + named animals/buildings with direct causal influence
     # Level 2: All objects/organisms with measurable causal influence
     # Level 3: Abstract concepts (ideas, rumors, movements) as propagating entities
-    
+    # Level 4: AnyEntity - highly adaptive entities that can be anything
+    # Level 5: KamiEntity - visible/invisible spiritual forces with disclosure properties
+    # Level 6: AIEntity - AI-powered entities with external agent integration
+
     def should_create_entity(self, entity_type: str) -> bool:
         type_hierarchy = {
             "human": 0,
@@ -1214,9 +1291,12 @@ class AnimismConfig:
             "building": 1,
             "object": 2,
             "plant": 2,
-            "abstract": 3
+            "abstract": 3,
+            "any": 4,
+            "kami": 5,
+            "ai": 6
         }
-        return type_hierarchy.get(entity_type, 3) <= self.level
+        return type_hierarchy.get(entity_type, 6) <= self.level
 ```
 
 ### Integration with Causal Validation

@@ -4,7 +4,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
 import numpy as np
-from pydantic import field_validator
+from pydantic import BaseModel, field_validator
 
 class ResolutionLevel(str, Enum):
     TENSOR_ONLY = "tensor_only"
@@ -13,12 +13,20 @@ class ResolutionLevel(str, Enum):
     DIALOG = "dialog"
     TRAINED = "trained"
 
+class TemporalMode(str, Enum):
+    """Different causal regimes for temporal reasoning"""
+    PEARL = "pearl"  # Standard causality (no anachronisms, forward flow)
+    DIRECTORIAL = "directorial"  # Narrative structure with dramatic tension
+    NONLINEAR = "nonlinear"  # Presentation ≠ causality (flashbacks, foreshadowing)
+    BRANCHING = "branching"  # Many-worlds interpretation
+    CYCLICAL = "cyclical"  # Time loops and prophecy
+
 class TTMTensor(SQLModel):
     """Timepoint Tensor Model - context, biology, behavior"""
     context_vector: bytes  # Serialized numpy array (knowledge, information)
     biology_vector: bytes  # Serialized numpy array (age, health, physical constraints)
     behavior_vector: bytes  # Serialized numpy array (personality, patterns, momentum)
-    
+
     @classmethod
     def from_arrays(cls, context: np.ndarray, biology: np.ndarray, behavior: np.ndarray):
         import msgspec
@@ -27,7 +35,7 @@ class TTMTensor(SQLModel):
             biology_vector=msgspec.msgpack.encode(biology.tolist()),
             behavior_vector=msgspec.msgpack.encode(behavior.tolist())
         )
-    
+
     def to_arrays(self):
         import msgspec
         return (
@@ -36,10 +44,35 @@ class TTMTensor(SQLModel):
             np.array(msgspec.msgpack.decode(self.behavior_vector))
         )
 
+
+class PhysicalTensor(BaseModel):
+    """Physical state tensor - age, health, pain, mobility"""
+    age: float
+    health_status: float = 1.0  # 0.0-1.0
+    pain_level: float = 0.0  # 0.0-1.0
+    pain_location: Optional[str] = None
+    fever: float = 36.5  # Celsius, normal body temperature
+    mobility: float = 1.0  # 0.0-1.0
+    stamina: float = 1.0  # 0.0-1.0
+    sensory_acuity: Dict[str, float] = {}  # vision, hearing, etc.
+    location: Optional[tuple[float, float]] = None
+
+
+class CognitiveTensor(BaseModel):
+    """Cognitive state tensor - knowledge, emotions, energy"""
+    knowledge_state: List[str] = []  # Changed from set to list for JSON serialization
+    emotional_valence: float = 0.0  # -1.0 to 1.0
+    emotional_arousal: float = 0.0  # 0.0 to 1.0
+    energy_budget: float = 100.0  # Current available cognitive resources
+    decision_confidence: float = 0.8  # Current certainty level
+    patience_threshold: float = 50.0  # Tolerance for frustration
+    risk_tolerance: float = 0.5  # 0.0-1.0, willingness to take risks
+    social_engagement: float = 0.8  # 0.0-1.0, willingness to engage socially
+
 class Entity(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     entity_id: str = Field(unique=True, index=True)
-    entity_type: str  # person, location, event
+    entity_type: str = Field(default="human")  # Discriminator: "human", "animal", "building", "object", "abstract"
     temporal_span_start: Optional[datetime] = None
     temporal_span_end: Optional[datetime] = None
     tensor: Optional[str] = Field(default=None, sa_column=Column(JSON))  # Serialized TTM
@@ -47,10 +80,79 @@ class Entity(SQLModel, table=True):
     query_count: int = Field(default=0)
     eigenvector_centrality: float = Field(default=0.0)
     resolution_level: ResolutionLevel = Field(default=ResolutionLevel.TENSOR_ONLY)
-    entity_metadata: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))  # Renamed from metadata
+    entity_metadata: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))  # Type-specific metadata
+
+    @property
+    def physical_tensor(self) -> PhysicalTensor:
+        """Get the physical tensor from entity metadata"""
+        physical_data = self.entity_metadata.get("physical_tensor", {})
+        return PhysicalTensor(**physical_data)
+
+    @physical_tensor.setter
+    def physical_tensor(self, value: PhysicalTensor):
+        """Set the physical tensor in entity metadata"""
+        self.entity_metadata["physical_tensor"] = value.dict()
+
+    @property
+    def cognitive_tensor(self) -> CognitiveTensor:
+        """Get the cognitive tensor from entity metadata"""
+        cognitive_data = self.entity_metadata.get("cognitive_tensor", {})
+        return CognitiveTensor(**cognitive_data)
+
+    @cognitive_tensor.setter
+    def cognitive_tensor(self, value: CognitiveTensor):
+        """Set the cognitive tensor in entity metadata"""
+        self.entity_metadata["cognitive_tensor"] = value.dict()
+
+
+# ============================================================================
+# Scene-Level Entities (Mechanism 10)
+# ============================================================================
+
+class EnvironmentEntity(SQLModel, table=True):
+    """Environmental context for scenes - location, capacity, conditions"""
+    scene_id: str = Field(primary_key=True)
+    timepoint_id: str = Field(foreign_key="timepoint.timepoint_id")
+    location: str
+    capacity: int
+    ambient_temperature: float
+    lighting_level: float  # 0.0-1.0 (dark to bright)
+    weather: Optional[str] = None
+    architectural_style: Optional[str] = None
+    acoustic_properties: Optional[str] = None  # "reverberant", "muffled", etc.
+
+
+class AtmosphereEntity(SQLModel, table=True):
+    """Aggregated emotional and social atmosphere of a scene"""
+    scene_id: str = Field(primary_key=True)
+    timepoint_id: str = Field(foreign_key="timepoint.timepoint_id")
+    tension_level: float  # 0.0-1.0 (calm to tense)
+    formality_level: float  # 0.0-1.0 (casual to formal)
+    emotional_valence: float  # -1.0 to 1.0 (negative to positive)
+    emotional_arousal: float  # 0.0-1.0 (calm to excited)
+    social_cohesion: float  # 0.0-1.0 (divided to united)
+    energy_level: float  # 0.0-1.0 (lethargic to energetic)
+
+
+class CrowdEntity(SQLModel, table=True):
+    """Crowd dynamics and composition"""
+    scene_id: str = Field(primary_key=True)
+    timepoint_id: str = Field(foreign_key="timepoint.timepoint_id")
+    size: int  # Number of people present
+    density: float  # 0.0-1.0 (sparse to crowded)
+    mood_distribution: str = Field(sa_column=Column(JSON))  # Dict[str, float]: mood -> percentage
+    movement_pattern: str  # "static", "flowing", "agitated", "orderly"
+    demographic_composition: Optional[str] = Field(default=None, sa_column=Column(JSON))  # Dict of demographic breakdowns
+    noise_level: float  # 0.0-1.0 (quiet to loud)
 
 class Timeline(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    timeline_id: str = Field(unique=True, index=True)
+    parent_timeline_id: Optional[str] = Field(default=None, foreign_key="timeline.timeline_id")  # NEW for branching
+    branch_point: Optional[str] = Field(default=None)  # Timepoint where branch occurred
+    intervention_description: Optional[str] = Field(default=None)  # Description of intervention
+    temporal_mode: TemporalMode = Field(default=TemporalMode.PEARL)  # NEW: Causal regime
+    # Original fields
     timepoint_id: str = Field(unique=True, index=True)
     timestamp: datetime
     resolution: str  # year, month, day, hour
@@ -86,8 +188,278 @@ class ExposureEvent(SQLModel, table=True):
 class Timepoint(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     timepoint_id: str = Field(unique=True, index=True)
+    timeline_id: Optional[str] = Field(default=None, index=True)  # NEW: for counterfactual branching
     timestamp: datetime
     event_description: str
     entities_present: List[str] = Field(default_factory=list, sa_column=Column(JSON))
     causal_parent: Optional[str] = Field(default=None, index=True)  # previous timepoint_id
     resolution_level: ResolutionLevel = Field(default=ResolutionLevel.SCENE)
+
+
+# ============================================================================
+# Dialog Synthesis (Mechanism 11)
+# ============================================================================
+
+class DialogTurn(BaseModel):
+    """Single turn in a dialog conversation"""
+    speaker: str  # entity_id of speaker
+    content: str  # what was said
+    timestamp: datetime
+    emotional_tone: Optional[str] = None  # inferred emotional tone
+    knowledge_references: List[str] = []  # knowledge items referenced
+    confidence: float = 1.0  # confidence in generation
+    physical_state_influence: Optional[str] = None  # how physical state affected utterance
+
+
+class DialogData(BaseModel):
+    """Structured data for dialog generation"""
+    turns: List[DialogTurn]
+    total_duration: Optional[int] = None  # estimated duration in seconds
+    information_exchanged: List[str] = []  # knowledge items passed between entities
+    relationship_impacts: Dict[str, float] = {}  # how relationships changed (entity_pair -> delta)
+    atmosphere_evolution: List[Dict[str, float]] = []  # atmosphere changes over time
+
+
+class Dialog(SQLModel, table=True):
+    """Complete dialog conversation between entities"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    dialog_id: str = Field(unique=True, index=True)
+    timepoint_id: str = Field(foreign_key="timepoint.timepoint_id", index=True)
+    participants: str = Field(sa_column=Column(JSON))  # JSON list of entity_ids
+    turns: str = Field(sa_column=Column(JSON))  # JSON list of DialogTurn dicts
+    context_used: str = Field(sa_column=Column(JSON))  # JSON dict of context flags
+    duration_seconds: Optional[int] = None
+    information_transfer_count: int = Field(default=0)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# ============================================================================
+# Multi-Entity Synthesis (Mechanism 13)
+# ============================================================================
+
+class RelationshipMetrics(BaseModel):
+    """Metrics quantifying relationship between two entities"""
+    shared_knowledge: int = 0  # number of shared knowledge items
+    belief_alignment: float = 0.0  # -1.0 to 1.0, how aligned beliefs are
+    interaction_count: int = 0  # number of past interactions
+    trust_level: float = 0.5  # 0.0-1.0, current trust level
+    emotional_bond: float = 0.0  # -1.0 to 1.0, emotional connection
+    power_dynamic: float = 0.0  # -1.0 to 1.0, relative power (-1 = entity_a subordinate)
+
+
+class RelationshipState(BaseModel):
+    """Relationship state at a specific timepoint"""
+    entity_a: str
+    entity_b: str
+    timestamp: datetime
+    timepoint_id: str
+    metrics: RelationshipMetrics
+    recent_events: List[str] = []  # recent events affecting relationship
+
+
+class RelationshipTrajectory(SQLModel, table=True):
+    """Trajectory of relationship evolution over time"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    trajectory_id: str = Field(unique=True, index=True)
+    entity_a: str = Field(index=True)
+    entity_b: str = Field(index=True)
+    start_timepoint: str
+    end_timepoint: str
+    states: str = Field(sa_column=Column(JSON))  # JSON list of RelationshipState dicts
+    overall_trend: str  # "improving", "deteriorating", "stable", "volatile"
+    key_events: List[str] = Field(default_factory=list, sa_column=Column(JSON))
+
+
+class Contradiction(BaseModel):
+    """Identified contradiction between entities' knowledge/beliefs"""
+    entity_a: str
+    entity_b: str
+    topic: str  # the subject of the contradiction
+    position_a: float  # entity_a's position/stance (-1.0 to 1.0)
+    position_b: float  # entity_b's position/stance (-1.0 to 1.0)
+    severity: float  # 0.0-1.0, how significant the contradiction is
+    timepoint_id: str
+    context: str  # description of the contradictory statements
+    resolution_possible: bool = True  # whether this can be resolved through discussion
+
+
+class ComparativeAnalysis(BaseModel):
+    """Results of comparing multiple entities across timepoints"""
+    analysis_id: str
+    entities_compared: List[str]
+    timepoints_covered: List[str]
+    relationship_trajectories: List[str]  # trajectory_ids
+    contradictions_found: List[Contradiction]
+    consensus_topics: List[str] = []  # topics where entities agree
+    conflict_topics: List[str] = []  # topics where entities disagree
+    information_flow_patterns: Dict[str, List[str]] = {}  # who learned what from whom
+
+
+# ============================================================================
+# Mechanism 14: Circadian Activity Patterns
+# ============================================================================
+
+class CircadianContext(BaseModel):
+    """Time-of-day context for entity activities"""
+    hour: int  # 0-23
+    typical_activities: Dict[str, float]  # activity -> probability
+    ambient_conditions: Dict[str, float]  # lighting, noise, etc.
+    social_constraints: List[str]  # time-appropriate social norms
+    fatigue_level: float = 0.0  # 0.0-1.0 accumulated fatigue
+    energy_penalty: float = 1.0  # multiplier for energy costs
+
+
+# ============================================================================
+# Mechanism 15: Entity Prospection
+# ============================================================================
+
+class Expectation(BaseModel):
+    """An entity's expectation about a future event"""
+    predicted_event: str
+    subjective_probability: float  # 0.0-1.0
+    desired_outcome: bool
+    preparation_actions: List[str] = []  # Actions entity plans to take
+    confidence: float = 1.0  # 0.0-1.0, how confident entity is in this expectation
+    time_horizon_days: int = 30  # How far in future this expectation applies
+
+
+class ProspectiveState(SQLModel, table=True):
+    """An entity's internal forecasting and expectations"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    prospective_id: str = Field(unique=True, index=True)
+    entity_id: str = Field(foreign_key="entity.entity_id", index=True)
+    timepoint_id: str = Field(foreign_key="timepoint.timepoint_id", index=True)
+    forecast_horizon_days: int = 30
+    expectations: str = Field(sa_column=Column(JSON))  # List[Expectation] as JSON
+    contingency_plans: str = Field(sa_column=Column(JSON), default_factory=dict)  # Dict[str, List[str]]
+    anxiety_level: float = 0.0  # 0.0-1.0
+    forecast_confidence: float = 1.0  # Overall confidence in forecasting ability
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    last_updated: datetime = Field(default_factory=datetime.utcnow)
+
+
+# ============================================================================
+# Mechanism 12: Counterfactual Branching
+# ============================================================================
+
+class Intervention(BaseModel):
+    """A modification applied to create a counterfactual branch"""
+    type: str  # "entity_removal", "entity_modification", "event_cancellation", "knowledge_alteration"
+    target: str  # entity_id or event_id
+    parameters: Dict[str, Any] = {}  # Additional parameters for the intervention
+    description: str = ""  # Human-readable description
+
+
+class BranchComparison(BaseModel):
+    """Results of comparing two timeline branches"""
+    baseline_timeline: str
+    counterfactual_timeline: str
+    divergence_point: Optional[str]  # First timepoint where timelines differ
+    metrics: Dict[str, Dict[str, float]] = {}  # metric_name -> {"baseline": val, "counterfactual": val, "delta": diff}
+    causal_explanation: str = ""  # Explanation of why branches diverged
+    key_events_differed: List[str] = []  # Events that occurred differently
+    entity_states_differed: List[str] = []  # Entities whose states diverged
+
+
+# ============================================================================
+# Mechanism 16: Animistic Entity Extension
+# ============================================================================
+
+class AnimalEntity(BaseModel):
+    """Biological state and capabilities of animal entities"""
+    species: str
+    biological_state: Dict[str, float] = {}  # age, health, energy, hunger, stress, etc.
+    training_level: float = 0.0  # 0.0-1.0, how trained/domesticated
+    goals: List[str] = []  # Simple behavioral goals: "avoid_pain", "seek_food", "trust_handler", etc.
+    sensory_capabilities: Dict[str, float] = {}  # vision, hearing, smell acuity
+    physical_capabilities: Dict[str, float] = {}  # strength, speed, endurance
+
+
+class BuildingEntity(BaseModel):
+    """Physical and functional properties of building entities"""
+    structural_integrity: float = 1.0  # 0.0-1.0, current condition
+    capacity: int = 0  # Maximum occupancy
+    age: int = 0  # Age in years
+    maintenance_state: float = 1.0  # 0.0-1.0, how well maintained
+    constraints: List[str] = []  # Limitations: "cannot_move", "weather_dependent", "capacity_limited"
+    affordances: List[str] = []  # What it enables: "shelter", "symbolize_authority", "storage"
+
+
+class AbstractEntity(BaseModel):
+    """Properties of conceptual/abstract entities"""
+    propagation_vector: List[float] = []  # How concept spreads through population
+    intensity: float = 1.0  # Current strength/potency of the concept
+    carriers: List[str] = []  # Entity IDs holding this concept
+    decay_rate: float = 0.01  # How quickly the concept fades
+    coherence: float = 1.0  # Internal consistency of the concept
+    manifestation_forms: List[str] = []  # How concept manifests: "beliefs", "behaviors", "cultural_practices"
+
+
+class AnyEntity(BaseModel):
+    """Highly adaptive entity that can represent literally anything in the animistic framework"""
+    adaptability_score: float = 1.0  # 0.0-1.0, how easily it can change form/behavior
+    morphing_capability: Dict[str, float] = {}  # What it can morph into and probability
+    essence_type: str = "unknown"  # Core nature: "physical", "spiritual", "conceptual", "chaotic"
+    manifestation_forms: List[str] = []  # Current and potential forms it can take
+    stability_index: float = 0.5  # 0.0-1.0, how stable its current form is
+    influence_radius: float = 0.0  # How far its animistic presence extends
+    resonance_patterns: Dict[str, float] = {}  # How it resonates with different entity types
+    adaptive_goals: List[str] = []  # Goals that change based on context and interactions
+
+
+class KamiEntity(BaseModel):
+    """Spiritual/supernatural entity (kami) with visibility and disclosure properties"""
+    visibility_state: str = "invisible"  # "visible", "invisible", "partially_visible", "disguised"
+    disclosure_level: str = "unknown"  # "unknown", "rumored", "known", "worshiped", "feared"
+    influence_domain: List[str] = []  # Areas of influence: "nature", "weather", "emotions", "fate", "protection"
+    manifestation_probability: float = 0.1  # 0.0-1.0, likelihood of appearing to mortals
+    spiritual_power: float = 0.5  # 0.0-1.0, strength of supernatural influence
+    mortal_perception: Dict[str, float] = {}  # How different entity types perceive this kami
+    sacred_sites: List[str] = []  # Locations where this kami is particularly strong
+    blessings_curses: Dict[str, List[str]] = {}  # Positive/negative effects it can bestow
+    worshipers: List[str] = []  # Entity IDs that acknowledge/worship this kami
+    taboo_violations: List[str] = []  # Actions that anger or weaken this kami
+
+
+class AIEntity(BaseModel):
+    """AI-powered entity with external agent integration capabilities"""
+    # Core AI parameters
+    temperature: float = 0.7  # 0.0-2.0, randomness in generation
+    top_p: float = 0.9  # 0.0-1.0, nucleus sampling
+    max_tokens: int = 1000  # Maximum tokens to generate
+    frequency_penalty: float = 0.0  # -2.0-2.0, repetition penalty
+    presence_penalty: float = 0.0  # -2.0-2.0, topic diversity
+    model_name: str = "gpt-3.5-turbo"  # AI model to use
+
+    # System prompt and context
+    system_prompt: str = ""  # Core personality and behavior instructions
+    context_injection: Dict[str, Any] = {}  # Dynamic context to inject
+    knowledge_base: List[str] = []  # Domain-specific knowledge
+    behavioral_constraints: List[str] = []  # Safety and behavioral rules
+
+    # Operational parameters
+    activation_threshold: float = 0.5  # Confidence threshold for responses
+    response_cache_ttl: int = 300  # Cache responses for N seconds
+    rate_limit_per_minute: int = 60  # API call limits
+    safety_level: str = "moderate"  # "minimal", "moderate", "strict", "maximum"
+
+    # Integration capabilities
+    api_endpoints: Dict[str, str] = {}  # Available API endpoints
+    webhook_urls: List[str] = []  # Webhook destinations
+    integration_tokens: Dict[str, str] = {}  # API tokens for external services
+
+    # Monitoring and control
+    performance_metrics: Dict[str, float] = {}  # Response time, accuracy, etc.
+    error_handling: Dict[str, str] = {}  # Error response strategies
+    fallback_responses: List[str] = []  # Default responses when AI fails
+
+    # Safety and validation
+    input_bleaching_rules: List[str] = []  # Input sanitization patterns
+    output_filtering_rules: List[str] = []  # Output content filters
+    prohibited_topics: List[str] = []  # Topics to avoid
+    required_disclaimers: List[str] = []  # Required safety notices
+
+
+# ============================================================================
+# Mechanism 17: Modal Temporal Causality
+# ============================================================================

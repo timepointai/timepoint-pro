@@ -3,8 +3,9 @@
 # ============================================================================
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
-from schemas import Timepoint, ResolutionLevel
+from schemas import Timepoint, ResolutionLevel, Entity
 from entity_templates import HISTORICAL_CONTEXTS
+from validation import couple_pain_to_cognition, couple_illness_to_cognition
 
 
 def build_temporal_chain(context_name: str, num_timepoints: int = 5) -> List[Timepoint]:
@@ -228,3 +229,43 @@ def validate_causal_chain_integrity(timepoints: List[Timepoint]) -> Dict[str, An
         "issues": issues,
         "message": f"Causal chain validation: {len(issues)} issues found"
     }
+
+
+# ============================================================================
+# Body-Mind Coupling Integration (Mechanism 8.1)
+# ============================================================================
+
+def apply_body_mind_coupling(entity: Entity) -> Entity:
+    """
+    Apply body-mind coupling to update cognitive state based on physical state.
+    This should be called whenever entity state is updated to ensure physical
+    conditions affect cognitive performance.
+    """
+    # Get current physical and cognitive states
+    physical = entity.physical_tensor
+    cognitive = entity.cognitive_tensor
+
+    # Apply pain coupling
+    updated_cognitive = couple_pain_to_cognition(physical, cognitive)
+
+    # Apply illness coupling
+    updated_cognitive = couple_illness_to_cognition(physical, updated_cognitive)
+
+    # Update the entity's cognitive tensor
+    entity.cognitive_tensor = updated_cognitive
+
+    return entity
+
+
+def update_entity_state_with_coupling(entity: Entity, **state_updates) -> Entity:
+    """
+    Update entity state and apply body-mind coupling.
+    This is the main function to call when updating entity states.
+    """
+    # Apply any state updates first
+    for key, value in state_updates.items():
+        if hasattr(entity, key):
+            setattr(entity, key, value)
+
+    # Apply body-mind coupling
+    return apply_body_mind_coupling(entity)

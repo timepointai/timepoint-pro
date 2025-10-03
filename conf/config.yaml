@@ -20,3 +20,122 @@ training:
   target_resolution: tensor_only
   context: founding_fathers_1789  # or renaissance_florence_1504
   num_timepoints: 5
+
+# Mechanism 14: Circadian Activity Patterns
+circadian:
+  activity_probabilities:
+    sleep: {hours: [0,1,2,3,4,5], probability: 0.95}
+    meals: {hours: [7,12,19], probability: 0.8}
+    work: {hours: [9,10,11,12,13,14,15,16], probability: 0.7}
+    social: {hours: [18,19,20,21,22], probability: 0.6}
+    travel: {hours: [6,7,8,17,18,19,20], probability: 0.5}
+    leisure: {hours: [10,11,14,15,16,17,18,19,20,21], probability: 0.4}
+
+  # Energy cost multipliers
+  energy_multipliers:
+    night_penalty: 1.5  # Cost increase for activities 22:00-06:00
+    fatigue_accumulation: 0.5  # Additional cost per hour awake beyond 16 hours
+    base_fatigue_threshold: 16  # Hours awake before fatigue penalties
+
+  # Validation thresholds
+  validation:
+    low_probability_threshold: 0.1  # Flag activities below this probability
+    critical_probability_threshold: 0.05  # Error on activities below this
+
+# Mechanism 15: Entity Prospection
+prospection:
+  forecast_horizon_days: 30  # How far ahead entities forecast
+  anxiety_thresholds:
+    low: 0.3   # Below this: relaxed
+    medium: 0.6  # Medium anxiety
+    high: 0.8   # High anxiety (affects behavior)
+  expectation_generation:
+    max_expectations: 5  # Maximum expectations per prospective state
+    probability_range: [0.1, 0.9]  # Subjective probability bounds
+    confidence_decay: 0.1  # How much prediction error reduces confidence
+  behavioral_influence:
+    anxiety_conservatism_multiplier: 0.7  # Risk tolerance reduction at high anxiety
+    preparation_energy_cost: 5  # Energy cost per preparation action
+    anxiety_energy_penalty: 0.2  # Additional energy cost per anxiety unit
+  validation:
+    unrealized_expectation_threshold: 0.3  # Flag if too many expectations unrealized
+    overconfidence_penalty: 0.2  # Penalty for overconfident failed predictions
+
+# Mechanism 16: Animistic Entity Extension
+animism:
+  level: 1  # 0=humans only, 1=animals/buildings, 2=all objects, 3=abstract concepts, 4=any entities, 5=kami spirits, 6=ai entities
+  entity_generation:
+    animal_probability: 0.2  # Probability of generating animal entities in scenes
+    building_probability: 0.3  # Probability of generating building entities in scenes
+    object_probability: 0.1  # Probability of generating object entities
+    abstract_probability: 0.05  # Probability of generating abstract concept entities
+    any_probability: 0.02  # Probability of generating highly adaptive any entities
+    kami_probability: 0.01  # Probability of generating spiritual kami entities
+    ai_probability: 0.005  # Probability of generating AI-powered entities (very rare)
+  biological_defaults:
+    animal_health: 0.9  # Default health for generated animals
+    animal_energy: 0.8  # Default energy for generated animals
+    animal_training: 0.5  # Default training level for generated animals
+  building_defaults:
+    structural_integrity: 0.85  # Default condition for generated buildings
+    maintenance_state: 0.8  # Default maintenance for generated buildings
+  abstract_defaults:
+    initial_intensity: 0.7  # Starting potency for abstract concepts
+    decay_rate: 0.01  # How quickly concepts fade
+    coherence: 0.9  # Initial consistency of concepts
+  any_defaults:
+    adaptability_score: 0.8  # How easily any entities can change form
+    stability_index: 0.6  # How stable their forms are
+    influence_radius: 10.0  # Base influence radius in scene units
+  kami_defaults:
+    manifestation_probability: 0.1  # Base chance of appearing to mortals
+    spiritual_power: 0.5  # Base supernatural influence strength
+    visibility_state: "invisible"  # Default invisible state
+    disclosure_level: "unknown"  # Default unknown to mortals
+  ai_defaults:
+    temperature: 0.7  # Default randomness level
+    top_p: 0.9  # Default nucleus sampling
+    max_tokens: 1000  # Default token limit
+    model_name: "gpt-3.5-turbo"  # Default AI model
+    safety_level: "moderate"  # Default safety settings
+    activation_threshold: 0.5  # Default confidence threshold
+    rate_limit_per_minute: 60  # Default API rate limit
+
+# AI Entity Service Configuration
+ai_entity_service:
+  enabled: true
+  host: "localhost"
+  port: 8001
+  public_endpoints: false  # Set to true to expose public API
+  api_keys_required: true
+  rate_limiting: true
+  cors_origins: ["http://localhost:3000", "http://localhost:8000"]
+  ssl_enabled: false
+  log_level: "INFO"
+  cache_enabled: true
+  monitoring_enabled: true
+  fallback_mode: "static"  # "static", "echo", "random"
+  safety:
+    input_bleaching: true
+    output_filtering: true
+    content_moderation: true
+    rate_limiting: true
+    audit_logging: true
+
+# Mechanism 17: Modal Temporal Causality
+temporal_mode:
+  active_mode: pearl  # Default: "pearl", "directorial", "nonlinear", "branching", "cyclical"
+  directorial:
+    narrative_arc: "rising_action"  # rising_action, climax, falling_action, resolution
+    dramatic_tension: 0.7  # 0.0-1.0 tension level
+    coincidence_boost_factor: 1.5  # How much to boost coincidental events
+    foreshadowing_probability: 0.3  # Probability of foreshadowing events
+  cyclical:
+    cycle_length: 10  # Length of time loops in timepoints
+    prophecy_accuracy: 0.85  # How accurate prophecies are
+    destiny_weight: 0.6  # How strongly destiny influences events
+    loop_closure_events: ["prophecy_fulfilled", "destiny_manifested", "cycle_completed"]
+  nonlinear:
+    presentation_offset_max: 5  # Maximum timepoints between occurrence and presentation
+    flashback_probability: 0.2  # Probability of flashback sequences
+    foreshadowing_probability: 0.15  # Probability of foreshadowing hints

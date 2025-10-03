@@ -1,0 +1,118 @@
+{
+  "status": "dry_run_complete",
+  "report": "ValidationReport(total_files=16, total_tests=67, quality_score=0.203125, critical_issues=['./test_caching_layer.py: Syntax error: expected an indented block after function definition on line 19 (test_caching_layer.py, line 20)', './test_on_demand_generation.py: No test methods found', './test_error_handling_retry.py: Critical pattern found: assert False', './test_error_handling_retry.py: No test methods found', './test_validation_system.py: Critical pattern found: assert True', './test_validation_system.py: Critical pattern found: assert False', './test_validation_system.py: Critical pattern found: pass$', './test_validation_system.py: Critical pattern found: NotImplementedError', './test_validation_system.py: No test methods found', './test_branching_integration.py: No test methods found', './test_scene_queries.py: No test methods found', './test_knowledge_enrichment.py: Critical pattern found: pass$', './test_knowledge_enrichment.py: No test methods found', './test_body_mind_coupling.py: No test methods found', './test_parallel_execution.py: No test methods found', './test_prospection_mechanism.py: No test methods found', './test_branching_mechanism.py: No test methods found', './test_circadian_mechanism.py: No test methods found'], warnings=['./test_animistic_entities.py: Missing test framework imports', './test_on_demand_generation.py: Warning pattern found: print\\\\(', './test_on_demand_generation.py: Warning pattern found: except.*:', './test_on_demand_generation.py: Missing test framework imports', './test_error_handling_retry.py: Warning pattern found: print\\\\(', './test_error_handling_retry.py: Warning pattern found: except.*:', './test_validation_system.py: Warning pattern found: print\\\\(', './test_validation_system.py: Warning pattern found: # TODO', './test_validation_system.py: Warning pattern found: except.*:', './test_validation_system.py: Missing test framework imports', './test_branching_integration.py: Warning pattern found: print\\\\(', './test_branching_integration.py: Warning pattern found: except.*:', './test_branching_integration.py: Missing test framework imports', './test_scene_queries.py: Warning pattern found: print\\\\(', './test_scene_queries.py: Warning pattern found: except.*:', './test_scene_queries.py: Missing test framework imports', './test_knowledge_enrichment.py: Warning pattern found: print\\\\(', './test_knowledge_enrichment.py: Warning pattern found: except.*:', './test_knowledge_enrichment.py: Missing test framework imports', './test_body_mind_coupling.py: Warning pattern found: print\\\\(', './test_body_mind_coupling.py: Warning pattern found: except.*:', './test_body_mind_coupling.py: Missing test framework imports', './test_parallel_execution.py: Warning pattern found: print\\\\(', './test_parallel_execution.py: Warning pattern found: except.*:', './test_parallel_execution.py: Missing test framework imports', './test_prospection_mechanism.py: Warning pattern found: print\\\\(', './test_prospection_mechanism.py: Warning pattern found: except.*:', './test_prospection_mechanism.py: Missing test framework imports', './test_branching_mechanism.py: Warning pattern found: print\\\\(', './test_branching_mechanism.py: Warning pattern found: except.*:', './test_branching_mechanism.py: Missing test framework imports', './test_phase3_dialog_multi_entity.py: Warning pattern found: print\\\\(', './test_circadian_mechanism.py: Warning pattern found: print\\\\(', './test_circadian_mechanism.py: Warning pattern found: except.*:', './test_circadian_mechanism.py: Missing test framework imports'], recommendations=['./test_animistic_entities.py: Add proper test framework imports', './test_animistic_entities.py: Consider adding test fixtures for setup/teardown', './test_modal_temporal_causality.py: Consider adding test fixtures for setup/teardown', './test_caching_layer.py: Fix syntax errors', './test_on_demand_generation.py: Add test methods or remove empty test file', './test_on_demand_generation.py: Add proper test framework imports', './test_error_handling_retry.py: Add test methods or remove empty test file', './test_validation_system.py: Add test methods or remove empty test file', './test_validation_system.py: Add proper test framework imports', './test_branching_integration.py: Add test methods or remove empty test file', './test_branching_integration.py: Add proper test framework imports', './test_scene_queries.py: Add test methods or remove empty test file', './test_scene_queries.py: Add proper test framework imports', './test_knowledge_enrichment.py: Add test methods or remove empty test file', './test_knowledge_enrichment.py: Add proper test framework imports', './test_body_mind_coupling.py: Add test methods or remove empty test file', './test_body_mind_coupling.py: Add proper test framework imports', './test_parallel_execution.py: Add test methods or remove empty test file', './test_parallel_execution.py: Add proper test framework imports', './test_prospection_mechanism.py: Add test methods or remove empty test file', './test_prospection_mechanism.py: Add proper test framework imports', './test_branching_mechanism.py: Add test methods or remove empty test file', './test_branching_mechanism.py: Add proper test framework imports', './test_circadian_mechanism.py: Add test methods or remove empty test file', './test_circadian_mechanism.py: Add proper test framework imports'], execution_summary={}, autopilot_ready=False)",
+  "execution_plan": [
+    {
+      "file": "./test_animistic_entities.py",
+      "priority": "high",
+      "estimated_tests": 21,
+      "quality_score": 1.0,
+      "has_issues": true
+    },
+    {
+      "file": "./test_modal_temporal_causality.py",
+      "priority": "high",
+      "estimated_tests": 19,
+      "quality_score": 1.0,
+      "has_issues": false
+    },
+    {
+      "file": "./test_ai_entity_service.py",
+      "priority": "high",
+      "estimated_tests": 16,
+      "quality_score": 0.8,
+      "has_issues": false
+    },
+    {
+      "file": "./test_phase3_dialog_multi_entity.py",
+      "priority": "medium",
+      "estimated_tests": 11,
+      "quality_score": 0.45000000000000007,
+      "has_issues": true
+    },
+    {
+      "file": "./test_caching_layer.py",
+      "priority": "medium",
+      "estimated_tests": 0,
+      "quality_score": 0.0,
+      "has_issues": true
+    },
+    {
+      "file": "./test_on_demand_generation.py",
+      "priority": "medium",
+      "estimated_tests": 0,
+      "quality_score": 0.0,
+      "has_issues": true
+    },
+    {
+      "file": "./test_error_handling_retry.py",
+      "priority": "medium",
+      "estimated_tests": 0,
+      "quality_score": 0.0,
+      "has_issues": true
+    },
+    {
+      "file": "./test_validation_system.py",
+      "priority": "medium",
+      "estimated_tests": 0,
+      "quality_score": 0.0,
+      "has_issues": true
+    },
+    {
+      "file": "./test_branching_integration.py",
+      "priority": "medium",
+      "estimated_tests": 0,
+      "quality_score": 0.0,
+      "has_issues": true
+    },
+    {
+      "file": "./test_scene_queries.py",
+      "priority": "medium",
+      "estimated_tests": 0,
+      "quality_score": 0.0,
+      "has_issues": true
+    },
+    {
+      "file": "./test_knowledge_enrichment.py",
+      "priority": "medium",
+      "estimated_tests": 0,
+      "quality_score": 0.0,
+      "has_issues": true
+    },
+    {
+      "file": "./test_body_mind_coupling.py",
+      "priority": "medium",
+      "estimated_tests": 0,
+      "quality_score": 0.0,
+      "has_issues": true
+    },
+    {
+      "file": "./test_parallel_execution.py",
+      "priority": "medium",
+      "estimated_tests": 0,
+      "quality_score": 0.0,
+      "has_issues": true
+    },
+    {
+      "file": "./test_prospection_mechanism.py",
+      "priority": "medium",
+      "estimated_tests": 0,
+      "quality_score": 0.0,
+      "has_issues": true
+    },
+    {
+      "file": "./test_branching_mechanism.py",
+      "priority": "medium",
+      "estimated_tests": 0,
+      "quality_score": 0.0,
+      "has_issues": true
+    },
+    {
+      "file": "./test_circadian_mechanism.py",
+      "priority": "medium",
+      "estimated_tests": 0,
+      "quality_score": 0.0,
+      "has_issues": true
+    }
+  ]
+}

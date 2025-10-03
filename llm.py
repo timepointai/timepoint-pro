@@ -405,6 +405,56 @@ Relevance score:"""
             print(f"LLM relevance scoring failed after retries: {e}")
             return self._heuristic_relevance_score(query, knowledge_item)
 
+    def generate_dialog(self, prompt: str, max_tokens: int = 2000, model: Optional[str] = None):
+        """Generate dialog with structured output"""
+        if self.dry_run:
+            return self._mock_dialog_generation()
+
+        # Use provided model or default to Llama model
+        selected_model = model or self.default_model
+
+        # Add structured output instruction to prompt
+        structured_prompt = f"""{prompt}
+
+Return a JSON object with these exact fields:
+- turns: array of objects, each with:
+  - speaker: string (entity_id)
+  - content: string (what was said)
+  - timestamp: string (ISO format datetime)
+  - emotional_tone: string (optional inferred tone)
+  - knowledge_references: array of strings (optional knowledge items mentioned)
+  - confidence: number (0.0-1.0, default 1.0)
+  - physical_state_influence: string (optional how physical state affected utterance)
+- total_duration: number (optional estimated seconds)
+- information_exchanged: array of strings (knowledge items passed between entities)
+- relationship_impacts: object (optional entity_pair -> delta relationship change)
+- atmosphere_evolution: array of objects (optional atmosphere changes over time)
+
+Return only valid JSON, no other text."""
+
+        def _api_call():
+            response = self.client.chat.completions.create(
+                model=selected_model,
+                messages=[{"role": "user", "content": structured_prompt}],
+                temperature=0.7,
+                max_tokens=max_tokens
+            )
+            # Extract content from response
+            content = response["choices"][0]["message"]["content"]
+            # Parse JSON manually
+            try:
+                from schemas import DialogData
+                data = json.loads(content.strip())
+                return DialogData(**data)
+            except (json.JSONDecodeError, ValueError) as e:
+                raise Exception(f"Failed to parse LLM response as JSON: {e}. Content: {content}")
+
+        response = retry_with_backoff(_api_call, max_retries=3, base_delay=1.0)
+
+        self.token_count += max_tokens  # Estimate
+        self.cost += 0.02  # Estimate for dialog generation
+        return response
+
     def _heuristic_relevance_score(self, query: str, knowledge_item: str) -> float:
         """Fallback heuristic relevance scoring"""
         query_words = set(query.lower().split())
@@ -435,5 +485,36 @@ Relevance score:"""
             personality_traits=np.random.uniform(-1, 1, 5).tolist(),
             temporal_awareness=f"Aware of events up to {entity_schema.get('timestamp', 'unknown')}",
             confidence=0.8
+        )
+
+    def _mock_dialog_generation(self):
+        """Deterministic mock for dialog generation in dry-run mode"""
+        from schemas import DialogTurn, DialogData
+        from datetime import datetime
+
+        # Generate mock dialog turns
+        turns = []
+        speakers = ["washington", "jefferson", "hamilton", "adams"]
+        base_time = datetime.now()
+
+        for i in range(8):
+            speaker = speakers[i % len(speakers)]
+            turn = DialogTurn(
+                speaker=speaker,
+                content=f"This is a mock dialog turn {i+1} from {speaker} about historical matters.",
+                timestamp=base_time.replace(second=i*30),  # 30 second intervals
+                emotional_tone="neutral",
+                knowledge_references=["mock_fact_1", "mock_fact_2"],
+                confidence=0.9,
+                physical_state_influence="none"
+            )
+            turns.append(turn)
+
+        return DialogData(
+            turns=turns,
+            total_duration=240,  # 4 minutes
+            information_exchanged=["mock_fact_1", "mock_fact_2", "mock_fact_3"],
+            relationship_impacts={"washington_jefferson": 0.1, "hamilton_adams": -0.05},
+            atmosphere_evolution=[]
         )
 

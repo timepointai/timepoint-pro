@@ -7,7 +7,7 @@ import networkx as nx
 import json
 from functools import lru_cache
 
-from schemas import Entity, Timeline, SystemPrompt, ExposureEvent, Timepoint
+from schemas import Entity, Timeline, SystemPrompt, ExposureEvent, Timepoint, Dialog, RelationshipTrajectory
 
 class GraphStore:
     """Unified storage for entities, timelines, and graphs"""
@@ -135,3 +135,128 @@ class GraphStore:
             return session.exec(
                 select(SystemPrompt).where(SystemPrompt.name == name)
             ).first()
+
+    # ============================================================================
+    # Dialog Storage (Mechanism 11)
+    # ============================================================================
+
+    def save_dialog(self, dialog: Dialog) -> Dialog:
+        """Save a dialog conversation"""
+        with Session(self.engine) as session:
+            session.add(dialog)
+            session.commit()
+            session.refresh(dialog)
+            return dialog
+
+    def get_dialog(self, dialog_id: str) -> Optional[Dialog]:
+        """Get a dialog by ID"""
+        with Session(self.engine) as session:
+            statement = select(Dialog).where(Dialog.dialog_id == dialog_id)
+            return session.exec(statement).first()
+
+    def get_dialogs_at_timepoint(self, timepoint_id: str) -> list[Dialog]:
+        """Get all dialogs that occurred at a specific timepoint"""
+        with Session(self.engine) as session:
+            statement = select(Dialog).where(Dialog.timepoint_id == timepoint_id)
+            return list(session.exec(statement).all())
+
+    def get_dialogs_for_entities(self, entity_ids: list[str]) -> list[Dialog]:
+        """Get all dialogs involving any of the specified entities"""
+        with Session(self.engine) as session:
+            # Find dialogs where participants JSON contains any of the entity_ids
+            all_dialogs = session.exec(select(Dialog)).all()
+            matching_dialogs = []
+
+            for dialog in all_dialogs:
+                participants = json.loads(dialog.participants)
+                if any(entity_id in participants for entity_id in entity_ids):
+                    matching_dialogs.append(dialog)
+
+            return matching_dialogs
+
+    # ============================================================================
+    # Relationship Trajectory Storage (Mechanism 13)
+    # ============================================================================
+
+    def save_relationship_trajectory(self, trajectory: RelationshipTrajectory) -> RelationshipTrajectory:
+        """Save a relationship trajectory"""
+        with Session(self.engine) as session:
+            session.add(trajectory)
+            session.commit()
+            session.refresh(trajectory)
+            return trajectory
+
+    def get_relationship_trajectory(self, trajectory_id: str) -> Optional[RelationshipTrajectory]:
+        """Get a relationship trajectory by ID"""
+        with Session(self.engine) as session:
+            statement = select(RelationshipTrajectory).where(RelationshipTrajectory.trajectory_id == trajectory_id)
+            return session.exec(statement).first()
+
+    def get_relationship_trajectory_between(self, entity_a: str, entity_b: str) -> Optional[RelationshipTrajectory]:
+        """Get the most recent relationship trajectory between two entities"""
+        with Session(self.engine) as session:
+            statement = select(RelationshipTrajectory).where(
+                RelationshipTrajectory.entity_a == entity_a,
+                RelationshipTrajectory.entity_b == entity_b
+            ).order_by(RelationshipTrajectory.id.desc())  # Most recent first
+            return session.exec(statement).first()
+
+    def get_entity_relationships(self, entity_id: str) -> list[RelationshipTrajectory]:
+        """Get all relationship trajectories involving an entity"""
+        with Session(self.engine) as session:
+            statement = select(RelationshipTrajectory).where(
+                (RelationshipTrajectory.entity_a == entity_id) |
+                (RelationshipTrajectory.entity_b == entity_id)
+            )
+            return list(session.exec(statement).all())
+
+    # ============================================================================
+    # Additional Helper Methods
+    # ============================================================================
+
+    def get_entity_at_timepoint(self, entity_id: str, timepoint_id: str) -> Optional[Entity]:
+        """Get entity state at a specific timepoint"""
+        # For now, return current entity state (could be enhanced to track historical states)
+        return self.get_entity(entity_id)
+
+    def get_timepoints_in_range(self, start_time=None, end_time=None) -> list[Timepoint]:
+        """Get timepoints within a time range"""
+        with Session(self.engine) as session:
+            statement = select(Timepoint)
+            if start_time:
+                statement = statement.where(Timepoint.timestamp >= start_time)
+            if end_time:
+                statement = statement.where(Timepoint.timestamp <= end_time)
+            statement = statement.order_by(Timepoint.timestamp)
+            return list(session.exec(statement).all())
+
+    # ============================================================================
+    # Timeline Storage (Mechanism 12: Counterfactual Branching)
+    # ============================================================================
+
+    def save_timeline(self, timeline: Timeline) -> Timeline:
+        """Save a timeline to the database"""
+        with Session(self.engine) as session:
+            session.add(timeline)
+            session.commit()
+            session.refresh(timeline)
+        return timeline
+
+    def get_timeline(self, timeline_id: str) -> Optional[Timeline]:
+        """Get a timeline by ID"""
+        with Session(self.engine) as session:
+            return session.exec(
+                select(Timeline).where(Timeline.timeline_id == timeline_id)
+            ).first()
+
+    def get_timelines(self) -> list[Timeline]:
+        """Get all timelines"""
+        with Session(self.engine) as session:
+            return list(session.exec(select(Timeline)).all())
+
+    def get_child_timelines(self, parent_timeline_id: str) -> list[Timeline]:
+        """Get all child timelines of a parent timeline"""
+        with Session(self.engine) as session:
+            return list(session.exec(
+                select(Timeline).where(Timeline.parent_timeline_id == parent_timeline_id)
+            ).all())
