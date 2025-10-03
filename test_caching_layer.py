@@ -13,6 +13,10 @@ from query_interface import QueryInterface
 from llm_v2 import LLMClient  # Use new centralized service
 
 
+@pytest.mark.integration
+@pytest.mark.llm
+@pytest.mark.slow
+@pytest.mark.system
 class TestCachingLayer:
     """Test caching layer functionality"""
 

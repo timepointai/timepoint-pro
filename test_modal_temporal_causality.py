@@ -10,6 +10,9 @@ from workflows import TemporalAgent
 from validation import Validator
 
 
+@pytest.mark.integration
+@pytest.mark.system
+@pytest.mark.temporal
 class TestTemporalModeEnum:
     """Test TemporalMode enum functionality"""
 
@@ -27,6 +30,9 @@ class TestTemporalModeEnum:
         assert TemporalMode.PEARL.value == "pearl"
 
 
+@pytest.mark.integration
+@pytest.mark.system
+@pytest.mark.temporal
 class TestTemporalAgent:
     """Test TemporalAgent class functionality"""
 
@@ -138,6 +144,9 @@ class TestTemporalAgent:
         assert agent._closes_causal_loop("regular occurrence", {}) == False
 
 
+@pytest.mark.integration
+@pytest.mark.system
+@pytest.mark.temporal
 class TestTemporalModeValidation:
     """Test temporal consistency validation by mode"""
 
@@ -248,6 +257,9 @@ class TestTemporalModeValidation:
         assert "Multiverse causality" in result["message"]
 
 
+@pytest.mark.integration
+@pytest.mark.system
+@pytest.mark.temporal
 class TestTimelineModalSupport:
     """Test Timeline schema support for temporal modes"""
 
@@ -285,6 +297,9 @@ class TestTimelineModalSupport:
         assert timeline.temporal_mode == TemporalMode.PEARL
 
 
+@pytest.mark.integration
+@pytest.mark.system
+@pytest.mark.temporal
 class TestIntegrationScenarios:
     """Test integrated scenarios with temporal agents and modes"""
 

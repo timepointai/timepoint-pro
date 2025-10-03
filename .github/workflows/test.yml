@@ -1,0 +1,284 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  # Fast unit tests - run first for quick feedback
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-test.txt
+
+      - name: Check dependencies
+        run: python check_deps.py
+
+      - name: Run unit tests
+        run: |
+          pytest -m unit -v \
+            --junit-xml=reports/junit-unit.xml \
+            --cov=. \
+            --cov-report=xml \
+            --cov-report=term
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.xml
+          flags: unit
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: unit-test-results
+          path: reports/
+
+  # Integration tests - run in parallel with unit
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-test.txt
+
+      - name: Run integration tests
+        run: |
+          pytest -m integration -v \
+            --junit-xml=reports/junit-integration.xml \
+            --cov=. \
+            --cov-report=xml
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.xml
+          flags: integration
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: integration-test-results
+          path: reports/
+
+  # System tests - full stack testing
+  system-tests:
+    name: System Tests
+    runs-on: ubuntu-latest
+    needs: [unit-tests]  # Run after unit tests pass
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-test.txt
+
+      - name: Run system tests
+        run: |
+          pytest -m system -v \
+            --junit-xml=reports/junit-system.xml \
+            --cov=. \
+            --cov-report=xml
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.xml
+          flags: system
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: system-test-results
+          path: reports/
+
+  # E2E tests - only on main branch or manual trigger
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-test.txt
+
+      - name: Run E2E tests (mock LLM)
+        run: |
+          pytest -m e2e -v \
+            --junit-xml=reports/junit-e2e.xml
+        env:
+          # Mock LLM by default (no API key)
+          OPENROUTER_API_KEY: test
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: e2e-test-results
+          path: reports/
+
+  # E2E with real LLM - manual trigger only
+  e2e-real-llm:
+    name: E2E Tests (Real LLM)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    needs: [unit-tests, integration-tests, system-tests]
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-test.txt
+
+      - name: Run E2E tests with real LLM
+        run: |
+          pytest -m e2e --real-llm -v \
+            --junit-xml=reports/junit-e2e-real.xml
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: e2e-real-test-results
+          path: reports/
+
+      - name: Upload LLM cost logs
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: llm-cost-logs
+          path: logs/llm_calls/
+
+  # Quality checks
+  quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-test.txt
+          pip install ruff black mypy
+
+      - name: Run test quality checks
+        run: |
+          pytest --strict-quality \
+            --quality-threshold=0.7 \
+            --collect-only
+
+      - name: Run linters
+        run: |
+          ruff check .
+          black --check .
+
+      - name: Type checking
+        run: |
+          mypy . --ignore-missing-imports || true
+
+  # Parallel execution test
+  parallel-tests:
+    name: Parallel Test Execution
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-test.txt
+          pip install pytest-xdist
+
+      - name: Run tests in parallel
+        run: |
+          pytest -n auto -v \
+            --junit-xml=reports/junit-parallel.xml
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: parallel-test-results
+          path: reports/
