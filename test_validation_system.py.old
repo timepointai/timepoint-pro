@@ -128,37 +128,53 @@ class TestValidator:
                     if isinstance(item, ast.FunctionDef) and item.name.startswith('test_'):
                         test_methods.append(f"{node.name}.{item.name}")
 
+        # Also detect standalone test functions (not in classes)
+        for node in ast.iter_child_nodes(tree):
+            if isinstance(node, ast.FunctionDef) and node.name.startswith('test_'):
+                # Only add if not already in a test class
+                if f"{node.name}" not in [m.split('.')[-1] for m in test_methods]:
+                    test_methods.append(node.name)
+
         # Analyze quality issues
         issues = []
         recommendations = []
 
+        # Separate critical issues from warnings
+        critical_issues = []
+        warnings = []
+
         # Check for critical patterns
         for pattern in self.critical_patterns:
             if re.search(pattern, content, re.MULTILINE):
-                issues.append(f"Critical pattern found: {pattern}")
+                critical_issues.append(f"Critical pattern found: {pattern}")
 
-        # Check for warning patterns
+        # Check for warning patterns (these don't heavily impact quality)
         for pattern in self.warning_patterns:
             if re.search(pattern, content, re.MULTILINE):
-                issues.append(f"Warning pattern found: {pattern}")
+                warnings.append(f"Warning pattern found: {pattern}")
 
         # Check test coverage
         if len(test_methods) == 0:
-            issues.append("No test methods found")
+            critical_issues.append("No test methods found")
             recommendations.append("Add test methods or remove empty test file")
 
-        # Check for proper test structure
-        if not any('unittest' in imp or 'pytest' in imp for imp in imports):
-            issues.append("Missing test framework imports")
+        # Check for proper test structure (relaxed - many tests use pytest without explicit import)
+        # Only warn if there are no test-related imports at all
+        has_test_imports = any('unittest' in imp or 'pytest' in imp or 'mock' in imp for imp in imports)
+        if not has_test_imports and len(test_methods) > 0:
+            warnings.append("Missing test framework imports")
             recommendations.append("Add proper test framework imports")
+
+        # Combine issues for backward compatibility
+        issues = critical_issues + warnings
 
         # Check for fixtures and setup
         has_setup = 'setUp' in content or 'setup_method' in content or 'setup_class' in content
         if len(test_methods) > 5 and not has_setup:
             recommendations.append("Consider adding test fixtures for setup/teardown")
 
-        # Calculate quality score
-        quality_score = self._calculate_quality_score(len(test_methods), len(issues), len(recommendations))
+        # Calculate quality score (only critical issues heavily penalize)
+        quality_score = self._calculate_quality_score(len(test_methods), len(critical_issues), len(warnings), len(recommendations))
 
         return TestAnalysis(
             file_path=file_path,
@@ -172,21 +188,31 @@ class TestValidator:
             recommendations=recommendations
         )
 
-    def _calculate_quality_score(self, test_count: int, issue_count: int, rec_count: int) -> float:
-        """Calculate quality score based on various factors"""
+    def _calculate_quality_score(self, test_count: int, critical_count: int, warning_count: int = 0, rec_count: int = 0) -> float:
+        """Calculate quality score based on various factors
+
+        Args:
+            test_count: Number of test methods
+            critical_count: Number of critical issues (heavily penalized)
+            warning_count: Number of warnings (lightly penalized)
+            rec_count: Number of recommendations (small bonus)
+        """
         if test_count == 0:
             return 0.0
 
         # Base score from test count (more tests = higher score)
         base_score = min(1.0, test_count / 20.0)  # Cap at 20 tests
 
-        # Penalty for issues
-        issue_penalty = min(0.5, issue_count * 0.1)
+        # Heavy penalty for critical issues
+        critical_penalty = min(0.6, critical_count * 0.3)
+
+        # Light penalty for warnings (don't heavily impact quality)
+        warning_penalty = min(0.2, warning_count * 0.02)
 
         # Bonus for recommendations (shows thoughtful design)
-        rec_bonus = min(0.2, rec_count * 0.05)
+        rec_bonus = min(0.1, rec_count * 0.02)
 
-        return max(0.0, min(1.0, base_score - issue_penalty + rec_bonus))
+        return max(0.0, min(1.0, base_score - critical_penalty - warning_penalty + rec_bonus))
 
     def run_test_execution(self, file_path: str) -> Tuple[int, int, float]:
         """Execute a test file and return results"""
@@ -203,6 +229,11 @@ class TestValidator:
 
             # Parse results
             output = result.stdout + result.stderr
+
+            # Debug: print output if no tests found
+            if 'no tests ran' in output.lower() or 'collected 0 items' in output.lower():
+                print(f"\n⚠️  Warning: No tests collected for {file_path}")
+                print(f"   pytest output (first 500 chars): {output[:500]}")
 
             # Extract passed/failed counts from pytest output
             passed_match = re.search(r'(\d+) passed', output)

@@ -26,6 +26,10 @@ from query_interface import QueryInterface, QueryIntent
 from validation import Validator
 
 
+@pytest.mark.integration
+@pytest.mark.llm
+@pytest.mark.slow
+@pytest.mark.system
 class TestPhase3DialogSynthesis:
     """Test Mechanism 11: Dialog Synthesis with body-mind coupling"""
 
@@ -203,6 +207,10 @@ class TestPhase3DialogSynthesis:
         assert "CRITICAL INSTRUCTIONS:" in captured_prompt
 
 
+@pytest.mark.integration
+@pytest.mark.llm
+@pytest.mark.slow
+@pytest.mark.system
 class TestPhase3MultiEntityAnalysis:
     """Test Mechanism 13: Multi-Entity Synthesis"""
 
@@ -292,6 +300,10 @@ class TestPhase3MultiEntityAnalysis:
         assert "Multi-Entity Analysis:" in response
 
 
+@pytest.mark.integration
+@pytest.mark.llm
+@pytest.mark.slow
+@pytest.mark.system
 class TestPhase3Integration:
     """Test integration of Phase 3 features with query interface"""
 
@@ -342,6 +354,10 @@ class TestPhase3Integration:
         assert "Hamilton" in response and "Jefferson" in response
 
 
+@pytest.mark.integration
+@pytest.mark.llm
+@pytest.mark.slow
+@pytest.mark.system
 class TestPhase3Validators:
     """Test Phase 3 dialog validators"""
 

@@ -1,0 +1,428 @@
+#!/usr/bin/env python3
+"""
+autopilot.py - Comprehensive Test Autopilot System
+
+Runs all validated tests with quality assurance, parallel execution,
+and comprehensive reporting. Ensures only high-quality tests are executed.
+
+SUPPORTS REAL LLM CALLS:
+- Set OPENROUTER_API_KEY in .env or environment
+- Tests using llm_v2 will make real API calls
+- Costs will be tracked in logs/llm_calls/
+"""
+import argparse
+import json
+import os
+import subprocess
+import sys
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
+from typing import Dict, List, Any, Optional, Tuple
+
+# Load .env file if it exists
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # dotenv not installed, check for .env file manually
+    env_file = Path('.env')
+    if env_file.exists():
+        with open(env_file) as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    os.environ[key.strip()] = value.strip()
+
+from test_validation_system import TestValidator, AutopilotSystem
+
+
+class EnhancedAutopilot:
+    """Enhanced autopilot system with comprehensive test execution"""
+
+    def __init__(self, test_files: List[str], config: Dict[str, Any]):
+        self.test_files = test_files
+        self.config = config
+        self.validator = TestValidator()
+        self.results = {}
+        self.start_time = None
+
+    def run_full_autopilot(self, dry_run: bool = False, parallel: bool = True,
+                          max_workers: int = 4, output_file: str = None) -> Dict[str, Any]:
+        """Run the complete autopilot pipeline"""
+        self.start_time = time.time()
+
+        print("🚀 Timepoint-Daedalus Autopilot System")
+        print("=" * 70)
+
+        # Check for API key and LLM mode
+        api_key = os.environ.get('OPENROUTER_API_KEY', '')
+        if api_key and api_key != 'test':
+            print("✅ REAL LLM MODE: API key detected")
+            print(f"   Key: {api_key[:20]}...")
+            print("   ⚠️  Tests will make real API calls and incur costs")
+            print("   💰 Costs will be logged to logs/llm_calls/")
+        else:
+            print("ℹ️  DRY-RUN MODE: No API key or test key")
+            print("   Tests using llm_v2 will use mock responses")
+            print("   To enable real LLM: export OPENROUTER_API_KEY=your_key")
+        print("=" * 70)
+
+        # Phase 1: Validation
+        print("\n📋 Phase 1: Test Validation & Quality Assurance")
+        report = self.validator.validate_all_tests(self.test_files, execute=False)
+
+        if not report.autopilot_ready and not dry_run and not self.config.get('force_execution', False):
+            print("❌ Tests not ready for autopilot. Critical issues found.")
+            print("   Run with --dry-run to see issues, or --force to override.")
+            return {'status': 'validation_failed', 'report': report}
+
+        # Phase 2: Filter and prioritize tests
+        print("\n📋 Phase 2: Test Selection & Prioritization")
+        validated_tests = self._filter_validated_tests(report)
+
+        if not validated_tests and not dry_run:
+            print("❌ No validated tests available for execution.")
+            return {'status': 'no_valid_tests', 'report': report}
+
+        # Check if validated tests have critical issues
+        validated_test_names = {Path(f).name for f in validated_tests}
+        critical_issues_in_validated = [
+            issue for issue in report.critical_issues
+            if any(test_name in issue for test_name in validated_test_names)
+        ]
+
+        if critical_issues_in_validated and not dry_run:
+            print(f"❌ {len(critical_issues_in_validated)} critical issues found in validated tests.")
+            for issue in critical_issues_in_validated[:3]:
+                print(f"  • {issue}")
+            return {'status': 'critical_issues_in_validated', 'report': report, 'issues': critical_issues_in_validated}
+
+        # Phase 3: Execution
+        print(f"\n🏃 Phase 3: Test Execution ({len(validated_tests)} test files)")
+
+        if dry_run:
+            print("🏃 Dry run mode - showing execution plan:")
+            for test_file in validated_tests:
+                analysis = self.validator.analysis_results.get(test_file, None)
+                test_count = analysis.total_tests if analysis else 0
+                print(f"  • {test_file} ({test_count} tests)")
+
+            return {
+                'status': 'dry_run_complete',
+                'validated_tests': validated_tests,
+                'report': report
+            }
+
+        # Execute tests
+        if parallel and len(validated_tests) > 1:
+            execution_results = self._run_parallel_execution(validated_tests, max_workers)
+        else:
+            execution_results = self._run_serial_execution(validated_tests)
+
+        # Phase 4: Analysis & Reporting
+        print("\n📊 Phase 4: Results Analysis")
+        analysis = self._analyze_execution_results(execution_results, report)
+
+        # Phase 5: Save Results
+        final_results = {
+            'status': 'complete',
+            'execution_time': time.time() - self.start_time,
+            'validation_report': report,
+            'execution_results': execution_results,
+            'analysis': analysis,
+            'config': self.config
+        }
+
+        if output_file:
+            self._save_results(final_results, output_file)
+
+        self._print_summary(final_results)
+        return final_results
+
+    def _filter_validated_tests(self, report: Any) -> List[str]:
+        """Filter tests based on validation results and quality criteria"""
+        validated = []
+
+        for test_file in self.test_files:
+            if test_file in self.validator.analysis_results:
+                analysis = self.validator.analysis_results[test_file]
+
+                # Include if it has test methods and meets quality criteria
+                if (analysis.total_tests > 0 and
+                    analysis.quality_score >= self.validator.quality_threshold and
+                    not any('No test methods found' in issue for issue in analysis.issues)):
+
+                    # Additional filtering for critical patterns
+                    has_critical_issues = any(
+                        any(pattern in issue for pattern in [
+                            'Syntax error', 'Cannot read file', 'No test methods found'
+                        ]) for issue in analysis.issues
+                    )
+
+                    if not has_critical_issues:
+                        validated.append(test_file)
+
+        print(f"✅ Filtered {len(validated)} high-quality test files from {len(self.test_files)} total")
+        return validated
+
+    def _run_serial_execution(self, test_files: List[str]) -> Dict[str, Any]:
+        """Run tests serially"""
+        results = {}
+        total_start = time.time()
+
+        for i, test_file in enumerate(test_files, 1):
+            print(f"  [{i}/{len(test_files)}] Executing {test_file}...")
+            start_time = time.time()
+
+            passed, failed, exec_time = self.validator.run_test_execution(test_file)
+
+            results[test_file] = {
+                'passed': passed,
+                'failed': failed,
+                'time': exec_time,
+                'total': passed + failed,
+                'success_rate': (passed / (passed + failed)) if (passed + failed) > 0 else 0.0
+            }
+
+        results['_summary'] = {
+            'total_time': time.time() - total_start,
+            'total_files': len(test_files),
+            'total_passed': sum(r['passed'] for r in results.values() if isinstance(r, dict) and 'passed' in r),
+            'total_failed': sum(r['failed'] for r in results.values() if isinstance(r, dict) and 'failed' in r),
+            'avg_success_rate': 0.0
+        }
+
+        # Calculate average success rate
+        success_rates = [r['success_rate'] for r in results.values()
+                        if isinstance(r, dict) and 'success_rate' in r]
+        if success_rates:
+            results['_summary']['avg_success_rate'] = sum(success_rates) / len(success_rates)
+
+        return results
+
+    def _run_parallel_execution(self, test_files: List[str], max_workers: int) -> Dict[str, Any]:
+        """Run tests in parallel using ThreadPoolExecutor"""
+        results = {}
+        total_start = time.time()
+
+        print(f"  Running with {max_workers} parallel workers...")
+
+        def execute_single_test(test_file: str) -> Tuple[str, Dict[str, Any]]:
+            """Execute a single test file"""
+            passed, failed, exec_time = self.validator.run_test_execution(test_file)
+            return test_file, {
+                'passed': passed,
+                'failed': failed,
+                'time': exec_time,
+                'total': passed + failed,
+                'success_rate': (passed / (passed + failed)) if (passed + failed) > 0 else 0.0
+            }
+
+        # Execute tests in parallel
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [executor.submit(execute_single_test, test_file)
+                      for test_file in test_files]
+
+            for future in as_completed(futures):
+                test_file, result = future.result()
+                results[test_file] = result
+                print(f"  ✓ Completed {test_file} ({result['passed']}/{result['total']} passed)")
+
+        # Add summary
+        results['_summary'] = {
+            'total_time': time.time() - total_start,
+            'total_files': len(test_files),
+            'total_passed': sum(r['passed'] for r in results.values() if isinstance(r, dict) and 'passed' in r),
+            'total_failed': sum(r['failed'] for r in results.values() if isinstance(r, dict) and 'failed' in r),
+            'avg_success_rate': 0.0
+        }
+
+        success_rates = [r['success_rate'] for r in results.values()
+                        if isinstance(r, dict) and 'success_rate' in r]
+        if success_rates:
+            results['_summary']['avg_success_rate'] = sum(success_rates) / len(success_rates)
+
+        return results
+
+    def _analyze_execution_results(self, execution_results: Dict[str, Any],
+                                 validation_report: Any) -> Dict[str, Any]:
+        """Analyze execution results for insights and recommendations"""
+        summary = execution_results.get('_summary', {})
+
+        analysis = {
+            'total_passed': summary.get('total_passed', 0),
+            'total_failed': summary.get('total_failed', 0),
+            'total_tests': summary.get('total_passed', 0) + summary.get('total_failed', 0),
+            'success_rate': summary.get('avg_success_rate', 0.0),
+            'execution_time': summary.get('total_time', 0),
+            'performance_insights': [],
+            'failed_tests': [],
+            'recommendations': []
+        }
+
+        # Identify failed tests
+        for test_file, result in execution_results.items():
+            if (isinstance(result, dict) and
+                'failed' in result and
+                result['failed'] > 0 and
+                not test_file.startswith('_')):
+                analysis['failed_tests'].append({
+                    'file': test_file,
+                    'failed': result['failed'],
+                    'passed': result.get('passed', 0),
+                    'total': result.get('total', 0)
+                })
+
+        # Performance insights
+        if analysis['success_rate'] >= 0.95:
+            analysis['performance_insights'].append("Excellent test suite reliability")
+        elif analysis['success_rate'] >= 0.80:
+            analysis['performance_insights'].append("Good test suite with minor issues")
+        elif analysis['success_rate'] >= 0.60:
+            analysis['performance_insights'].append("Test suite needs attention")
+        else:
+            analysis['performance_insights'].append("Critical test suite issues detected")
+
+        # Recommendations
+        if analysis['failed_tests']:
+            analysis['recommendations'].append(
+                f"Fix {len(analysis['failed_tests'])} failing test files"
+            )
+
+        if analysis['execution_time'] > 300:  # 5 minutes
+            analysis['recommendations'].append("Consider parallel execution for faster runs")
+
+        if analysis['total_tests'] < 50:
+            analysis['recommendations'].append("Consider adding more comprehensive test coverage")
+
+        return analysis
+
+    def _save_results(self, results: Dict[str, Any], output_file: str):
+        """Save results to file"""
+        try:
+            with open(output_file, 'w') as f:
+                json.dump(results, f, indent=2, default=str)
+            print(f"💾 Results saved to {output_file}")
+        except Exception as e:
+            print(f"❌ Failed to save results: {e}")
+
+    def _print_summary(self, results: Dict[str, Any]):
+        """Print execution summary"""
+        analysis = results.get('analysis', {})
+
+        print("\n🎉 Autopilot Execution Complete")
+        print(f"  Execution Time: {results.get('execution_time', 0):.2f}s")
+        print(f"  Test Files: {analysis.get('total_passed', 0) + analysis.get('total_failed', 0)}")
+        print(f"  Tests Passed: {analysis.get('total_passed', 0)}")
+        print(f"  Tests Failed: {analysis.get('total_failed', 0)}")
+
+        # Check for LLM cost logs
+        log_dir = Path("logs/llm_calls")
+        if log_dir.exists():
+            import glob
+            log_files = glob.glob(str(log_dir / "*.jsonl"))
+            if log_files:
+                print("\n💰 LLM Cost Summary:")
+                print(f"   Log files: {len(log_files)}")
+                print(f"   Location: {log_dir}")
+                print("   To calculate costs:")
+                print(f"     cat {log_dir}/*.jsonl | jq -s 'map(.cost_usd) | add'")
+
+        if analysis.get('performance_insights'):
+            print("\n💡 Insights:")
+            for insight in analysis['performance_insights']:
+                print(f"  • {insight}")
+
+        if analysis.get('failed_tests'):
+            print("\n❌ Failed Tests:")
+            for failed in analysis['failed_tests'][:5]:  # Show first 5
+                print(f"  • {failed['file']}: {failed['failed']}/{failed['total']} failed")
+
+        if analysis.get('recommendations'):
+            print("\n📋 Recommendations:")
+            for rec in analysis['recommendations']:
+                print(f"  • {rec}")
+
+
+def main():
+    """Main entry point"""
+    parser = argparse.ArgumentParser(
+        description="Timepoint-Daedalus Autopilot Test System",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python autopilot.py --dry-run                    # Validate tests without running
+  python autopilot.py --parallel --workers 4      # Run tests in parallel
+  python autopilot.py --output results.json       # Save results to file
+  python autopilot.py --force                      # Override validation and run anyway
+        """
+    )
+
+    parser.add_argument("--dry-run", action="store_true",
+                       help="Validate tests and show execution plan without running")
+    parser.add_argument("--parallel", action="store_true", default=True,
+                       help="Run tests in parallel (default: True)")
+    parser.add_argument("--workers", type=int, default=4,
+                       help="Number of parallel workers (default: 4)")
+    parser.add_argument("--force", action="store_true",
+                       help="Force execution even with validation issues")
+    parser.add_argument("--output", type=str,
+                       help="Save results to JSON file")
+    parser.add_argument("--config", type=str, default="autopilot_config.json",
+                       help="Configuration file (default: autopilot_config.json)")
+
+    args = parser.parse_args()
+
+    # Get test files (exclude validation and autopilot systems)
+    excluded_files = {"test_validation_system.py", "autopilot.py"}
+    test_files = [
+        f"./{f}" for f in os.listdir(".")
+        if f.startswith("test_") and f.endswith(".py") and f not in excluded_files
+    ]
+
+    # Load configuration
+    config = {
+        "parallel_execution": args.parallel,
+        "max_workers": args.workers,
+        "force_execution": args.force,
+        "output_file": args.output,
+        "quality_threshold": 0.7,
+        "test_timeout": 300  # 5 minutes per test file
+    }
+
+    # Initialize and run autopilot
+    autopilot = EnhancedAutopilot(test_files, config)
+
+    try:
+        results = autopilot.run_full_autopilot(
+            dry_run=args.dry_run,
+            parallel=args.parallel,
+            max_workers=args.workers,
+            output_file=args.output
+        )
+
+        # Exit with appropriate code
+        if results.get('status') in ['validation_failed', 'no_valid_tests']:
+            if not args.force:
+                sys.exit(1)
+
+        failed_tests = results.get('analysis', {}).get('total_failed', 0)
+        if failed_tests > 0:
+            sys.exit(1)
+
+        sys.exit(0)
+
+    except KeyboardInterrupt:
+        print("\n⚠️  Execution interrupted by user")
+        sys.exit(130)
+    except Exception as e:
+        print(f"\n❌ Autopilot failed: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

@@ -8,8 +8,12 @@ from datetime import datetime
 from schemas import Entity, AnimalEntity, BuildingEntity, AbstractEntity, AnyEntity, KamiEntity, AIEntity, ResolutionLevel
 from workflows import should_create_animistic_entity, create_animistic_entity, generate_animistic_entities_for_scene
 from validation import Validator
+import pytest
 
 
+@pytest.mark.animism
+@pytest.mark.integration
+@pytest.mark.system
 class TestAnimisticEntityCreation:
     """Test creation of animistic entities"""
 
@@ -241,6 +245,9 @@ class TestAnimisticEntityCreation:
         assert ai_entity.required_disclaimers  # Should have disclaimers
 
 
+@pytest.mark.animism
+@pytest.mark.integration
+@pytest.mark.system
 class TestAnimisticEntityValidation:
     """Test validation of animistic entities"""
 
@@ -526,6 +533,9 @@ class TestAnimisticEntityValidation:
         assert "no input bleaching rules" in result["message"]
 
 
+@pytest.mark.animism
+@pytest.mark.integration
+@pytest.mark.system
 class TestSceneGeneration:
     """Test generation of animistic entities for scenes"""
 
@@ -570,6 +580,9 @@ class TestSceneGeneration:
         assert len(entities) == 0
 
 
+@pytest.mark.animism
+@pytest.mark.integration
+@pytest.mark.system
 class TestAdvancedAnimisticValidators:
     """Test advanced validators for spiritual and adaptive entities"""
 
