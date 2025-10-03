@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from schemas import Entity, ResolutionLevel, Timepoint, ExposureEvent
 from storage import GraphStore
-from llm import LLMClient
+from llm_v2 import LLMClient  # Use new centralized service
 from resolution_engine import ResolutionEngine
 from datetime import datetime
 

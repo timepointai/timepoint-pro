@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from schemas import Entity, Timepoint, ResolutionLevel
 from storage import GraphStore
 from query_interface import QueryInterface
-from llm import LLMClient
+from llm_v2 import LLMClient  # Use new centralized service
 
 
 class TestCachingLayer:

@@ -8,6 +8,75 @@ llm:
   model: null  # null = auto-select Llama 70B, or specify model ID like "meta-llama/llama-3.1-70b-instruct"
   model_cache_ttl_hours: 24  # How often to refresh available models from OpenRouter
 
+# Centralized LLM Service Configuration (New Architecture - ACTIVE)
+llm_service:
+  # Provider configuration
+  provider: "custom"  # custom (OpenRouter), test, future: mirascope
+  base_url: "https://openrouter.ai/api/v1"
+
+  # API key management
+  api_keys:
+    primary: ${oc.env:OPENROUTER_API_KEY,test}
+    rotation: []  # Future: multiple keys for rotation
+
+  # Operating modes - Set to match legacy llm.dry_run for compatibility
+  modes:
+    mode: "production"  # production, dry_run, validation - automatically synced with llm.dry_run
+
+  # Default LLM parameters
+  defaults:
+    model: "meta-llama/llama-3.1-70b-instruct"
+    temperature: 0.7
+    top_p: 0.9
+    max_tokens: 1000
+    frequency_penalty: 0.0
+    presence_penalty: 0.0
+
+  # Error handling and retry
+  error_handling:
+    max_retries: 3
+    backoff_base: 1.0
+    backoff_multiplier: 2.0
+    failsoft_enabled: true
+    retry_on_invalid_json: true
+
+  # Logging configuration
+  logging:
+    level: "metadata"  # metadata, prompts, responses, full
+    directory: "logs/llm_calls"
+    rotation: "daily"
+    retention_days: 30
+    truncate_prompts_chars: 500
+    truncate_responses_chars: 1000
+
+  # Security controls
+  security:
+    input_bleaching: true
+    output_sanitization: true
+    max_input_length: 50000
+    dangerous_patterns:
+      - "(?i)ignore.*previous.*instructions"
+      - "(?i)forget.*system.*prompt"
+      - "(?i)disregard.*rules"
+
+  # Performance optimization
+  performance:
+    caching_enabled: true
+    cache_ttl: 300
+    timeout_seconds: 30.0
+
+  # Session management
+  sessions:
+    enabled: true
+    id_prefix: "llm_"
+
+  # Validation mode configuration
+  validation_mode:
+    model: "meta-llama/llama-3.1-8b-instruct"
+    system_prompt: "Respond in Spanish"
+    user_prompt: "Say hello world"
+    expected_pattern: "(?i)(hola|buenos días|buenas)"
+
 mode: autopilot
 seed: 42
 

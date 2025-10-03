@@ -7,7 +7,7 @@ Tests that entity population runs in parallel using asyncio within LangGraph wor
 import asyncio
 import time
 from workflows import create_entity_training_workflow, WorkflowState
-from llm import LLMClient
+from llm_v2 import LLMClient  # Use new centralized service
 from storage import GraphStore
 from schemas import ResolutionLevel
 import networkx as nx

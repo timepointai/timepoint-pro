@@ -20,7 +20,7 @@ from schemas import (
     Entity, Timepoint, ResolutionLevel, TemporalMode,
     AnimalEntity, BuildingEntity, AbstractEntity, AnyEntity, KamiEntity, AIEntity
 )
-from llm import LLMClient
+from llm_v2 import LLMClient  # Use new centralized service
 from workflows import (
     create_animistic_entity, generate_animistic_entities_for_scene,
     TemporalAgent

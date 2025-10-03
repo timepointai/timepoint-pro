@@ -6,7 +6,7 @@ Tests that unknown entities are generated dynamically when queried.
 
 from query_interface import QueryInterface
 from storage import GraphStore
-from llm import LLMClient
+from llm_v2 import LLMClient  # Use new centralized service
 import tempfile
 import os
 

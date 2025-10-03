@@ -6,7 +6,7 @@ Tests that scene-level queries work correctly.
 
 from query_interface import QueryInterface, QueryIntent
 from storage import GraphStore
-from llm import LLMClient
+from llm_v2 import LLMClient  # Use new centralized service
 from schemas import Entity, PhysicalTensor, CognitiveTensor
 import tempfile
 import os

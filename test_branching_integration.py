@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from query_interface import QueryInterface, QueryIntent
 from storage import GraphStore
-from llm import LLMClient
+from llm_v2 import LLMClient  # Use new centralized service
 import yaml
 
 def load_config():

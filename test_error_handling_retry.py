@@ -6,7 +6,7 @@ Tests that retry mechanism handles LLM API failures with exponential backoff.
 
 import time
 from unittest.mock import Mock, patch
-from llm import LLMClient, retry_with_backoff
+from llm_v2 import LLMClient  # Use new centralized service, retry_with_backoff
 
 def test_retry_with_backoff_success():
     """Test that retry function works on successful calls"""

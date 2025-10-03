@@ -10,7 +10,7 @@ import re
 import json
 from schemas import Entity, Timepoint, ResolutionLevel, EnvironmentEntity, AtmosphereEntity, CrowdEntity
 from storage import GraphStore
-from llm import LLMClient
+from llm_v2 import LLMClient  # Use new centralized service
 from resolution_engine import ResolutionEngine
 # Removed OpenAI/instructor dependency
 from tensors import load_compressed_entity_data

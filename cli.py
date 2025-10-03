@@ -9,7 +9,7 @@ from datetime import datetime
 # Import all required modules
 import networkx as nx
 from storage import GraphStore
-from llm import LLMClient
+from llm_v2 import LLMClient  # Use new centralized service
 from workflows import create_entity_training_workflow, WorkflowState
 from graph import create_test_graph, export_graph_data, print_graph_summary
 from evaluation import EvaluationMetrics
@@ -65,13 +65,9 @@ def main(cfg: DictConfig) -> None:
 
     # Initialize components
     store = GraphStore(cfg.database.url)
-    llm_client = LLMClient(
-        api_key=cfg.llm.api_key,
-        base_url=cfg.llm.base_url,
-        dry_run=cfg.llm.dry_run,
-        default_model=cfg.llm.model,
-        model_cache_ttl_hours=getattr(cfg.llm, 'model_cache_ttl_hours', 24)
-    )
+
+    # Use new centralized LLM service
+    llm_client = LLMClient.from_hydra_config(cfg, use_centralized_service=True)
 
     # Add cost warning for real API calls
     if not llm_client.dry_run:

@@ -13,7 +13,8 @@ from datetime import datetime
 from schemas import Entity, ResolutionLevel, TTMTensor, EnvironmentEntity, AtmosphereEntity, CrowdEntity
 from schemas import Dialog, DialogTurn, DialogData, RelationshipTrajectory, RelationshipState, RelationshipMetrics, Contradiction, ComparativeAnalysis
 from schemas import AnimalEntity, BuildingEntity, AbstractEntity, AnyEntity, KamiEntity, AIEntity, TemporalMode
-from llm import LLMClient, EntityPopulation
+from llm_v2 import LLMClient  # Use new centralized service
+from llm import EntityPopulation  # Keep schema import
 from resolution_engine import ResolutionEngine
 from storage import GraphStore
 from graph import create_test_graph
@@ -263,7 +264,8 @@ def create_environment_entity(timepoint_id: str, location: str, capacity: int = 
 
 
 def compute_scene_atmosphere(entities: List[Entity], environment: EnvironmentEntity,
-                           relationship_graph: Optional[nx.Graph] = None) -> AtmosphereEntity:
+                           relationship_graph: Optional[nx.Graph] = None,
+                           llm_client=None, timepoint_info: Optional[Dict] = None) -> AtmosphereEntity:
     """Aggregate individual entity states into scene atmosphere"""
 
     if not entities:
@@ -308,7 +310,7 @@ def compute_scene_atmosphere(entities: List[Entity], environment: EnvironmentEnt
     # Compute social cohesion (inverse of tension, adjusted by formality)
     social_cohesion = max(0.0, 1.0 - tension_level - (formality_level * 0.3))
 
-    return AtmosphereEntity(
+    atmosphere = AtmosphereEntity(
         scene_id=environment.scene_id,
         timepoint_id=environment.timepoint_id,
         tension_level=tension_level,
@@ -318,6 +320,55 @@ def compute_scene_atmosphere(entities: List[Entity], environment: EnvironmentEnt
         social_cohesion=social_cohesion,
         energy_level=avg_energy
     )
+
+    # Optional: Generate rich narrative description with LLM
+    if llm_client is not None and timepoint_info is not None:
+        try:
+            # Prepare data for LLM
+            timepoint_dict = {
+                'event_description': timepoint_info.get('event_description', ''),
+                'timestamp': timepoint_info.get('timestamp', ''),
+                'timepoint_id': timepoint_info.get('timepoint_id', '')
+            }
+
+            env_dict = {
+                'location': environment.location,
+                'ambient_temperature': environment.ambient_temperature,
+                'lighting_level': environment.lighting_level,
+                'weather': environment.weather,
+                'architectural_style': environment.architectural_style
+            }
+
+            atmosphere_dict = {
+                'tension_level': tension_level,
+                'formality_level': formality_level,
+                'emotional_valence': avg_valence,
+                'energy_level': avg_energy,
+                'social_cohesion': social_cohesion
+            }
+
+            entity_dicts = [{'entity_id': e.entity_id, 'entity_type': e.entity_type} for e in entities[:20]]
+
+            # Generate LLM description
+            llm_description = llm_client.generate_scene_atmosphere(
+                timepoint=timepoint_dict,
+                entities=entity_dicts,
+                environment=env_dict,
+                atmosphere_data=atmosphere_dict
+            )
+
+            # Add LLM-generated narrative to atmosphere metadata
+            if hasattr(atmosphere, 'metadata'):
+                atmosphere.metadata['llm_narrative'] = llm_description
+            else:
+                # Store in a custom attribute if metadata doesn't exist
+                atmosphere.llm_narrative = llm_description
+
+        except Exception as e:
+            # If LLM generation fails, continue with base atmosphere
+            pass
+
+    return atmosphere
 
 
 def compute_crowd_dynamics(entities: List[Entity], environment: EnvironmentEntity) -> CrowdEntity:
@@ -1154,29 +1205,24 @@ def generate_prospective_state(
     }
 
     # Generate expectations using LLM
-    prompt = f"""
-    Generate realistic expectations for entity {entity.entity_id} about the future.
+    entity_context = {
+        'entity_id': entity.entity_id,
+        'entity_type': getattr(entity, 'entity_type', 'person'),
+        'knowledge_sample': list(entity.entity_metadata.get("knowledge_state", []))[:10],
+        'personality': getattr(entity, 'personality_traits', {}),
+        'forecast_horizon_days': forecast_horizon,
+        'max_expectations': max_expectations
+    }
 
-    Context:
-    - Current situation: {context['current_timepoint']}
-    - Time: {context['current_timestamp']}
-    - Entity type: {context['entity_type']}
-    - Recent knowledge: {', '.join(context['knowledge_sample'][:5])}
-
-    Generate {max_expectations} expectations about events that might happen in the next {forecast_horizon} days.
-    Each expectation should include:
-    - predicted_event: What the entity expects to happen
-    - subjective_probability: How likely they think it is (0.0-1.0)
-    - desired_outcome: Whether they want this to happen (true/false)
-    - preparation_actions: List of actions they might take to prepare or respond
-    - confidence: How confident they are in this expectation (0.0-1.0)
-
-    Return as JSON array of expectation objects.
-    """
+    timepoint_context = {
+        'current_timepoint': timepoint.event_description,
+        'current_timestamp': timepoint.timestamp.isoformat()
+    }
 
     try:
-        response = llm.generate_structured(prompt, response_model=List[Expectation])
-        expectations = response if isinstance(response, list) else []
+        expectations = llm.generate_expectations(entity_context, timepoint_context)
+        if not isinstance(expectations, list):
+            expectations = []
     except Exception as e:
         # Fallback to mock expectations if LLM fails
         expectations = [
@@ -1368,7 +1414,8 @@ def create_counterfactual_branch(
     parent_timeline_id: str,
     intervention_point: str,
     intervention: 'Intervention',
-    store: 'GraphStore'
+    store: 'GraphStore',
+    llm_client=None
 ) -> str:
     """Create a counterfactual branch from a parent timeline with an intervention"""
     import uuid
@@ -1389,6 +1436,43 @@ def create_counterfactual_branch(
     if not intervention_timepoint:
         raise ValueError(f"Intervention point {intervention_point} not found in timeline {parent_timeline_id}")
 
+    # Optional: Use LLM to predict counterfactual outcomes
+    llm_prediction = None
+    if llm_client is not None:
+        try:
+            # Gather baseline timeline info
+            baseline_info = {
+                'timeline_id': parent_timeline_id,
+                'event_summary': ', '.join([tp.event_description for tp in parent_timepoints[:5]]),
+                'key_entities': list(set([e for tp in parent_timepoints if hasattr(tp, 'entities_present') for e in tp.entities_present]))[:10]
+            }
+
+            # Intervention info
+            intervention_info = {
+                'type': intervention.type,
+                'target': intervention.target,
+                'description': intervention.description or f"{intervention.type} on {intervention.target}",
+                'intervention_point': intervention_point,
+                'parameters': intervention.parameters if hasattr(intervention, 'parameters') else {}
+            }
+
+            # Get affected entities
+            affected_entities = []
+            if hasattr(intervention_timepoint, 'entities_present'):
+                for entity_id in intervention_timepoint.entities_present[:10]:
+                    affected_entities.append({'entity_id': entity_id})
+
+            # Get LLM prediction
+            llm_prediction = llm_client.predict_counterfactual_outcome(
+                baseline_timeline=baseline_info,
+                intervention=intervention_info,
+                affected_entities=affected_entities
+            )
+
+        except Exception as e:
+            # If prediction fails, continue with deterministic branching
+            pass
+
     # Copy timepoints before intervention
     copied_timepoints = []
     for tp in parent_timepoints:
@@ -1399,9 +1483,9 @@ def create_counterfactual_branch(
             copied_timepoints.append(copied_tp)
             store.save_timepoint(copied_tp)
 
-    # Apply intervention at branch point
+    # Apply intervention at branch point (enhanced with LLM prediction if available)
     branch_timepoint = apply_intervention_to_timepoint(
-        intervention_timepoint, intervention, branch_timeline_id
+        intervention_timepoint, intervention, branch_timeline_id, llm_prediction
     )
     store.save_timepoint(branch_timepoint)
 
@@ -1427,12 +1511,19 @@ def create_counterfactual_branch(
 def apply_intervention_to_timepoint(
     timepoint: 'Timepoint',
     intervention: 'Intervention',
-    new_timeline_id: str
+    new_timeline_id: str,
+    llm_prediction: Optional[Dict] = None
 ) -> 'Timepoint':
     """Apply an intervention to a timepoint, creating a modified version"""
     # Create a copy of the timepoint
     modified_tp = timepoint.copy() if hasattr(timepoint, 'copy') else timepoint
     modified_tp.timeline_id = new_timeline_id
+
+    # If LLM prediction is available, enhance the event description
+    if llm_prediction:
+        immediate_effects = llm_prediction.get('immediate_effects', [])
+        if immediate_effects:
+            modified_tp.event_description = f"{modified_tp.event_description} [LLM Prediction: {'; '.join(immediate_effects[:2])}]"
 
     if intervention.type == "entity_removal":
         # Remove entity from entities_present
@@ -1889,12 +1980,30 @@ def create_animistic_entity(entity_id: str, entity_type: str, context: Dict, con
     else:
         metadata = {}
 
+    # Optional: Enrich with LLM if enabled
+    llm_enrichment_enabled = animism_config.get("llm_enrichment_enabled", False)
+    llm_client = context.get("llm_client")
+
+    final_metadata = metadata.dict() if hasattr(metadata, 'dict') else metadata
+
+    if llm_enrichment_enabled and llm_client is not None:
+        try:
+            final_metadata = llm_client.enrich_animistic_entity(
+                entity_id=entity_id,
+                entity_type=entity_type,
+                base_metadata=final_metadata,
+                context=context
+            )
+        except Exception as e:
+            # If enrichment fails, use base metadata
+            pass
+
     return Entity(
         entity_id=entity_id,
         entity_type=entity_type,
         temporal_span_start=context.get("current_timepoint"),
         resolution_level=ResolutionLevel.TENSOR_ONLY,
-        entity_metadata=metadata.dict() if hasattr(metadata, 'dict') else metadata
+        entity_metadata=final_metadata
     )
 
 

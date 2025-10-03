@@ -16,7 +16,7 @@ from schemas import (
     Contradiction, ComparativeAnalysis
 )
 from storage import GraphStore
-from llm import LLMClient
+from llm_v2 import LLMClient  # Use new centralized service
 from workflows import (
     synthesize_dialog, analyze_relationship_evolution,
     detect_contradictions, synthesize_multi_entity_response,

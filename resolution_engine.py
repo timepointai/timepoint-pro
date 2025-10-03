@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 import networkx as nx
 from schemas import Entity, Timepoint, ResolutionLevel, ExposureEvent
 from storage import GraphStore
-from llm import LLMClient
+from llm_v2 import LLMClient  # Use new centralized service
 
 
 class ResolutionEngine:

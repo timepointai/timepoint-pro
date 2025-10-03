@@ -33,7 +33,7 @@ except ImportError:
 import openai
 
 from schemas import AIEntity, Entity
-from llm import LLMClient
+from llm_v2 import LLMClient  # Use new centralized service
 from storage import GraphStore
 from validation import Validator
 
