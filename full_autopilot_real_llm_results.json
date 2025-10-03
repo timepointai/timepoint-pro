@@ -1,0 +1,55 @@
+{
+  "status": "complete",
+  "execution_time": 11.55151104927063,
+  "validation_report": "ValidationReport(total_files=15, total_tests=70, quality_score=0.22000000000000003, critical_issues=['./test_on_demand_generation.py: No test methods found', './test_error_handling_retry.py: No test methods found', './test_branching_integration.py: No test methods found', './test_scene_queries.py: No test methods found', './test_knowledge_enrichment.py: Critical pattern found: ^\\\\s*pass\\\\s*$', './test_knowledge_enrichment.py: No test methods found', './test_body_mind_coupling.py: No test methods found', './test_parallel_execution.py: No test methods found', './test_prospection_mechanism.py: No test methods found', './test_branching_mechanism.py: No test methods found', './test_circadian_mechanism.py: No test methods found'], warnings=['./test_animistic_entities.py: Missing test framework imports', './test_caching_layer.py: Warning pattern found: print\\\\(', './test_on_demand_generation.py: Warning pattern found: print\\\\(', './test_on_demand_generation.py: Warning pattern found: except.*:', './test_on_demand_generation.py: Missing test framework imports', './test_error_handling_retry.py: Warning pattern found: print\\\\(', './test_error_handling_retry.py: Warning pattern found: except.*:', './test_branching_integration.py: Warning pattern found: print\\\\(', './test_branching_integration.py: Warning pattern found: except.*:', './test_branching_integration.py: Missing test framework imports', './test_scene_queries.py: Warning pattern found: print\\\\(', './test_scene_queries.py: Warning pattern found: except.*:', './test_scene_queries.py: Missing test framework imports', './test_knowledge_enrichment.py: Warning pattern found: print\\\\(', './test_knowledge_enrichment.py: Warning pattern found: except.*:', './test_knowledge_enrichment.py: Missing test framework imports', './test_body_mind_coupling.py: Warning pattern found: print\\\\(', './test_body_mind_coupling.py: Warning pattern found: except.*:', './test_body_mind_coupling.py: Missing test framework imports', './test_parallel_execution.py: Warning pattern found: print\\\\(', './test_parallel_execution.py: Warning pattern found: except.*:', './test_parallel_execution.py: Missing test framework imports', './test_prospection_mechanism.py: Warning pattern found: print\\\\(', './test_prospection_mechanism.py: Warning pattern found: except.*:', './test_prospection_mechanism.py: Missing test framework imports', './test_branching_mechanism.py: Warning pattern found: print\\\\(', './test_branching_mechanism.py: Warning pattern found: except.*:', './test_branching_mechanism.py: Missing test framework imports', './test_phase3_dialog_multi_entity.py: Warning pattern found: print\\\\(', './test_circadian_mechanism.py: Warning pattern found: print\\\\(', './test_circadian_mechanism.py: Warning pattern found: except.*:', './test_circadian_mechanism.py: Missing test framework imports'], recommendations=['./test_animistic_entities.py: Add proper test framework imports', './test_animistic_entities.py: Consider adding test fixtures for setup/teardown', './test_modal_temporal_causality.py: Consider adding test fixtures for setup/teardown', './test_on_demand_generation.py: Add test methods or remove empty test file', './test_on_demand_generation.py: Add proper test framework imports', './test_error_handling_retry.py: Add test methods or remove empty test file', './test_branching_integration.py: Add test methods or remove empty test file', './test_branching_integration.py: Add proper test framework imports', './test_scene_queries.py: Add test methods or remove empty test file', './test_scene_queries.py: Add proper test framework imports', './test_knowledge_enrichment.py: Add test methods or remove empty test file', './test_knowledge_enrichment.py: Add proper test framework imports', './test_body_mind_coupling.py: Add test methods or remove empty test file', './test_body_mind_coupling.py: Add proper test framework imports', './test_parallel_execution.py: Add test methods or remove empty test file', './test_parallel_execution.py: Add proper test framework imports', './test_prospection_mechanism.py: Add test methods or remove empty test file', './test_prospection_mechanism.py: Add proper test framework imports', './test_branching_mechanism.py: Add test methods or remove empty test file', './test_branching_mechanism.py: Add proper test framework imports', './test_circadian_mechanism.py: Add test methods or remove empty test file', './test_circadian_mechanism.py: Add proper test framework imports'], execution_summary={}, autopilot_ready=False)",
+  "execution_results": {
+    "./test_animistic_entities.py": {
+      "passed": 21,
+      "failed": 0,
+      "time": 8.461242198944092,
+      "total": 21,
+      "success_rate": 1.0
+    },
+    "./test_modal_temporal_causality.py": {
+      "passed": 19,
+      "failed": 0,
+      "time": 8.46187686920166,
+      "total": 19,
+      "success_rate": 1.0
+    },
+    "./test_ai_entity_service.py": {
+      "passed": 18,
+      "failed": 0,
+      "time": 3.0241479873657227,
+      "total": 18,
+      "success_rate": 1.0
+    },
+    "_summary": {
+      "total_time": 11.486603736877441,
+      "total_files": 3,
+      "total_passed": 58,
+      "total_failed": 0,
+      "avg_success_rate": 1.0
+    }
+  },
+  "analysis": {
+    "total_passed": 58,
+    "total_failed": 0,
+    "total_tests": 58,
+    "success_rate": 1.0,
+    "execution_time": 11.486603736877441,
+    "performance_insights": [
+      "Excellent test suite reliability"
+    ],
+    "failed_tests": [],
+    "recommendations": []
+  },
+  "config": {
+    "parallel_execution": true,
+    "max_workers": 2,
+    "force_execution": true,
+    "output_file": "full_autopilot_real_llm_results.json",
+    "quality_threshold": 0.7,
+    "test_timeout": 300
+  }
+}
