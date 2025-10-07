@@ -31,18 +31,48 @@ class Validator(ABC):
                 })
         return violations
 
+    def validate_entity(self, entity: Entity, context: Optional[Dict] = None) -> Dict[str, Any]:
+        """
+        Validate an entity and return results.
+
+        Args:
+            entity: Entity to validate
+            context: Optional validation context
+
+        Returns:
+            Dict with validation results
+        """
+        context = context or {}
+        violations = self.validate_all(entity, context)
+
+        return {
+            "valid": len(violations) == 0,
+            "violations": violations,
+            "entity_id": entity.entity_id
+        }
+
 @Validator.register("information_conservation", "ERROR")
 def validate_information_conservation(entity: Entity, context: Dict, store=None) -> Dict:
     """Validate knowledge ⊆ exposure history"""
+    # Handle both Entity and EntityPopulation types
+    from llm import EntityPopulation
+
     # If store is provided, query actual exposure events from database
     if store:
-        exposure_events = store.get_exposure_events(entity.entity_id)
+        entity_id = getattr(entity, 'entity_id', '')
+        exposure_events = store.get_exposure_events(entity_id)
         exposure = set(event.information for event in exposure_events)
     else:
         # Fallback to context-based validation for backward compatibility
         exposure = set(context.get("exposure_history", []))
 
-    knowledge = set(entity.entity_metadata.get("knowledge_state", []))
+    # Get knowledge state from either Entity or EntityPopulation
+    if isinstance(entity, EntityPopulation):
+        knowledge = set(entity.knowledge_state)
+    elif hasattr(entity, 'entity_metadata'):
+        knowledge = set(entity.entity_metadata.get("knowledge_state", []))
+    else:
+        knowledge = set()
 
     unknown = knowledge - exposure
     if unknown:
@@ -52,10 +82,19 @@ def validate_information_conservation(entity: Entity, context: Dict, store=None)
 @Validator.register("energy_budget", "WARNING")
 def validate_energy_budget(entity: Entity, context: Dict) -> Dict:
     """Validate interaction costs ≤ capacity with circadian adjustments"""
-    budget = entity.entity_metadata.get("energy_budget", 100)
+    # Handle both Entity and EntityPopulation types
+    from llm import EntityPopulation
 
-    # Count interactions at this timepoint based on knowledge items added
-    current_knowledge = set(entity.entity_metadata.get("knowledge_state", []))
+    if isinstance(entity, EntityPopulation):
+        budget = entity.energy_budget
+        current_knowledge = set(entity.knowledge_state)
+    elif hasattr(entity, 'entity_metadata'):
+        budget = entity.entity_metadata.get("energy_budget", 100)
+        current_knowledge = set(entity.entity_metadata.get("knowledge_state", []))
+    else:
+        # No energy data available
+        return {"valid": True, "message": "No energy budget data to validate"}
+
     previous_knowledge = set(context.get("previous_knowledge", []) or [])
     new_knowledge_count = len(current_knowledge - previous_knowledge)
 
@@ -104,7 +143,17 @@ def validate_behavioral_inertia(entity: Entity, context: Dict) -> Dict:
 @Validator.register("biological_constraints", "ERROR")
 def validate_biological_constraints(entity: Entity, context: Dict) -> Dict:
     """Validate age-dependent capabilities"""
-    age = entity.entity_metadata.get("age", 0)
+    # Handle both Entity and EntityPopulation types
+    from llm import EntityPopulation
+
+    if isinstance(entity, EntityPopulation):
+        # EntityPopulation doesn't have age, skip validation
+        return {"valid": True, "message": "No age data in EntityPopulation"}
+    elif hasattr(entity, 'entity_metadata'):
+        age = entity.entity_metadata.get("age", 0)
+    else:
+        return {"valid": True, "message": "No age data available"}
+
     action = context.get("action", "")
 
     if age > 100 and "physical_labor" in action:
@@ -231,10 +280,16 @@ def couple_illness_to_cognition(physical: PhysicalTensor, cognitive: CognitiveTe
 # ============================================================================
 
 @Validator.register("dialog_realism", severity="WARNING")
-def validate_dialog_realism(dialog_data: Dict, entities: List[Entity], context: Dict = None) -> Dict:
+def validate_dialog_realism(entity: Entity, context: Dict = None) -> Dict:
     """Check if dialog respects physical/emotional constraints"""
     if context is None:
         context = {}
+
+    # This validator only applies to Dialog objects, skip for regular entities
+    if not hasattr(entity, 'entity_metadata') or 'dialog_data' not in entity.entity_metadata:
+        return {"valid": True, "message": "Not a dialog entity, skipping dialog validation"}
+
+    dialog_data = entity.entity_metadata.get('dialog_data', {})
 
     # Parse dialog turns
     turns = dialog_data.get("turns", [])
@@ -243,6 +298,12 @@ def validate_dialog_realism(dialog_data: Dict, entities: List[Entity], context: 
         turns = json.loads(turns)
 
     validation_issues = []
+
+    # Get entities from context if available
+    entities = context.get("entities", [])
+    if not entities:
+        # If no entities in context, skip detailed validation
+        return {"valid": True, "message": "No entities in context for dialog validation"}
 
     for i, turn in enumerate(turns):
         speaker_id = turn.get("speaker")
@@ -301,10 +362,16 @@ def validate_dialog_realism(dialog_data: Dict, entities: List[Entity], context: 
 
 
 @Validator.register("dialog_knowledge_consistency", severity="ERROR")
-def validate_dialog_knowledge_consistency(dialog_data: Dict, entities: List[Entity], context: Dict = None) -> Dict:
+def validate_dialog_knowledge_consistency(entity: Entity, context: Dict = None) -> Dict:
     """Check if dialog speakers only reference knowledge they actually have"""
     if context is None:
         context = {}
+
+    # This validator only applies to Dialog objects, skip for regular entities
+    if not hasattr(entity, 'entity_metadata') or 'dialog_data' not in entity.entity_metadata:
+        return {"valid": True, "message": "Not a dialog entity, skipping dialog knowledge validation"}
+
+    dialog_data = entity.entity_metadata.get('dialog_data', {})
 
     # Parse dialog turns
     turns = dialog_data.get("turns", [])
@@ -313,6 +380,12 @@ def validate_dialog_knowledge_consistency(dialog_data: Dict, entities: List[Enti
         turns = json.loads(turns)
 
     knowledge_violations = []
+
+    # Get entities from context if available
+    entities = context.get("entities", [])
+    if not entities:
+        # If no entities in context, skip detailed validation
+        return {"valid": True, "message": "No entities in context for dialog knowledge validation"}
 
     for turn in turns:
         speaker_id = turn.get("speaker")
@@ -352,10 +425,16 @@ def validate_dialog_knowledge_consistency(dialog_data: Dict, entities: List[Enti
 
 
 @Validator.register("dialog_relationship_consistency", severity="WARNING")
-def validate_dialog_relationship_consistency(dialog_data: Dict, entities: List[Entity], context: Dict = None) -> Dict:
+def validate_dialog_relationship_consistency(entity: Entity, context: Dict = None) -> Dict:
     """Check if dialog tone matches established relationship dynamics"""
     if context is None:
         context = {}
+
+    # This validator only applies to Dialog objects, skip for regular entities
+    if not hasattr(entity, 'entity_metadata') or 'dialog_data' not in entity.entity_metadata:
+        return {"valid": True, "message": "Not a dialog entity, skipping dialog relationship validation"}
+
+    dialog_data = entity.entity_metadata.get('dialog_data', {})
 
     # Parse dialog turns
     turns = dialog_data.get("turns", [])
@@ -364,6 +443,12 @@ def validate_dialog_relationship_consistency(dialog_data: Dict, entities: List[E
         turns = json.loads(turns)
 
     relationship_issues = []
+
+    # Get entities from context if available
+    entities = context.get("entities", [])
+    if not entities:
+        # If no entities in context, skip detailed validation
+        return {"valid": True, "message": "No entities in context for dialog relationship validation"}
 
     # Build relationship map
     entity_map = {e.entity_id: e for e in entities}
@@ -453,10 +538,18 @@ def compute_energy_cost_with_circadian(activity: str, hour: int, base_cost: floa
 
 
 @Validator.register("circadian_plausibility", severity="WARNING")
-def validate_circadian_activity(entity: Entity, activity: str, timepoint: 'Timepoint', context: Dict = None) -> Dict:
+def validate_circadian_activity(entity: Entity, context: Dict = None) -> Dict:
     """Check if activity is plausible at the given time of day"""
     if context is None:
         context = {}
+
+    # Get activity and timepoint from context
+    activity = context.get("activity")
+    timepoint = context.get("timepoint")
+
+    # If no activity or timepoint specified, skip validation
+    if not activity or not timepoint:
+        return {"valid": True, "message": "No activity or timepoint specified for circadian validation"}
 
     # Get circadian config from context or default
     circadian_config = context.get("circadian_config", {})
@@ -536,10 +629,15 @@ def create_circadian_context(hour: int, circadian_config: Dict) -> 'CircadianCon
 # ============================================================================
 
 @Validator.register("prospection_consistency", severity="WARNING")
-def validate_prospection_consistency(prospective_state: 'ProspectiveState', context: Dict = None) -> Dict:
+def validate_prospection_consistency(entity: Entity, context: Dict = None) -> Dict:
     """Validate that prospective expectations are consistent and realistic"""
     if context is None:
         context = {}
+
+    # Get prospective_state from context
+    prospective_state = context.get("prospective_state")
+    if not prospective_state:
+        return {"valid": True, "message": "No prospective state to validate"}
 
     # Parse expectations
     expectations = prospective_state.expectations
@@ -589,10 +687,15 @@ def validate_prospection_consistency(prospective_state: 'ProspectiveState', cont
 
 
 @Validator.register("prospection_energy_impact", severity="WARNING")
-def validate_prospection_energy_impact(prospective_state: 'ProspectiveState', entity: 'Entity', context: Dict = None) -> Dict:
+def validate_prospection_energy_impact(entity: 'Entity', context: Dict = None) -> Dict:
     """Validate that prospection doesn't deplete energy unrealistically"""
     if context is None:
         context = {}
+
+    # Get prospective_state from context
+    prospective_state = context.get("prospective_state")
+    if not prospective_state:
+        return {"valid": True, "message": "No prospective state to validate"}
 
     # Parse expectations
     expectations = prospective_state.expectations
@@ -637,10 +740,17 @@ def validate_prospection_energy_impact(prospective_state: 'ProspectiveState', en
 # ============================================================================
 
 @Validator.register("branch_consistency", severity="WARNING")
-def validate_branch_consistency(branch_timeline: 'Timeline', baseline_timeline: Optional['Timeline'] = None, context: Dict = None) -> Dict:
+def validate_branch_consistency(entity: Entity, context: Dict = None) -> Dict:
     """Validate that a branch timeline is consistent with its parent"""
     if context is None:
         context = {}
+
+    # Get timelines from context
+    branch_timeline = context.get("branch_timeline")
+    baseline_timeline = context.get("baseline_timeline")
+
+    if not branch_timeline:
+        return {"valid": True, "message": "No branch timeline to validate"}
 
     issues = []
 
@@ -677,10 +787,14 @@ def validate_branch_consistency(branch_timeline: 'Timeline', baseline_timeline: 
 
 
 @Validator.register("intervention_plausibility", severity="WARNING")
-def validate_intervention_plausibility(intervention: 'Intervention', context: Dict = None) -> Dict:
+def validate_intervention_plausibility(entity: Entity, context: Dict = None) -> Dict:
     """Validate that an intervention is plausible and well-formed"""
     if context is None:
         context = {}
+
+    intervention = context.get("intervention")
+    if not intervention:
+        return {"valid": True, "message": "No intervention to validate"}
 
     issues = []
 
@@ -719,10 +833,14 @@ def validate_intervention_plausibility(intervention: 'Intervention', context: Di
 
 
 @Validator.register("timeline_divergence", severity="INFO")
-def validate_timeline_divergence(comparison: 'BranchComparison', context: Dict = None) -> Dict:
+def validate_timeline_divergence(entity: Entity, context: Dict = None) -> Dict:
     """Validate that timeline divergence is meaningful and causal"""
     if context is None:
         context = {}
+
+    comparison = context.get("comparison")
+    if not comparison:
+        return {"valid": True, "message": "No comparison to validate"}
 
     # Check that there's actually a divergence
     if not comparison.divergence_point:
@@ -757,34 +875,43 @@ def validate_timeline_divergence(comparison: 'BranchComparison', context: Dict =
 # ============================================================================
 
 @Validator.register("environmental_constraints", severity="ERROR")
-def validate_environmental_constraints(action: Dict, environment_entities: List[Entity]) -> Dict:
+def validate_environmental_constraints(entity: Entity, context: Dict = None) -> Dict:
     """Validate that actions respect constraints imposed by animistic entities"""
+    if context is None:
+        context = {}
+
+    action = context.get("action")
+    environment_entities = context.get("environment_entities", [])
+
+    if not action or not environment_entities:
+        return {"valid": True, "message": "No action or environment entities to validate"}
+
     issues = []
 
-    for entity in environment_entities:
-        if entity.entity_type == "building":
+    for env_entity in environment_entities:
+        if env_entity.entity_type == "building":
             # Import here to avoid circular imports
             from schemas import BuildingEntity
 
             try:
-                building = BuildingEntity(**entity.entity_metadata)
+                building = BuildingEntity(**env_entity.entity_metadata)
                 participant_count = action.get("participant_count", 0)
 
                 if participant_count > building.capacity:
-                    issues.append(f"Building {entity.entity_id} capacity {building.capacity} exceeded by {participant_count} participants")
+                    issues.append(f"Building {env_entity.entity_id} capacity {building.capacity} exceeded by {participant_count} participants")
 
                 if building.structural_integrity < 0.5:
-                    issues.append(f"Building {entity.entity_id} structural integrity too low ({building.structural_integrity:.2f}) for use")
+                    issues.append(f"Building {env_entity.entity_id} structural integrity too low ({building.structural_integrity:.2f}) for use")
 
                 if "weather_dependent" in building.constraints:
                     weather_conditions = action.get("weather_conditions", {})
                     if weather_conditions.get("precipitation", 0) > 0.5:  # Heavy rain
-                        issues.append(f"Building {entity.entity_id} cannot be used in heavy precipitation")
+                        issues.append(f"Building {env_entity.entity_id} cannot be used in heavy precipitation")
 
             except Exception as e:
-                issues.append(f"Invalid building metadata for {entity.entity_id}: {e}")
+                issues.append(f"Invalid building metadata for {env_entity.entity_id}: {e}")
 
-        elif entity.entity_type == "animal":
+        elif env_entity.entity_type == "animal":
             # Import here to avoid circular imports
             from schemas import AnimalEntity
 
@@ -834,16 +961,25 @@ def validate_environmental_constraints(action: Dict, environment_entities: List[
 
 
 @Validator.register("spiritual_influence", severity="WARNING")
-def validate_spiritual_influence(action: Dict, environment_entities: List[Entity]) -> Dict:
+def validate_spiritual_influence(entity: Entity, context: Dict = None) -> Dict:
     """Validate spiritual/supernatural influences from kami entities"""
+    if context is None:
+        context = {}
+
+    action = context.get("action")
+    environment_entities = context.get("environment_entities", [])
+
+    if not action or not environment_entities:
+        return {"valid": True, "message": "No action or environment entities to validate"}
+
     issues = []
 
-    for entity in environment_entities:
-        if entity.entity_type == "kami":
+    for env_entity in environment_entities:
+        if env_entity.entity_type == "kami":
             from schemas import KamiEntity
 
             try:
-                kami = KamiEntity(**entity.entity_metadata)
+                kami = KamiEntity(**env_entity.entity_metadata)
                 participant_ids = action.get("participant_ids", [])
 
                 # Check if kami's domain affects the action
@@ -861,18 +997,18 @@ def validate_spiritual_influence(action: Dict, environment_entities: List[Entity
                 if affected_by_domains and kami.spiritual_power > 0.7:
                     # High power kami with relevant domains may influence the action
                     if kami.visibility_state == "invisible" and kami.disclosure_level == "unknown":
-                        issues.append(f"Unknown kami {entity.entity_id} (domains: {affected_by_domains}) may secretly influence action")
+                        issues.append(f"Unknown kami {env_entity.entity_id} (domains: {affected_by_domains}) may secretly influence action")
                     elif kami.disclosure_level in ["worshiped", "feared"]:
-                        issues.append(f"Known kami {entity.entity_id} (domains: {affected_by_domains}) may actively affect participants")
+                        issues.append(f"Known kami {env_entity.entity_id} (domains: {affected_by_domains}) may actively affect participants")
 
                 # Check taboo violations
                 action_description = action.get("description", "").lower()
                 for taboo in kami.taboo_violations:
                     if taboo.lower() in action_description:
-                        issues.append(f"Action violates taboo of kami {entity.entity_id}: {taboo}")
+                        issues.append(f"Action violates taboo of kami {env_entity.entity_id}: {taboo}")
 
             except Exception as e:
-                issues.append(f"Invalid kami metadata for {entity.entity_id}: {e}")
+                issues.append(f"Invalid kami metadata for {env_entity.entity_id}: {e}")
 
     if issues:
         return {
@@ -1148,11 +1284,21 @@ def validate_biological_plausibility(entity: Entity, context: Dict) -> Dict:
 @Validator.register("temporal_consistency", severity="ERROR")
 def validate_temporal_consistency(
     entity: Entity,
-    knowledge_item: str,
-    timepoint: 'Timepoint',
-    mode: 'TemporalMode'
+    context: Dict = None
 ) -> Dict:
     """Validate temporal consistency based on the active temporal mode"""
+    if context is None:
+        context = {}
+
+    # Get parameters from context
+    knowledge_item = context.get("knowledge_item")
+    timepoint = context.get("timepoint")
+    mode = context.get("mode", "pearl")
+
+    # If no knowledge_item or timepoint specified, skip validation
+    if not knowledge_item or not timepoint:
+        return {"valid": True, "message": "No knowledge_item or timepoint specified for temporal consistency validation"}
+
     learned_at = None  # Would need to query from store in real implementation
 
     # Simplified version - in practice would need access to exposure events

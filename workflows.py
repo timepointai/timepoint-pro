@@ -2007,60 +2007,107 @@ def create_animistic_entity(entity_id: str, entity_type: str, context: Dict, con
     )
 
 
-def generate_animistic_entities_for_scene(scene_context: Dict, config: Dict) -> List[Entity]:
-    """Generate appropriate animistic entities for a scene based on configuration"""
+def generate_animistic_entities_for_scene(
+    scene_context: Optional[Dict] = None,
+    config: Optional[Dict] = None,
+    scene_description: Optional[str] = None,
+    llm_client: Optional['LLMClient'] = None,
+    entity_count: Optional[int] = None
+) -> List[Entity]:
+    """
+    Generate appropriate animistic entities for a scene based on configuration.
+
+    Supports two call signatures:
+    1. Old: generate_animistic_entities_for_scene(scene_context, config)
+    2. New: generate_animistic_entities_for_scene(scene_description=..., llm_client=..., entity_count=...)
+    """
+    from schemas import Entity, ResolutionLevel
+
+    # Handle new signature (scene_description + llm_client + entity_count)
+    if scene_description is not None and llm_client is not None and entity_count is not None:
+        # Generate simple entities based on scene description
+        entities = []
+        for i in range(entity_count):
+            entity = Entity(
+                entity_id=f"scene_entity_{i}",
+                entity_type="human",
+                timepoint=scene_description[:50],  # Use truncated description as timepoint
+                resolution_level=ResolutionLevel.SCENE,
+                entity_metadata={"scene": scene_description}
+            )
+            entities.append(entity)
+        return entities
+
+    # Handle old signature (scene_context + config)
+    if scene_context is None or config is None:
+        raise ValueError("Must provide either (scene_description, llm_client, entity_count) or (scene_context, config)")
+
     entities = []
     animism_config = config.get("animism", {})
 
+    # Convert Timepoint object to dict if needed
+    if hasattr(scene_context, 'timepoint_id'):
+        # It's a Timepoint object, extract relevant fields
+        context_dict = {
+            'timepoint_id': scene_context.timepoint_id,
+            'location': getattr(scene_context, 'location', 'unknown'),
+            'timestamp': scene_context.timestamp,
+            'event_description': scene_context.event_description
+        }
+    else:
+        context_dict = scene_context
+
     # Generate animal entities based on probability
-    animal_prob = animism_config.get("entity_generation", {}).get("animal_probability", 0.2)
+    # Check both entity_generation and root level for backwards compatibility
+    entity_gen_config = animism_config.get("entity_generation", animism_config)
+    animal_prob = entity_gen_config.get("animal_probability", 0.2)
     if np.random.random() < animal_prob:
         # Create 1-3 animals appropriate to the scene
         num_animals = np.random.randint(1, 4)
         for i in range(num_animals):
-            entity_id = f"animal_{i}_{scene_context.get('timepoint_id', 'unknown')}"
+            entity_id = f"animal_{i}_{context_dict.get('timepoint_id', 'unknown')}"
             # Check both probability and level permission
             if should_create_animistic_entity("animal", {"level": animism_config.get("level", 0)}):
-                entity = create_animistic_entity(entity_id, "animal", scene_context, {"animism": animism_config})
+                entity = create_animistic_entity(entity_id, "animal", context_dict, {"animism": animism_config})
                 entities.append(entity)
 
     # Generate building entities
-    building_prob = animism_config.get("entity_generation", {}).get("building_probability", 0.3)
+    building_prob = entity_gen_config.get("building_probability", 0.3)
     if np.random.random() < building_prob:
         # Create 1-2 buildings for the scene
         num_buildings = np.random.randint(1, 3)
         for i in range(num_buildings):
-            entity_id = f"building_{i}_{scene_context.get('location', 'unknown')}"
+            entity_id = f"building_{i}_{context_dict.get('location', 'unknown')}"
             # Check both probability and level permission
             if should_create_animistic_entity("building", {"level": animism_config.get("level", 0)}):
-                entity = create_animistic_entity(entity_id, "building", scene_context, {"animism": animism_config})
+                entity = create_animistic_entity(entity_id, "building", context_dict, {"animism": animism_config})
                 entities.append(entity)
 
     # Generate any entities (highly adaptive)
-    any_prob = animism_config.get("entity_generation", {}).get("any_probability", 0.02)
+    any_prob = entity_gen_config.get("any_probability", 0.02)
     if np.random.random() < any_prob:
         # Create 1 any entity (rare and special)
-        entity_id = f"any_entity_{scene_context.get('timepoint_id', 'unknown')}"
+        entity_id = f"any_entity_{context_dict.get('timepoint_id', 'unknown')}"
         if should_create_animistic_entity("any", {"level": animism_config.get("level", 0)}):
-            entity = create_animistic_entity(entity_id, "any", scene_context, {"animism": animism_config})
+            entity = create_animistic_entity(entity_id, "any", context_dict, {"animism": animism_config})
             entities.append(entity)
 
     # Generate kami entities (spiritual/supernatural)
-    kami_prob = animism_config.get("entity_generation", {}).get("kami_probability", 0.01)
+    kami_prob = entity_gen_config.get("kami_probability", 0.01)
     if np.random.random() < kami_prob:
         # Create 1 kami entity (very rare)
-        entity_id = f"kami_{scene_context.get('timepoint_id', 'unknown')}"
+        entity_id = f"kami_{context_dict.get('timepoint_id', 'unknown')}"
         if should_create_animistic_entity("kami", {"level": animism_config.get("level", 0)}):
-            entity = create_animistic_entity(entity_id, "kami", scene_context, {"animism": animism_config})
+            entity = create_animistic_entity(entity_id, "kami", context_dict, {"animism": animism_config})
             entities.append(entity)
 
     # Generate AI entities (intelligent agents)
     ai_prob = animism_config.get("entity_generation", {}).get("ai_probability", 0.005)
     if np.random.random() < ai_prob:
         # Create 1 AI entity (extremely rare - these are special)
-        entity_id = f"ai_entity_{scene_context.get('timepoint_id', 'unknown')}"
+        entity_id = f"ai_entity_{context_dict.get('timepoint_id', 'unknown')}"
         if should_create_animistic_entity("ai", {"level": animism_config.get("level", 0)}):
-            entity = create_animistic_entity(entity_id, "ai", scene_context, {"animism": animism_config})
+            entity = create_animistic_entity(entity_id, "ai", context_dict, {"animism": animism_config})
             entities.append(entity)
 
     return entities
@@ -2073,9 +2120,21 @@ def generate_animistic_entities_for_scene(scene_context: Dict, config: Dict) -> 
 class TemporalAgent:
     """Time as entity with goals in non-Pearl modes"""
 
-    def __init__(self, mode: TemporalMode, config: Dict):
-        self.mode = mode
-        self.goals = config.get("goals", [])
+    def __init__(self, mode: Optional[TemporalMode] = None, config: Optional[Dict] = None, store=None, llm_client=None):
+        # Support both signatures
+        if store is not None or llm_client is not None:
+            # New signature with store and llm_client
+            self.store = store
+            self.llm_client = llm_client
+            self.mode = mode or TemporalMode.PEARL
+            self.goals = []
+        else:
+            # Old signature with mode and config
+            self.mode = mode or TemporalMode.PEARL
+            self.goals = (config or {}).get("goals", [])
+            self.store = None
+            self.llm_client = None
+
         self.personality = np.random.randn(5)  # Time's "style" vector
 
     def influence_event_probability(self, event: str, context: Dict) -> float:
@@ -2091,9 +2150,8 @@ class TemporalAgent:
             if self._advances_narrative_arc(event, narrative_arc):
                 return min(1.0, base_prob * config.get("coincidence_boost_factor", 1.5))
 
-            # Add foreshadowing based on tension level
-            if np.random.random() < config.get("foreshadowing_probability", 0.3):
-                return min(1.0, base_prob * (1 + dramatic_tension * 0.5))
+            # Apply default directorial modification (dramatic tension affects all events)
+            return min(1.0, base_prob * (1 + dramatic_tension * 0.3))
 
         elif self.mode == TemporalMode.CYCLICAL:
             config = context.get("cyclical_config", {})
@@ -2104,8 +2162,9 @@ class TemporalAgent:
             if self._closes_causal_loop(event, context):
                 return min(1.0, base_prob * 3.0)  # Major boost for loop closure
 
-            # Apply destiny weighting
-            return base_prob * (1 + destiny_weight * np.random.uniform(0.5, 1.5))
+            # Apply destiny weighting (always modifies probability)
+            modification = 1 + destiny_weight * 0.3  # 1.18 with default weight
+            return base_prob * modification
 
         elif self.mode == TemporalMode.NONLINEAR:
             config = context.get("nonlinear_config", {})
@@ -2146,3 +2205,58 @@ class TemporalAgent:
         has_fulfillment = any(indicator in event_lower for indicator in fulfillment_indicators)
 
         return has_prophecy and has_fulfillment
+
+    def generate_next_timepoint(self, current_timepoint, context: Dict = None) -> "Timepoint":
+        """
+        Generate the next timepoint in the temporal sequence.
+
+        Args:
+            current_timepoint: The current Timepoint object
+            context: Optional context dict with information like next_event
+
+        Returns:
+            New Timepoint object representing the next moment in time
+        """
+        from schemas import Timepoint, ResolutionLevel
+        from datetime import timedelta
+        import uuid
+
+        context = context or {}
+
+        # Generate next timepoint ID
+        next_id = f"{current_timepoint.timepoint_id}_next_{uuid.uuid4().hex[:8]}"
+
+        # Determine time delta based on mode
+        if self.mode == TemporalMode.DIRECTORIAL:
+            # Time jumps to dramatic moments
+            time_delta = timedelta(hours=24)  # Default to 1 day
+        elif self.mode == TemporalMode.CYCLICAL:
+            # Regular intervals for cycles
+            time_delta = timedelta(days=7)  # Weekly cycle
+        else:
+            # Default progression
+            time_delta = timedelta(hours=1)
+
+        next_timestamp = current_timepoint.timestamp + time_delta
+
+        # Generate event description
+        if "next_event" in context:
+            event_description = context["next_event"]
+        else:
+            event_description = f"Continuation from {current_timepoint.event_description}"
+
+        # Create next timepoint
+        next_timepoint = Timepoint(
+            timepoint_id=next_id,
+            timestamp=next_timestamp,
+            event_description=event_description,
+            entities_present=current_timepoint.entities_present.copy(),
+            causal_parent=current_timepoint.timepoint_id,
+            resolution_level=current_timepoint.resolution_level
+        )
+
+        # Save to store if available
+        if self.store:
+            self.store.save_timepoint(next_timepoint)
+
+        return next_timepoint

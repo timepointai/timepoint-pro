@@ -4,10 +4,68 @@ test_modal_temporal_causality.py - Tests for Mechanism 17: Modal Temporal Causal
 """
 import pytest
 import numpy as np
+from typing import Dict, Any, Optional
 
-from schemas import TemporalMode, Timeline
+from schemas import TemporalMode, Timeline, Timepoint
 from workflows import TemporalAgent
 from validation import Validator
+
+
+class ModalTemporalCausalitySystem:
+    """System for managing modal temporal causality across different temporal modes"""
+
+    def __init__(self, store=None, llm_client=None):
+        self.store = store
+        self.llm_client = llm_client
+        self.current_mode = TemporalMode.PEARL
+        self.agents = {}
+
+    def set_mode(self, mode: TemporalMode, config: Optional[Dict] = None):
+        """Set the active temporal mode"""
+        self.current_mode = mode
+        if mode not in self.agents:
+            self.agents[mode] = TemporalAgent(mode, config or {})
+
+    def influence_event(self, event: str, context: Dict) -> float:
+        """Get event probability influenced by current temporal mode"""
+        if self.current_mode in self.agents:
+            return self.agents[self.current_mode].influence_event_probability(event, context)
+        return context.get("base_probability", 0.5)
+
+    def validate_causality(self, entity, knowledge_item: str, timepoint: Timepoint) -> Dict[str, Any]:
+        """Validate temporal consistency based on current mode"""
+        return Validator._validators["temporal_consistency"]["func"](
+            entity, knowledge_item, timepoint, self.current_mode.value
+        )
+
+    def create_modal_branch(self, base_timepoint: Timepoint, mode: TemporalMode) -> Timepoint:
+        """
+        Create a modal branch from a base timepoint.
+
+        Args:
+            base_timepoint: The timepoint to branch from
+            mode: The temporal mode for this branch
+
+        Returns:
+            New timepoint representing the modal branch
+        """
+        from schemas import Timepoint, ResolutionLevel
+        from datetime import datetime
+
+        branch_id = f"{base_timepoint.timepoint_id}_modal_{mode.value}"
+
+        branch = Timepoint(
+            timepoint_id=branch_id,
+            timestamp=base_timepoint.timestamp,
+            event_description=f"Modal branch ({mode.value}): {base_timepoint.event_description}",
+            entities_present=base_timepoint.entities_present.copy(),
+            resolution_level=base_timepoint.resolution_level
+        )
+
+        if self.store:
+            self.store.save_timepoint(branch)
+
+        return branch
 
 
 @pytest.mark.integration

@@ -128,6 +128,14 @@ class LLMClient:
     ) -> EntityPopulation:
         """Implementation using centralized service"""
 
+        # Handle both Dict and Entity object
+        if hasattr(entity_schema, 'entity_id'):
+            # It's an Entity object
+            entity_id = entity_schema.entity_id
+        else:
+            # It's a dict
+            entity_id = entity_schema['entity_id']
+
         # Build prompts
         previous_context = ""
         if previous_knowledge:
@@ -138,11 +146,11 @@ class LLMClient:
             )
 
         system_prompt = "You are an expert at generating realistic entity information for historical simulations."
-        user_prompt = f"""Generate entity information for {entity_schema['entity_id']}.
+        user_prompt = f"""Generate entity information for {entity_id}.
 Context: {context}{previous_context}
 
 Return a JSON object with these exact fields:
-- entity_id: string (must be "{entity_schema['entity_id']}")
+- entity_id: string (must be "{entity_id}")
 - knowledge_state: array of strings (3-8 knowledge items)
 - energy_budget: number between 0-100
 - personality_traits: array of exactly 5 floats between -1 and 1

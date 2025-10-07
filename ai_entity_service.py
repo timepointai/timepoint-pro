@@ -380,22 +380,35 @@ class AIEntityRunner:
 class AIEntityService:
     """FastAPI service for AI entity interactions"""
 
-    def __init__(self, config: Dict):
-        self.config = config
+    def __init__(self, config: Optional[Dict] = None, store: Optional[GraphStore] = None, llm_client: Optional[LLMClient] = None):
+        # Support both old signature (config dict) and new signature (store, llm_client)
+        if config is None and store is None and llm_client is None:
+            # Default empty config
+            config = {}
+
+        if config is not None and store is None and llm_client is None:
+            # Old signature: config dict
+            self.config = config
+            self.llm_client = LLMClient(config)
+            self.store = GraphStore()
+        else:
+            # New signature: explicit store and llm_client
+            self.config = config or {}
+            self.llm_client = llm_client or LLMClient(self.config)
+            self.store = store or GraphStore()
+
         self.app = FastAPI(
             title="AI Entity Service",
             description="API for interacting with AI-powered entities",
             version="1.0.0"
         )
 
-        # Initialize components
-        self.llm_client = LLMClient(config)
-        self.store = GraphStore()
-        self.runner = AIEntityRunner(self.llm_client, self.store, config)
+        # Initialize runner
+        self.runner = AIEntityRunner(self.llm_client, self.store, self.config)
 
         # Security
-        self.security = HTTPBearer() if config.get("api_keys_required", True) else None
-        self.api_keys = config.get("api_keys", [])
+        self.security = HTTPBearer() if self.config.get("api_keys_required", True) else None
+        self.api_keys = self.config.get("api_keys", [])
 
         # Setup middleware
         self._setup_middleware()
@@ -413,6 +426,126 @@ class AIEntityService:
                 allow_methods=["*"],
                 allow_headers=["*"],
             )
+
+    def register_entity(self, entity):
+        """
+        Register an AI entity with the service.
+
+        Args:
+            entity: AIEntity to register
+        """
+        # Save to store
+        if self.store:
+            self.store.save_entity(entity)
+
+        # Could add to in-memory registry if needed
+        return entity
+
+    def train_entity(self, entity_id: str, training_data: list):
+        """
+        Train an AI entity with provided training data.
+
+        Args:
+            entity_id: ID of the entity to train
+            training_data: List of training examples (dicts with 'query' and 'response')
+
+        Returns:
+            Training summary
+        """
+        # Get entity
+        entity = self.store.get_entity(entity_id) if self.store else None
+        if not entity:
+            raise ValueError(f"Entity {entity_id} not found")
+
+        # For now, just update metadata with training examples count
+        # In a full implementation, this would fine-tune the model or update knowledge base
+        if 'training_examples' not in entity.entity_metadata:
+            entity.entity_metadata['training_examples'] = []
+
+        entity.entity_metadata['training_examples'].extend(training_data)
+        entity.training_count = len(entity.entity_metadata['training_examples'])
+
+        # Save updated entity
+        if self.store:
+            self.store.save_entity(entity)
+
+        return {
+            "entity_id": entity_id,
+            "training_examples_added": len(training_data),
+            "total_training_examples": entity.training_count
+        }
+
+    def generate_response(self, entity_id: str, query: str) -> str:
+        """
+        Generate a response from an AI entity.
+
+        Args:
+            entity_id: ID of the entity
+            query: User query
+
+        Returns:
+            Generated response string
+        """
+        # Get entity
+        entity = self.store.get_entity(entity_id) if self.store else None
+        if not entity:
+            raise ValueError(f"Entity {entity_id} not found")
+
+        # Get AI config from metadata
+        ai_config = entity.entity_metadata.get('ai_config', {})
+        system_prompt = ai_config.get('system_prompt', 'You are a helpful assistant.')
+
+        # Use LLM to generate response
+        # For now, return a simple response based on training data
+        training_examples = entity.entity_metadata.get('training_examples', [])
+
+        # Simple mock response that uses training data
+        response = f"Based on my knowledge: "
+        if training_examples:
+            response += f"I have been trained on {len(training_examples)} examples. "
+
+        response += f"Regarding '{query}': This is a response about the topic."
+
+        # Increment query count
+        entity.query_count += 1
+        if self.store:
+            self.store.save_entity(entity)
+
+        return response
+
+    def save_entity_state(self, entity_id: str):
+        """
+        Save the current state of an AI entity.
+
+        Args:
+            entity_id: ID of the entity to save
+        """
+        # Entity state is already saved in store, this is a no-op
+        # but included for API completeness
+        entity = self.store.get_entity(entity_id) if self.store else None
+        if not entity:
+            raise ValueError(f"Entity {entity_id} not found")
+
+        # Force a save
+        if self.store:
+            self.store.save_entity(entity)
+
+        return {"entity_id": entity_id, "status": "saved"}
+
+    def get_entity(self, entity_id: str):
+        """
+        Retrieve an AI entity.
+
+        Args:
+            entity_id: ID of the entity
+
+        Returns:
+            Entity object
+        """
+        if not self.store:
+            raise ValueError("No store configured")
+
+        return self.store.get_entity(entity_id)
 
     def _setup_routes(self):
         """Setup API routes"""

@@ -100,11 +100,21 @@ class GraphStore:
             session.exec(text("DELETE FROM validationrule"))
             session.commit()
 
-    @lru_cache(maxsize=1000)
-    def get_entity(self, entity_id: str) -> Optional[Entity]:
-        """Get entity by ID with LRU caching"""
+    def get_entity(self, entity_id: str, timepoint: Optional[str] = None) -> Optional[Entity]:
+        """
+        Get entity by ID with optional timepoint filter.
+
+        Args:
+            entity_id: Entity identifier
+            timepoint: Optional timepoint filter (for compatibility)
+
+        Returns:
+            Entity if found, None otherwise
+        """
         with Session(self.engine) as session:
             statement = select(Entity).where(Entity.entity_id == entity_id)
+            if timepoint:
+                statement = statement.where(Entity.timepoint == timepoint)
             return session.exec(statement).first()
     
     def save_graph(self, graph: nx.Graph, timepoint_id: str):
@@ -260,3 +270,27 @@ class GraphStore:
             return list(session.exec(
                 select(Timeline).where(Timeline.parent_timeline_id == parent_timeline_id)
             ).all())
+
+    def get_successor_timepoints(self, timepoint_id: str) -> list[Timepoint]:
+        """Get all timepoints that have the given timepoint as their causal parent"""
+        with Session(self.engine) as session:
+            statement = select(Timepoint).where(Timepoint.causal_parent == timepoint_id)
+            return list(session.exec(statement).all())
+
+    def get_predecessor_timepoints(self, timepoint_id: str) -> list[Timepoint]:
+        """Get the causal parent(s) of a given timepoint"""
+        with Session(self.engine) as session:
+            # Get the timepoint to find its causal parent
+            timepoint = session.exec(
+                select(Timepoint).where(Timepoint.timepoint_id == timepoint_id)
+            ).first()
+
+            if not timepoint or not timepoint.causal_parent:
+                return []
+
+            # Get the parent timepoint
+            parent = session.exec(
+                select(Timepoint).where(Timepoint.timepoint_id == timepoint.causal_parent)
+            ).first()
+
+            return [parent] if parent else []
