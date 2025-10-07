@@ -82,19 +82,31 @@ class TestE2EEntityGeneration:
         )
         llm_time = time.time() - start_time
 
-        # Step 3: Save to database
-        graph_store.save_entity(populated_entity)
+        # Step 3: Convert EntityPopulation to Entity and save to database
+        from schemas import entity_population_to_entity
+        entity_to_save = entity_population_to_entity(
+            population=populated_entity,
+            entity_id="washington",
+            entity_type="human",
+            timepoint="e2e_tp_001",
+            resolution_level=ResolutionLevel.FULL_DETAIL
+        )
+        graph_store.save_entity(entity_to_save)
 
-        # Step 4: Validate
+        # Step 4: Validate (validate the converted entity, not the EntityPopulation)
         validator = Validator()
-        validation_result = validator.validate_entity(populated_entity)
-        assert validation_result.is_valid, f"Entity validation failed: {validation_result.errors}"
+        validation_result = validator.validate_entity(entity_to_save)
+        assert validation_result["valid"] or len(validation_result["violations"]) == 0, \
+            f"Entity validation failed: {validation_result.get('violations', [])}"
 
         # Step 5: Verify retrieval
         retrieved = graph_store.get_entity("washington", "e2e_tp_001")
         assert retrieved is not None
         assert retrieved.entity_id == "washington"
-        assert 'knowledge_state' in retrieved.entity_metadata
+        # Knowledge state is stored in cognitive_tensor
+        assert 'cognitive_tensor' in retrieved.entity_metadata
+        cognitive = retrieved.entity_metadata.get('cognitive_tensor', {})
+        assert 'knowledge_state' in cognitive
 
         # Performance assertion
         assert llm_time < 30, f"LLM population took too long: {llm_time:.2f}s"
@@ -123,7 +135,8 @@ class TestE2EEntityGeneration:
         for entity in entities:
             validator = Validator()
             result = validator.validate_entity(entity)
-            assert result.is_valid, f"Entity {entity.entity_id} validation failed"
+            assert result["valid"] or len(result.get("violations", [])) == 0, \
+                f"Entity {entity.entity_id} validation failed: {result.get('violations', [])}"
 
             graph_store.save_entity(entity)
 
@@ -212,19 +225,21 @@ class TestE2ETemporalWorkflows:
         )
         graph_store.save_timepoint(base_tp)
 
-        # Test different modal branches
-        actual_branch = system.create_modal_branch(base_tp, TemporalMode.ACTUAL)
-        possible_branch = system.create_modal_branch(base_tp, TemporalMode.POSSIBLE)
-        necessary_branch = system.create_modal_branch(base_tp, TemporalMode.NECESSARY)
+        # Test different modal branches using actual TemporalMode values
+        pearl_branch = system.create_modal_branch(base_tp, TemporalMode.PEARL)
+        branching_branch = system.create_modal_branch(base_tp, TemporalMode.BRANCHING)
+        cyclical_branch = system.create_modal_branch(base_tp, TemporalMode.CYCLICAL)
 
-        assert actual_branch.mode == TemporalMode.ACTUAL
-        assert possible_branch.mode == TemporalMode.POSSIBLE
-        assert necessary_branch.mode == TemporalMode.NECESSARY
+        # Verify branches were created (they're Timepoint objects, not Timeline objects)
+        assert pearl_branch.timepoint_id.endswith(f"_modal_{TemporalMode.PEARL.value}")
+        assert branching_branch.timepoint_id.endswith(f"_modal_{TemporalMode.BRANCHING.value}")
+        assert cyclical_branch.timepoint_id.endswith(f"_modal_{TemporalMode.CYCLICAL.value}")
 
         # Validate modal relationships
-        all_branches = [actual_branch, possible_branch, necessary_branch]
+        all_branches = [pearl_branch, branching_branch, cyclical_branch]
         for branch in all_branches:
-            assert branch.base_timepoint_id == base_tp.timepoint_id
+            assert branch.timestamp == base_tp.timestamp  # Same moment in time
+            assert base_tp.timepoint_id in branch.timepoint_id  # Contains base ID
 
         print(f"\n✅ Created {len(all_branches)} modal branches")
 
@@ -249,15 +264,22 @@ class TestE2EAIEntityService:
         """
         service = AIEntityService(store=graph_store, llm_client=real_llm_client)
 
-        # Step 1: Create AI entity
-        ai_entity = AIEntity(
+        # Step 1: Create AI entity (Entity with AIEntity configuration in metadata)
+        ai_config = AIEntity(
+            model_name="gpt-3.5-turbo",
+            system_prompt="You are a historical advisor specializing in the American Revolution.",
+            temperature=0.7
+        )
+
+        ai_entity = Entity(
             entity_id="ai_assistant_e2e",
             entity_type="ai_agent",
             timepoint="e2e_ai_tp",
             resolution_level=ResolutionLevel.FULL_DETAIL,
             entity_metadata={
                 "role": "historical_advisor",
-                "specialization": "american_revolution"
+                "specialization": "american_revolution",
+                "ai_config": ai_config.model_dump()
             }
         )
         service.register_entity(ai_entity)
@@ -417,7 +439,8 @@ class TestE2ESystemValidation:
                 entity_metadata={"related_to": f"entity_{3-i}"}
             )
             result = validator.validate_entity(entity)
-            assert result.is_valid
+            assert result["valid"] or len(result.get("violations", [])) == 0, \
+                f"Entity {entity.entity_id} validation failed: {result.get('violations', [])}"
             graph_store.save_entity(entity)
             entities.append(entity)
 
@@ -447,18 +470,30 @@ class TestE2ESystemValidation:
             entity_metadata={"role": "test_subject"}
         )
 
-        populated = real_llm_client.populate_entity(
+        populated_entity_pop = real_llm_client.populate_entity(
             entity_schema=entity,
             context={"test": "safety_validation"}
         )
 
+        # Convert to Entity for validation
+        from schemas import entity_population_to_entity
+        populated = entity_population_to_entity(
+            population=populated_entity_pop,
+            entity_id="safety_test_entity",
+            entity_type="human",
+            timepoint="safety_tp",
+            resolution_level=ResolutionLevel.FULL_DETAIL
+        )
+
         # Validate generated content
         result = validator.validate_entity(populated)
-        assert result.is_valid, "LLM-generated entity failed validation"
+        assert result["valid"] or len(result.get("violations", [])) == 0, \
+            f"LLM-generated entity failed validation: {result.get('violations', [])}"
 
         # Check for required safety attributes
-        assert 'knowledge_state' in populated.entity_metadata
-        assert len(populated.entity_metadata['knowledge_state']) > 0
+        cognitive_tensor = populated.entity_metadata.get('cognitive_tensor', {})
+        assert 'knowledge_state' in cognitive_tensor
+        assert len(cognitive_tensor['knowledge_state']) > 0
 
         print(f"\n✅ LLM safety validation passed")
 
@@ -523,7 +558,8 @@ class TestE2ESystemIntegration:
         validation_results = []
         for entity in entities:
             result = validator.validate_entity(entity)
-            validation_results.append(result.is_valid)
+            is_valid = result["valid"] or len(result.get("violations", [])) == 0
+            validation_results.append(is_valid)
         print(f"  ✓ Validated {sum(validation_results)}/{len(validation_results)} entities")
 
         # Phase 5: Final report

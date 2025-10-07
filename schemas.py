@@ -12,6 +12,7 @@ class ResolutionLevel(str, Enum):
     GRAPH = "graph"
     DIALOG = "dialog"
     TRAINED = "trained"
+    FULL_DETAIL = "full_detail"  # Highest resolution with all data
 
 class TemporalMode(str, Enum):
     """Different causal regimes for temporal reasoning"""
@@ -73,6 +74,7 @@ class Entity(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     entity_id: str = Field(unique=True, index=True)
     entity_type: str = Field(default="human")  # Discriminator: "human", "animal", "building", "object", "abstract"
+    timepoint: Optional[str] = Field(default=None, index=True)  # Which timepoint this entity exists at
     temporal_span_start: Optional[datetime] = None
     temporal_span_end: Optional[datetime] = None
     tensor: Optional[str] = Field(default=None, sa_column=Column(JSON))  # Serialized TTM
@@ -458,6 +460,68 @@ class AIEntity(BaseModel):
     output_filtering_rules: List[str] = []  # Output content filters
     prohibited_topics: List[str] = []  # Topics to avoid
     required_disclaimers: List[str] = []  # Required safety notices
+
+
+# ============================================================================
+# Entity Type Converters
+# ============================================================================
+
+def entity_population_to_entity(population, entity_id: str, entity_type: str = "human",
+                                timepoint: Optional[str] = None,
+                                resolution_level: ResolutionLevel = ResolutionLevel.FULL_DETAIL) -> "Entity":
+    """
+    Convert an EntityPopulation (from LLM) to an Entity (for database).
+
+    Args:
+        population: EntityPopulation object from LLM
+        entity_id: Entity identifier
+        entity_type: Type of entity (human, animal, etc.)
+        timepoint: Timepoint identifier
+        resolution_level: Resolution level for entity
+
+    Returns:
+        Entity object ready for database storage
+    """
+    # Import here to avoid circular dependency
+    from llm import EntityPopulation
+
+    # Handle both EntityPopulation objects and dicts
+    if isinstance(population, EntityPopulation):
+        knowledge_state = population.knowledge_state
+        energy_budget = population.energy_budget
+        personality_traits = population.personality_traits
+        temporal_awareness = population.temporal_awareness
+        confidence = population.confidence
+    else:
+        # Assume it's a dict-like object
+        knowledge_state = getattr(population, 'knowledge_state', [])
+        energy_budget = getattr(population, 'energy_budget', 50.0)
+        personality_traits = getattr(population, 'personality_traits', [0.0, 0.0, 0.0, 0.0, 0.0])
+        temporal_awareness = getattr(population, 'temporal_awareness', 'present')
+        confidence = getattr(population, 'confidence', 0.5)
+
+    # Create cognitive tensor from EntityPopulation data
+    cognitive = CognitiveTensor(
+        knowledge_state=knowledge_state,
+        energy_budget=energy_budget,
+        decision_confidence=confidence
+    )
+
+    # Create entity with metadata
+    entity = Entity(
+        entity_id=entity_id,
+        entity_type=entity_type,
+        timepoint=timepoint,
+        resolution_level=resolution_level,
+        entity_metadata={
+            "cognitive_tensor": cognitive.model_dump(),
+            "personality_traits": personality_traits,
+            "temporal_awareness": temporal_awareness,
+            "llm_generated": True
+        }
+    )
+
+    return entity
 
 
 # ============================================================================

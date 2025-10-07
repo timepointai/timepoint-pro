@@ -223,12 +223,12 @@ def retry_with_backoff(func: Callable[..., T], max_retries: int = 3, base_delay:
 
 class EntityPopulation(BaseModel):
     """Structured output schema for entity population"""
-    entity_id: str
-    knowledge_state: List[str]
-    energy_budget: float
-    personality_traits: List[float]
-    temporal_awareness: str
-    confidence: float
+    entity_id: str = ""
+    knowledge_state: List[str] = []
+    energy_budget: float = 50.0
+    personality_traits: List[float] = [0.0, 0.0, 0.0, 0.0, 0.0]
+    temporal_awareness: str = "present"
+    confidence: float = 0.5
 
 class ValidationResult(BaseModel):
     """Structured validation result"""
