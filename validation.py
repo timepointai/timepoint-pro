@@ -64,7 +64,12 @@ def validate_information_conservation(entity: Entity, context: Dict, store=None)
         exposure = set(event.information for event in exposure_events)
     else:
         # Fallback to context-based validation for backward compatibility
-        exposure = set(context.get("exposure_history", []))
+        exposure_history = context.get("exposure_history", [])
+        # Handle both list of strings and list of ExposureEvent objects
+        if exposure_history and isinstance(exposure_history[0], ExposureEvent):
+            exposure = set(event.information for event in exposure_history)
+        else:
+            exposure = set(exposure_history)
 
     # Get knowledge state from either Entity or EntityPopulation
     if isinstance(entity, EntityPopulation):

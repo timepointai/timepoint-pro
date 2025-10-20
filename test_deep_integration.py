@@ -88,14 +88,14 @@ class TestDeepEntityGeneration:
             }
         )
 
-        # Validate populated entity
+        # Validate populated entity (EntityPopulation has direct fields, not entity_metadata)
         assert populated_entity.entity_id == "test_hamilton"
-        assert hasattr(populated_entity, 'entity_metadata')
-        assert populated_entity.entity_metadata['role'] == "founding_father"
+        assert hasattr(populated_entity, 'knowledge_state')
+        assert hasattr(populated_entity, 'energy_budget')
 
         # Check for LLM-generated content
-        assert 'knowledge_state' in populated_entity.entity_metadata
-        assert len(populated_entity.entity_metadata['knowledge_state']) > 0
+        assert len(populated_entity.knowledge_state) > 0
+        assert populated_entity.energy_budget > 0
 
     def test_animistic_entity_llm_generation(self, llm_client):
         """Test generation of animistic entities with LLM"""
@@ -211,7 +211,7 @@ class TestDeepTemporalWorkflows:
             )
 
             # Populate with LLM
-            populated = llm_client.populate_entity(
+            populated_entity_pop = llm_client.populate_entity(
                 entity_schema=entity,
                 context={
                     "timepoint": timepoints[0].timestamp.isoformat(),
@@ -220,14 +220,27 @@ class TestDeepTemporalWorkflows:
                 }
             )
 
+            # Convert EntityPopulation to Entity for storage
+            from schemas import entity_population_to_entity
+            populated = entity_population_to_entity(
+                population=populated_entity_pop,
+                entity_id=entity_id,
+                entity_type="human",
+                timepoint=timepoints[0].timepoint_id,
+                resolution_level=ResolutionLevel.TENSOR_ONLY
+            )
+
             entities.append(populated)
             temp_store.save_entity(populated)
 
         # Validate temporal relationships
         assert len(entities) == 3
         for entity in entities:
-            assert 'knowledge_state' in entity.entity_metadata
-            assert len(entity.entity_metadata['knowledge_state']) > 0
+            # Knowledge state is stored in cognitive_tensor after conversion
+            assert 'cognitive_tensor' in entity.entity_metadata
+            cognitive = entity.entity_metadata['cognitive_tensor']
+            assert 'knowledge_state' in cognitive
+            assert len(cognitive['knowledge_state']) > 0
 
     def test_modal_temporal_causality_with_llm(self, llm_client):
         """Test modal temporal causality with real LLM context"""
@@ -417,11 +430,11 @@ class TestDeepPerformanceValidation:
             )
             responses.append(response)
 
-        # Check for some consistency in responses
+        # Check for some consistency in responses (EntityPopulation has direct fields)
         assert len(responses) == 3
         for response in responses:
-            assert hasattr(response, 'entity_metadata')
-            assert 'knowledge_state' in response.entity_metadata
+            assert hasattr(response, 'knowledge_state')
+            assert len(response.knowledge_state) >= 0
 
     def test_temporal_validation_performance(self, llm_client):
         """Test temporal validation performance with LLM-generated content"""
