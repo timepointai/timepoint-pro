@@ -1,0 +1,18 @@
+{
+  "execution": {
+    "start_time": "2025-10-07T16:35:48.654742",
+    "end_time": "2025-10-07T16:35:52.467577",
+    "duration_seconds": 3.812835
+  },
+  "files": {},
+  "summary": {
+    "total_files": 0,
+    "total_tests": 0,
+    "files_by_outcome": {
+      "passed": [],
+      "failed": [],
+      "skipped": [],
+      "error": []
+    }
+  }
+}

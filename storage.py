@@ -26,6 +26,14 @@ class GraphStore:
             session.refresh(entity)
             return entity
 
+    def save_exposure_event(self, event: ExposureEvent) -> ExposureEvent:
+        """Save a single exposure event"""
+        with Session(self.engine) as session:
+            session.add(event)
+            session.commit()
+            session.refresh(event)
+            return event
+
     def save_exposure_events(self, exposure_events: list[ExposureEvent]) -> None:
         """Batch save exposure events"""
         with Session(self.engine) as session:

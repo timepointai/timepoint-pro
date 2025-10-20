@@ -590,6 +590,301 @@ class TestE2ESystemIntegration:
         assert report['temporal_chain_length'] >= 2
 
 
+@pytest.mark.e2e
+@pytest.mark.slow
+class TestE2EOrchestratorIntegration:
+    """E2E tests for OrchestratorAgent integration with existing workflows"""
+
+    @pytest.mark.llm
+    def test_orchestrator_entity_generation_workflow(self, real_llm_client, graph_store):
+        """
+        E2E: Orchestrator → Entity Generation Workflow
+
+        Tests complete integration:
+        1. Orchestrator generates scene specification
+        2. Entities fed to LangGraph workflow
+        3. Validation with exposure events
+        4. Storage persistence
+        """
+        from orchestrator import simulate_event
+        from workflows import create_entity_training_workflow
+
+        print("\n" + "="*70)
+        print("TEST: Orchestrator + Entity Generation Workflow")
+        print("="*70)
+
+        # Phase 1: Orchestrate scene
+        print("\n[Phase 1] Orchestrating scene from natural language...")
+        result = simulate_event(
+            "simulate a brief historical meeting with 4 people",
+            real_llm_client,
+            graph_store,
+            context={"max_entities": 4, "max_timepoints": 2, "temporal_mode": "pearl"},
+            save_to_db=True
+        )
+
+        print(f"  ✓ Scene: {result['specification'].scene_title}")
+        print(f"  ✓ Entities: {len(result['entities'])}")
+        print(f"  ✓ Timepoints: {len(result['timepoints'])}")
+        print(f"  ✓ Graph edges: {result['graph'].number_of_edges()}")
+
+        # Phase 2: Run LangGraph workflow on orchestrated entities
+        print("\n[Phase 2] Running LangGraph entity training workflow...")
+        workflow = create_entity_training_workflow(real_llm_client, graph_store)
+
+        workflow_result = workflow.invoke({
+            "graph": result["graph"],
+            "entities": result["entities"],
+            "timepoint": result["timepoints"][0].timepoint_id,
+            "resolution": ResolutionLevel.FULL_DETAIL,
+            "violations": [],
+            "results": {},
+            "entity_populations": {}
+        })
+
+        print(f"  ✓ Workflow completed")
+        print(f"  ✓ Entities processed: {len(workflow_result['entities'])}")
+        print(f"  ✓ Violations: {len(workflow_result['violations'])}")
+
+        # Phase 3: Validate with exposure events
+        print("\n[Phase 3] Validating with exposure event provenance...")
+        validator = Validator()
+        validation_count = 0
+
+        for entity in result["entities"]:
+            exposure_events = graph_store.get_exposure_events(entity.entity_id)
+            context = {
+                "exposure_history": exposure_events,
+                "graph": result["graph"]
+            }
+            validation_result = validator.validate_entity(entity, context)
+            if validation_result["valid"] or len(validation_result.get("violations", [])) == 0:
+                validation_count += 1
+
+        print(f"  ✓ Validated {validation_count}/{len(result['entities'])} entities")
+
+        # Assertions
+        assert len(result['entities']) >= 2, "Should generate at least 2 entities"
+        assert len(result['timepoints']) >= 1, "Should generate at least 1 timepoint"
+        assert result['graph'].number_of_nodes() >= 2, "Graph should have nodes"
+        assert validation_count >= len(result['entities']) * 0.8, "80% validation success"
+
+        print("\n" + "="*70)
+        print("✅ ORCHESTRATOR → WORKFLOW INTEGRATION SUCCESS")
+        print("="*70)
+
+    @pytest.mark.llm
+    def test_orchestrator_temporal_chain_creation(self, real_llm_client, graph_store):
+        """
+        E2E: Orchestrator → Temporal Chain Creation
+
+        Tests temporal integration:
+        1. Orchestrator generates initial timepoints
+        2. TemporalAgent extends chain
+        3. Validation of temporal consistency
+        """
+        from orchestrator import simulate_event
+
+        print("\n" + "="*70)
+        print("TEST: Orchestrator + Temporal Chain Creation")
+        print("="*70)
+
+        # Phase 1: Orchestrate scene
+        print("\n[Phase 1] Orchestrating temporal scene...")
+        result = simulate_event(
+            "simulate a three-day historical event",
+            real_llm_client,
+            graph_store,
+            context={"max_entities": 3, "max_timepoints": 3, "temporal_mode": "pearl"},
+            save_to_db=True
+        )
+
+        initial_timepoints = result["timepoints"]
+        print(f"  ✓ Initial timepoints: {len(initial_timepoints)}")
+
+        # Phase 2: Extend with TemporalAgent
+        print("\n[Phase 2] Extending temporal chain...")
+        temporal_agent = result["temporal_agent"]
+        last_tp = initial_timepoints[-1]
+
+        next_tp = temporal_agent.generate_next_timepoint(
+            current_timepoint=last_tp,
+            context={"next_event": "Continuation of events"}
+        )
+
+        print(f"  ✓ Generated successor: {next_tp.timepoint_id}")
+        print(f"  ✓ Causal parent: {next_tp.causal_parent}")
+
+        # Phase 3: Validate temporal relationships
+        print("\n[Phase 3] Validating temporal relationships...")
+        successors = graph_store.get_successor_timepoints(last_tp.timepoint_id)
+        assert len(successors) >= 1, "Should have at least one successor"
+        assert any(s.timepoint_id == next_tp.timepoint_id for s in successors)
+
+        print(f"  ✓ Temporal chain validated")
+
+        # Assertions
+        assert len(initial_timepoints) >= 2
+        assert next_tp.causal_parent == last_tp.timepoint_id
+        assert result["temporal_agent"].mode == TemporalMode.PEARL
+
+        print("\n" + "="*70)
+        print("✅ ORCHESTRATOR → TEMPORAL CHAIN SUCCESS")
+        print("="*70)
+
+    @pytest.mark.llm
+    def test_full_pipeline_with_orchestrator(self, real_llm_client, graph_store):
+        """
+        E2E: Complete Pipeline with Orchestrator
+
+        The ULTIMATE integration test - natural language to validated simulation:
+        1. Natural language input
+        2. Orchestrator scene generation
+        3. LangGraph workflow execution
+        4. Temporal chain creation
+        5. Validation with exposure events
+        6. Storage persistence
+        7. Performance metrics
+        """
+        from orchestrator import simulate_event
+        from workflows import create_entity_training_workflow
+        import time
+
+        print("\n" + "="*70)
+        print("ULTIMATE TEST: Full Pipeline with Orchestrator")
+        print("="*70)
+
+        start_time = time.time()
+
+        # Phase 1: Natural Language → Scene Specification
+        print("\n[Phase 1] Orchestrating scene from natural language...")
+        orchestration_start = time.time()
+
+        result = simulate_event(
+            "simulate the signing of the declaration of independence",
+            real_llm_client,
+            graph_store,
+            context={"max_entities": 5, "max_timepoints": 3, "temporal_mode": "pearl"},
+            save_to_db=True
+        )
+
+        orchestration_time = time.time() - orchestration_start
+        print(f"  ✓ Orchestration completed in {orchestration_time:.2f}s")
+        print(f"  ✓ Scene: {result['specification'].scene_title}")
+        print(f"  ✓ Entities: {len(result['entities'])}")
+        print(f"  ✓ Timepoints: {len(result['timepoints'])}")
+
+        # Phase 2: LangGraph Workflow Execution
+        print("\n[Phase 2] Running LangGraph entity training workflow...")
+        workflow_start = time.time()
+
+        workflow = create_entity_training_workflow(real_llm_client, graph_store)
+        workflow_result = workflow.invoke({
+            "graph": result["graph"],
+            "entities": result["entities"],
+            "timepoint": result["timepoints"][0].timepoint_id,
+            "resolution": ResolutionLevel.FULL_DETAIL,
+            "violations": [],
+            "results": {},
+            "entity_populations": {}
+        })
+
+        workflow_time = time.time() - workflow_start
+        print(f"  ✓ Workflow completed in {workflow_time:.2f}s")
+        print(f"  ✓ Processed entities: {len(workflow_result['entities'])}")
+
+        # Phase 3: Temporal Chain Extension
+        print("\n[Phase 3] Extending temporal chain...")
+        temporal_start = time.time()
+
+        temporal_agent = result["temporal_agent"]
+        extended_timepoints = []
+
+        for i in range(2):  # Extend by 2 more timepoints
+            current = result["timepoints"][i] if i == 0 else extended_timepoints[-1]
+            next_tp = temporal_agent.generate_next_timepoint(
+                current_timepoint=current,
+                context={"next_event": f"Historical progression {i+1}"}
+            )
+            extended_timepoints.append(next_tp)
+
+        temporal_time = time.time() - temporal_start
+        print(f"  ✓ Extended chain by {len(extended_timepoints)} timepoints in {temporal_time:.2f}s")
+
+        # Phase 4: Comprehensive Validation
+        print("\n[Phase 4] Comprehensive validation...")
+        validation_start = time.time()
+
+        validator = Validator()
+        validation_results = []
+
+        for entity in result["entities"]:
+            exposure_events = graph_store.get_exposure_events(entity.entity_id)
+            context = {
+                "exposure_history": exposure_events,
+                "graph": result["graph"],
+                "timepoint_id": entity.timepoint
+            }
+            validation_result = validator.validate_entity(entity, context)
+            validation_results.append(
+                validation_result["valid"] or len(validation_result.get("violations", [])) == 0
+            )
+
+        validation_time = time.time() - validation_start
+        validation_rate = sum(validation_results) / len(validation_results) if validation_results else 0
+
+        print(f"  ✓ Validation completed in {validation_time:.2f}s")
+        print(f"  ✓ Success rate: {validation_rate*100:.1f}%")
+
+        # Phase 5: Storage Verification
+        print("\n[Phase 5] Verifying storage persistence...")
+        stored_entities = len(graph_store.get_all_entities())
+        stored_timepoints = len(graph_store.get_all_timepoints())
+
+        print(f"  ✓ Stored entities: {stored_entities}")
+        print(f"  ✓ Stored timepoints: {stored_timepoints}")
+
+        # Phase 6: Performance Report
+        total_time = time.time() - start_time
+
+        print("\n" + "="*70)
+        print("PERFORMANCE METRICS")
+        print("="*70)
+        print(f"Orchestration: {orchestration_time:.2f}s")
+        print(f"LangGraph Workflow: {workflow_time:.2f}s")
+        print(f"Temporal Extension: {temporal_time:.2f}s")
+        print(f"Validation: {validation_time:.2f}s")
+        print(f"Total: {total_time:.2f}s")
+        print("="*70)
+
+        print("\n" + "="*70)
+        print("FINAL RESULTS")
+        print("="*70)
+        print(f"Scene Title: {result['specification'].scene_title}")
+        print(f"Entities Created: {len(result['entities'])}")
+        print(f"Initial Timepoints: {len(result['timepoints'])}")
+        print(f"Extended Timepoints: {len(extended_timepoints)}")
+        print(f"Total Timepoints: {len(result['timepoints']) + len(extended_timepoints)}")
+        print(f"Graph Nodes: {result['graph'].number_of_nodes()}")
+        print(f"Graph Edges: {result['graph'].number_of_edges()}")
+        print(f"Validation Rate: {validation_rate*100:.1f}%")
+        print(f"Exposure Events: {sum(len(graph_store.get_exposure_events(e.entity_id)) for e in result['entities'])}")
+        print("="*70)
+
+        # Final Assertions
+        assert len(result['entities']) >= 3, "Should generate at least 3 entities"
+        assert len(result['timepoints']) >= 2, "Should generate at least 2 timepoints"
+        assert len(extended_timepoints) == 2, "Should extend by 2 timepoints"
+        assert validation_rate >= 0.8, "At least 80% validation success"
+        assert stored_entities >= 3, "Should persist entities"
+        assert stored_timepoints >= 4, "Should persist timepoints"
+        assert total_time < 120, f"Total time should be under 2 minutes, got {total_time:.2f}s"
+
+        print("\n" + "="*70)
+        print("✅ FULL PIPELINE WITH ORCHESTRATOR SUCCESS")
+        print("="*70)
+
+
 if __name__ == "__main__":
     """
     Run E2E tests directly
