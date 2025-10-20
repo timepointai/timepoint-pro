@@ -308,6 +308,10 @@ Return only valid JSON, no other text."""
 
         response = retry_with_backoff(_api_call, max_retries=3, base_delay=1.0)
 
+        # FIX: Explicitly set entity_id from schema if not in LLM response or empty
+        if not response.entity_id or response.entity_id == "":
+            response.entity_id = entity_schema.get('entity_id', '')
+
         self.token_count += 1000  # Estimate
         self.cost += 0.01  # Estimate
         return response

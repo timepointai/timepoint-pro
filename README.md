@@ -1,75 +1,68 @@
 # Timepoint-Daedalus
 
-**Interactive Temporal Knowledge Graph & AI Entity System** - A complete simulation framework for temporal reasoning with heterogeneous fidelity, modal causality, animistic entities, and AI-powered agents.
+**Interactive Temporal Knowledge Graph & AI Entity System** - A comprehensive simulation framework for temporal reasoning with heterogeneous fidelity, modal causality, and AI-powered agents.
 
-## Overview
+## 🎯 System Status
 
-Timepoint-Daedalus creates **queryable temporal simulations** where entities evolve through causally-linked timepoints. The system features heterogeneous fidelity (tensor compression to full LLM elaboration), modal temporal causality (Pearl, Directorial, Nonlinear, Branching, Cyclical), animistic entity extension (animals, buildings, abstract concepts, adaptive entities, spiritual forces), and AI entity integration with safety controls.
+**Last Updated:** October 2025
+**Test Status:** 11/16 E2E tests passing (68.75%)
+**Core Mechanisms:** 17/17 implemented
+**Production Status:** Core features operational, orchestrator integration in progress
 
-**Key Features:**
-- **17+ Mechanisms**: Complete implementation of all MECHANICS.md specifications plus experimental extensions
+### Current State
+
+✅ **Fully Operational:**
+- Heterogeneous fidelity temporal graphs with query-driven resolution
+- Modal temporal causality (Pearl, Directorial, Nonlinear, Branching, Cyclical)
+- Animistic entities (humans, animals, buildings, objects, abstract concepts)
+- AI entity integration with safety controls
+- LangGraph workflows for parallel entity processing
+- Comprehensive validation framework
+- TTM tensor compression (97% reduction)
+
+⚠️ **Known Issues:**
+- Orchestrator integration incomplete (3/3 tests failing)
+- SQLModel validation errors with entity IDs
+- LLM client architecture needs alignment
+- TestProvider collection warning
+
+See [TESTING.md](TESTING.md) for detailed test results and known issues.
+
+## 📋 Overview
+
+Timepoint-Daedalus creates **queryable temporal simulations** where entities evolve through causally-linked timepoints. The system features:
+
+- **17+ Mechanisms**: Complete implementation of MECHANICS.md specifications
 - **Modal Temporal Causality**: Switch between different causal regimes (Pearl DAG, narrative-driven, cyclical time)
-- **Animistic Entities**: Non-human entities (animals, buildings, objects, abstract concepts, adaptive AnyEntities, spiritual KamiEntities)
-- **AI Entity Integration**: External AI agents with configurable parameters, safety controls, and service architecture
+- **Animistic Entities**: Support for non-human entities (animals, buildings, objects, abstract concepts)
+- **AI Entity Integration**: External AI agents with safety controls and service architecture
 - **Heterogeneous Fidelity**: Query-driven resolution from compressed tensors to fully trained states
 - **Comprehensive Validation**: Physics-inspired structural invariants and temporal coherence checks
 
-## Installation
+## 🚀 Quick Start
 
-### Quick Install (Recommended)
-
-Use the provided installation script that handles all compatibility issues:
+### Installation
 
 ```bash
-./install.sh
-```
-
-### Using Poetry (Recommended)
-
-```bash
-# Install Poetry if you haven't already
-curl -sSL https://install.python-poetry.org | python3 -
-
-# Clean any existing locks and cache (if reinstalling)
-poetry cache clear pypi --all
-rm -f poetry.lock
-
-# Install dependencies
+# Using Poetry (recommended)
 poetry install
-
-# Activate virtual environment
 poetry shell
+
+# Or using pip
+pip install -r requirements.txt
+
+# For testing
+pip install -r requirements-test.txt
 ```
 
-**macOS Apple Silicon (M1/M2/M3) Users:**
-
-If you encounter grpcio build errors, try:
-
+**macOS Apple Silicon Users:**
 ```bash
-# Set environment variables for better compatibility
 export GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=1
 export GRPC_PYTHON_BUILD_SYSTEM_ZLIB=1
-
-# Install with pre-built wheels
-poetry install
-
-# Or install grpcio separately first
-pip install --upgrade grpcio
 poetry install
 ```
 
-### Using pip
-
-```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-## Configuration
+### Configuration
 
 Edit `conf/config.yaml` to configure:
 - Database connection
@@ -77,124 +70,199 @@ Edit `conf/config.yaml` to configure:
 - Autopilot parameters
 - Training settings
 
-## Usage
+### Running Tests
 
-### Create Temporal Simulation
 ```bash
-# Build temporal chain with causal evolution
+# Run all tests
+pytest -v
+
+# Run E2E tests
+pytest -m e2e -v
+
+# Run with real LLM (requires API key)
+pytest --real-llm -m e2e -v
+
+# Skip slow tests
+pytest --skip-slow -v
+```
+
+See [TESTING.md](TESTING.md) for comprehensive testing guide.
+
+### Basic Usage
+
+```bash
+# Create temporal simulation
 python cli.py mode=temporal_train training.context=founding_fathers_1789 training.num_timepoints=3
 
-# Run comprehensive evaluation
+# Run evaluation
 python cli.py mode=evaluate
-```
 
-### Interactive Queries
-```bash
-# Start interactive query REPL
+# Interactive queries
 python cli.py mode=interactive
-
-# Example queries:
-# "What did George Washington think about becoming president?"
-# "How did Hamilton and Jefferson interact during the cabinet meetings?"
-# "What was the atmosphere at Federal Hall during the inauguration?"
-# "Describe the crowd dynamics during the ceremony"
-# "What did attendee #47 think about the new constitution?"
 ```
 
-### Configuration Options
-```bash
-# Enable dry-run mode (no API costs)
-python cli.py mode=temporal_train llm.dry_run=true
+## 📊 Architecture
 
-# Change context/scenario
-python cli.py mode=temporal_train training.context=renaissance_florence_1504
+### Core Components (27 files)
 
-# Adjust number of timepoints
-python cli.py mode=temporal_train training.num_timepoints=5
-```
+**Application Layer:**
+- `cli.py` - Command-line interface with temporal_train/evaluate/interactive modes
+- `llm.py` / `llm_v2.py` - LLM clients with OpenRouter integration
+- `storage.py` - SQLite database layer with SQLModel ORM
+- `schemas.py` - Polymorphic entity system and data models
 
-## Architecture: Component Breakdown
+**Temporal Intelligence:**
+- `temporal_chain.py` - Builds causal chains of timepoints
+- `resolution_engine.py` - Adaptive resolution system (tensor → trained)
+- `query_interface.py` - Natural language query parsing
+- `workflows.py` - LangGraph orchestration for entity population
+- `temporal_agent.py` - Directorial temporal agent
+- `orchestrator.py` - Scene-to-specification compiler (integration in progress)
 
-Timepoint-Daedalus consists of **27 core files** organized into a comprehensive, production-ready architecture:
+**AI & Safety:**
+- `ai_entity_service.py` - FastAPI service for AI entity management
+- `validation.py` - Physics-inspired structural validators
+- `evaluation.py` - Comprehensive metrics and quality scoring
 
-### 🎯 **Core Application**
-- **`cli.py`** - Main command-line interface with modes: `temporal_train`, `evaluate`, `interactive`
-- **`llm.py`** - OpenRouter API client with Llama models, manual JSON parsing, model management
-- **`storage.py`** - SQLite database layer with SQLModel ORM for entities, timepoints, exposure events, dialogs, relationships
-- **`schemas.py`** - Data models: polymorphic Entity system (human, animal, building, abstract, any, kami, ai), Timepoint, ExposureEvent, Dialog, RelationshipTrajectory with resolution levels and temporal tracking
+**Data Processing:**
+- `tensors.py` - TTM tensor compression (97% reduction)
+- `graph.py` - NetworkX relationship graphs
+- `entity_templates.py` - Historical context templates
 
-### 🧠 **Temporal Intelligence**
-- **`temporal_chain.py`** - Builds causal chains of timepoints with historical context
-- **`resolution_engine.py`** - Adaptive resolution system (tensor-only → trained) based on query patterns
-- **`query_interface.py`** - Natural language query parsing and response synthesis with multi-entity support
-- **`workflows.py`** - LangGraph orchestration for entity population, dialog synthesis, relationship analysis, and modal temporal causality
-- **`temporal_agent.py`** - Directorial temporal agent influencing event probabilities based on narrative goals
+### Resolution Levels
 
-### 🤖 **AI Entity System**
-- **`ai_entity_service.py`** - FastAPI-based service for AI entity management with safety controls
-- **`test_ai_entity_service.py`** - Comprehensive testing for AI entity functionality
-
-### 🔍 **Validation & Quality**
-- **`validation.py`** - Information conservation, temporal coherence, biological constraints, environmental constraints
-- **`evaluation.py`** - Comprehensive metrics: knowledge consistency, temporal coherence, resolution distribution
-- **`test_validation_system.py`** - Test validation framework with quality scoring
-- **`autopilot.py`** - Automated test execution system with quality filtering
-
-### 📊 **Data Processing**
-- **`tensors.py`** - TTMTensor (context/biology/behavior) compression with PCA/SVD
-- **`graph.py`** - NetworkX relationship graphs with eigenvector centrality
-- **`entity_templates.py`** - Historical context templates (Founding Fathers, Renaissance Florence)
-
-### 🧪 **Testing & Quality Assurance**
-- **`test_*`** - 15 comprehensive test files covering all functionality
-- **Quality Assurance**: Automated test validation, parallel execution, dry-run capability
-- **Coverage**: Core mechanisms, experimental extensions, AI entity service, modal causality
-
-### 🛠️ **Infrastructure**
-- **`reporting.py`** - JSON/Markdown/GraphML report generation
-- **`conf/config.yaml`** - Configuration management with animism levels, temporal modes, AI entity settings
-- **`pyproject.toml`** - Poetry dependency management
-- **`requirements.txt`** - Alternative pip installation
-- **`poetry.lock`** - Locked dependency versions
-
-### 📜 **Documentation & Scripts**
-- **`README.md`** - This documentation
-- **`MECHANICS.md`** - Technical architecture and mechanism specifications
-- **`CHANGE-ROUND.md`** - Current development status and implementation notes
-- **`demo.sh`** - End-to-end workflow demonstration
-- **`install.sh`** - macOS-compatible installation script
-
-### Resolution Levels (Adaptive Detail)
-
-1. **TENSOR_ONLY**: Compressed tensor representation only (memory efficient)
+1. **TENSOR_ONLY**: Compressed representation (8-16 floats)
 2. **SCENE**: Scene-level context with basic knowledge
-3. **GRAPH**: Full graph relationships and moderate detail
+3. **GRAPH**: Full graph relationships
 4. **DIALOG**: Dialog-level detail with conversations
 5. **TRAINED**: Fully trained entity with complete knowledge state
 
-### Validation Rules (Temporal Coherence)
+## 🧪 Testing
 
-- **Information Conservation**: Entity knowledge ⊆ exposure history (no anachronisms)
-- **Temporal Coherence**: Entity evolution follows causal chains
-- **Knowledge Consistency**: Cross-entity claims don't contradict
-- **Biological Constraints**: Age/health-appropriate capabilities
+### Test Status
 
-## Example Workflow
+**E2E Tests:** 11 passing / 5 failing (68.75%)
+
+**Passing:**
+- ✅ Full entity generation workflow
+- ✅ Multi-entity scene generation
+- ✅ Full temporal chain creation
+- ✅ Modal temporal causality
+- ✅ AI entity full lifecycle
+- ✅ Bulk entity creation performance
+- ✅ Concurrent timepoint access
+- ✅ End-to-end data consistency
+- ✅ LLM safety and validation
+- ✅ Complete simulation workflow
+- ✅ Modal causality with LLM
+
+**Failing:**
+- ❌ Deep integration temporal chain (SQLModel validation)
+- ❌ Scene generation with animism (LLM client attribute error)
+- ❌ Orchestrator entity generation (SQLModel validation)
+- ❌ Orchestrator temporal chain (LLM client error)
+- ❌ Full pipeline with orchestrator (multiple errors)
+
+### Running Tests
 
 ```bash
-# 1. Create temporal simulation
-./demo.sh
+# Run E2E suite
+pytest -m e2e -v
 
-# 2. Explore interactively
-python cli.py mode=interactive
-# Query: "What did Washington think about the presidency?"
-# Query: "How did Jefferson react to Hamilton's financial plan?"
+# Run specific test
+pytest test_e2e_autopilot.py::TestE2ETemporalWorkflows::test_full_temporal_chain_creation -v
 
-# 3. Check evaluation metrics
-python cli.py mode=evaluate
+# Run with coverage
+pytest -m e2e --cov=. -v
 ```
 
-## Development
+## 📚 Core Mechanisms
+
+### Implemented (17/17)
+
+1. **Heterogeneous Fidelity** - Query-driven resolution elevation
+2. **Progressive Training** - Metadata-driven quality without cache invalidation
+3. **Exposure Event Tracking** - Causal knowledge provenance
+4. **Physics-Inspired Validation** - Conservation law validators
+5. **Query-Driven Resolution** - Lazy elevation based on access patterns
+6. **TTM Tensor Model** - Context/biology/behavior factorization
+7. **Causal Temporal Chains** - Counterfactual branching support
+8. **Embodied Entity States** - Age-dependent constraints
+9. **Body-Mind Coupling** - Pain/illness effects on cognition
+10. **On-Demand Entity Generation** - Unknown entity handling
+11. **Scene-Level Entity Sets** - Atmosphere and crowd modeling
+12. **Dialog/Interaction Synthesis** - Multi-entity conversations
+13. **Counterfactual Branching** - Timeline interventions
+14. **Multi-Entity Synthesis** - Relationship trajectory analysis
+15. **Circadian Activity Patterns** - Time-of-day constraints
+16. **Entity Prospection** - Future forecasting with anxiety modeling
+17. **Animistic Entity Extension** - Non-human entity support
+
+### Experimental Extensions
+
+- **Modal Temporal Causality** - Pearl/Directorial/Nonlinear/Branching/Cyclical modes
+- **AI Entity Integration** - External AI agents with safety controls
+- **AnyEntity** - Highly adaptive entities with dynamic forms
+- **KamiEntity** - Spiritual entities with visibility states
+
+## 🔧 Configuration
+
+### Temporal Modes
+
+```yaml
+temporal_mode:
+  active_mode: pearl  # pearl | directorial | nonlinear | branching | cyclical
+  directorial:
+    narrative_arc: rising_action
+    dramatic_tension: 0.7
+  cyclical:
+    cycle_length: 10
+    prophecy_accuracy: 0.85
+```
+
+### Animism Levels
+
+```yaml
+animism:
+  level: 1  # 0=humans only, 1=animals/buildings, 2=objects, 3=abstract
+  llm_enrichment_enabled: true
+```
+
+### AI Entity Service
+
+```yaml
+ai_entity_service:
+  enabled: true
+  safety_controls:
+    input_bleaching: true
+    output_filtering: true
+    rate_limiting: true
+```
+
+## 📈 Performance
+
+### Efficiency Metrics
+
+- **Token Cost Reduction**: 95% (from $500 to $5-20 per query)
+- **Compression Ratio**: 97% via TTM tensors (50k → 200 tokens)
+- **Test Execution**: ~89 seconds for 16 E2E tests
+- **LLM Integration**: 34 available models with cost tracking
+
+### Cost Estimates
+
+- 7 timepoints, 5 entities: ~$1.49
+- 8 queries: ~$0.09
+- Extended simulation (10 timepoints, 20 entities): $4-6
+
+## 🔗 Documentation
+
+- **[TESTING.md](TESTING.md)** - Comprehensive testing guide
+- **[MECHANICS.md](MECHANICS.md)** - Technical architecture and mechanisms
+- **[CHANGE-ROUND.md](CHANGE-ROUND.md)** - Development roadmap and status
+- **[ORCHESTRATOR_DOCUMENTATION.md](ORCHESTRATOR_DOCUMENTATION.md)** - Orchestrator API reference
+- **[CURRENT_STATE_ANALYSIS.md](CURRENT_STATE_ANALYSIS.md)** - Integration status analysis
+
+## 🛠️ Development
 
 ### Code Quality
 
@@ -202,96 +270,96 @@ python cli.py mode=evaluate
 # Format code
 black .
 
-# Lint code
+# Lint
 ruff check .
 
 # Type checking
 mypy .
 ```
 
-### Current Status
+### Project Structure
 
-✅ **FULLY COMPLETE**: All 17 MECHANICS.md mechanisms plus experimental extensions operational
-- **17 Core Mechanisms**: Complete implementation of all temporal knowledge graph specifications
-- **Modal Temporal Causality**: Switch between Pearl DAG, Directorial, Nonlinear, Branching, and Cyclical causal regimes
-- **Animistic Entity Extension**: Non-human entities (animals, buildings, objects, abstract concepts, AnyEntity, KamiEntity)
-- **AI Entity Integration**: External AI agents with configurable parameters, safety controls, and service architecture
-- **Production-Ready Architecture**: Comprehensive testing, validation, and quality assurance systems
+```
+timepoint-daedalus/
+├── cli.py                    # Main CLI
+├── llm.py / llm_v2.py        # LLM clients
+├── storage.py                # Database layer
+├── schemas.py                # Data models
+├── workflows.py              # LangGraph orchestration
+├── orchestrator.py           # Scene compiler
+├── validation.py             # Validators
+├── evaluation.py             # Metrics
+├── tensors.py                # TTM compression
+├── graph.py                  # NetworkX graphs
+├── conf/
+│   └── config.yaml           # Configuration
+├── tests/
+│   ├── test_e2e_autopilot.py # E2E test suite
+│   ├── test_*.py             # Unit/integration tests
+│   └── conftest.py           # Shared fixtures
+└── docs/
+    └── *.md                  # Documentation
+```
 
-### Implementation Status
+## ⚠️ Known Issues & Limitations
 
-#### ✅ **Core Mechanisms (17/17 Complete)**
-- **Mechanism 1**: Heterogeneous Fidelity Temporal Graphs with query-driven resolution
-- **Mechanism 2**: Progressive Training Without Cache Invalidation via metadata-driven quality
-- **Mechanism 3**: Exposure Event Tracking for causal knowledge provenance
-- **Mechanism 4**: Physics-Inspired Validation with conservation law validators
-- **Mechanism 5**: Query-Driven Lazy Resolution Elevation
-- **Mechanism 6**: TTM Tensor Model with context/biology/behavior factorization (97% compression)
-- **Mechanism 7**: Causal Temporal Chains with counterfactual branching support
-- **Mechanism 8**: Embodied Entity States with age-dependent constraints
-- **Mechanism 8.1**: Body-Mind Coupling with pain and illness effects on cognition
-- **Mechanism 9**: On-Demand Entity Generation for unknown referenced entities
-- **Mechanism 10**: Scene-Level Entity Sets with atmosphere and crowd modeling
-- **Mechanism 11**: Dialog/Interaction Synthesis with multi-entity conversations
-- **Mechanism 12**: Counterfactual Branching with timeline interventions
-- **Mechanism 13**: Multi-Entity Synthesis with relationship trajectory analysis
-- **Mechanism 14**: Circadian Activity Patterns with time-of-day constraints
-- **Mechanism 15**: Entity Prospection with future forecasting and anxiety modeling
+### Current Limitations
 
-#### ✅ **Experimental Extensions**
-- **Mechanism 16**: Animistic Entity Extension (animals, buildings, abstract concepts, AnyEntity, KamiEntity)
-- **Mechanism 17**: Modal Temporal Causality (Pearl, Directorial, Nonlinear, Branching, Cyclical modes)
-- **AI Entity Integration**: External AI agents with FastAPI service, safety controls, and LLM integration
+1. **Orchestrator Integration**: 3 orchestrator tests failing due to:
+   - SQLModel validation errors (empty entity IDs)
+   - LLM client architecture mismatch
+   - Need for integration layer between orchestrator and workflows
 
-#### ✅ **Quality Assurance**
-- **15 Test Files**: Comprehensive coverage of all functionality
-- **Autopilot System**: Automated test execution with quality filtering
-- **Validation Framework**: Test quality scoring and issue detection
-- **100% Test Success Rate**: All validated tests pass in parallel execution
+2. **TestProvider Warning**: Collection warning still present despite claimed fix
 
-See `CHANGE-ROUND.md` for detailed development progress.
+3. **Error Claims vs Reality**: Some documentation claims "all errors fixed" but tests show 31.25% failure rate
 
-## System Status ✅
+### Planned Improvements
 
-**Last Updated: October 2, 2025**
+- [ ] Complete orchestrator integration with workflows
+- [ ] Fix SQLModel validation pipeline
+- [ ] Align LLM client architecture across codebase
+- [ ] Resolve TestProvider collection warning
+- [ ] Add orchestrator performance tests
+- [ ] Improve error handling in scene parsing
 
-### 🚀 **System Overview**
-Timepoint-Daedalus is a **production-ready temporal knowledge graph simulation system** with comprehensive testing, validation, and AI entity integration. The system implements all 17 MECHANICS.md mechanisms plus experimental extensions for advanced temporal reasoning.
+See [CURRENT_STATE_ANALYSIS.md](CURRENT_STATE_ANALYSIS.md) for detailed integration analysis.
 
-### 🎯 **Core Functionality**
+## 🤝 Contributing
 
-#### **Temporal Knowledge Graph System**
-- **Heterogeneous Fidelity**: Query-driven resolution from compressed tensors to fully trained LLM states
-- **Modal Temporal Causality**: Switch between Pearl DAG, Directorial, Nonlinear, Branching, and Cyclical causal regimes
-- **Animistic Entities**: Support for animals, buildings, objects, abstract concepts, adaptive AnyEntities, and spiritual KamiEntities
-- **AI Entity Integration**: External AI agents with configurable parameters, safety controls, and FastAPI service architecture
+### Development Workflow
 
-#### **Advanced Features**
-- **Counterfactual Branching**: Create alternate timelines with interventions and causal analysis
-- **Entity Prospection**: Future forecasting with anxiety-driven behavioral influence
-- **Body-Mind Coupling**: Pain and illness directly affect cognitive states and dialog generation
-- **Circadian Activity Patterns**: Time-of-day constraints with energy penalties and fatigue modeling
-- **Multi-Entity Dialog Synthesis**: Realistic conversations with relationship dynamics and contradiction detection
+1. Create feature branch
+2. Write tests first
+3. Implement feature
+4. Ensure all tests pass: `pytest -v`
+5. Update documentation
+6. Submit pull request
 
-#### **Quality Assurance & Testing**
-- **Autopilot Test System**: Automated execution with quality filtering and parallel processing
-- **Comprehensive Validation**: Physics-inspired structural invariants and temporal coherence checks
-- **Test Coverage**: 15 test files covering all mechanisms and experimental extensions
-- **100% Success Rate**: All validated tests pass in automated execution
+### Test Requirements
 
-#### **Production Architecture**
-- **27 Core Files**: Modular, well-documented codebase with comprehensive error handling
-- **FastAPI AI Service**: Production-ready API for AI entity management with safety controls
-- **Extensive Configuration**: YAML-based config for animism levels, temporal modes, and AI settings
-- **Performance Optimized**: 95%+ token cost reduction through heterogeneous fidelity and compression
+- Unit tests for new functionality
+- Integration tests for workflows
+- E2E tests for major features
+- Documentation updates
 
-### 📊 **Performance Characteristics**
-- **Token Efficiency**: 95% cost reduction (from $500 to $5-20 per query) through heterogeneous fidelity
-- **Compression Ratio**: 97% reduction via TTM tensor factorization (50k tokens → 200 tokens)
-- **Test Execution**: 100% success rate with 6.25s parallel execution time
-- **LLM Integration**: 34 available models with automatic cost tracking and reliability features
-- **Memory Efficiency**: Progressive resolution prevents loading unused high-fidelity states
-
-## License
+## 📝 License
 
 MIT
+
+## 🙏 Acknowledgments
+
+Built with:
+- **LangGraph** - Workflow orchestration
+- **NetworkX** - Graph operations
+- **Instructor** - LLM structured output
+- **scikit-learn** - Tensor compression
+- **SQLModel** - ORM layer
+- **FastAPI** - AI entity service
+- **Hydra** - Configuration management
+
+---
+
+**Status**: Core features operational, orchestrator integration in progress
+**Test Coverage**: 68.75% E2E passing, comprehensive unit/integration coverage
+**Production Ready**: Core mechanisms yes, full integration pending

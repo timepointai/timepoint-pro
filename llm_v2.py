@@ -170,6 +170,10 @@ Return only valid JSON, no other text."""
             call_type="populate_entity",
         )
 
+        # FIX: Explicitly set entity_id from schema if not in LLM response or empty
+        if not result.entity_id or result.entity_id == "":
+            result.entity_id = entity_id
+
         # Update statistics
         stats = self.service.get_statistics()
         self.token_count = stats.get("logger_stats", {}).get("total_tokens", 0)
