@@ -367,3 +367,77 @@ class VerticalGenerator:
                 json.dump(structure, f, indent=2)
         else:
             raise ValueError(f"Unsupported format: {format}")
+
+    def export_to_oxen(
+        self,
+        config: SimulationConfig,
+        oxen_client: "OxenClient",
+        commit_message: Optional[str] = None,
+        dataset_name: Optional[str] = None,
+    ) -> "UploadResult":
+        """
+        Export temporally-expanded configuration to Oxen.ai.
+
+        Args:
+            config: Configuration with temporal expansion
+            oxen_client: OxenClient instance
+            commit_message: Optional commit message. Auto-generated if None.
+            dataset_name: Optional dataset filename. Auto-generated if None.
+
+        Returns:
+            UploadResult with URLs for viewing and fine-tuning
+
+        Example:
+            >>> from oxen_integration import OxenClient
+            >>> client = OxenClient(namespace="user", repo_name="temporal")
+            >>> expanded = generator.generate_temporal_depth(base, 5, 5)
+            >>> result = generator.export_to_oxen(expanded, client)
+            >>> print(f"Fine-tune at: {result.finetune_url}")
+        """
+        import tempfile
+        import os
+        import json
+        from datetime import datetime
+
+        # Import here to avoid circular dependency
+        try:
+            from oxen_integration import UploadResult
+        except ImportError:
+            raise ImportError(
+                "oxen_integration module required. Ensure it's installed."
+            )
+
+        # Generate filename if not provided
+        if dataset_name is None:
+            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            dataset_name = f"temporal_expansion_{timestamp}.json"
+
+        # Generate commit message if not provided
+        if commit_message is None:
+            stats = self.get_generation_stats()
+            total_tp = stats["total_timepoints"]
+            savings = stats.get("cost_savings_estimated", 0.0)
+            commit_message = (
+                f"Add temporal expansion ({total_tp} timepoints, "
+                f"{savings:.1%} cost savings)"
+            )
+
+        # Export configuration to temporary file
+        with tempfile.NamedTemporaryFile(
+            mode='w', suffix='.json', delete=False
+        ) as tmp_file:
+            tmp_path = tmp_file.name
+            json.dump(config.to_dict(), tmp_file, indent=2)
+
+        try:
+            # Upload to Oxen
+            result = oxen_client.upload_dataset(
+                file_path=tmp_path,
+                commit_message=commit_message,
+                dst_path=f"datasets/{dataset_name}"
+            )
+            return result
+        finally:
+            # Clean up temporary file
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)

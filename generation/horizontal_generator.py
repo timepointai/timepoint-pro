@@ -447,3 +447,76 @@ class HorizontalGenerator:
                     f.write(json.dumps(variation.to_dict()) + '\n')
         else:
             raise ValueError(f"Unsupported format: {format}")
+
+    def export_to_oxen(
+        self,
+        variations: List[SimulationConfig],
+        oxen_client: "OxenClient",
+        commit_message: Optional[str] = None,
+        dataset_name: Optional[str] = None,
+    ) -> "UploadResult":
+        """
+        Export variations to Oxen.ai for storage and fine-tuning.
+
+        Args:
+            variations: List of variations to export
+            oxen_client: OxenClient instance
+            commit_message: Optional commit message. Auto-generated if None.
+            dataset_name: Optional dataset filename. Auto-generated if None.
+
+        Returns:
+            UploadResult with URLs for viewing and fine-tuning
+
+        Example:
+            >>> from oxen_integration import OxenClient
+            >>> client = OxenClient(namespace="user", repo_name="variations")
+            >>> result = generator.export_to_oxen(variations, client)
+            >>> print(f"Fine-tune at: {result.finetune_url}")
+        """
+        import tempfile
+        import os
+
+        # Import here to avoid circular dependency
+        try:
+            from oxen_integration import UploadResult
+        except ImportError:
+            raise ImportError(
+                "oxen_integration module required. Ensure it's installed."
+            )
+
+        if not variations:
+            raise ValueError("No variations to export")
+
+        # Generate filename if not provided
+        if dataset_name is None:
+            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            dataset_name = f"variations_{timestamp}.jsonl"
+
+        # Generate commit message if not provided
+        if commit_message is None:
+            stats = self.get_generation_stats()
+            commit_message = (
+                f"Add {len(variations)} variations "
+                f"(strategies: {', '.join(stats['strategies_used'])})"
+            )
+
+        # Export to temporary file
+        with tempfile.NamedTemporaryFile(
+            mode='w', suffix='.jsonl', delete=False
+        ) as tmp_file:
+            tmp_path = tmp_file.name
+            for variation in variations:
+                tmp_file.write(json.dumps(variation.to_dict()) + '\n')
+
+        try:
+            # Upload to Oxen
+            result = oxen_client.upload_dataset(
+                file_path=tmp_path,
+                commit_message=commit_message,
+                dst_path=f"datasets/{dataset_name}"
+            )
+            return result
+        finally:
+            # Clean up temporary file
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)

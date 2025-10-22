@@ -21,6 +21,7 @@ from typing import List, Dict, Optional, Any
 from pydantic import BaseModel
 import numpy as np
 from datetime import datetime
+import os
 
 # Import new service
 from llm_service import LLMService, LLMServiceConfig
@@ -55,14 +56,22 @@ class LLMClient:
         Initialize LLM client.
 
         Args:
-            api_key: OpenRouter API key
+            api_key: OpenRouter API key (REQUIRED for real operations)
             base_url: API base URL
-            dry_run: If True, return mock responses
+            dry_run: If True, return mock responses (NOT RECOMMENDED - use for testing only)
             default_model: Default model identifier
             model_cache_ttl_hours: Model cache TTL
             use_centralized_service: Use new centralized service (recommended)
             service_config: Optional pre-built service config
         """
+        # VALIDATION: Reject dry_run mode unless explicitly testing
+        if dry_run and not os.getenv("ALLOW_MOCK_MODE"):
+            raise ValueError(
+                "Mock/dry-run mode is disabled by default. "
+                "This system requires REAL LLM integration. "
+                "Set ALLOW_MOCK_MODE=true ONLY for unit testing."
+            )
+
         self.api_key = api_key
         self.base_url = base_url
         self.dry_run = dry_run

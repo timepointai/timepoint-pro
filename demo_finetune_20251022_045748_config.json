@@ -1,0 +1,32 @@
+{
+  "dataset_path": "datasets/board_meeting_training.jsonl",
+  "model_name": "Qwen/Qwen2.5-1.5B-Instruct",
+  "prompt_column": "prompt",
+  "completion_column": "completion",
+  "system_message": null,
+  "epochs": 3,
+  "batch_size": 2,
+  "learning_rate": 0.0002,
+  "max_seq_length": 2048,
+  "use_lora": true,
+  "lora_rank": 16,
+  "lora_alpha": 16,
+  "lora_dropout": 0.05,
+  "gradient_accumulation_steps": 4,
+  "warmup_steps": 100,
+  "logging_steps": 10,
+  "save_steps": 100,
+  "eval_steps": 100,
+  "use_4bit_quantization": true,
+  "gradient_checkpointing": true,
+  "output_dir": "finetune_output",
+  "experiment_name": null,
+  "estimated_cost_usd": null,
+  "max_cost_usd": 10.0,
+  "description": "Fine-tune on board meeting simulation variations",
+  "tags": [
+    "timepoint",
+    "simulations",
+    "board-meetings"
+  ]
+}
