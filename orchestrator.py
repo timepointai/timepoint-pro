@@ -176,10 +176,15 @@ Schema:
         return prompt
 
     def _call_llm_structured(self, prompt: str, response_model: type) -> Any:
-        """Call LLM and parse structured response"""
+        """Call LLM and parse structured response - REQUIRES REAL LLM"""
+        import os
+
+        # CRITICAL: Reject dry_run mode - no mocks allowed
         if self.llm.dry_run:
-            # Return mock data for dry run
-            return self._mock_scene_specification()
+            raise RuntimeError(
+                "Orchestrator requires REAL LLM integration. "
+                "Mock mode is disabled. Set LLM_SERVICE_ENABLED=true and provide OPENROUTER_API_KEY."
+            )
 
         try:
             from llm import retry_with_backoff
@@ -205,9 +210,11 @@ Schema:
             return result
 
         except Exception as e:
-            print(f"⚠️ Scene parsing failed: {e}")
-            print("Returning mock specification")
-            return self._mock_scene_specification()
+            # DO NOT fall back to mocks - fail fast with clear error
+            raise RuntimeError(
+                f"Scene parsing failed: {e}\n"
+                f"Orchestrator requires real LLM integration. Cannot proceed with mocks."
+            ) from e
 
     def _mock_scene_specification(self) -> SceneSpecification:
         """Generate mock scene specification for testing"""

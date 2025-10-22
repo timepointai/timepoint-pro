@@ -14,10 +14,12 @@ Timepoint-Daedalus enables you to:
 - **Export results** - Reports in Markdown, JSON, CSV with compression
 - **Optimize costs** - 95% reduction via adaptive fidelity (tensor compression)
 
-**Status**: Production Ready ✅
-- All 17 core mechanisms implemented
-- 70/70 E2E tests passing (100%)
+**Status**: Integration in Progress ⏳
+- All 17 core mechanisms implemented (M1-M17)
+- 458 tests collected (13 E2E, 445 integration/unit)
+- Democked LLM integration (requires real API key)
 - Complete pipeline: Natural Language → Simulation → Query → Report → Export
+- **Note**: System now requires `OPENROUTER_API_KEY` - mock mode removed for production workflows
 
 ---
 
@@ -209,14 +211,18 @@ exporter.export_batch(
 ### Run Tests
 
 ```bash
-# All tests (70 tests in ~60 seconds)
+# All tests (458 tests collected)
 pytest -v
 
-# Specific test suites
-pytest test_e2e_autopilot.py -v           # Core timepoint stack (13 tests)
-pytest test_e2e_sprint1_full_stack.py -v  # Query interface (16 tests)
-pytest test_e2e_sprint2_full_stack.py -v  # Reporting & export (16 tests)
-pytest test_e2e_sprint3_nl_interface.py -v # Natural language (23 tests)
+# E2E tests (13 tests - require real LLM)
+pytest test_e2e_autopilot.py -v -m e2e
+
+# Unit/integration tests (run without API key)
+pytest -m "not llm" -v
+
+# Run with real LLM (requires OPENROUTER_API_KEY)
+export OPENROUTER_API_KEY=your_key
+pytest -m llm -v
 
 # Complete pipeline integration
 pytest test_e2e_complete_pipeline.py -v -s
@@ -224,26 +230,28 @@ pytest test_e2e_complete_pipeline.py -v -s
 
 ### Test Coverage
 
-| Component | Tests | Status |
-|-----------|-------|--------|
-| Core Timepoint Stack | 13 | ✅ 100% |
-| Sprint 1 (Query) | 16 | ✅ 100% |
-| Sprint 2 (Reports) | 16 | ✅ 100% |
-| Sprint 3 (NL) | 23 | ✅ 100% |
-| Integration | 2 | ✅ 100% |
-| **TOTAL** | **70** | **✅ 100%** |
+**Total Tests**: 458 collected
+
+| Test Type | Count | Notes |
+|-----------|-------|-------|
+| E2E (full stack) | 13 | Require real LLM |
+| Integration | ~200 | Multi-component tests |
+| Unit | ~245 | Isolated components |
+| **TOTAL** | **458** | See PLAN.md for details |
+
+**Test Markers**:
+- `@pytest.mark.e2e` - End-to-end workflows
+- `@pytest.mark.llm` - Require real LLM API
+- `@pytest.mark.slow` - Long-running tests
+- `@pytest.mark.unit` - Fast isolated tests
 
 ---
 
 ## Documentation
 
 - **README.md** (this file) - Quick start and overview
-- **PROOF_OF_INTEGRATION.md** - Comprehensive test evidence
-- **E2E_INTEGRATION_COMPLETE.md** - API documentation and integration details
-- **MECHANICS.md** - Technical architecture
-- **SPRINT1_COMPLETE.md** - Query interface documentation
-- **SPRINT2_COMPLETE_SUMMARY.md** - Reporting & export documentation
-- **SPRINT3_COMPLETE.md** - Natural language interface documentation
+- **MECHANICS.md** - Technical architecture and 17 core mechanisms
+- **PLAN.md** - Integration status, validation checklists, known issues
 
 ---
 
@@ -330,4 +338,4 @@ For questions or issues, please open a GitHub issue.
 
 ---
 
-**Production Ready** ✅ | **70/70 Tests Passing** ✅ | **All Features Operational** ✅
+**Integration in Progress** ⏳ | **458 Tests Collected** ✅ | **Democked LLM Integration** ✅ | See **PLAN.md** for status
