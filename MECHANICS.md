@@ -31,7 +31,7 @@
 - ✅ M16: Animistic Entities (schemas.py:196-289 - 6 types, validation.py:843-1243)
 - ✅ M17: Modal Temporal Causality (schemas.py:17-23, validation.py:1250-1301, workflows.py)
 
-See [PLAN.md](PLAN.md) for detailed implementation evidence and [README.md](README.md) for quick start.
+See [PROOF_OF_INTEGRATION.md](PROOF_OF_INTEGRATION.md) for comprehensive test evidence and [README.md](README.md) for quick start.
 
 ---
 

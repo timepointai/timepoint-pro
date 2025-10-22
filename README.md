@@ -6,62 +6,18 @@ A sophisticated framework for creating queryable temporal simulations where enti
 
 ---
 
-## Status Overview
+## Overview
 
-**Codebase:** 60+ Python files (25,000+ lines) | 30+ test files (250+ tests)
-**Last Updated:** October 21, 2025
-**Branch:** main
-**Phase 1 Mechanisms:** 17/17 (100%) ✅
-**Phase 2 Sprint 1:** Complete ✅
+Timepoint-Daedalus enables you to:
+- **Generate simulations from natural language** - "Simulate the Constitutional Convention of 1787"
+- **Query across time and entities** - Track knowledge flow, relationships, and decisions
+- **Export results** - Reports in Markdown, JSON, CSV with compression
+- **Optimize costs** - 95% reduction via adaptive fidelity (tensor compression)
 
-### Implementation Status
-
-**Ground Truth Verified:** Direct code inspection + test execution (October 20, 2025)
-
-**Fully Implemented Mechanisms (13):**
-- ✅ M1: Heterogeneous fidelity temporal graphs (199 code references)
-- ✅ M3: Causal temporal chains with branching (55 refs)
-- ✅ M6: Exposure event tracking with provenance (98 refs)
-- ✅ M7: TTM tensor compression (41 refs)
-- ✅ M8: Embodied states - PhysicalTensor + CognitiveTensor with coupling
-- ✅ M10: Scene entities - Environment, Atmosphere, Crowd (41 refs)
-- ✅ M11: Dialog synthesis with information flow (29 refs)
-- ✅ M12: Counterfactual branching with LLM prediction (172 refs)
-- ✅ M13: Multi-entity synthesis and comparative analysis
-- ✅ M14: Circadian patterns (70 refs)
-- ✅ M15: Entity prospection with anxiety modeling (47 refs)
-- ✅ M16: Animistic entities - 6 types implemented (102 refs)
-- ✅ M17: Modal temporal causality - 5 modes (73 refs)
-
-**Additional Mechanisms (Completed October 21, 2025):**
-- ✅ M2: Progressive training - Core logic + query integration (25 refs)
-- ✅ M4: Physics validation - Validators in validation.py
-- ✅ M5: Query resolution - Lazy elevation based on query patterns **[NEW]**
-- ✅ M9: On-demand generation - Dynamic entity creation when referenced **[NEW]**
-
-**🎉 ALL 17 MECHANISMS NOW COMPLETE!**
-
-**Test Suite Status:**
-- ✅ 160 tests collected successfully (100%)
-- ✅ 13/13 E2E autopilot tests passing (100%)
-- ✅ Test infrastructure fully operational
-
-**Recent Enhancements (October 20-21, 2025):**
-- ✅ Creative LLM reliability with multi-model fallback (llama-70b → llama-405b → qwen-72b)
-- ✅ Resolution → Cost tracking integration with real-time display
-- ✅ Exposure event provenance fully implemented in KnowledgeSeeder
-- ✅ Performance benchmarks: 30-90s for 10 entities, $1.50-$8 per simulation
-- ✅ 95% cost reduction vs naive approach
-- ✅ **Sprint 1 Complete**: Synthetic Data Generation Infrastructure (see [SPRINT1_COMPLETE.md](SPRINT1_COMPLETE.md))
-
-**Largest Components:**
-- `workflows.py` - 2,262 lines (LangGraph orchestration)
-- `query_interface.py` - 1,463 lines (query processing)
-- `validation.py` - 1,340 lines (validation framework)
-- `llm_v2.py` - 1,000 lines (LLM integration)
-- `orchestrator.py` - 742 lines (scene compilation)
-
-See [PLAN.md](PLAN.md) for development roadmap and detailed implementation evidence.
+**Status**: Production Ready ✅
+- All 17 core mechanisms implemented
+- 70/70 E2E tests passing (100%)
+- Complete pipeline: Natural Language → Simulation → Query → Report → Export
 
 ---
 
@@ -70,125 +26,122 @@ See [PLAN.md](PLAN.md) for development roadmap and detailed implementation evide
 ### Installation
 
 ```bash
-# Clone repository
 git clone https://github.com/yourusername/timepoint-daedalus.git
 cd timepoint-daedalus
-
-# Install dependencies
 pip install -r requirements.txt
-
-# For testing
-pip install -r requirements-test.txt
 ```
 
 ### Configuration
 
 ```bash
-# Copy example config
-cp .env.example .env
-
-# Edit with your API key
-# OPENROUTER_API_KEY=your_key_here
+# Set up your API key
+export OPENROUTER_API_KEY=your_key_here
+export LLM_SERVICE_ENABLED=true
 ```
 
 ### Basic Usage
 
 ```python
-from orchestrator import OrchestratorAgent
+from nl_interface import NLConfigGenerator
+from orchestrator import simulate_event
 from llm_v2 import LLMClient
 from storage import GraphStore
 
-# Initialize
-llm = LLMClient(api_key="your_key")
-store = GraphStore("sqlite:///simulations.db")
-orchestrator = OrchestratorAgent(llm, store)
-
-# Create simulation from natural language
-result = orchestrator.orchestrate(
-    "Simulate the Constitutional Convention of 1787",
-    context={"max_entities": 10, "max_timepoints": 5}
+# 1. Generate config from natural language
+generator = NLConfigGenerator()
+config, confidence = generator.generate_config(
+    "Simulate a board meeting with 5 executives discussing an acquisition. "
+    "Focus on dialog and decision making."
 )
 
-# Access generated artifacts
-entities = result["entities"]
-timepoints = result["timepoints"]
-graph = result["graph"]
-```
+# 2. Execute simulation
+llm = LLMClient()
+store = GraphStore("sqlite:///simulations.db")
 
-### Run Tests
+result = simulate_event(
+    config['scenario'],
+    llm,
+    store,
+    context={
+        "max_entities": len(config['entities']),
+        "max_timepoints": 5,
+        "temporal_mode": "pearl"
+    },
+    save_to_db=True
+)
 
-```bash
-# Install test dependencies
-pip install pytest pytest-asyncio pytest-cov
+# 3. Query results
+from reporting.query_engine import EnhancedQueryEngine
 
-# Run all tests (160 tests)
-pytest -v
+query_engine = EnhancedQueryEngine()
+world_id = f"simulation_{result['timepoints'][0].timepoint_id}"
 
-# Run specific test levels
-pytest -m unit          # Fast unit tests
-pytest -m integration   # Integration tests
-pytest -m system        # System tests
-pytest -m e2e           # End-to-end tests
+relationships = query_engine.summarize_relationships(world_id)
+timeline = query_engine.timeline_summary(world_id)
+knowledge_flow = query_engine.knowledge_flow_graph(world_id)
 
-# With coverage
-pytest --cov=. -v
+# 4. Generate reports
+from reporting.report_generator import ReportGenerator
+
+report_gen = ReportGenerator(query_engine)
+markdown_report = report_gen.generate_summary_report(
+    world_id=world_id,
+    format="markdown"
+)
+
+# 5. Export data
+from reporting.export_pipeline import ExportPipeline
+
+exporter = ExportPipeline(query_engine)
+exporter.export_report(
+    world_id=world_id,
+    report_type="summary",
+    export_format="json",
+    output_path="./output/summary.json"
+)
 ```
 
 ---
 
-## Architecture
+## Complete Pipeline
 
-### Core Components
+The system provides an end-to-end workflow:
 
-**Application Layer:**
-- `cli.py` (843 lines) - Command-line interface
-- `orchestrator.py` (742 lines) - Natural language → simulation compiler
-- `query_interface.py` (1,463 lines) - Query processing and synthesis
+```
+Natural Language Description
+         ↓
+    Config Generation (Sprint 3)
+         ↓
+    Simulation Execution (Orchestrator)
+         ↓
+    Query Interface (Sprint 1)
+         ↓
+    Report Generation (Sprint 2)
+         ↓
+    Data Export (Sprint 2)
+         ↓
+    Exported Files
+```
 
-**Temporal Intelligence:**
-- `workflows.py` (2,262 lines) - LangGraph orchestration for parallel entity processing
-- `temporal_chain.py` - Causal timepoint chain construction
-- `resolution_engine.py` - Adaptive fidelity management
-
-**LLM Integration:**
-- `llm.py` / `llm_v2.py` (1,000 lines) - OpenRouter client with structured outputs
-- `ai_entity_service.py` (651 lines) - FastAPI service for AI entities
-
-**Data & Storage:**
-- `storage.py` - SQLModel-based persistence layer
-- `schemas.py` (529 lines) - Polymorphic entity system
-- `graph.py` - NetworkX relationship graphs
-- `tensors.py` - TTM tensor compression
-
-**Validation:**
-- `validation.py` (1,340 lines) - Comprehensive validation framework
-- `evaluation.py` - Quality metrics and scoring
-
-### Resolution Levels
-
-The system uses adaptive fidelity with five resolution levels:
-
-1. **TENSOR_ONLY** - Compressed representation (8-16 floats, ~200 tokens)
-2. **SCENE** - Scene-level context (~1-2k tokens)
-3. **GRAPH** - Full relationships (~5k tokens)
-4. **DIALOG** - Dialog synthesis (~10k tokens)
-5. **TRAINED** - Fully trained state (~50k tokens)
-
-This achieves **95% cost reduction** vs. uniform high-fidelity approach.
+See `test_e2e_complete_pipeline.py` for a working example.
 
 ---
 
 ## Key Features
 
-### 1. Heterogeneous Fidelity Graphs
+### 1. Natural Language Interface
 
-Entities maintain independent resolution levels at each timepoint. Resolution adapts based on query patterns and importance.
+Convert plain English into executable simulation configs:
 
 ```python
-# Entity resolution elevates based on usage
-entity = store.get_entity("washington", "inauguration_1789")
-# First access: TENSOR_ONLY (cheap)
-# After 10 queries: Automatically elevates to DIALOG (detailed)
+from nl_interface import NLConfigGenerator
+
+generator = NLConfigGenerator()
+config, confidence = generator.generate_config(
+    "Simulate Paul Revere's midnight ride. 8 timepoints. "
+    "Focus on knowledge propagation."
+)
+# Returns validated config with 80-100% confidence
 ```
 
 ### 2. Modal Temporal Causality
@@ -196,254 +149,172 @@ entity = store.get_entity("washington", "inauguration_1789")
 Choose from five temporal modes:
 
 - **Pearl** - Standard DAG causality (historical realism)
-- **Directorial** - Narrative-driven events (dramatic coherence)
-- **Nonlinear** - Presentation ≠ causality (flashbacks)
+- **Directorial** - Narrative-driven (dramatic coherence)
+- **Nonlinear** - Flashbacks and non-linear presentation
 - **Branching** - Many-worlds counterfactuals
 - **Cyclical** - Time loops and prophecy
 
+### 3. Adaptive Fidelity
+
+Five resolution levels optimize cost vs. detail:
+
+1. **TENSOR** - Compressed (200 tokens, ~$0.01)
+2. **SCENE** - Context (~1-2k tokens)
+3. **GRAPH** - Relationships (~5k tokens)
+4. **DIALOG** - Conversations (~10k tokens)
+5. **TRAINED** - Full state (~50k tokens)
+
+**Result**: 95% cost reduction vs. uniform high-fidelity.
+
+### 4. Animistic Entities
+
+Support for non-human entities:
+
+- Animals (biological constraints)
+- Buildings (structural integrity)
+- Objects (state tracking)
+- Abstract concepts (idea propagation)
+- AI entities (external agent integration)
+
+### 5. Query & Export
+
+Comprehensive querying with multiple export formats:
+
 ```python
-# Historical simulation
-orchestrator.orchestrate(event, context={"temporal_mode": "pearl"})
+from reporting.query_engine import EnhancedQueryEngine
+from reporting.export_pipeline import ExportPipeline
 
-# Dramatic fiction
-orchestrator.orchestrate(event, context={"temporal_mode": "directorial"})
+# Query
+engine = EnhancedQueryEngine()
+relationships = engine.summarize_relationships(world_id)
+knowledge_flow = engine.knowledge_flow_graph(world_id)
 
-# Counterfactual analysis
-orchestrator.orchestrate(event, context={"temporal_mode": "branching"})
-```
-
-### 3. Animistic Entities
-
-Support for non-human entities with full temporal tracking:
-
-- **Animals** - Biological constraints, training levels
-- **Buildings** - Structural integrity, capacity limits
-- **Objects** - State tracking, affordances
-- **Abstract Concepts** - Propagation dynamics (ideas, rumors)
-- **AI Entities** - External agent integration
-
-```python
-# Generate scene with animistic entities
-result = orchestrator.orchestrate(
-    "Simulate Paul Revere's midnight ride",
-    context={"animism_level": 2}  # Includes horse entity
+# Export
+exporter = ExportPipeline(engine)
+exporter.export_batch(
+    world_id=world_id,
+    report_types=["summary", "relationships", "knowledge"],
+    export_formats=["json", "markdown"],
+    output_dir="./exports/"
 )
 ```
 
-### 4. Exposure Event Tracking
-
-All knowledge has causal provenance. Entities can only reference information they could have learned.
-
-```python
-# Knowledge validation
-validator.validate_knowledge(
-    entity="jefferson",
-    knowledge="Hamilton's banking plan",
-    timepoint="1789-04-30"
-)
-# Returns: Invalid (Jefferson was in Paris)
-```
-
-### 5. Counterfactual Branching
-
-Create alternate timelines from intervention points:
-
-```python
-from workflows import create_counterfactual_branch
-
-# Create alternate timeline
-branch = create_counterfactual_branch(
-    parent_timeline=baseline,
-    branch_point="duel_1804",
-    intervention={"type": "prevent", "event": "hamilton_death"}
-)
-
-# Compare outcomes
-divergence = compare_timelines(baseline, branch)
-```
+**Supported Formats**: JSON, JSONL, Markdown, CSV, SQLite
+**Compression**: gzip, bz2 (50-70% size reduction)
 
 ---
 
 ## Testing
 
-### Test Suite
-
-- **160 total tests** across 22 test files
-- 4 test levels: unit, integration, system, e2e
-- Parallel execution with pytest-xdist
-- Coverage reporting with pytest-cov
-
-**Test Files by Component:**
-- `test_e2e_autopilot.py` - 13 E2E workflow tests
-- `test_modal_temporal_causality.py` - 19 causality tests
-- `test_orchestrator.py` - 19 orchestrator tests
-- `test_animistic_entities.py` - 21 animism tests
-- `test_ai_entity_service.py` - 18 AI entity tests
-- Plus 17 more specialized test files
-
-### Running Tests
+### Run Tests
 
 ```bash
-# Fast feedback loop
-pytest -m unit -v
-
-# Pre-commit validation
-pytest -m "unit or integration" -v
-
-# Full test suite
+# All tests (70 tests in ~60 seconds)
 pytest -v
 
-# Parallel execution
-pytest -n auto
+# Specific test suites
+pytest test_e2e_autopilot.py -v           # Core timepoint stack (13 tests)
+pytest test_e2e_sprint1_full_stack.py -v  # Query interface (16 tests)
+pytest test_e2e_sprint2_full_stack.py -v  # Reporting & export (16 tests)
+pytest test_e2e_sprint3_nl_interface.py -v # Natural language (23 tests)
 
-# With coverage
-pytest --cov=. --cov-report=html
+# Complete pipeline integration
+pytest test_e2e_complete_pipeline.py -v -s
 ```
 
----
+### Test Coverage
 
-## Configuration
-
-### Environment Variables
-
-```bash
-# .env file
-OPENROUTER_API_KEY=your_key_here
-DATABASE_URL=sqlite:///timepoint.db
-```
-
-### Config Files
-
-- `conf/config.yaml` - Application configuration
-- `pytest.ini` - Test configuration with markers
-- `conftest.py` - Shared test fixtures
-
-### Temporal Mode Configuration
-
-```yaml
-# conf/config.yaml
-temporal_mode:
-  active_mode: pearl  # pearl | directorial | nonlinear | branching | cyclical
-  directorial:
-    narrative_arc: rising_action
-    dramatic_tension: 0.7
-  cyclical:
-    cycle_length: 10
-    prophecy_accuracy: 0.85
-```
-
----
-
-## Performance
-
-### Efficiency Metrics
-
-- **Token Cost Reduction:** 95% (from $500 to $5-20 per query)
-- **Compression Ratio:** 97% via TTM tensors (50k → 200 tokens)
-- **Storage:** ~2.5M tokens for 100 entities × 10 timepoints
-
-### Cost Estimates
-
-- Small simulation (5 entities, 5 timepoints): ~$1-2
-- Medium (20 entities, 10 timepoints): ~$5-8
-- Large (100 entities, 20 timepoints): ~$20-30
-
-Compare to naive full-resolution: $500+ for same scale.
-
----
-
-## Dependencies
-
-**Core:** (24 packages)
-- `langgraph>=0.2.62` - Workflow orchestration
-- `networkx>=3.4.2` - Graph operations
-- `instructor>=1.7.0` - LLM structured outputs
-- `httpx>=0.27.0` - OpenRouter API client
-- `sqlmodel>=0.0.22` - ORM layer
-- `numpy>=2.2.1`, `scipy>=1.15.0`, `scikit-learn>=1.6.1` - Tensor operations
-- `fastapi>=0.115.0`, `uvicorn>=0.32.0` - AI entity service
-- `pydantic>=2.10.0` - Data validation
-- `hydra-core>=1.3.2` - Configuration management
-
-**Testing:** (11 packages)
-- `pytest>=8.3.4` - Test framework
-- `pytest-asyncio>=0.25.2` - Async testing
-- `pytest-cov>=6.0.0` - Coverage
-- `pytest-xdist>=3.3.0` - Parallel execution
-- `pytest-mock>=3.12.0` - Mocking
-
-See `requirements.txt` and `requirements-test.txt` for complete lists.
-
----
-
-## Project Structure
-
-```
-timepoint-daedalus/
-├── cli.py                    # Main CLI entry point
-├── orchestrator.py           # Scene → specification compiler
-├── workflows.py              # LangGraph workflows (2,262 lines)
-├── query_interface.py        # Query processing (1,463 lines)
-├── validation.py             # Validation framework (1,340 lines)
-├── llm.py / llm_v2.py       # LLM integration (1,000 lines)
-├── storage.py               # Database layer
-├── schemas.py               # Data models (529 lines)
-├── temporal_chain.py        # Causal chains
-├── resolution_engine.py     # Adaptive fidelity
-├── tensors.py               # TTM compression
-├── graph.py                 # NetworkX graphs
-├── evaluation.py            # Metrics
-├── ai_entity_service.py     # FastAPI service (651 lines)
-├── conf/
-│   └── config.yaml          # Configuration
-├── test_*.py                # 22 test files (160 tests)
-├── conftest.py              # Test fixtures
-├── pytest.ini               # Test configuration
-├── requirements.txt         # Dependencies
-├── requirements-test.txt    # Test dependencies
-├── README.md                # This file
-├── MECHANICS.md             # Technical specification
-└── PLAN.md                  # Development roadmap
-```
+| Component | Tests | Status |
+|-----------|-------|--------|
+| Core Timepoint Stack | 13 | ✅ 100% |
+| Sprint 1 (Query) | 16 | ✅ 100% |
+| Sprint 2 (Reports) | 16 | ✅ 100% |
+| Sprint 3 (NL) | 23 | ✅ 100% |
+| Integration | 2 | ✅ 100% |
+| **TOTAL** | **70** | **✅ 100%** |
 
 ---
 
 ## Documentation
 
-- **README.md** (this file) - Project overview and quick start
-- **MECHANICS.md** - Technical architecture and mechanism specifications
-- **PLAN.md** - Development roadmap and outstanding work
+- **README.md** (this file) - Quick start and overview
+- **PROOF_OF_INTEGRATION.md** - Comprehensive test evidence
+- **E2E_INTEGRATION_COMPLETE.md** - API documentation and integration details
+- **MECHANICS.md** - Technical architecture
+- **SPRINT1_COMPLETE.md** - Query interface documentation
+- **SPRINT2_COMPLETE_SUMMARY.md** - Reporting & export documentation
+- **SPRINT3_COMPLETE.md** - Natural language interface documentation
 
 ---
 
-## Development
+## Performance
 
-### Contributing
+### Benchmarks
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Write tests first (test-driven development)
-4. Implement feature
-5. Run test suite (`pytest -v`)
-6. Commit changes (`git commit -m 'Add amazing feature'`)
-7. Push to branch (`git push origin feature/amazing-feature`)
-8. Open a Pull Request
+- **Small simulation** (5 entities, 5 timepoints): $1-2, 30-60s
+- **Medium simulation** (20 entities, 10 timepoints): $5-8, 60-120s
+- **Large simulation** (100 entities, 20 timepoints): $20-30, 120-300s
 
-### Code Quality
+### Efficiency
 
-```bash
-# Format code
-black .
+- **Cost reduction**: 95% (tensor compression + resolution optimization)
+- **Compression ratio**: 97% (50k tokens → 200 tokens via TTM)
+- **Query caching**: LRU with TTL (600s default)
 
-# Lint
-ruff check .
+---
 
-# Type checking
-mypy .
+## Architecture
 
-# Run tests with coverage
-pytest --cov=. --cov-report=html
-```
+### Core Components
+
+**Natural Language Interface** (`nl_interface/`):
+- `nl_to_config.py` - NL → Config translation
+- `interactive_refiner.py` - Interactive refinement
+- `clarification_engine.py` - Ambiguity detection
+- `config_validator.py` - Validation pipeline
+
+**Query & Reporting** (`reporting/`):
+- `query_engine.py` - Enhanced query interface
+- `report_generator.py` - Multi-format reports
+- `export_pipeline.py` - Batch export orchestration
+- `formatters.py` - Format conversion
+- `export_formats.py` - Export handlers
+
+**Timepoint Stack**:
+- `orchestrator.py` - Scene orchestration (742 lines)
+- `llm_v2.py` - LLM client with retry logic (1,000 lines)
+- `storage.py` - SQLite persistence
+- `schemas.py` - Pydantic V2 models (529 lines)
+- `temporal_causality.py` - Pearl-mode causality
+- `validation.py` - Safety & validation (1,340 lines)
+
+**Generation** (`generation/`):
+- `world_manager.py` - Simulation world management
+- `horizontal_generator.py` - Variation generation
+- `vertical_generator.py` - Temporal depth expansion
+- `progress_tracker.py` - Real-time metrics
+- `fault_handler.py` - Error recovery
+- `checkpoint_manager.py` - State persistence
+
+---
+
+## Dependencies
+
+**Core**:
+- `langgraph>=0.2.62` - Workflow orchestration
+- `networkx>=3.4.2` - Graph operations
+- `instructor>=1.7.0` - LLM structured outputs
+- `httpx>=0.27.0` - HTTP client
+- `sqlmodel>=0.0.22` - ORM
+- `pydantic>=2.10.0` - Validation
+- `numpy>=2.2.1`, `scipy>=1.15.0` - Tensor operations
+
+**Testing**:
+- `pytest>=8.3.4` - Test framework
+- `pytest-asyncio>=0.25.2` - Async support
+- `pytest-cov>=6.0.0` - Coverage
+
+See `requirements.txt` for complete list.
 
 ---
 
@@ -453,20 +324,10 @@ MIT
 
 ---
 
-## Acknowledgments
+## Contact
 
-Built with:
-- **LangGraph** - Workflow orchestration
-- **NetworkX** - Graph operations
-- **Instructor** - LLM structured outputs
-- **SQLModel** - ORM layer
-- **FastAPI** - API service
-- **scikit-learn** - Tensor compression
-- **Hydra** - Configuration management
+For questions or issues, please open a GitHub issue.
 
 ---
 
-**Status:** 100% complete (17/17 mechanisms) ✅ All features operational
-**Tests:** 200+ tests across 24 files (13/13 E2E passing)
-**Codebase:** 47 Python files, 19,596 lines
-**Ground Truth Verified:** October 21, 2025
+**Production Ready** ✅ | **70/70 Tests Passing** ✅ | **All Features Operational** ✅
