@@ -15,7 +15,7 @@ class OxenConfig:
     api_token: Optional[str] = None
     default_namespace: Optional[str] = None
     default_repo: Optional[str] = None
-    hub_url: str = "https://hub.oxen.ai"
+    hub_url: str = "https://www.oxen.ai"
     api_base_url: str = "https://api.oxen.ai"
 
     @classmethod

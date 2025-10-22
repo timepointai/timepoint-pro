@@ -216,8 +216,11 @@ class OxenClient:
             # Build URLs
             full_name = f"{self.namespace}/{self.repo_name}"
             repo_url = f"{self.config.hub_url}/{full_name}"
-            dataset_url = f"{repo_url}/file/main/{dst_path}"
-            finetune_url = f"{self.config.hub_url}/fine-tune?repo={full_name}&file={dst_path}"
+            # For file URLs, need to append filename at the end
+            dataset_url = f"{repo_url}/file/main/{dst_path}/{file_path_obj.name}"
+            # Oxen.ai does not support programmatic fine-tune creation
+            # Users must create fine-tunes manually through the web UI
+            finetune_url = repo_url  # Direct users to repo where they can create fine-tune
 
             # Extract commit ID if available
             commit_id = getattr(commit_result, "id", None) or "unknown"
@@ -296,3 +299,261 @@ class OxenClient:
             return True
         except Exception:
             return False
+
+    # Branch Management Methods
+
+    def create_branch(
+        self, branch_name: str, from_branch: str = "main"
+    ) -> str:
+        """
+        Create a new branch from an existing branch.
+
+        Args:
+            branch_name: Name of the new branch
+            from_branch: Branch to create from (default: "main")
+
+        Returns:
+            Branch name
+
+        Raises:
+            RepositoryError: If branch creation fails
+        """
+        if not self.remote_repo:
+            raise RepositoryError("No repository initialized")
+
+        try:
+            self.remote_repo.create_branch(branch_name, from_branch)
+            return branch_name
+        except Exception as e:
+            raise RepositoryError(f"Failed to create branch '{branch_name}': {e}")
+
+    def list_branches(self) -> list:
+        """
+        List all branches in the repository.
+
+        Returns:
+            List of branch names
+
+        Raises:
+            RepositoryError: If listing branches fails
+        """
+        if not self.remote_repo:
+            raise RepositoryError("No repository initialized")
+
+        try:
+            branches = self.remote_repo.branches()
+            # Extract branch names from branch objects
+            return [b.name if hasattr(b, 'name') else str(b) for b in branches]
+        except Exception as e:
+            raise RepositoryError(f"Failed to list branches: {e}")
+
+    def get_current_branch(self) -> str:
+        """
+        Get the current branch name.
+
+        Returns:
+            Current branch name
+
+        Raises:
+            RepositoryError: If getting current branch fails
+        """
+        if not self.remote_repo:
+            raise RepositoryError("No repository initialized")
+
+        try:
+            branch = self.remote_repo.branch()
+            return branch.name if hasattr(branch, 'name') else str(branch)
+        except Exception as e:
+            raise RepositoryError(f"Failed to get current branch: {e}")
+
+    def branch_exists(self, branch_name: str) -> bool:
+        """
+        Check if a branch exists.
+
+        Args:
+            branch_name: Name of the branch to check
+
+        Returns:
+            True if branch exists
+
+        Raises:
+            RepositoryError: If checking branch existence fails
+        """
+        if not self.remote_repo:
+            raise RepositoryError("No repository initialized")
+
+        try:
+            return self.remote_repo.branch_exists(branch_name)
+        except Exception as e:
+            raise RepositoryError(f"Failed to check if branch exists: {e}")
+
+    def switch_branch(self, branch_name: str) -> None:
+        """
+        Switch to a different branch (checkout).
+
+        Args:
+            branch_name: Name of the branch to switch to
+
+        Raises:
+            RepositoryError: If checkout fails
+        """
+        if not self.remote_repo:
+            raise RepositoryError("No repository initialized")
+
+        try:
+            self.remote_repo.checkout(branch_name)
+        except Exception as e:
+            raise RepositoryError(f"Failed to checkout branch '{branch_name}': {e}")
+
+    def delete_branch(self, branch_name: str) -> None:
+        """
+        Delete a branch.
+
+        Args:
+            branch_name: Name of the branch to delete
+
+        Raises:
+            RepositoryError: If branch deletion fails
+        """
+        if not self.remote_repo:
+            raise RepositoryError("No repository initialized")
+
+        try:
+            self.remote_repo.delete_branch(branch_name)
+        except Exception as e:
+            raise RepositoryError(f"Failed to delete branch '{branch_name}': {e}")
+
+    def merge_branch(
+        self, source_branch: str, target_branch: str, message: Optional[str] = None
+    ) -> str:
+        """
+        Merge source branch into target branch.
+
+        Args:
+            source_branch: Branch to merge from
+            target_branch: Branch to merge into
+            message: Optional merge commit message
+
+        Returns:
+            Merge commit ID
+
+        Raises:
+            RepositoryError: If merge fails
+        """
+        if not self.remote_repo:
+            raise RepositoryError("No repository initialized")
+
+        try:
+            # First checkout target branch
+            self.remote_repo.checkout(target_branch)
+
+            # Check if merge is possible
+            is_mergeable = self.remote_repo.mergeable(source_branch, target_branch)
+            if not is_mergeable:
+                raise RepositoryError(
+                    f"Cannot merge '{source_branch}' into '{target_branch}' - conflicts detected"
+                )
+
+            # Perform merge
+            merge_result = self.remote_repo.merge(source_branch, message or f"Merge {source_branch} into {target_branch}")
+            return getattr(merge_result, "id", "unknown")
+        except Exception as e:
+            raise RepositoryError(f"Failed to merge '{source_branch}' into '{target_branch}': {e}")
+
+    def create_feature_branch(self, feature_name: str, from_branch: str = "main") -> str:
+        """
+        Convenience method to create a feature branch with standard naming.
+
+        Args:
+            feature_name: Name of the feature (will be prefixed with "feature/")
+            from_branch: Branch to create from (default: "main")
+
+        Returns:
+            Full branch name (e.g., "feature/my-feature")
+
+        Raises:
+            RepositoryError: If branch creation fails
+        """
+        branch_name = f"feature/{feature_name}"
+        return self.create_branch(branch_name, from_branch)
+
+    def create_experiment_branch(self, experiment_name: str, from_branch: str = "main") -> str:
+        """
+        Convenience method to create an experiment branch for model training.
+
+        Args:
+            experiment_name: Name of the experiment (will be prefixed with "experiments/")
+            from_branch: Branch to create from (default: "main")
+
+        Returns:
+            Full branch name (e.g., "experiments/my-experiment")
+
+        Raises:
+            RepositoryError: If branch creation fails
+        """
+        branch_name = f"experiments/{experiment_name}"
+        return self.create_branch(branch_name, from_branch)
+
+    # Workspace Management Methods
+
+    def create_workspace(self, workspace_id: Optional[str] = None, branch: str = "main"):
+        """
+        Create a workspace for making changes.
+
+        Args:
+            workspace_id: Optional workspace ID (auto-generated if None)
+            branch: Branch to create workspace from (default: "main")
+
+        Returns:
+            Workspace object
+
+        Raises:
+            RepositoryError: If workspace creation fails
+        """
+        if not self.remote_repo:
+            raise RepositoryError("No repository initialized")
+
+        try:
+            if workspace_id:
+                workspace = self.remote_repo.create_workspace(workspace_id, branch)
+            else:
+                workspace = self.remote_repo.create_workspace(branch)
+            return workspace
+        except Exception as e:
+            raise RepositoryError(f"Failed to create workspace: {e}")
+
+    def list_workspaces(self) -> list:
+        """
+        List all workspaces in the repository.
+
+        Returns:
+            List of workspace objects
+
+        Raises:
+            RepositoryError: If listing workspaces fails
+        """
+        if not self.remote_repo:
+            raise RepositoryError("No repository initialized")
+
+        try:
+            return self.remote_repo.list_workspaces()
+        except Exception as e:
+            raise RepositoryError(f"Failed to list workspaces: {e}")
+
+    def delete_workspace(self, workspace_id: str) -> None:
+        """
+        Delete a workspace.
+
+        Args:
+            workspace_id: ID of the workspace to delete
+
+        Raises:
+            RepositoryError: If workspace deletion fails
+        """
+        if not self.remote_repo:
+            raise RepositoryError("No repository initialized")
+
+        try:
+            self.remote_repo.delete_workspace(workspace_id)
+        except Exception as e:
+            raise RepositoryError(f"Failed to delete workspace '{workspace_id}': {e}")

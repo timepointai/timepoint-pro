@@ -519,7 +519,7 @@ class FineTuneLauncher:
         lora_rank_str = str(job.config.lora_rank) if job.config.use_lora else 'N/A'
 
         instructions = {
-            "notebook_url": "https://hub.oxen.ai/ox/train-llm",
+            "notebook_url": "https://www.oxen.ai/ox/train-llm",
             "instructions": f"""
 To launch fine-tuning on Oxen.ai:
 

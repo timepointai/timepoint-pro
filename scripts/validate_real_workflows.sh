@@ -46,14 +46,19 @@ if [ -z "$OXEN_API_KEY" ]; then
     exit 1
 fi
 
-# Force real LLM mode
+# Force real LLM mode and export tokens
 export LLM_SERVICE_ENABLED=true
 export ALLOW_MOCK_MODE=false
 export OXEN_TEST_NAMESPACE="realityinspector"
+export OXEN_API_TOKEN="${OXEN_API_KEY}"  # Script loads OXEN_API_KEY from .env, export as OXEN_API_TOKEN
 
 echo "✓ API keys loaded"
 echo "✓ LLM_SERVICE_ENABLED=true (real mode enforced)"
 echo "✓ ALLOW_MOCK_MODE=false (mocks disabled)"
+
+# Activate virtual environment
+echo "✓ Activating virtual environment..."
+source .venv/bin/activate
 echo ""
 
 # ============================================================================
@@ -65,7 +70,7 @@ echo "========================================================================"
 echo "Testing: orchestrator.py → LLM → scene specification"
 echo ""
 
-python3 << 'PYTHON_SCRIPT' > "${EVIDENCE_DIR}/workflow1_timepoint_modeling.log" 2>&1
+python << 'PYTHON_SCRIPT' > "${EVIDENCE_DIR}/workflow1_timepoint_modeling.log" 2>&1
 import os
 import sys
 sys.path.insert(0, os.getcwd())
@@ -196,7 +201,7 @@ echo "========================================================================"
 echo "Testing: Generate data → Store locally → Upload to Oxen → Validate"
 echo ""
 
-python3 << 'PYTHON_SCRIPT' > "${EVIDENCE_DIR}/workflow3_data_oxen.log" 2>&1
+python << 'PYTHON_SCRIPT' > "${EVIDENCE_DIR}/workflow3_data_oxen.log" 2>&1
 import os
 import sys
 import json
@@ -319,7 +324,7 @@ echo ""
 
 # Note: Running full 50 simulations would be expensive (~$2-5)
 # Run with reduced count for validation
-python3 << 'PYTHON_SCRIPT' > "${EVIDENCE_DIR}/workflow4_finetuning.log" 2>&1
+python << 'PYTHON_SCRIPT' > "${EVIDENCE_DIR}/workflow4_finetuning.log" 2>&1
 import os
 import sys
 import json

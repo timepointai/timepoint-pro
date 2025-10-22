@@ -70,20 +70,47 @@ class EntityEvolutionFormatter:
     ) -> Dict[str, str]:
         """Create a single evolution training example with REAL simulation data"""
 
-        # Extract entity state at T0 from actual simulation
+        # Get exposure events for this entity
+        exposure_events = simulation_result.get("exposure_events", {})
+        entity_exposures = exposure_events.get(entity.entity_id, [])
+
+        # Reconstruct knowledge state at T0 by filtering exposures up to T0
+        t0_exposures = [
+            exp for exp in entity_exposures
+            if hasattr(exp, 'timepoint_id') and (
+                exp.timepoint_id == t0.timepoint_id or
+                exp.event_type == "initial"  # Include initial knowledge
+            )
+        ]
+        t0_knowledge = [exp.information for exp in t0_exposures if hasattr(exp, 'information')]
+
+        # Reconstruct knowledge state at T1 by filtering exposures up to T1
+        t1_exposures = [
+            exp for exp in entity_exposures
+            if hasattr(exp, 'timepoint_id') and (
+                exp.timepoint_id in [t0.timepoint_id, t1.timepoint_id] or
+                exp.event_type == "initial"
+            )
+        ]
+        t1_knowledge = [exp.information for exp in t1_exposures if hasattr(exp, 'information')]
+
+        # Calculate new knowledge acquired between T0 and T1
+        new_knowledge = [k for k in t1_knowledge if k not in t0_knowledge]
+
+        # Reconstruct entity state at T0
         t0_state = {
             "entity_id": entity.entity_id,
             "entity_type": entity.entity_type,
-            "knowledge_state": entity.cognitive_tensor.knowledge_state if hasattr(entity, 'cognitive_tensor') else [],
-            "energy_budget": entity.cognitive_tensor.energy_budget if hasattr(entity, 'cognitive_tensor') else 100.0,
+            "knowledge_state": t0_knowledge,  # RECONSTRUCTED from exposure events
+            "energy_budget": 100.0,  # Start with full energy at T0
             "emotional_state": {
-                "valence": entity.cognitive_tensor.emotional_valence if hasattr(entity, 'cognitive_tensor') else 0.0,
-                "arousal": entity.cognitive_tensor.emotional_arousal if hasattr(entity, 'cognitive_tensor') else 0.0,
-            } if hasattr(entity, 'cognitive_tensor') else {"valence": 0.0, "arousal": 0.0},
+                "valence": 0.0,
+                "arousal": 0.0,
+            },
             "resolution_level": entity.resolution_level.value if hasattr(entity.resolution_level, 'value') else str(entity.resolution_level),
         }
 
-        # Build prompt
+        # Build prompt showing T0 state and the event
         prompt = f"""Given an entity at timepoint T0 and an event, predict the entity's state at T1.
 
 Entity at T0:
@@ -92,7 +119,7 @@ Entity at T0:
 Event at T0:
 {t0.event_description}
 
-Timepoint T1:
+Event at T1:
 {t1.event_description}
 
 Predict the entity's state at T1 including:
@@ -103,43 +130,30 @@ Predict the entity's state at T1 including:
 
 Respond with JSON."""
 
-        # Extract REAL exposure events for this entity at T1
-        exposure_events = simulation_result.get("exposure_events", {})
-        entity_exposures = exposure_events.get(entity.entity_id, [])
-
-        # Filter exposures that occurred at or before T1
-        t1_exposures = [
-            exp for exp in entity_exposures
-            if hasattr(exp, 'timepoint_id') and exp.timepoint_id == t1.timepoint_id
-        ]
-
-        # Extract new knowledge from exposures
-        new_knowledge = [exp.information for exp in t1_exposures if hasattr(exp, 'information')]
-
-        # Simulate energy decrease based on activity
+        # Calculate energy decrease based on activity
         energy_cost = 5.0 + (len(t1.entities_present) * 2.0)  # Base cost + social cost
         new_energy = max(0, t0_state["energy_budget"] - energy_cost)
 
-        # Simulate emotional changes based on event importance
+        # Calculate emotional changes based on event importance
         importance = getattr(t1, 'importance', 0.5)
         emotional_delta = {
-            "valence": (importance - 0.5) * 0.2,  # Higher importance -> more valence change
-            "arousal": importance * 0.3  # Higher importance -> higher arousal
+            "valence": (importance - 0.5) * 0.2,
+            "arousal": importance * 0.3
         }
 
-        # Build completion with REAL simulation data
+        # Build completion with T1 state showing REAL evolution
         completion = json.dumps({
             "entity_id": entity.entity_id,
             "timepoint": t1.timepoint_id,
-            "knowledge_state": t0_state["knowledge_state"] + new_knowledge,  # REAL knowledge updates
-            "energy_budget": new_energy,  # REAL energy calculation
+            "knowledge_state": t1_knowledge,  # RECONSTRUCTED from exposure events
+            "energy_budget": new_energy,
             "emotional_state": {
                 "valence": t0_state["emotional_state"]["valence"] + emotional_delta["valence"],
                 "arousal": t0_state["emotional_state"]["arousal"] + emotional_delta["arousal"]
             },
             "resolution_level": t0_state["resolution_level"],
             "changes_from_t0": {
-                "new_knowledge_acquired": new_knowledge,  # REAL exposure events
+                "new_knowledge_acquired": new_knowledge,  # REAL knowledge delta
                 "energy_spent": energy_cost,
                 "emotional_delta": emotional_delta,
                 "causal_factors": [t1.event_description],

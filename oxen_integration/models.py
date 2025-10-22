@@ -32,9 +32,16 @@ class UploadResult:
                 f"✅ Upload successful\n"
                 f"   Repository: {self.repo_url}\n"
                 f"   Dataset: {self.dataset_url}\n"
-                f"   Fine-tune: {self.finetune_url}\n"
                 f"   Size: {self.file_size_bytes:,} bytes\n"
-                f"   Commit: {self.commit_id}"
+                f"   Commit: {self.commit_id}\n"
+                f"\n"
+                f"   Next steps to create a fine-tune:\n"
+                f"   1. Visit: {self.finetune_url}\n"
+                f"   2. Navigate to the dataset file\n"
+                f"   3. Click 'Fine-tune' to create a fine-tuning job\n"
+                f"   \n"
+                f"   Note: Oxen.ai does not support programmatic fine-tune creation.\n"
+                f"         Fine-tunes must be created manually through the web UI."
             )
         else:
             return f"❌ Upload failed: {self.error_message}"

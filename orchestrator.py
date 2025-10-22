@@ -187,25 +187,14 @@ Schema:
             )
 
         try:
-            from llm import retry_with_backoff
-
-            def _api_call():
-                response = self.llm.client.chat.completions.create(
-                    model=self.llm.default_model,
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=0.3,  # Lower temperature for structured output
-                    max_tokens=4000
-                )
-                content = response["choices"][0]["message"]["content"]
-
-                # Parse JSON response
-                data = json.loads(content.strip())
-                return response_model(**data)
-
-            result = retry_with_backoff(_api_call, max_retries=3, base_delay=1.0)
-
-            self.llm.token_count += 4000  # Estimate
-            self.llm.cost += 0.02  # Estimate
+            # Use LLMClient's generate_structured method (proper API)
+            result = self.llm.generate_structured(
+                prompt=prompt,
+                response_model=response_model,
+                model=None,  # Use default model
+                temperature=0.3,  # Lower temperature for structured output
+                max_tokens=4000
+            )
 
             return result
 

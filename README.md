@@ -14,12 +14,13 @@ Timepoint-Daedalus enables you to:
 - **Export results** - Reports in Markdown, JSON, CSV with compression
 - **Optimize costs** - 95% reduction via adaptive fidelity (tensor compression)
 
-**Status**: Integration in Progress ⏳
+**Status**: Validated and Production Ready ✅
 - All 17 core mechanisms implemented (M1-M17)
-- 458 tests collected (13 E2E, 445 integration/unit)
-- Democked LLM integration (requires real API key)
+- 462 tests collected (17 E2E, 445 integration/unit)
+- Real LLM integration validated (requires `OPENROUTER_API_KEY`)
 - Complete pipeline: Natural Language → Simulation → Query → Report → Export
-- **Note**: System now requires `OPENROUTER_API_KEY` - mock mode removed for production workflows
+- **Note**: Mock mode disabled - system requires real LLM for production workflows
+- **Validation**: See [VALIDATION_REPORT.md](VALIDATION_REPORT.md) for comprehensive validation evidence
 
 ---
 
@@ -211,11 +212,14 @@ exporter.export_batch(
 ### Run Tests
 
 ```bash
-# All tests (458 tests collected)
+# All tests (462 tests collected)
 pytest -v
 
-# E2E tests (13 tests - require real LLM)
-pytest test_e2e_autopilot.py -v -m e2e
+# E2E tests (17 tests - require real LLM)
+pytest test_e2e_autopilot.py -v --real-llm
+
+# Validation workflow tests (4 critical workflows)
+pytest test_e2e_autopilot.py::TestE2EValidationWorkflows -v --real-llm
 
 # Unit/integration tests (run without API key)
 pytest -m "not llm" -v
@@ -230,20 +234,55 @@ pytest test_e2e_complete_pipeline.py -v -s
 
 ### Test Coverage
 
-**Total Tests**: 458 collected
+**Total Tests**: 462 collected
 
 | Test Type | Count | Notes |
 |-----------|-------|-------|
-| E2E (full stack) | 13 | Require real LLM |
+| E2E (full stack) | 17 | Require real LLM (13 original + 4 validation workflows) |
 | Integration | ~200 | Multi-component tests |
 | Unit | ~245 | Isolated components |
-| **TOTAL** | **458** | See PLAN.md for details |
+| **TOTAL** | **462** | See [TEST_CHECKLIST.md](TEST_CHECKLIST.md) for details |
 
 **Test Markers**:
 - `@pytest.mark.e2e` - End-to-end workflows
 - `@pytest.mark.llm` - Require real LLM API
+- `@pytest.mark.validation` - Critical validation workflow tests
 - `@pytest.mark.slow` - Long-running tests
 - `@pytest.mark.unit` - Fast isolated tests
+
+**Validation Workflows** (see [VALIDATION_REPORT.md](VALIDATION_REPORT.md)):
+1. Timepoint AI modeling (orchestrator → LLM → scene spec)
+2. E2E test rig with real LLM
+3. Data generation + Oxen storage
+4. Fine-tuning data quality validation
+
+---
+
+## Fine-Tuning
+
+### Horizontal Fine-Tuning (Breadth)
+Generate many scenario variations for training diversity:
+
+```bash
+# Generate 50 variations with different personalities/outcomes
+python run_real_finetune.py
+```
+
+### Vertical Fine-Tuning (Depth)
+Generate deep temporal simulations with 12 timepoints:
+
+```bash
+# Generate deep temporal simulation with progressive training
+python run_vertical_finetune.py
+```
+
+**Output**: Training data in JSONL format uploaded to Oxen.ai
+**Repository**: `realityinspector/proof-the-e2e-works`
+
+**Note**: Oxen.ai does not support programmatic fine-tune creation. After uploading:
+1. Visit your Oxen repository
+2. Navigate to the uploaded dataset file
+3. Use the web UI to manually create a fine-tuning job
 
 ---
 
@@ -251,7 +290,8 @@ pytest test_e2e_complete_pipeline.py -v -s
 
 - **README.md** (this file) - Quick start and overview
 - **MECHANICS.md** - Technical architecture and 17 core mechanisms
-- **PLAN.md** - Integration status, validation checklists, known issues
+- **VALIDATION_REPORT.md** - Comprehensive validation evidence
+- **TEST_CHECKLIST.md** - Test inventory and validation checklist
 
 ---
 
@@ -338,4 +378,4 @@ For questions or issues, please open a GitHub issue.
 
 ---
 
-**Integration in Progress** ⏳ | **458 Tests Collected** ✅ | **Democked LLM Integration** ✅ | See **PLAN.md** for status
+**Validated and Production Ready** ✅ | **462 Tests (17 E2E)** ✅ | **Real LLM Integration** ✅ | See **VALIDATION_REPORT.md** for evidence

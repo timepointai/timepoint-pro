@@ -178,6 +178,7 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "validation: Data validation and consistency")
     config.addinivalue_line("markers", "safety: Security and safety features")
     config.addinivalue_line("markers", "compliance: Regulatory and compliance")
+    config.addinivalue_line("markers", "validation_workflow: Critical validation workflow tests (requires real LLM)")
 
     # Apply skip markers based on options
     if config.getoption("--skip-llm"):

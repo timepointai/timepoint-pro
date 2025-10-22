@@ -885,6 +885,275 @@ class TestE2EOrchestratorIntegration:
         print("="*70)
 
 
+@pytest.mark.e2e
+@pytest.mark.validation
+@pytest.mark.slow
+class TestE2EValidationWorkflows:
+    """
+    E2E tests for the 4 critical validation workflows
+
+    These tests capture the validation workflows from VALIDATION_REPORT.md:
+    1. Timepoint AI modeling validation
+    2. E2E test rig with real LLM
+    3. Data generation + Oxen storage validation
+    4. Fine-tuning workflow validation
+    """
+
+    @pytest.mark.llm
+    def test_workflow1_timepoint_ai_modeling(self, real_llm_client, graph_store):
+        """
+        Workflow 1: Timepoint AI Modeling Validation
+
+        Tests: orchestrator.py → LLM → scene specification
+        Validates: No mock patterns, real LLM-generated content
+        """
+        from orchestrator import simulate_event
+
+        print("\n" + "="*70)
+        print("WORKFLOW 1: TIMEPOINT AI MODELING VALIDATION")
+        print("="*70)
+
+        # Run simulation with real LLM
+        result = simulate_event(
+            "Simulate a quick 2-person meeting to discuss project status",
+            real_llm_client,
+            graph_store,
+            context={
+                "max_entities": 2,
+                "max_timepoints": 2,
+                "temporal_mode": "pearl"
+            },
+            save_to_db=True
+        )
+
+        # Validate results
+        assert result is not None
+        assert 'specification' in result
+        assert 'entities' in result
+        assert 'timepoints' in result
+        assert 'graph' in result
+
+        # Validate NOT mock data
+        scene_title = result['specification'].scene_title
+        assert scene_title != "Test Scene", "Got mock 'Test Scene'"
+
+        # Check for mock entity patterns
+        for entity in result['entities']:
+            assert not entity.entity_id.startswith("test_entity_"), \
+                f"Mock entity ID detected: {entity.entity_id}"
+
+        # Validate real content
+        assert len(result['entities']) >= 2, "Should generate at least 2 entities"
+        assert len(result['timepoints']) >= 1, "Should generate at least 1 timepoint"
+        assert result['graph'].number_of_nodes() >= 2, "Graph should have nodes"
+
+        print(f"\n✅ WORKFLOW 1 PASSED")
+        print(f"   Scene: {scene_title}")
+        print(f"   Entities: {len(result['entities'])}")
+        print(f"   Timepoints: {len(result['timepoints'])}")
+        print(f"   Graph Nodes: {result['graph'].number_of_nodes()}")
+
+    @pytest.mark.llm
+    def test_workflow2_e2e_test_rig_validation(self, real_llm_client, graph_store):
+        """
+        Workflow 2: E2E Test Rig Validation
+
+        Tests: Full entity generation workflow with real LLM
+        Validates: E2E test infrastructure works with real API calls
+        """
+        from workflows import generate_animistic_entities_for_scene
+        from validation import Validator
+
+        print("\n" + "="*70)
+        print("WORKFLOW 2: E2E TEST RIG VALIDATION")
+        print("="*70)
+
+        scene_description = "Constitutional Convention debate, 1787"
+
+        # Generate entities
+        entities = generate_animistic_entities_for_scene(
+            scene_description=scene_description,
+            llm_client=real_llm_client,
+            entity_count=3
+        )
+
+        assert len(entities) >= 3, "Should generate at least 3 entities"
+
+        # Validate and save
+        validator = Validator()
+        validation_count = 0
+
+        for entity in entities:
+            result = validator.validate_entity(entity)
+            is_valid = result["valid"] or len(result.get("violations", [])) == 0
+            if is_valid:
+                validation_count += 1
+            graph_store.save_entity(entity)
+
+        # Verify retrieval
+        retrieved_count = 0
+        for entity in entities:
+            if graph_store.get_entity(entity.entity_id, entity.timepoint):
+                retrieved_count += 1
+
+        assert retrieved_count >= 3, f"Only retrieved {retrieved_count}/3 entities"
+        assert validation_count >= 2, "At least 2 entities should validate"
+
+        print(f"\n✅ WORKFLOW 2 PASSED")
+        print(f"   Entities generated: {len(entities)}")
+        print(f"   Entities validated: {validation_count}")
+        print(f"   Entities retrieved: {retrieved_count}")
+
+    @pytest.mark.llm
+    def test_workflow3_data_generation_oxen_storage(self, real_llm_client, graph_store):
+        """
+        Workflow 3: Data Generation + Oxen Storage Validation
+
+        Tests: Generate simulation → Store locally → Upload to Oxen
+        Validates: Full data pipeline with real simulation data
+        """
+        from orchestrator import simulate_event
+        from oxen_integration import OxenClient
+        import tempfile
+        import json
+        import os
+
+        print("\n" + "="*70)
+        print("WORKFLOW 3: DATA GENERATION + OXEN STORAGE")
+        print("="*70)
+
+        # Generate simulation
+        result = simulate_event(
+            "Simulate a 3-person negotiation with 3 key decision points",
+            real_llm_client,
+            graph_store,
+            context={
+                "max_entities": 3,
+                "max_timepoints": 3,
+                "temporal_mode": "pearl"
+            },
+            save_to_db=True
+        )
+
+        scene_title = result['specification'].scene_title
+        assert "Test Scene" not in scene_title, "Got mock data"
+
+        print(f"   Generated: {scene_title}")
+        print(f"   Entities: {len(result['entities'])}")
+        print(f"   Timepoints: {len(result['timepoints'])}")
+
+        # Store data locally
+        data_file = tempfile.mktemp(suffix=".json")
+        with open(data_file, 'w') as f:
+            json.dump({
+                "scene_title": scene_title,
+                "entities": [e.entity_id for e in result['entities']],
+                "timepoints": [tp.timepoint_id for tp in result['timepoints']],
+                "validation_timestamp": datetime.now().isoformat()
+            }, f, indent=2)
+
+        file_size = os.path.getsize(data_file)
+        print(f"   Stored locally: {file_size} bytes")
+
+        # Upload to Oxen
+        oxen_client = OxenClient(
+            namespace=os.getenv("OXEN_TEST_NAMESPACE", "realityinspector"),
+            repo_name="validation_test_workflow3_e2e",
+            interactive_auth=False
+        )
+
+        upload_result = oxen_client.upload_dataset(
+            file_path=data_file,
+            commit_message="Workflow 3 E2E validation: Real simulation data",
+            dst_path="validation/workflow3_e2e_test.json",
+            create_repo_if_missing=True
+        )
+
+        # Cleanup
+        os.unlink(data_file)
+
+        assert upload_result.repo_url is not None
+        assert upload_result.dataset_url is not None
+
+        print(f"\n✅ WORKFLOW 3 PASSED")
+        print(f"   Repository: {upload_result.repo_url}")
+        print(f"   Dataset URL: {upload_result.dataset_url}")
+
+    @pytest.mark.llm
+    def test_workflow4_finetuning_data_quality(self, real_llm_client, graph_store):
+        """
+        Workflow 4: Fine-Tuning Workflow Validation
+
+        Tests: Generate training data → Validate quality
+        Validates: Training data contains real LLM content, no mock patterns
+        """
+        from generation import HorizontalGenerator
+        from generation.config_schema import SimulationConfig
+        from orchestrator import simulate_event
+        from oxen_integration.data_formatters import EntityEvolutionFormatter
+
+        print("\n" + "="*70)
+        print("WORKFLOW 4: FINE-TUNING WORKFLOW VALIDATION")
+        print("="*70)
+
+        # Generate 3 simulations
+        generator = HorizontalGenerator()
+        base_config = SimulationConfig.example_board_meeting()
+
+        variations = generator.generate_variations(
+            base_config=base_config,
+            count=3,
+            strategies=["vary_personalities", "vary_outcomes"],
+            random_seed=42
+        )
+
+        simulation_results = []
+        for i, variation in enumerate(variations):
+            print(f"\n   Simulation {i+1}/3...")
+
+            result = simulate_event(
+                variation.scenario_description,
+                real_llm_client,
+                graph_store,
+                context={
+                    "max_entities": min(variation.entities.count, 3),
+                    "max_timepoints": min(variation.timepoints.count, 2),
+                    "temporal_mode": variation.temporal.mode
+                },
+                save_to_db=False
+            )
+
+            simulation_results.append(result)
+            print(f"      ✓ Title: {result['specification'].scene_title}")
+
+        # Validate uniqueness
+        titles = [r['specification'].scene_title for r in simulation_results]
+        assert "Test Scene" not in titles, "Mock data detected"
+
+        # Format training data
+        formatter = EntityEvolutionFormatter()
+        training_examples = formatter.format_batch(simulation_results)
+
+        assert len(training_examples) > 0, "No training examples generated"
+
+        # Validate training data quality
+        mock_patterns_found = 0
+        for example in training_examples[:5]:
+            completion = example.get('completion', '')
+            if isinstance(completion, str):
+                if 'test_entity_' in completion:
+                    mock_patterns_found += 1
+                elif '"fact1"' in completion or '"fact2"' in completion:
+                    mock_patterns_found += 1
+
+        assert mock_patterns_found == 0, f"Found {mock_patterns_found} mock patterns in training data"
+
+        print(f"\n✅ WORKFLOW 4 PASSED")
+        print(f"   Simulations: {len(simulation_results)}")
+        print(f"   Training examples: {len(training_examples)}")
+        print(f"   Mock patterns: {mock_patterns_found}")
+
+
 if __name__ == "__main__":
     """
     Run E2E tests directly

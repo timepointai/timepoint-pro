@@ -328,6 +328,216 @@ class SimulationConfig(BaseModel):
             )
         )
 
+    @classmethod
+    def example_scarlet_study_deep(cls) -> "SimulationConfig":
+        """
+        Deep temporal investigation case demonstrating all 17 mechanisms.
+
+        The Scarlet Study: A detective, doctor, and criminal mastermind navigate
+        a complex murder investigation across 101 timepoints. Showcases:
+        - M1-M5: Heterogeneous fidelity, progressive training, exposure tracking
+        - M6-M8: TTM tensors, causal chains, embodied states
+        - M9-M11: On-demand entities, scene atmosphere, dialog synthesis
+        - M12-M13: Counterfactual branches, relationship evolution
+        - M14-M17: Circadian patterns, prospection, animism, modal causality
+
+        Use this for character-based fine-tuning data generation.
+        """
+        return cls(
+            scenario_description=(
+                "A brilliant but physically deteriorating detective (irregular sleep, stimulant use) "
+                "investigates a locked-room murder with his doctor companion. The victim, a diplomat, "
+                "was found with mysterious scarlet markings. Track the investigation from initial crime "
+                "scene discovery through 100+ timepoints of deduction, laboratory analysis, witness "
+                "interrogation, and final confrontation. The detective's deductive patterns improve "
+                "across timepoints (M2: progressive training), physical constraints affect cognition "
+                "(M8: embodied states), and knowledge accumulates through exposure events (M3). "
+                "London itself acts as an informant entity (M16: animism), atmosphere shifts with "
+                "revelations (M10: scene entities), and the detective models the criminal's next moves "
+                "(M15: prospection). Multiple resolution levels (M1): detective at TRAINED, doctor at "
+                "DIALOG, witnesses at SCENE, crowd at TENSOR."
+            ),
+            world_id="scarlet_study_deep",
+            entities=EntityConfig(
+                count=5,
+                types=["human", "building", "abstract"],
+                initial_resolution=ResolutionLevel.SCENE,
+                animism_level=3  # Include buildings (221B Baker Street) and abstract concepts (London fog)
+            ),
+            timepoints=TimepointConfig(
+                count=1,  # Critical moment: revelation of the killer's identity
+                before_count=50,  # 50 timepoints of investigation leading up
+                after_count=50,  # 50 timepoints of aftermath, trial, reflection
+                resolution="hour"
+            ),
+            temporal=TemporalConfig(
+                mode=TemporalMode.PEARL,  # Standard causality - clues must be observed before deduction
+                enable_counterfactuals=True  # M12: "What if detective missed this clue?"
+            ),
+            outputs=OutputConfig(
+                formats=["jsonl", "json"],
+                include_dialogs=True,  # M11: Detective-doctor exchanges, interrogations
+                include_relationships=True,  # M13: Trust evolution, rivalry dynamics
+                include_knowledge_flow=True,  # M3: Exposure event tracking
+                export_ml_dataset=True  # Character roleplay training data
+            ),
+            metadata={
+                "character_focus": "detective",
+                "mechanisms_featured": [
+                    "M1_heterogeneous_fidelity",
+                    "M2_progressive_training",
+                    "M3_exposure_events",
+                    "M4_physics_validation",
+                    "M5_query_resolution",
+                    "M6_ttm_tensors",
+                    "M7_causal_chains",
+                    "M8_embodied_states",
+                    "M9_on_demand_generation",
+                    "M10_scene_entities",
+                    "M11_dialog_synthesis",
+                    "M12_counterfactual_branching",
+                    "M13_multi_entity_synthesis",
+                    "M14_circadian_patterns",
+                    "M15_entity_prospection",
+                    "M16_animistic_entities",
+                    "M17_modal_causality"
+                ],
+                "character_ttm_tensors": {
+                    "detective": ["observation_acuity", "deductive_chains", "pattern_recognition", "stimulant_dependency"],
+                    "doctor": ["medical_knowledge", "empathy_vector", "narrative_coherence", "fatigue_accumulation"],
+                    "criminal": ["strategic_planning", "manipulation_skill", "risk_assessment", "desperation_level"]
+                },
+                "temporal_depth": 101,
+                "expected_training_examples": 500  # 5 entities × 100 transitions
+            }
+        )
+
+    @classmethod
+    def example_empty_house_flashback(cls) -> "SimulationConfig":
+        """
+        Nonlinear narrative demonstrating flashback structure and survival story.
+
+        The Empty House: A detective returns from apparent death, revealing how
+        they survived a fatal confrontation through nonlinear flashbacks. Demonstrates
+        M17: Modal Causality (NONLINEAR mode) where presentation order ≠ causal order.
+        """
+        return cls(
+            scenario_description=(
+                "Three years after the detective's apparent death at Reichenbach Falls, they suddenly "
+                "reappear in London. The narrative unfolds nonlinearly: present-day investigation of a "
+                "new murder intercut with flashbacks revealing survival techniques, hidden allies, and "
+                "the criminal network dismantled in secret. Track through 81 timepoints as past and "
+                "present converge. Emphasizes M17 (nonlinear causality), M13 (relationship evolution "
+                "across temporal gaps), M8 (physical trauma and recovery), and M15 (prospection: planning "
+                "the return while in hiding)."
+            ),
+            world_id="empty_house_flashback",
+            entities=EntityConfig(
+                count=4,
+                types=["human", "building"],
+                initial_resolution=ResolutionLevel.DIALOG,
+                animism_level=2  # Camden House (the empty house) as entity
+            ),
+            timepoints=TimepointConfig(
+                count=1,  # Critical moment: detective reveals survival
+                before_count=40,  # Flashbacks to survival period
+                after_count=40,  # Present-day investigation
+                resolution="day"
+            ),
+            temporal=TemporalConfig(
+                mode=TemporalMode.NONLINEAR,  # M17: Presentation order ≠ causal order
+                enable_counterfactuals=False
+            ),
+            outputs=OutputConfig(
+                formats=["jsonl", "markdown"],
+                include_dialogs=True,
+                include_relationships=True,
+                include_knowledge_flow=True,
+                export_ml_dataset=True
+            ),
+            metadata={
+                "character_focus": "detective",
+                "narrative_structure": "nonlinear_flashback",
+                "mechanisms_featured": [
+                    "M17_modal_causality_nonlinear",
+                    "M13_relationship_evolution",
+                    "M8_embodied_trauma_recovery",
+                    "M15_long_term_prospection",
+                    "M3_knowledge_gaps",
+                    "M11_emotional_reunion_dialogs"
+                ],
+                "temporal_depth": 81,
+                "expected_training_examples": 320  # 4 entities × 80 transitions
+            }
+        )
+
+    @classmethod
+    def example_final_problem_branching(cls) -> "SimulationConfig":
+        """
+        Branching timeline demonstrating counterfactual reasoning and many-worlds.
+
+        The Final Problem: Detective confronts criminal mastermind at Reichenbach Falls.
+        Multiple timeline branches explore: (1) detective survives, (2) detective dies,
+        (3) both survive and form uneasy alliance, (4) third party intervention.
+        Demonstrates M12: Counterfactual Branching and M17: BRANCHING mode causality.
+        """
+        return cls(
+            scenario_description=(
+                "The detective and criminal mastermind meet at Reichenbach Falls for their final confrontation. "
+                "This scenario branches into multiple timelines based on critical decision points: does the "
+                "detective accept the criminal's offer to join forces? Does a third party intervene? Does "
+                "the doctor arrive in time? Each branch propagates causally forward, creating distinct "
+                "futures. Track 61 timepoints across 4 major branches, with M12 (counterfactual branching), "
+                "M15 (prospection: both characters modeling each other's strategies), M8 (physical exhaustion "
+                "affecting decisions), and M17 (branching mode causality)."
+            ),
+            world_id="final_problem_branching",
+            entities=EntityConfig(
+                count=4,
+                types=["human", "abstract"],
+                initial_resolution=ResolutionLevel.TRAINED,  # High fidelity for strategic modeling
+                animism_level=3  # Fate/destiny as abstract entity influencing outcomes
+            ),
+            timepoints=TimepointConfig(
+                count=1,  # Critical branching moment: the confrontation
+                before_count=30,  # Lead-up: travel to Switzerland, preparations, final letters
+                after_count=30,  # Aftermath across multiple branches
+                resolution="minute"  # High temporal resolution for tense confrontation
+            ),
+            temporal=TemporalConfig(
+                mode=TemporalMode.BRANCHING,  # M17: Many-worlds causality
+                enable_counterfactuals=True  # M12: Explicit counterfactual modeling
+            ),
+            outputs=OutputConfig(
+                formats=["jsonl", "json"],
+                include_dialogs=True,  # Crucial philosophical debate between detective and criminal
+                include_relationships=True,  # Rivalry at peak intensity
+                include_knowledge_flow=True,
+                export_ml_dataset=True
+            ),
+            metadata={
+                "character_focus": ["detective", "criminal"],
+                "branch_count": 4,
+                "mechanisms_featured": [
+                    "M12_counterfactual_branching",
+                    "M17_modal_causality_branching",
+                    "M15_strategic_prospection",
+                    "M8_extreme_stress_embodiment",
+                    "M11_philosophical_dialog",
+                    "M13_rivalry_culmination",
+                    "M3_final_knowledge_exchange"
+                ],
+                "temporal_depth": 61,
+                "expected_training_examples": 240,  # 4 entities × 60 transitions
+                "branching_points": [
+                    "t030_initial_offer",
+                    "t045_physical_struggle",
+                    "t055_third_party_arrival",
+                    "t060_final_decision"
+                ]
+            }
+        )
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization"""
         return self.model_dump()

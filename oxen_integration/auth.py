@@ -57,7 +57,7 @@ class AuthManager:
         print("=" * 70)
         print()
         print("No API token found. You can get one from:")
-        print("  https://hub.oxen.ai → Settings → API Tokens")
+        print("  https://www.oxen.ai → Settings → API Tokens")
         print()
 
         token = getpass.getpass("Enter your Oxen API token: ").strip()

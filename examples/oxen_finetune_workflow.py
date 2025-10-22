@@ -277,7 +277,7 @@ def main():
     # Check environment
     if not os.getenv("OXEN_API_TOKEN"):
         print("❌ Error: OXEN_API_TOKEN environment variable not set")
-        print("   Get your token from: https://hub.oxen.ai/settings/tokens")
+        print("   Get your token from: https://www.oxen.ai/settings/tokens")
         return
 
     try:
@@ -308,14 +308,17 @@ def main():
 ✅ Evaluation framework demonstrated
 
 Next Steps:
-1. Review the generated configuration file
-2. Open the Oxen notebook and configure your fine-tuning
-3. Monitor training progress on Oxen.ai
-4. Use the evaluation framework to compare models
-5. Deploy the fine-tuned model for production use
+1. Visit your Oxen repository: {upload_result.repo_url}
+2. Navigate to your uploaded dataset file
+3. Use the web UI to create a fine-tuning job
+4. Monitor training progress on Oxen.ai
+5. Use the evaluation framework to compare models
+6. Deploy the fine-tuned model for production use
 
-💡 Remember:
-- Always review costs before approving fine-tuning
+💡 Important Notes:
+- Oxen.ai does not support programmatic fine-tune creation
+- Fine-tunes must be created manually through the web interface
+- Always review costs before starting fine-tuning
 - Start with small datasets to test
 - Use LoRA for parameter-efficient training
 - Evaluate thoroughly before deploying

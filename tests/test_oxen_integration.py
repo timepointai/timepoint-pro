@@ -36,7 +36,7 @@ class TestOxenConfig:
         assert config.api_token == "test_token"
         assert config.default_namespace == "test_user"
         assert config.default_repo == "test_repo"
-        assert config.hub_url == "https://hub.oxen.ai"
+        assert config.hub_url == "https://www.oxen.ai"
 
     def test_oxen_config_to_dict(self):
         """Test converting config to dict."""
@@ -212,10 +212,10 @@ class TestOxenClient:
             )
 
             url = client.get_hub_url()
-            assert url == "https://hub.oxen.ai/user/repo"
+            assert url == "https://www.oxen.ai/user/repo"
 
             file_url = client.get_hub_url("datasets/data.jsonl")
-            assert file_url == "https://hub.oxen.ai/user/repo/file/main/datasets/data.jsonl"
+            assert file_url == "https://www.oxen.ai/user/repo/file/main/datasets/data.jsonl"
 
     def test_oxen_client_get_finetune_url(self, monkeypatch):
         """Test getting fine-tune URL."""
@@ -229,12 +229,12 @@ class TestOxenClient:
             )
 
             url = client.get_finetune_url()
-            assert url == "https://hub.oxen.ai/fine-tune?repo=user/repo"
+            assert url == "https://www.oxen.ai/fine-tune?repo=user/repo"
 
             file_url = client.get_finetune_url("datasets/data.jsonl")
             assert (
                 file_url
-                == "https://hub.oxen.ai/fine-tune?repo=user/repo&file=datasets/data.jsonl"
+                == "https://www.oxen.ai/fine-tune?repo=user/repo&file=datasets/data.jsonl"
             )
 
 
@@ -245,9 +245,9 @@ class TestUploadResult:
         """Test successful upload result."""
         result = UploadResult(
             success=True,
-            repo_url="https://hub.oxen.ai/user/repo",
-            dataset_url="https://hub.oxen.ai/user/repo/file/main/data.jsonl",
-            finetune_url="https://hub.oxen.ai/fine-tune?repo=user/repo",
+            repo_url="https://www.oxen.ai/user/repo",
+            dataset_url="https://www.oxen.ai/user/repo/file/main/data.jsonl",
+            finetune_url="https://www.oxen.ai/fine-tune?repo=user/repo",
             file_size_bytes=1024,
             commit_id="abc123",
         )
@@ -281,7 +281,7 @@ class TestRepositoryInfo:
             namespace="user",
             name="repo",
             full_name="user/repo",
-            url="https://hub.oxen.ai/user/repo",
+            url="https://www.oxen.ai/user/repo",
             exists=True,
             description="Test repository",
         )
