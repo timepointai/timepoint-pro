@@ -54,10 +54,13 @@ class CoverageMatrix:
             # Status indicator
             status_icon = "✅" if run.status == "completed" else "❌" if run.status == "failed" else "🔄"
 
+            # Handle causal_mode - it might be a string or enum
+            causal_mode_str = run.causal_mode.value if hasattr(run.causal_mode, 'value') else run.causal_mode
+
             row = {
                 "Template": run.template_id,
                 "M1-M17": mechanisms_str,
-                "Causal Mode": run.causal_mode.value,
+                "Causal Mode": causal_mode_str,
                 "Resolutions": resolutions_str,
                 "Timepoints": timepoints_str,
                 "Entities": run.entities_created,
@@ -73,10 +76,18 @@ class CoverageMatrix:
 
         # Add summary row
         if len(runs) > 0:
+            # Get unique causal modes (handle string or enum)
+            unique_modes = set()
+            for r in runs:
+                if hasattr(r.causal_mode, 'value'):
+                    unique_modes.add(r.causal_mode.value)
+                else:
+                    unique_modes.add(r.causal_mode)
+
             summary = {
                 "Template": "TOTAL",
                 "M1-M17": f"Overall",
-                "Causal Mode": f"{len(set(r.causal_mode for r in runs))}/5 modes",
+                "Causal Mode": f"{len(unique_modes)}/5 modes",
                 "Resolutions": "All levels",
                 "Timepoints": sum(r.timepoints_created for r in runs),
                 "Entities": sum(r.entities_created for r in runs),
@@ -117,7 +128,15 @@ class CoverageMatrix:
             for mechanism in ALL_MECHANISMS:
                 templates_using = sum(1 for run in runs if mechanism in run.mechanisms_used)
                 summary[mechanism] = f"{templates_using}/{len(runs)}"
-            summary["Total"] = f"{len(set.union(*[r.mechanisms_used for r in runs if r.mechanisms_used]))}/17"
+
+            # Calculate total unique mechanisms (handle empty sets)
+            all_mechanisms = [r.mechanisms_used for r in runs if r.mechanisms_used]
+            if all_mechanisms:
+                total_mechanisms = len(set.union(*all_mechanisms))
+            else:
+                total_mechanisms = 0
+            summary["Total"] = f"{total_mechanisms}/17"
+
             df = pd.concat([df, pd.DataFrame([summary])], ignore_index=True)
 
         return df
@@ -131,7 +150,10 @@ class CoverageMatrix:
 
         mode_coverage = {}
         for mode in all_modes:
-            templates = [r.template_id for r in runs if r.causal_mode == mode]
+            # Handle causal_mode - might be string or enum
+            templates = [r.template_id for r in runs
+                        if (r.causal_mode == mode or
+                            (isinstance(r.causal_mode, str) and r.causal_mode == mode.value))]
             mode_coverage[mode.value] = {
                 "Templates": ", ".join(templates) if templates else "None",
                 "Count": len(templates),
@@ -186,22 +208,33 @@ class CoverageMatrix:
         report.append(df.to_string(index=False))
         report.append("")
 
-        # Mechanism completeness
-        all_mechanisms_used = set.union(*[r.mechanisms_used for r in runs if r.mechanisms_used])
+        # Mechanism completeness (handle empty sets)
+        all_mechanisms_list = [r.mechanisms_used for r in runs if r.mechanisms_used]
+        if all_mechanisms_list:
+            all_mechanisms_used = set.union(*all_mechanisms_list)
+        else:
+            all_mechanisms_used = set()
         report.append(f"Mechanisms Covered: {len(all_mechanisms_used)}/17")
         if len(all_mechanisms_used) < 17:
             missing = set(ALL_MECHANISMS) - all_mechanisms_used
             report.append(f"Missing: {', '.join(sorted(missing))}")
         report.append("")
 
-        # Causal mode completeness
-        modes_used = set(r.causal_mode for r in runs)
+        # Causal mode completeness (handle string or enum)
+        modes_used = set()
+        for r in runs:
+            if hasattr(r.causal_mode, 'value'):
+                modes_used.add(r.causal_mode.value)
+            else:
+                modes_used.add(r.causal_mode)
         report.append(f"Causal Modes Covered: {len(modes_used)}/5")
         all_modes = {TemporalMode.PEARL, TemporalMode.DIRECTORIAL, TemporalMode.NONLINEAR,
                      TemporalMode.BRANCHING, TemporalMode.CYCLICAL}
         if len(modes_used) < 5:
-            missing_modes = all_modes - modes_used
-            report.append(f"Missing: {', '.join(m.value for m in sorted(missing_modes, key=lambda x: x.value))}")
+            # Convert modes_used to enum values for comparison
+            all_mode_values = {m.value for m in all_modes}
+            missing_mode_values = all_mode_values - modes_used
+            report.append(f"Missing: {', '.join(sorted(missing_mode_values))}")
         report.append("")
 
         report.append("=" * 80)
@@ -255,9 +288,20 @@ class CoverageMatrix:
         report.append(df.to_markdown(index=False))
         report.append("")
 
-        # Completeness
-        all_mechanisms_used = set.union(*[r.mechanisms_used for r in runs if r.mechanisms_used])
-        modes_used = set(r.causal_mode for r in runs)
+        # Completeness (handle empty sets)
+        all_mechanisms_list = [r.mechanisms_used for r in runs if r.mechanisms_used]
+        if all_mechanisms_list:
+            all_mechanisms_used = set.union(*all_mechanisms_list)
+        else:
+            all_mechanisms_used = set()
+
+        # Handle causal_mode - might be string or enum
+        modes_used = set()
+        for r in runs:
+            if hasattr(r.causal_mode, 'value'):
+                modes_used.add(r.causal_mode.value)
+            else:
+                modes_used.add(r.causal_mode)
 
         report.append("## Coverage Completeness")
         report.append("")

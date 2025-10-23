@@ -6,6 +6,7 @@ from typing import Dict, Any, List, Callable, Optional
 import numpy as np
 
 from schemas import Entity, ExposureEvent, PhysicalTensor, CognitiveTensor
+from metadata.tracking import track_mechanism
 
 class Validator(ABC):
     """Base validator with plugin registry"""
@@ -146,6 +147,7 @@ def validate_behavioral_inertia(entity: Entity, context: Dict) -> Dict:
     return {"valid": True, "message": "Behavioral inertia satisfied"}
 
 @Validator.register("biological_constraints", "ERROR")
+@track_mechanism("M4", "physics_validation")
 def validate_biological_constraints(entity: Entity, context: Dict) -> Dict:
     """Validate age-dependent capabilities"""
     # Handle both Entity and EntityPopulation types
@@ -521,6 +523,7 @@ def get_activity_probability(hour: int, activity: str, circadian_config: Dict) -
     return 0.05  # Very low probability for inappropriate hours
 
 
+@track_mechanism("M14", "circadian_patterns")
 def compute_energy_cost_with_circadian(activity: str, hour: int, base_cost: float, circadian_config: Dict) -> float:
     """Compute energy cost adjusted for circadian factors"""
     multipliers = circadian_config.get("energy_multipliers", {})

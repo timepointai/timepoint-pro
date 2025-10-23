@@ -723,7 +723,90 @@
         "current_step": "complete_metadata"
       },
       "completed_at": "2025-10-23T09:12:49.532721"
+    },
+    "test_0020": {
+      "id": "test_0020",
+      "template": "hound_shadow_directorial",
+      "template_info": {
+        "name": "The Hound's Shadow (Directorial)",
+        "description": "Detective noir with narrative arc structure",
+        "mode": "directorial",
+        "entities": 5,
+        "timepoints": 15,
+        "mechanisms": [
+          1,
+          2,
+          3,
+          4,
+          7,
+          8,
+          10,
+          11,
+          13,
+          14,
+          15,
+          16,
+          17
+        ],
+        "expected_examples": 70,
+        "cost_estimate": "$0.50-2",
+        "runtime_estimate": "5-10min"
+      },
+      "pid": 29744,
+      "log_file": "logs/test_runs/test_0020_hound_shadow_directorial.log",
+      "script_file": "logs/test_runs/test_0020_hound_shadow_directorial.py",
+      "status": "running",
+      "started_at": "2025-10-23T09:23:36.441222",
+      "progress": {
+        "log_size": 94,
+        "last_modified": "2025-10-23T09:23:45.063325",
+        "success": false,
+        "errors": [],
+        "current_step": null
+      }
+    },
+    "test_0021": {
+      "id": "test_0021",
+      "template": "hound_shadow_directorial",
+      "template_info": {
+        "name": "The Hound's Shadow (Directorial)",
+        "description": "Detective noir with narrative arc structure",
+        "mode": "directorial",
+        "entities": 5,
+        "timepoints": 15,
+        "mechanisms": [
+          1,
+          2,
+          3,
+          4,
+          7,
+          8,
+          10,
+          11,
+          13,
+          14,
+          15,
+          16,
+          17
+        ],
+        "expected_examples": 70,
+        "cost_estimate": "$0.50-2",
+        "runtime_estimate": "5-10min"
+      },
+      "pid": 33040,
+      "log_file": "logs/test_runs/test_0021_hound_shadow_directorial.log",
+      "script_file": "logs/test_runs/test_0021_hound_shadow_directorial.py",
+      "status": "completed",
+      "started_at": "2025-10-23T09:34:05.082846",
+      "progress": {
+        "log_size": 6734,
+        "last_modified": "2025-10-23T09:34:47.511513",
+        "success": true,
+        "errors": [],
+        "current_step": "complete_metadata"
+      },
+      "completed_at": "2025-10-23T09:35:51.015056"
     }
   },
-  "next_id": 20
+  "next_id": 22
 }

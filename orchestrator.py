@@ -30,6 +30,7 @@ from schemas import (
 from llm import LLMClient, EntityPopulation
 from storage import GraphStore
 from workflows import TemporalAgent, create_entity_training_workflow
+from metadata.tracking import track_mechanism
 
 
 # ============================================================================
@@ -223,7 +224,7 @@ Schema:
             else:
                 # Medium scenario - use Llama 70B
                 model = None  # Use default (70B)
-                max_output_tokens = min(int(estimated_tokens * 1.5), 16000)  # 1.5x safety margin, cap at 16k
+                max_output_tokens = min(int(estimated_tokens * 2.5), 16000)  # 2.5x safety margin, cap at 16k
                 print(f"   ✅ Standard scenario: Using Llama 70B with {max_output_tokens:,} token limit")
 
             result = self.llm.generate_structured(
@@ -762,6 +763,7 @@ class KnowledgeSeeder:
     def __init__(self, store: GraphStore):
         self.store = store
 
+    @track_mechanism("M3", "exposure_event_tracking")
     def seed_knowledge(
         self,
         spec: SceneSpecification,
@@ -824,6 +826,7 @@ class RelationshipExtractor:
     - Node attributes: entity metadata
     """
 
+    @track_mechanism("M1", "heterogeneous_fidelity_graph")
     def build_graph(self, spec: SceneSpecification) -> nx.Graph:
         """
         Build relationship graph from scene specification.
@@ -912,6 +915,7 @@ class ResolutionAssigner:
     - environment: TENSOR_ONLY or SCENE (minimal detail)
     """
 
+    @track_mechanism("M1", "heterogeneous_fidelity_resolution")
     def assign_resolutions(
         self,
         spec: SceneSpecification,
@@ -1025,6 +1029,7 @@ class OrchestratorAgent:
         self.relationship_extractor = RelationshipExtractor()
         self.resolution_assigner = ResolutionAssigner()
 
+    @track_mechanism("M17", "modal_temporal_causality")
     def orchestrate(
         self,
         event_description: str,

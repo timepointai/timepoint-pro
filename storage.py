@@ -19,12 +19,14 @@ class GraphStore:
     def save_entity(self, entity: Entity) -> Entity:
         from sqlalchemy.orm.attributes import flag_modified
         with Session(self.engine) as session:
-            session.add(entity)
+            # Use merge to handle both insert and update (upsert behavior)
+            # This prevents UNIQUE constraint errors when entity already exists
+            merged_entity = session.merge(entity)
             # Mark entity_metadata as modified since it's a JSON column
-            flag_modified(entity, "entity_metadata")
+            flag_modified(merged_entity, "entity_metadata")
             session.commit()
-            session.refresh(entity)
-            return entity
+            session.refresh(merged_entity)
+            return merged_entity
 
     def save_exposure_event(self, event: ExposureEvent) -> ExposureEvent:
         """Save a single exposure event"""

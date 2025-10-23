@@ -14,6 +14,7 @@ from llm_v2 import LLMClient  # Use new centralized service
 from resolution_engine import ResolutionEngine
 # Removed OpenAI/instructor dependency
 from tensors import load_compressed_entity_data
+from metadata.tracking import track_mechanism
 
 # Query response cache with TTL
 _query_cache: Dict[str, Tuple[str, datetime]] = {}
@@ -331,6 +332,7 @@ Return only valid JSON, no other text."""
 
         return response
 
+    @track_mechanism("M5", "query_resolution")
     def synthesize_response(self, query_intent: QueryIntent, query_text: str = "") -> str:
         """Generate answer from entity states with lazy resolution elevation and attribution"""
 
@@ -642,6 +644,7 @@ Return only valid JSON, no other text."""
 
         return behavior_traits[:6]  # Limit to most relevant traits
 
+    @track_mechanism("M5", "lazy_resolution_elevation")
     def _elevate_entity_resolution(self, entity: Entity, target_resolution: ResolutionLevel) -> bool:
         """Elevate entity resolution by calling LLM for additional details"""
         try:
@@ -1191,12 +1194,14 @@ Return only valid JSON, no other text."""
 
         return entity_names
 
+    @track_mechanism("M9", "on_demand_entity_gap_detection")
     def detect_entity_gap(self, query: str, existing_entities: Set[str]) -> Optional[str]:
         """Parse query for entity mentions and return first missing entity"""
         entities_mentioned = self.extract_entity_names(query)
         missing = entities_mentioned - existing_entities
         return missing.pop() if missing else None
 
+    @track_mechanism("M9", "on_demand_entity_generation")
     def generate_entity_on_demand(self, entity_id: str, timepoint: Timepoint) -> Entity:
         """Create plausible entity matching query context dynamically"""
         context = {

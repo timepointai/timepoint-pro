@@ -20,6 +20,7 @@ from storage import GraphStore
 from graph import create_test_graph
 from validation import Validator
 from tensors import TensorCompressor
+from metadata.tracking import track_mechanism
 
 class WorkflowState(TypedDict):
     graph: nx.Graph
@@ -196,6 +197,7 @@ def create_entity_training_workflow(llm_client: LLMClient, store: GraphStore):
 
     return workflow.compile()
 
+@track_mechanism("M2", "progressive_training")
 def retrain_high_traffic_entities(graph: nx.Graph, store: GraphStore, llm_client: LLMClient):
     """
     Progressive training: Check all entities and retrain/elevate those that need it
@@ -263,6 +265,7 @@ def create_environment_entity(timepoint_id: str, location: str, capacity: int = 
     )
 
 
+@track_mechanism("M10", "scene_entities_atmosphere")
 def compute_scene_atmosphere(entities: List[Entity], environment: EnvironmentEntity,
                            relationship_graph: Optional[nx.Graph] = None,
                            llm_client=None, timepoint_info: Optional[Dict] = None) -> AtmosphereEntity:
@@ -527,6 +530,7 @@ def infer_movement_pattern(density: float, mood_distribution: Dict[str, float]) 
 # Dialog Synthesis (Mechanism 11)
 # ============================================================================
 
+@track_mechanism("M8", "embodied_states_pain")
 def couple_pain_to_cognition(physical: 'PhysicalTensor', cognitive: 'CognitiveTensor') -> 'CognitiveTensor':
     """Apply pain effects to cognitive state (body-mind coupling)"""
     pain_factor = physical.pain_level
@@ -642,6 +646,7 @@ def create_exposure_event(entity_id: str, information: str, source: str, event_t
     store.save_exposure_event(exposure)
 
 
+@track_mechanism("M11", "dialog_synthesis")
 def synthesize_dialog(
     entities: List[Entity],
     timepoint: 'Timepoint',
@@ -654,9 +659,14 @@ def synthesize_dialog(
     # Build comprehensive context for each participant
     participants_context = []
     for entity in entities:
-        # Get current state
-        physical = entity.physical_tensor
-        cognitive = entity.cognitive_tensor
+        # Get current state (with defensive checks)
+        physical = getattr(entity, 'physical_tensor', None)
+        cognitive = getattr(entity, 'cognitive_tensor', None)
+
+        # If entity doesn't have tensor attributes, skip it with warning
+        if physical is None or cognitive is None:
+            print(f"  ⚠️  Skipping {entity.entity_id} in dialog synthesis - missing tensor attributes")
+            continue
 
         # Apply body-mind coupling
         coupled_cognitive = couple_pain_to_cognition(physical, cognitive)
@@ -723,6 +733,20 @@ def synthesize_dialog(
         }
 
         participants_context.append(participant_ctx)
+
+    # Check if we have enough participants after filtering
+    if len(participants_context) < 2:
+        print(f"  ⚠️  Not enough valid participants for dialog ({len(participants_context)}/2 minimum)")
+        # Return a minimal dialog object
+        return Dialog(
+            dialog_id=f"dialog_{timepoint.timepoint_id}_skipped",
+            timepoint_id=timepoint.timepoint_id,
+            participants=json.dumps([e.entity_id for e in entities]),
+            turns=json.dumps([]),
+            context_used=json.dumps({"skipped": True, "reason": "insufficient_participants"}),
+            duration_seconds=0,
+            information_transfer_count=0
+        )
 
     # Build scene context
     scene_context = {
@@ -959,6 +983,7 @@ def detect_contradictions(
     return contradictions
 
 
+@track_mechanism("M13", "multi_entity_synthesis")
 def synthesize_multi_entity_response(
     entities: List[str],
     query: str,
@@ -1177,6 +1202,7 @@ def estimate_energy_cost_for_preparation(action: str) -> float:
     return action_costs.get(action, 5.0)  # Default cost
 
 
+@track_mechanism("M15", "entity_prospection")
 def generate_prospective_state(
     entity: 'Entity',
     timepoint: 'Timepoint',
@@ -1410,6 +1436,7 @@ def get_relevant_history_for_prospection(entity: 'Entity', timepoint: 'Timepoint
 # Mechanism 12: Counterfactual Branching
 # ============================================================================
 
+@track_mechanism("M12", "counterfactual_branching")
 def create_counterfactual_branch(
     parent_timeline_id: str,
     intervention_point: str,
@@ -2007,6 +2034,7 @@ def create_animistic_entity(entity_id: str, entity_type: str, context: Dict, con
     )
 
 
+@track_mechanism("M16", "animistic_entities")
 def generate_animistic_entities_for_scene(
     scene_context: Optional[Dict] = None,
     config: Optional[Dict] = None,
@@ -2206,6 +2234,7 @@ class TemporalAgent:
 
         return has_prophecy and has_fulfillment
 
+    @track_mechanism("M7", "causal_temporal_chains")
     def generate_next_timepoint(self, current_timepoint, context: Dict = None) -> "Timepoint":
         """
         Generate the next timepoint in the temporal sequence.

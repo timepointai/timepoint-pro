@@ -8,6 +8,7 @@ from typing import Callable, Dict, List, Optional
 import networkx as nx
 
 from schemas import Entity
+from metadata.tracking import track_mechanism
 class TensorCompressor:
     """Plugin registry for tensor compression algorithms"""
     _compressors = {}
@@ -20,6 +21,7 @@ class TensorCompressor:
         return decorator
     
     @classmethod
+    @track_mechanism("M6", "ttm_tensor_compression")
     def compress(cls, tensor: np.ndarray, method: str, **kwargs) -> np.ndarray:
         if method not in cls._compressors:
             raise ValueError(f"Unknown compression method: {method}")

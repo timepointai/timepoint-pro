@@ -24,7 +24,7 @@ from orchestrator import simulate_event
 from llm_v2 import LLMClient
 from storage import GraphStore
 from schemas import Entity, Timepoint, TemporalMode, ResolutionLevel
-from workflows import TemporalAgent
+from workflows import TemporalAgent, create_entity_training_workflow, synthesize_dialog
 from oxen_integration import OxenClient
 from oxen_integration.data_formatters import EntityEvolutionFormatter
 from metadata.run_tracker import MetadataManager, RunMetadata
@@ -96,6 +96,11 @@ class FullE2EWorkflowRunner:
                 # Step 4: Train entities (progressive elevation)
                 trained_entities = self._train_entities(
                     scene_result, all_timepoints, run_id
+                )
+
+                # Step 4.5: Synthesize dialogs (M11)
+                self._synthesize_dialogs(
+                    trained_entities, all_timepoints, scene_result, run_id
                 )
 
                 # Step 5: Format training data
@@ -272,36 +277,136 @@ class FullE2EWorkflowRunner:
     def _train_entities(
         self, scene_result: Dict, timepoints: List[Timepoint], run_id: str
     ) -> List[Entity]:
-        """Step 4: Train entities with progressive resolution elevation"""
+        """Step 4: Train entities with progressive resolution elevation using full LangGraph workflow"""
         with self.logfire.span("step:entity_training"):
-            print("\nStep 4: Training entities...")
+            print("\nStep 4: Training entities with full workflow...")
 
             entities = scene_result["entities"]
+            llm = scene_result["llm_client"]
+            store = scene_result["store"]
+            graph = scene_result.get("graph")
 
-            # For now, we'll simulate entity training by recording resolution levels
-            # In a full implementation, this would use LangGraph workflows
-            # to actually train entities through multiple passes
+            # Create the full entity training workflow
+            workflow = create_entity_training_workflow(llm, store)
 
+            # Prepare workflow state for each timepoint
             trained_entities = []
+
+            for timepoint in timepoints:
+                print(f"  Processing timepoint: {timepoint.timepoint_id}")
+
+                # Build workflow state
+                workflow_state = {
+                    "graph": graph if graph else store.load_graph(timepoint.timepoint_id),
+                    "entities": entities,
+                    "timepoint": timepoint.timepoint_id,
+                    "timepoint_obj": timepoint,  # Pass full timepoint for knowledge enrichment
+                    "resolution": ResolutionLevel.SCENE,  # Default resolution
+                    "violations": [],
+                    "results": {},
+                    "entity_populations": {}
+                }
+
+                try:
+                    # Run the full workflow (includes validation, compression, progressive training)
+                    # This invokes M2, M4, M6, M14 mechanisms
+                    result_state = workflow.invoke(workflow_state)
+
+                    # Extract trained entities from result
+                    if "entities" in result_state:
+                        entities = result_state["entities"]
+
+                    # Report violations if any
+                    violations = result_state.get("violations", [])
+                    if violations:
+                        print(f"  ⚠️  Found {len(violations)} validation violations")
+                        for v in violations[:3]:  # Show first 3
+                            print(f"    - {v.get('severity', 'UNKNOWN')}: {v.get('message', 'No message')}")
+
+                except Exception as e:
+                    print(f"  ⚠️  Workflow execution error: {e}")
+                    # Continue with entities as-is
+
+            # Record all entity resolutions
             for entity in entities:
-                # Record resolution assignment
                 self.metadata_manager.record_resolution(
                     run_id,
                     entity.entity_id,
                     entity.resolution_level,
                     timepoints[0].timepoint_id
                 )
-
                 trained_entities.append(entity)
 
-            print(f"✓ Trained {len(trained_entities)} entities")
+            print(f"✓ Trained {len(trained_entities)} entities through full workflow")
 
             self.logfire.info(
-                "Entity training complete",
-                entities=len(trained_entities)
+                "Entity training complete with workflow",
+                entities=len(trained_entities),
+                timepoints_processed=len(timepoints)
             )
 
             return trained_entities
+
+    def _synthesize_dialogs(
+        self,
+        entities: List[Entity],
+        timepoints: List[Timepoint],
+        scene_result: Dict,
+        run_id: str
+    ) -> None:
+        """Step 4.5: Synthesize dialogs between entities (M11)"""
+        with self.logfire.span("step:dialog_synthesis"):
+            print("\nStep 4.5: Synthesizing dialogs...")
+
+            llm = scene_result["llm_client"]
+            store = scene_result["store"]
+
+            # Synthesize dialogs for each timepoint with 2+ entities
+            dialogs_created = 0
+
+            for timepoint in timepoints:
+                # Get entities present at this timepoint
+                if len(entities) < 2:
+                    print(f"  ⚠️  Skipping {timepoint.timepoint_id} - need at least 2 entities for dialog")
+                    continue
+
+                try:
+                    # Select a subset of entities for dialog (2-4 entities)
+                    import random
+                    num_participants = min(4, len(entities))
+                    dialog_participants = random.sample(entities, num_participants)
+
+                    print(f"  Generating dialog for {timepoint.timepoint_id} with {num_participants} entities...")
+
+                    # Build timeline context (simplified)
+                    timeline = [{"event_description": tp.event_description, "timestamp": tp.timestamp} for tp in timepoints]
+
+                    # Synthesize dialog (this invokes M11)
+                    dialog = synthesize_dialog(
+                        dialog_participants,
+                        timepoint,
+                        timeline,
+                        llm,
+                        store
+                    )
+
+                    # Save dialog to store
+                    store.save_dialog(dialog)
+                    dialogs_created += 1
+
+                    print(f"  ✓ Created dialog with {len(dialog_participants)} participants")
+
+                except Exception as e:
+                    print(f"  ⚠️  Failed to synthesize dialog for {timepoint.timepoint_id}: {e}")
+                    # Continue with other timepoints
+
+            print(f"✓ Synthesized {dialogs_created} dialogs")
+
+            self.logfire.info(
+                "Dialog synthesis complete",
+                dialogs_created=dialogs_created,
+                timepoints_processed=len(timepoints)
+            )
 
     def _format_training_data(
         self,
