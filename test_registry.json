@@ -30,7 +30,8 @@
         "log_size": 530,
         "last_modified": "2025-10-23T07:08:00.926197",
         "success": false,
-        "errors": []
+        "errors": [],
+        "current_step": null
       },
       "completed_at": "2025-10-23T07:08:18.200941"
     },
@@ -64,7 +65,8 @@
         "log_size": 64,
         "last_modified": "2025-10-23T07:09:16.314876",
         "success": false,
-        "errors": []
+        "errors": [],
+        "current_step": null
       },
       "completed_at": "2025-10-23T07:09:36.540734"
     },
@@ -98,7 +100,8 @@
         "log_size": 64,
         "last_modified": "2025-10-23T07:10:04.702280",
         "success": false,
-        "errors": []
+        "errors": [],
+        "current_step": null
       },
       "completed_at": "2025-10-23T07:14:15.970179"
     },
@@ -132,7 +135,8 @@
         "log_size": 274,
         "last_modified": "2025-10-23T07:10:52.026785",
         "success": false,
-        "errors": []
+        "errors": [],
+        "current_step": null
       },
       "completed_at": "2025-10-23T07:14:15.969762"
     },
@@ -168,7 +172,8 @@
         "success": false,
         "errors": [
           "\u274c FAILED: create_entity_training_workflow() missing 1 required positional argument: 'store'"
-        ]
+        ],
+        "current_step": null
       },
       "completed_at": "2025-10-23T07:14:15.969373"
     },
@@ -202,10 +207,523 @@
         "log_size": 1507,
         "last_modified": "2025-10-23T07:13:03.547736",
         "success": true,
-        "errors": []
+        "errors": [],
+        "current_step": "complete_metadata"
       },
       "completed_at": "2025-10-23T07:14:09.680567"
+    },
+    "test_0007": {
+      "id": "test_0007",
+      "template": "jefferson_dinner",
+      "template_info": {
+        "name": "Jefferson's Compromise Dinner",
+        "description": "Historical negotiation scenario (QUICK TEST)",
+        "mode": "pearl",
+        "entities": 3,
+        "timepoints": 7,
+        "mechanisms": [
+          1,
+          2,
+          3,
+          4,
+          7,
+          8,
+          14
+        ],
+        "expected_examples": 21,
+        "cost_estimate": "$0.10-0.50",
+        "runtime_estimate": "2-5min"
+      },
+      "pid": 24852,
+      "log_file": "logs/test_runs/test_0007_jefferson_dinner.log",
+      "script_file": "logs/test_runs/test_0007_jefferson_dinner.py",
+      "status": "failed",
+      "started_at": "2025-10-23T08:46:12.483105",
+      "progress": {
+        "log_size": 315,
+        "last_modified": "2025-10-23T08:46:19.033090",
+        "success": false,
+        "errors": [],
+        "current_step": null
+      },
+      "completed_at": "2025-10-23T08:46:24.832189"
+    },
+    "test_0008": {
+      "id": "test_0008",
+      "template": "jefferson_dinner",
+      "template_info": {
+        "name": "Jefferson's Compromise Dinner",
+        "description": "Historical negotiation scenario (QUICK TEST)",
+        "mode": "pearl",
+        "entities": 3,
+        "timepoints": 7,
+        "mechanisms": [
+          1,
+          2,
+          3,
+          4,
+          7,
+          8,
+          14
+        ],
+        "expected_examples": 21,
+        "cost_estimate": "$0.10-0.50",
+        "runtime_estimate": "2-5min"
+      },
+      "pid": 25155,
+      "log_file": "logs/test_runs/test_0008_jefferson_dinner.log",
+      "script_file": "logs/test_runs/test_0008_jefferson_dinner.py",
+      "status": "failed",
+      "started_at": "2025-10-23T08:47:03.022790",
+      "progress": {
+        "log_size": 927,
+        "last_modified": "2025-10-23T08:47:03.981476",
+        "success": false,
+        "errors": [],
+        "current_step": null
+      },
+      "completed_at": "2025-10-23T08:47:19.592243"
+    },
+    "test_0009": {
+      "id": "test_0009",
+      "template": "jefferson_dinner",
+      "template_info": {
+        "name": "Jefferson's Compromise Dinner",
+        "description": "Historical negotiation scenario (QUICK TEST)",
+        "mode": "pearl",
+        "entities": 3,
+        "timepoints": 7,
+        "mechanisms": [
+          1,
+          2,
+          3,
+          4,
+          7,
+          8,
+          14
+        ],
+        "expected_examples": 21,
+        "cost_estimate": "$0.10-0.50",
+        "runtime_estimate": "2-5min"
+      },
+      "pid": 25568,
+      "log_file": "logs/test_runs/test_0009_jefferson_dinner.log",
+      "script_file": "logs/test_runs/test_0009_jefferson_dinner.py",
+      "status": "completed",
+      "started_at": "2025-10-23T08:48:21.668182",
+      "progress": {
+        "log_size": 4569,
+        "last_modified": "2025-10-23T08:48:42.449266",
+        "success": true,
+        "errors": [
+          "\u274c E2E WORKFLOW FAILED: run_20251023_084827_cb717987",
+          "\u274c E2E WORKFLOW FAILED: 'Entity' object has no attribute 'resolution'"
+        ],
+        "current_step": "entity_training"
+      },
+      "completed_at": "2025-10-23T09:11:31.412504"
+    },
+    "test_0010": {
+      "id": "test_0010",
+      "template": "jefferson_dinner",
+      "template_info": {
+        "name": "Jefferson's Compromise Dinner",
+        "description": "Historical negotiation scenario (QUICK TEST)",
+        "mode": "pearl",
+        "entities": 3,
+        "timepoints": 7,
+        "mechanisms": [
+          1,
+          2,
+          3,
+          4,
+          7,
+          8,
+          14
+        ],
+        "expected_examples": 21,
+        "cost_estimate": "$0.10-0.50",
+        "runtime_estimate": "2-5min"
+      },
+      "pid": 25873,
+      "log_file": "logs/test_runs/test_0010_jefferson_dinner.log",
+      "script_file": "logs/test_runs/test_0010_jefferson_dinner.py",
+      "status": "completed",
+      "started_at": "2025-10-23T08:49:18.909933",
+      "progress": {
+        "log_size": 4483,
+        "last_modified": "2025-10-23T08:49:46.309635",
+        "success": true,
+        "errors": [],
+        "current_step": "complete_metadata"
+      },
+      "completed_at": "2025-10-23T09:11:31.398689"
+    },
+    "test_0011": {
+      "id": "test_0011",
+      "template": "jefferson_dinner",
+      "template_info": {
+        "name": "Jefferson's Compromise Dinner",
+        "description": "Historical negotiation scenario (QUICK TEST)",
+        "mode": "pearl",
+        "entities": 3,
+        "timepoints": 7,
+        "mechanisms": [
+          1,
+          2,
+          3,
+          4,
+          7,
+          8,
+          14
+        ],
+        "expected_examples": 21,
+        "cost_estimate": "$0.10-0.50",
+        "runtime_estimate": "2-5min"
+      },
+      "pid": 28227,
+      "log_file": "logs/test_runs/test_0011_jefferson_dinner.log",
+      "script_file": "logs/test_runs/test_0011_jefferson_dinner.py",
+      "status": "completed",
+      "started_at": "2025-10-23T09:10:11.175046",
+      "progress": {
+        "log_size": 4405,
+        "last_modified": "2025-10-23T09:11:12.783895",
+        "success": true,
+        "errors": [],
+        "current_step": "complete_metadata"
+      },
+      "completed_at": "2025-10-23T09:11:31.314811"
+    },
+    "test_0012": {
+      "id": "test_0012",
+      "template": "board_meeting",
+      "template_info": {
+        "name": "Tech Startup Board Meeting",
+        "description": "Corporate scenario with acquisition proposal (QUICK TEST)",
+        "mode": "pearl",
+        "entities": 5,
+        "timepoints": 5,
+        "mechanisms": [
+          1,
+          2,
+          3,
+          4,
+          7,
+          8
+        ],
+        "expected_examples": 25,
+        "cost_estimate": "$0.10-0.50",
+        "runtime_estimate": "2-5min"
+      },
+      "pid": 28233,
+      "log_file": "logs/test_runs/test_0012_board_meeting.log",
+      "script_file": "logs/test_runs/test_0012_board_meeting.py",
+      "status": "completed",
+      "started_at": "2025-10-23T09:10:13.191065",
+      "progress": {
+        "log_size": 4746,
+        "last_modified": "2025-10-23T09:11:07.981655",
+        "success": true,
+        "errors": [],
+        "current_step": "complete_metadata"
+      },
+      "completed_at": "2025-10-23T09:11:31.275983"
+    },
+    "test_0013": {
+      "id": "test_0013",
+      "template": "scarlet_study_deep",
+      "template_info": {
+        "name": "The Scarlet Study (Deep)",
+        "description": "Detective investigation with all 17 mechanisms (FULL TEST)",
+        "mode": "pearl",
+        "entities": 5,
+        "timepoints": 101,
+        "mechanisms": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17
+        ],
+        "expected_examples": 500,
+        "cost_estimate": "$5-15",
+        "runtime_estimate": "15-30min"
+      },
+      "pid": 28243,
+      "log_file": "logs/test_runs/test_0013_scarlet_study_deep.log",
+      "script_file": "logs/test_runs/test_0013_scarlet_study_deep.py",
+      "status": "completed",
+      "started_at": "2025-10-23T09:10:15.229706",
+      "progress": {
+        "log_size": 5314,
+        "last_modified": "2025-10-23T09:11:10.183791",
+        "success": true,
+        "errors": [],
+        "current_step": "complete_metadata"
+      },
+      "completed_at": "2025-10-23T09:11:31.242641"
+    },
+    "test_0014": {
+      "id": "test_0014",
+      "template": "empty_house_flashback",
+      "template_info": {
+        "name": "The Empty House (Nonlinear)",
+        "description": "Survival story with flashback structure",
+        "mode": "nonlinear",
+        "entities": 4,
+        "timepoints": 81,
+        "mechanisms": [
+          1,
+          2,
+          3,
+          4,
+          7,
+          8,
+          9,
+          10,
+          13,
+          14,
+          15,
+          16,
+          17
+        ],
+        "expected_examples": 320,
+        "cost_estimate": "$3-8",
+        "runtime_estimate": "10-20min"
+      },
+      "pid": 28252,
+      "log_file": "logs/test_runs/test_0014_empty_house_flashback.log",
+      "script_file": "logs/test_runs/test_0014_empty_house_flashback.py",
+      "status": "completed",
+      "started_at": "2025-10-23T09:10:17.568925",
+      "progress": {
+        "log_size": 5007,
+        "last_modified": "2025-10-23T09:11:21.323473",
+        "success": true,
+        "errors": [],
+        "current_step": "complete_metadata"
+      },
+      "completed_at": "2025-10-23T09:11:31.221044"
+    },
+    "test_0015": {
+      "id": "test_0015",
+      "template": "final_problem_branching",
+      "template_info": {
+        "name": "The Final Problem (Branching)",
+        "description": "Counterfactual reasoning across timeline branches",
+        "mode": "branching",
+        "entities": 4,
+        "timepoints": 61,
+        "mechanisms": [
+          1,
+          2,
+          3,
+          5,
+          6,
+          7,
+          8,
+          11,
+          12,
+          14,
+          15,
+          16,
+          17
+        ],
+        "expected_examples": 240,
+        "cost_estimate": "$2-6",
+        "runtime_estimate": "8-15min"
+      },
+      "pid": 28258,
+      "log_file": "logs/test_runs/test_0015_final_problem_branching.log",
+      "script_file": "logs/test_runs/test_0015_final_problem_branching.py",
+      "status": "completed",
+      "started_at": "2025-10-23T09:10:20.607357",
+      "progress": {
+        "log_size": 5096,
+        "last_modified": "2025-10-23T09:11:10.970950",
+        "success": true,
+        "errors": [],
+        "current_step": "complete_metadata"
+      },
+      "completed_at": "2025-10-23T09:11:31.171336"
+    },
+    "test_0016": {
+      "id": "test_0016",
+      "template": "hound_shadow_directorial",
+      "template_info": {
+        "name": "The Hound's Shadow (Directorial)",
+        "description": "Detective noir with narrative arc structure",
+        "mode": "directorial",
+        "entities": 5,
+        "timepoints": 15,
+        "mechanisms": [
+          1,
+          2,
+          3,
+          4,
+          7,
+          8,
+          10,
+          11,
+          13,
+          14,
+          15,
+          16,
+          17
+        ],
+        "expected_examples": 70,
+        "cost_estimate": "$0.50-2",
+        "runtime_estimate": "5-10min"
+      },
+      "pid": 28261,
+      "log_file": "logs/test_runs/test_0016_hound_shadow_directorial.log",
+      "script_file": "logs/test_runs/test_0016_hound_shadow_directorial.py",
+      "status": "failed",
+      "started_at": "2025-10-23T09:10:23.329183",
+      "progress": {
+        "log_size": 617,
+        "last_modified": "2025-10-23T09:10:59.405200",
+        "success": false,
+        "errors": [],
+        "current_step": null
+      },
+      "completed_at": "2025-10-23T09:11:31.158543"
+    },
+    "test_0017": {
+      "id": "test_0017",
+      "template": "sign_loops_cyclical",
+      "template_info": {
+        "name": "The Sign of Four Loops (Cyclical)",
+        "description": "Time loop with prophecy mechanics",
+        "mode": "cyclical",
+        "entities": 4,
+        "timepoints": 12,
+        "mechanisms": [
+          1,
+          2,
+          3,
+          4,
+          7,
+          8,
+          13,
+          14,
+          15,
+          16,
+          17
+        ],
+        "expected_examples": 44,
+        "cost_estimate": "$0.50-2",
+        "runtime_estimate": "3-8min"
+      },
+      "pid": 28269,
+      "log_file": "logs/test_runs/test_0017_sign_loops_cyclical.log",
+      "script_file": "logs/test_runs/test_0017_sign_loops_cyclical.py",
+      "status": "failed",
+      "started_at": "2025-10-23T09:10:25.879779",
+      "progress": {
+        "log_size": 597,
+        "last_modified": "2025-10-23T09:10:59.391830",
+        "success": false,
+        "errors": [],
+        "current_step": null
+      },
+      "completed_at": "2025-10-23T09:11:31.138944"
+    },
+    "test_0018": {
+      "id": "test_0018",
+      "template": "hound_shadow_directorial",
+      "template_info": {
+        "name": "The Hound's Shadow (Directorial)",
+        "description": "Detective noir with narrative arc structure",
+        "mode": "directorial",
+        "entities": 5,
+        "timepoints": 15,
+        "mechanisms": [
+          1,
+          2,
+          3,
+          4,
+          7,
+          8,
+          10,
+          11,
+          13,
+          14,
+          15,
+          16,
+          17
+        ],
+        "expected_examples": 70,
+        "cost_estimate": "$0.50-2",
+        "runtime_estimate": "5-10min"
+      },
+      "pid": 28649,
+      "log_file": "logs/test_runs/test_0018_hound_shadow_directorial.log",
+      "script_file": "logs/test_runs/test_0018_hound_shadow_directorial.py",
+      "status": "failed",
+      "started_at": "2025-10-23T09:12:07.358469",
+      "progress": {
+        "log_size": 17240,
+        "last_modified": "2025-10-23T09:13:07.630103",
+        "success": false,
+        "errors": [],
+        "current_step": null
+      },
+      "completed_at": "2025-10-23T09:13:19.848775"
+    },
+    "test_0019": {
+      "id": "test_0019",
+      "template": "sign_loops_cyclical",
+      "template_info": {
+        "name": "The Sign of Four Loops (Cyclical)",
+        "description": "Time loop with prophecy mechanics",
+        "mode": "cyclical",
+        "entities": 4,
+        "timepoints": 12,
+        "mechanisms": [
+          1,
+          2,
+          3,
+          4,
+          7,
+          8,
+          13,
+          14,
+          15,
+          16,
+          17
+        ],
+        "expected_examples": 44,
+        "cost_estimate": "$0.50-2",
+        "runtime_estimate": "3-8min"
+      },
+      "pid": 28652,
+      "log_file": "logs/test_runs/test_0019_sign_loops_cyclical.log",
+      "script_file": "logs/test_runs/test_0019_sign_loops_cyclical.py",
+      "status": "completed",
+      "started_at": "2025-10-23T09:12:07.771229",
+      "progress": {
+        "log_size": 6247,
+        "last_modified": "2025-10-23T09:12:37.803195",
+        "success": true,
+        "errors": [],
+        "current_step": "complete_metadata"
+      },
+      "completed_at": "2025-10-23T09:12:49.532721"
     }
   },
-  "next_id": 7
+  "next_id": 20
 }

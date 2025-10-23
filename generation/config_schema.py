@@ -538,6 +538,142 @@ class SimulationConfig(BaseModel):
             }
         )
 
+    @classmethod
+    def example_hound_shadow_directorial(cls) -> "SimulationConfig":
+        """
+        Directorial narrative demonstrating narrative arc and dramatic tension.
+
+        The Hound's Shadow: A detective noir where narrative structure drives
+        causality. The story follows a rising action → climax → falling action arc,
+        with dramatic tension building mechanically. Demonstrates M17: DIRECTORIAL mode
+        where causality serves narrative structure.
+        """
+        return cls(
+            scenario_description=(
+                "A detective investigates a series of murders on the fog-shrouded moors, each victim "
+                "bearing strange hound bite marks. The narrative follows classical dramatic structure: "
+                "rising action (discovery and investigation), climax (confrontation with the supernatural "
+                "hound), falling action (revelation and resolution). Unlike Pearl causality, events occur "
+                "to serve narrative beats—the detective finds crucial clues at dramatically appropriate "
+                "moments, the hound appears when tension peaks. Track 15 timepoints with M17 (directorial "
+                "causality), M10 (moor atmosphere as narrative force), M14 (night/fog affecting visibility "
+                "and mood), M11 (dramatic dialog revelations), and M8 (fear affecting cognition)."
+            ),
+            world_id="hound_shadow_directorial",
+            entities=EntityConfig(
+                count=5,
+                types=["human", "animal", "building"],
+                initial_resolution=ResolutionLevel.DIALOG,
+                animism_level=4  # Moor, hound, Baskerville Hall as active forces
+            ),
+            timepoints=TimepointConfig(
+                count=15,
+                resolution="hour"
+            ),
+            temporal=TemporalConfig(
+                mode=TemporalMode.DIRECTORIAL,
+                narrative_arc="rising_action",  # Will progress to climax, falling_action
+                dramatic_tension=0.7  # High tension noir atmosphere
+            ),
+            outputs=OutputConfig(
+                formats=["jsonl", "markdown"],
+                include_dialogs=True,
+                include_relationships=True,
+                include_knowledge_flow=True,
+                export_ml_dataset=True
+            ),
+            metadata={
+                "character_focus": "detective",
+                "narrative_structure": "classical_three_act",
+                "mechanisms_featured": [
+                    "M17_modal_causality_directorial",
+                    "M10_atmospheric_entities",
+                    "M14_circadian_fog_patterns",
+                    "M11_dramatic_dialog",
+                    "M8_fear_embodiment",
+                    "M16_animistic_moor",
+                    "M13_relationship_tension",
+                    "M15_dread_prospection"
+                ],
+                "temporal_depth": 15,
+                "expected_training_examples": 70,  # 5 entities × 14 transitions
+                "narrative_beats": [
+                    "t01_arrival_on_moor",
+                    "t05_first_hound_sighting",
+                    "t08_rising_dread",
+                    "t11_climax_confrontation",
+                    "t15_resolution"
+                ]
+            }
+        )
+
+    @classmethod
+    def example_sign_loops_cyclical(cls) -> "SimulationConfig":
+        """
+        Cyclical narrative demonstrating time loops and prophecy mechanics.
+
+        The Sign of Four Loops: A detective trapped in a recursive investigation
+        where outcomes loop back to influence causes. Each cycle, the detective
+        gains knowledge that affects the "previous" iteration. Demonstrates M17:
+        CYCLICAL mode with prophecy accuracy determining loop variation.
+        """
+        return cls(
+            scenario_description=(
+                "A detective investigates a murder tied to a mysterious pact made years ago. But the "
+                "investigation loops: every time the detective solves the case, they find themselves back "
+                "at the beginning with residual memories (déjà vu). Each cycle, prophecies made in the "
+                "current iteration affect past events in the next loop. Track 12 timepoints across 3 "
+                "complete cycles (4 events each), with M17 (cyclical causality), M15 (prospection becomes "
+                "prophecy), M3 (knowledge persists across loops), M8 (temporal disorientation affecting "
+                "cognition), and M14 (repeating circadian patterns with variations)."
+            ),
+            world_id="sign_loops_cyclical",
+            entities=EntityConfig(
+                count=4,
+                types=["human", "abstract"],
+                initial_resolution=ResolutionLevel.TRAINED,  # High fidelity for complex temporal reasoning
+                animism_level=5  # Time itself as entity, fate, prophecy
+            ),
+            timepoints=TimepointConfig(
+                count=12,  # 3 loops × 4 events each
+                resolution="day"
+            ),
+            temporal=TemporalConfig(
+                mode=TemporalMode.CYCLICAL,
+                cycle_length=4,  # Each loop is 4 timepoints
+                prophecy_accuracy=0.8  # High accuracy—prophecies mostly come true
+            ),
+            outputs=OutputConfig(
+                formats=["jsonl", "json"],
+                include_dialogs=True,
+                include_relationships=True,
+                include_knowledge_flow=True,
+                export_ml_dataset=True
+            ),
+            metadata={
+                "character_focus": "detective",
+                "narrative_structure": "recursive_loop",
+                "mechanisms_featured": [
+                    "M17_modal_causality_cyclical",
+                    "M15_prophecy_prospection",
+                    "M3_cross_loop_knowledge",
+                    "M8_temporal_disorientation",
+                    "M14_repeating_patterns",
+                    "M16_time_as_entity",
+                    "M13_relationship_permutations",
+                    "M7_causal_loops"
+                ],
+                "temporal_depth": 12,
+                "expected_training_examples": 44,  # 4 entities × 11 transitions
+                "loop_count": 3,
+                "prophecies": [
+                    "loop1_prophecy_affects_loop2",
+                    "loop2_prophecy_affects_loop3",
+                    "loop3_prophecy_affects_loop1"
+                ]
+            }
+        )
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization"""
         return self.model_dump()

@@ -1,22 +1,26 @@
 #!/usr/bin/env python3
 """
-Test Rig - Simple orchestrator for prebaked Timepoint scenarios
+Test Rig - Lightweight monitor for Full E2E Timepoint workflows
 
-This is a DUMB orchestrator - it just runs tests and monitors them.
-All intelligence lives in the app (orchestrator.py, workflows, etc).
+This is a DUMB monitor - it just runs tests and tracks them.
+All intelligence lives in the app (workflows/e2e_runner.py, metadata/, etc).
 
-Prebaked Templates (all 17 mechanisms):
-- scarlet_study_deep: Pearl mode, 101 timepoints, 5 entities, all M1-M17
+Prebaked Templates (all 5 causal modes, all 17 mechanisms):
+- jefferson_dinner: Pearl mode, 7 timepoints, 3 entities [quick test]
+- board_meeting: Pearl mode, 5 timepoints, 5 entities [quick test]
+- scarlet_study_deep: Pearl mode, 101 timepoints, 5 entities, all M1-M17 [full test]
 - empty_house_flashback: Nonlinear mode, 81 timepoints, 4 entities
-- final_problem_branching: Branching mode, 61 timepoints × 4 branches, 4 entities
-- jefferson_dinner: Historical, 7 timepoints, 3 entities
-- board_meeting: Corporate, 5 timepoints, 5 entities
+- final_problem_branching: Branching mode, 61 timepoints, 4 entities
+- hound_shadow_directorial: Directorial mode, 15 timepoints, 5 entities
+- sign_loops_cyclical: Cyclical mode, 12 timepoints, 4 entities
 
 Usage:
-    python3 test_rig.py run --template scarlet_study_deep
+    python3 test_rig.py run --template jefferson_dinner
+    python3 test_rig.py run-all                          # Run all templates & generate coverage matrix
     python3 test_rig.py list
     python3 test_rig.py status --test-id test_0001
     python3 test_rig.py kill --test-id test_0001
+    python3 test_rig.py coverage                         # Show coverage matrix from completed runs
 """
 
 import subprocess
@@ -30,11 +34,33 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 
-# Prebaked template definitions
+# Prebaked template definitions - now matching FullE2EWorkflowRunner
 TEMPLATES = {
+    "jefferson_dinner": {
+        "name": "Jefferson's Compromise Dinner",
+        "description": "Historical negotiation scenario (QUICK TEST)",
+        "mode": "pearl",
+        "entities": 3,
+        "timepoints": 7,
+        "mechanisms": [1, 2, 3, 4, 7, 8, 14],
+        "expected_examples": 21,
+        "cost_estimate": "$0.10-0.50",
+        "runtime_estimate": "2-5min"
+    },
+    "board_meeting": {
+        "name": "Tech Startup Board Meeting",
+        "description": "Corporate scenario with acquisition proposal (QUICK TEST)",
+        "mode": "pearl",
+        "entities": 5,
+        "timepoints": 5,
+        "mechanisms": [1, 2, 3, 4, 7, 8],
+        "expected_examples": 25,
+        "cost_estimate": "$0.10-0.50",
+        "runtime_estimate": "2-5min"
+    },
     "scarlet_study_deep": {
         "name": "The Scarlet Study (Deep)",
-        "description": "Detective investigation with all 17 mechanisms",
+        "description": "Detective investigation with all 17 mechanisms (FULL TEST)",
         "mode": "pearl",
         "entities": 5,
         "timepoints": 101,
@@ -56,43 +82,42 @@ TEMPLATES = {
     },
     "final_problem_branching": {
         "name": "The Final Problem (Branching)",
-        "description": "Counterfactual reasoning across 4 timeline branches",
+        "description": "Counterfactual reasoning across timeline branches",
         "mode": "branching",
         "entities": 4,
         "timepoints": 61,
-        "branches": 4,
         "mechanisms": [1, 2, 3, 5, 6, 7, 8, 11, 12, 14, 15, 16, 17],
         "expected_examples": 240,
         "cost_estimate": "$2-6",
         "runtime_estimate": "8-15min"
     },
-    "jefferson_dinner": {
-        "name": "Jefferson's Compromise Dinner",
-        "description": "Historical negotiation scenario",
-        "mode": "pearl",
-        "entities": 3,
-        "timepoints": 7,
-        "mechanisms": [1, 2, 3, 4, 7, 8, 14],
-        "expected_examples": 21,
-        "cost_estimate": "$0.10-0.50",
-        "runtime_estimate": "1-2min"
-    },
-    "board_meeting": {
-        "name": "Tech Startup Board Meeting",
-        "description": "Corporate scenario with acquisition proposal",
-        "mode": "pearl",
+    "hound_shadow_directorial": {
+        "name": "The Hound's Shadow (Directorial)",
+        "description": "Detective noir with narrative arc structure",
+        "mode": "directorial",
         "entities": 5,
-        "timepoints": 5,
-        "mechanisms": [1, 2, 3, 4, 7, 8],
-        "expected_examples": 25,
-        "cost_estimate": "$0.10-0.50",
-        "runtime_estimate": "1-2min"
+        "timepoints": 15,
+        "mechanisms": [1, 2, 3, 4, 7, 8, 10, 11, 13, 14, 15, 16, 17],
+        "expected_examples": 70,
+        "cost_estimate": "$0.50-2",
+        "runtime_estimate": "5-10min"
+    },
+    "sign_loops_cyclical": {
+        "name": "The Sign of Four Loops (Cyclical)",
+        "description": "Time loop with prophecy mechanics",
+        "mode": "cyclical",
+        "entities": 4,
+        "timepoints": 12,
+        "mechanisms": [1, 2, 3, 4, 7, 8, 13, 14, 15, 16, 17],
+        "expected_examples": 44,
+        "cost_estimate": "$0.50-2",
+        "runtime_estimate": "3-8min"
     }
 }
 
 
 class TestRig:
-    """Simple test orchestrator - just runs and monitors"""
+    """Simple test monitor - runs FullE2EWorkflowRunner and tracks results"""
 
     def __init__(self, workspace_dir: str = "."):
         self.workspace = Path(workspace_dir)
@@ -119,19 +144,27 @@ class TestRig:
         print("="*80)
         print("AVAILABLE PREBAKED TEMPLATES")
         print("="*80)
-        for template_id, info in TEMPLATES.items():
-            print(f"\n📋 {template_id}")
-            print(f"   Name: {info['name']}")
-            print(f"   {info['description']}")
-            print(f"   Mode: {info['mode']}, Entities: {info['entities']}, Timepoints: {info['timepoints']}")
-            if 'branches' in info:
-                print(f"   Branches: {info['branches']}")
-            print(f"   Mechanisms: M{', M'.join(map(str, info['mechanisms']))}")
-            print(f"   Expected Examples: {info['expected_examples']}")
-            print(f"   Cost: {info['cost_estimate']}, Runtime: {info['runtime_estimate']}")
+        print("\nCoverage: 5/5 causal modes | 17/17 mechanisms")
+        print("\nQUICK TESTS (< 5min):")
+        for template_id in ["jefferson_dinner", "board_meeting"]:
+            info = TEMPLATES[template_id]
+            print(f"\n  📋 {template_id}")
+            print(f"     {info['description']}")
+            print(f"     {info['mode']} | {info['entities']} entities | {info['timepoints']} timepoints")
+            print(f"     Cost: {info['cost_estimate']}, Runtime: {info['runtime_estimate']}")
+
+        print("\nFULL TESTS:")
+        for template_id in ["scarlet_study_deep", "empty_house_flashback", "final_problem_branching",
+                           "hound_shadow_directorial", "sign_loops_cyclical"]:
+            info = TEMPLATES[template_id]
+            print(f"\n  📋 {template_id}")
+            print(f"     {info['description']}")
+            print(f"     {info['mode']} | {info['entities']} entities | {info['timepoints']} timepoints")
+            print(f"     Mechanisms: M{', M'.join(map(str, info['mechanisms']))}")
+            print(f"     Cost: {info['cost_estimate']}, Runtime: {info['runtime_estimate']}")
 
     def run_template(self, template_id: str) -> str:
-        """Run a prebaked template"""
+        """Run a prebaked template using FullE2EWorkflowRunner"""
         if template_id not in TEMPLATES:
             print(f"❌ Unknown template: {template_id}")
             print(f"Available: {', '.join(TEMPLATES.keys())}")
@@ -147,15 +180,13 @@ class TestRig:
         print(f"📋 Template: {template_id}")
         print(f"📝 Log: {log_file}")
 
-        # Write Python code to temporary script file
+        # Write Python code using FullE2EWorkflowRunner
         script_file = self.log_dir / f"{test_id}_{template_id}.py"
         python_code = f'''
 import os
-import tempfile
 from generation.config_schema import SimulationConfig
-from orchestrator import simulate_event
-from llm_v2 import LLMClient
-from storage import GraphStore
+from e2e_workflows.e2e_runner import FullE2EWorkflowRunner
+from metadata.run_tracker import MetadataManager
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -164,41 +195,32 @@ logging.basicConfig(level=logging.INFO)
 config = SimulationConfig.example_{template_id}()
 
 print("\\n" + "="*80)
-print(f"RUNNING: {{config.world_id}}")
+print(f"RUNNING FULL E2E WORKFLOW: {{config.world_id}}")
+print(f"6-Step Pipeline: scene → temporal → training → format → oxen → metadata")
 print("="*80 + "\\n")
 
 try:
-    # Initialize LLM client
-    api_key = os.getenv("OPENROUTER_API_KEY")
-    llm = LLMClient(api_key=api_key, dry_run=False)
+    # Initialize metadata manager
+    metadata_manager = MetadataManager("metadata/runs.db")
 
-    # Initialize storage
-    db_path = tempfile.mktemp(suffix=".db")
-    store = GraphStore(f"sqlite:///{{db_path}}")
+    # Initialize E2E runner
+    runner = FullE2EWorkflowRunner(metadata_manager)
 
-    # Run simulation
-    result = simulate_event(
-        config.scenario_description,
-        llm,
-        store,
-        context={{
-            "max_entities": config.entities.count,
-            "max_timepoints": config.timepoints.count,
-            "temporal_mode": config.temporal.mode.value
-        }},
-        save_to_db=True
-    )
+    # Run complete workflow
+    metadata = runner.run(config)
 
-    print(f"\\n✅ COMPLETE: {{config.world_id}}")
-    print(f"   Entities: {{len(result['entities'])}}")
-    print(f"   Timepoints: {{len(result['timepoints'])}}")
-
-    # Cleanup
-    if os.path.exists(db_path):
-        os.unlink(db_path)
+    print(f"\\n✅ E2E WORKFLOW COMPLETE")
+    print(f"   Run ID: {{metadata.run_id}}")
+    print(f"   Entities: {{metadata.entities_created}}")
+    print(f"   Timepoints: {{metadata.timepoints_created}}")
+    print(f"   Training Examples: {{metadata.training_examples}}")
+    print(f"   Mechanisms Used: {{len(metadata.mechanisms_used)}}/17")
+    print(f"   Cost: ${{metadata.cost_usd:.2f}}")
+    if metadata.oxen_repo_url:
+        print(f"   Oxen Repo: {{metadata.oxen_repo_url}}")
 
 except Exception as e:
-    print(f"\\n❌ FAILED: {{e}}")
+    print(f"\\n❌ E2E WORKFLOW FAILED: {{e}}")
     import traceback
     traceback.print_exc()
     raise
@@ -226,12 +248,11 @@ except Exception as e:
         # Always enable LLM service for tests
         env['LLM_SERVICE_ENABLED'] = 'true'
 
-        # Add workspace to PYTHONPATH so imports work
+        # Add workspace to PYTHONPATH
         env['PYTHONPATH'] = str(self.workspace)
 
         # Build bash command with venv activation
         bash_cmd = f"source .venv/bin/activate && python3 {script_file}"
-
         cmd = ["bash", "-c", bash_cmd]
 
         with open(log_file, 'w') as log:
@@ -251,6 +272,7 @@ except Exception as e:
             "template_info": template,
             "pid": process.pid,
             "log_file": str(log_file),
+            "script_file": str(script_file),
             "status": "running",
             "started_at": datetime.now().isoformat(),
         }
@@ -259,7 +281,85 @@ except Exception as e:
         print(f"✅ Test {test_id} started (PID: {process.pid})")
         print(f"\n📊 Monitor: python3 test_rig.py status --test-id {test_id}")
         print(f"📊 List all: python3 test_rig.py list")
+        print(f"🛑 Kill: python3 test_rig.py kill --test-id {test_id}")
         return test_id
+
+    def run_all_templates(self):
+        """Run all templates and generate coverage matrix"""
+        print("="*80)
+        print("RUNNING ALL TEMPLATES")
+        print("="*80)
+        print(f"\nTotal templates: {len(TEMPLATES)}")
+        print("This will run FULL E2E workflows for all 7 templates.")
+        print("Estimated total runtime: 40-80 minutes")
+        print("Estimated total cost: $10-30")
+        print("\nTemplates:")
+        for template_id in TEMPLATES:
+            print(f"  - {template_id} ({TEMPLATES[template_id]['runtime_estimate']})")
+
+        response = input("\nContinue? [y/N]: ")
+        if response.lower() != 'y':
+            print("Cancelled.")
+            return
+
+        test_ids = []
+        for template_id in TEMPLATES:
+            print(f"\n{'='*80}")
+            test_id = self.run_template(template_id)
+            if test_id:
+                test_ids.append(test_id)
+            time.sleep(2)  # Brief pause between launches
+
+        print(f"\n{'='*80}")
+        print(f"✅ Launched {len(test_ids)} tests")
+        print("="*80)
+        print("\n📊 Monitor progress:")
+        print("   python3 test_rig.py list")
+        print("\n📊 Generate coverage matrix when all complete:")
+        print("   python3 test_rig.py coverage")
+
+    def show_coverage(self):
+        """Show coverage matrix from completed runs"""
+        print("="*80)
+        print("COVERAGE MATRIX")
+        print("="*80)
+
+        # Import metadata components
+        try:
+            from metadata.run_tracker import MetadataManager
+            from metadata.coverage_matrix import CoverageMatrix
+        except ImportError as e:
+            print(f"❌ Failed to import metadata: {e}")
+            return
+
+        # Load metadata
+        metadata_manager = MetadataManager("metadata/runs.db")
+        all_runs = metadata_manager.get_all_runs()
+
+        if not all_runs:
+            print("\n⚠️  No completed runs found. Run templates first:")
+            print("   python3 test_rig.py run-all")
+            return
+
+        print(f"\nTotal runs: {len(all_runs)}")
+        print(f"Completed: {sum(1 for r in all_runs if r.status == 'completed')}")
+        print(f"Failed: {sum(1 for r in all_runs if r.status == 'failed')}")
+        print("")
+
+        # Generate matrices
+        matrix = CoverageMatrix()
+
+        # Generate text report
+        report = matrix.generate_text_report(all_runs)
+        print(report)
+
+        # Save markdown report
+        markdown = matrix.generate_markdown_report(all_runs)
+        report_file = self.workspace / "COVERAGE_REPORT.md"
+        with open(report_file, 'w') as f:
+            f.write(markdown)
+
+        print(f"\n📄 Markdown report saved: {report_file}")
 
     def check_status(self, test_id: str) -> Dict:
         """Check test status"""
@@ -301,15 +401,33 @@ except Exception as e:
             "log_size": log_path.stat().st_size,
             "last_modified": datetime.fromtimestamp(log_path.stat().st_mtime).isoformat(),
             "success": False,
-            "errors": []
+            "errors": [],
+            "current_step": None
         }
 
         try:
             with open(log_path) as f:
                 lines = f.readlines()
-                for line in lines[-50:]:  # Last 50 lines
-                    if "✅ COMPLETE" in line or "TEST PASSED" in line:
+
+                # Scan for E2E workflow steps
+                for line in lines[-100:]:  # Last 100 lines
+                    if "E2E WORKFLOW COMPLETE" in line or "✅" in line:
                         progress["success"] = True
+                    if "Step 1:" in line:
+                        progress["current_step"] = "start_tracking"
+                    elif "Step 2:" in line:
+                        progress["current_step"] = "initial_scene"
+                    elif "Step 3:" in line:
+                        progress["current_step"] = "temporal_generation"
+                    elif "Step 4:" in line:
+                        progress["current_step"] = "entity_training"
+                    elif "Step 5:" in line:
+                        progress["current_step"] = "format_training_data"
+                    elif "Step 6:" in line:
+                        progress["current_step"] = "oxen_upload"
+                    elif "Step 7:" in line:
+                        progress["current_step"] = "complete_metadata"
+
                     if "ERROR" in line or "FAILED" in line or "❌" in line:
                         progress["errors"].append(line.strip())
         except:
@@ -358,7 +476,7 @@ except Exception as e:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Test Rig for Timepoint scenarios")
+    parser = argparse.ArgumentParser(description="Test Rig for Timepoint E2E workflows")
     subparsers = parser.add_subparsers(dest="command")
 
     # Templates command
@@ -367,6 +485,12 @@ def main():
     # Run command
     run_parser = subparsers.add_parser("run", help="Run a template")
     run_parser.add_argument("--template", required=True, choices=list(TEMPLATES.keys()))
+
+    # Run-all command
+    subparsers.add_parser("run-all", help="Run all templates and generate coverage matrix")
+
+    # Coverage command
+    subparsers.add_parser("coverage", help="Show coverage matrix from completed runs")
 
     # Status command
     status_parser = subparsers.add_parser("status", help="Check test status")
@@ -389,32 +513,60 @@ def main():
     elif args.command == "run":
         rig.run_template(args.template)
 
+    elif args.command == "run-all":
+        rig.run_all_templates()
+
+    elif args.command == "coverage":
+        rig.show_coverage()
+
     elif args.command == "status":
         status = rig.check_status(args.test_id)
-        print(json.dumps(status, indent=2, default=str))
+        if "error" in status:
+            print(status["error"])
+        else:
+            print(f"\n{'='*80}")
+            print(f"TEST STATUS: {status['id']}")
+            print(f"{'='*80}")
+            print(f"Template: {status['template']}")
+            print(f"Status: {status['status']}")
+            print(f"Started: {status['started_at']}")
+            if status.get('completed_at'):
+                print(f"Completed: {status['completed_at']}")
+
+            progress = status.get('progress', {})
+            if progress.get('current_step'):
+                print(f"Current Step: {progress['current_step']}")
+            if progress.get('success'):
+                print(f"✅ Success!")
+            if progress.get('errors'):
+                print(f"⚠️  Errors: {len(progress['errors'])}")
+                print("\nRecent errors:")
+                for error in progress['errors'][-5:]:
+                    print(f"  {error}")
+
+            print(f"\n📝 Log file: {status['log_file']}")
+            print(f"📝 Script: {status.get('script_file', 'N/A')}")
 
     elif args.command == "list":
         tests = rig.list_tests()
         if not tests:
             print("No tests found")
         else:
-            print(f"Found {len(tests)} test(s):\n")
+            print(f"\n{'='*80}")
+            print(f"ALL TESTS ({len(tests)} total)")
+            print(f"{'='*80}\n")
             for test in tests:
                 template = test.get("template_info", {})
-                print(f"{'='*80}")
-                print(f"🧪 {test['id']}: {template.get('name', test['template'])}")
-                print(f"{'='*80}")
-                print(f"Status: {test['status']}")
-                print(f"Template: {test['template']}")
-                print(f"Started: {test['started_at']}")
-                if test.get('completed_at'):
-                    print(f"Completed: {test['completed_at']}")
+                status_icon = "✅" if test["status"] == "completed" else "❌" if test["status"] == "failed" else "🔄"
+
+                print(f"{status_icon} {test['id']}: {template.get('name', test['template'])}")
+                print(f"   Status: {test['status']} | Started: {test['started_at']}")
 
                 progress = test.get('progress', {})
-                if progress.get('success'):
-                    print(f"✅ Success!")
+                if progress.get('current_step'):
+                    print(f"   Step: {progress['current_step']}")
                 if progress.get('errors'):
-                    print(f"⚠️  Errors: {len(progress['errors'])}")
+                    print(f"   ⚠️  {len(progress['errors'])} error(s)")
                 print()
 
     elif args.command == "kill":
