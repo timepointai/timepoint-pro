@@ -28,7 +28,7 @@ llm_service:
     model: "meta-llama/llama-3.1-70b-instruct"
     temperature: 0.7
     top_p: 0.9
-    max_tokens: 1000
+    max_tokens: 4000  # Increased for large structured outputs (orchestrator needs 30k+ for big scenarios)
     frequency_penalty: 0.0
     presence_penalty: 0.0
 
@@ -37,7 +37,7 @@ llm_service:
     max_retries: 3
     backoff_base: 1.0
     backoff_multiplier: 2.0
-    failsoft_enabled: true
+    failsoft_enabled: false  # MOCKS ARE ILLEGAL - fail fast with real errors
     retry_on_invalid_json: true
 
   # Logging configuration

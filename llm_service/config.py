@@ -22,7 +22,7 @@ class ErrorHandlingConfig:
     max_retries: int = 3
     backoff_base: float = 1.0
     backoff_multiplier: float = 2.0
-    failsoft_enabled: bool = True
+    failsoft_enabled: bool = False  # MOCKS ARE ILLEGAL - fail fast with real errors
     retry_on_invalid_json: bool = True
 
 

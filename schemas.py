@@ -85,10 +85,15 @@ class Entity(SQLModel, table=True):
     entity_metadata: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))  # Type-specific metadata
 
     @property
-    def physical_tensor(self) -> PhysicalTensor:
+    def physical_tensor(self) -> Optional[PhysicalTensor]:
         """Get the physical tensor from entity metadata"""
         physical_data = self.entity_metadata.get("physical_tensor", {})
-        return PhysicalTensor(**physical_data)
+        if not physical_data or 'age' not in physical_data:
+            return None  # No valid physical tensor data
+        try:
+            return PhysicalTensor(**physical_data)
+        except Exception:
+            return None  # Failed validation, return None instead of raising
 
     @physical_tensor.setter
     def physical_tensor(self, value: PhysicalTensor):
@@ -96,10 +101,15 @@ class Entity(SQLModel, table=True):
         self.entity_metadata["physical_tensor"] = value.dict()
 
     @property
-    def cognitive_tensor(self) -> CognitiveTensor:
+    def cognitive_tensor(self) -> Optional[CognitiveTensor]:
         """Get the cognitive tensor from entity metadata"""
         cognitive_data = self.entity_metadata.get("cognitive_tensor", {})
-        return CognitiveTensor(**cognitive_data)
+        if not cognitive_data:
+            return None  # No cognitive tensor data
+        try:
+            return CognitiveTensor(**cognitive_data)
+        except Exception:
+            return None  # Failed validation, return None instead of raising
 
     @cognitive_tensor.setter
     def cognitive_tensor(self, value: CognitiveTensor):

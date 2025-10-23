@@ -44,7 +44,8 @@ class LLMService:
 
         # Initialize components
         self.prompt_manager = PromptManager()
-        self.response_parser = ResponseParser(strict=False)
+        # Set strict mode based on failsoft setting: strict=True means no mocks
+        self.response_parser = ResponseParser(strict=not config.error_handling.failsoft_enabled)
         self.security_filter = SecurityFilter(
             max_input_length=config.security.max_input_length,
             dangerous_patterns=config.security.dangerous_patterns,
@@ -241,10 +242,11 @@ class LLMService:
                 allow_partial=allow_partial
             )
         except Exception as e:
-            if self.config.error_handling.failsoft_enabled:
-                return self.response_parser._create_null_instance(schema)
-            else:
+            # When failsoft is disabled, never return mocks - raise the error
+            if not self.config.error_handling.failsoft_enabled:
                 raise Exception(f"Failed to parse structured response: {e}")
+            # Failsoft mode: return null instance
+            return self.response_parser._create_null_instance(schema)
 
     def start_session(
         self,

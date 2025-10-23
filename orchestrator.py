@@ -100,7 +100,8 @@ class SceneParser:
         prompt = self._build_parsing_prompt(event_description, context)
 
         # Use LLM to generate structured scene specification
-        response = self._call_llm_structured(prompt, SceneSpecification)
+        # Pass context for auto-scaling token limits and model selection
+        response = self._call_llm_structured(prompt, SceneSpecification, context)
 
         return response
 
@@ -109,6 +110,16 @@ class SceneParser:
         preferred_mode = context.get("temporal_mode", "pearl")
         max_entities = context.get("max_entities", 20)
         max_timepoints = context.get("max_timepoints", 10)
+
+        # Check if this is a forced requirement (MAX mode)
+        require_exact = context.get("require_exact_counts", False)
+
+        if require_exact:
+            entity_instruction = f"**Entities** (REQUIRED: exactly {max_entities}): You MUST generate exactly {max_entities} entities. This is a hard requirement. List of people, objects, places, concepts involved"
+            timepoint_instruction = f"**Timepoints** (REQUIRED: exactly {max_timepoints}): You MUST generate exactly {max_timepoints} timepoints. This is a hard requirement. Key moments in the event sequence"
+        else:
+            entity_instruction = f"**Entities** (max {max_entities}): List of people, objects, places involved"
+            timepoint_instruction = f"**Timepoints** (max {max_timepoints}): Key moments in the event sequence"
 
         prompt = f"""You are a historical scene analyzer. Parse this event description into a structured simulation specification.
 
@@ -124,7 +135,7 @@ Generate a complete scene specification with these components:
    - start_date: ISO datetime when events begin
    - end_date: ISO datetime when events conclude
    - location: Geographic location description
-5. **Entities** (max {max_entities}): List of people, objects, places involved
+5. {entity_instruction}
    For each entity provide:
    - entity_id: Unique identifier (lowercase, no spaces, e.g., "james_madison")
    - entity_type: Type (human, animal, building, object, abstract)
@@ -132,7 +143,7 @@ Generate a complete scene specification with these components:
    - description: Brief description (1 sentence)
    - initial_knowledge: List of 3-8 facts this entity knows at start
    - relationships: Dict mapping other entity_ids to relationship types (e.g., "ally", "rival", "mentor")
-6. **Timepoints** (max {max_timepoints}): Key moments in the event sequence
+6. {timepoint_instruction}
    For each timepoint provide:
    - timepoint_id: Unique identifier (e.g., "tp_001_opening")
    - timestamp: ISO datetime
@@ -175,7 +186,7 @@ Schema:
 
         return prompt
 
-    def _call_llm_structured(self, prompt: str, response_model: type) -> Any:
+    def _call_llm_structured(self, prompt: str, response_model: type, context: Optional[Dict] = None) -> Any:
         """Call LLM and parse structured response - REQUIRES REAL LLM"""
         import os
 
@@ -186,24 +197,90 @@ Schema:
                 "Mock mode is disabled. Set LLM_SERVICE_ENABLED=true and provide OPENROUTER_API_KEY."
             )
 
+        context = context or {}
+        max_entities = context.get("max_entities", 20)
+        max_timepoints = context.get("max_timepoints", 10)
+
         try:
             # Use LLMClient's generate_structured method (proper API)
+            # For very large scenarios (100+ entities, 100+ timepoints), use Llama 405B with 100k tokens
+            # For medium scenarios (20-100 entities, 20-100 timepoints), use Llama 70B with 16k tokens
+            # Estimate: ~50 tokens per entity + ~100 tokens per timepoint + ~1000 overhead
+            estimated_tokens = (max_entities * 50) + (max_timepoints * 100) + 1000
+
+            if estimated_tokens > 15000:
+                # Large scenario - use Llama 405B with extended token limit
+                model = "meta-llama/llama-3.1-405b-instruct"
+                max_output_tokens = min(int(estimated_tokens * 1.5), 100000)  # 1.5x safety margin, cap at 100k
+                print(f"   🚀 Large scenario detected: Using Llama 405B with {max_output_tokens:,} token limit")
+                print(f"   📊 Estimated: {max_entities} entities × {max_timepoints} timepoints = ~{estimated_tokens:,} tokens")
+            else:
+                # Medium scenario - use Llama 70B
+                model = None  # Use default (70B)
+                max_output_tokens = min(int(estimated_tokens * 1.5), 16000)  # 1.5x safety margin, cap at 16k
+                print(f"   ✅ Standard scenario: Using Llama 70B with {max_output_tokens:,} token limit")
+
             result = self.llm.generate_structured(
                 prompt=prompt,
                 response_model=response_model,
-                model=None,  # Use default model
+                model=model,
                 temperature=0.3,  # Lower temperature for structured output
-                max_tokens=4000
+                max_tokens=max_output_tokens
             )
 
             return result
 
         except Exception as e:
-            # DO NOT fall back to mocks - fail fast with clear error
-            raise RuntimeError(
-                f"Scene parsing failed: {e}\n"
-                f"Orchestrator requires real LLM integration. Cannot proceed with mocks."
-            ) from e
+            # DO NOT fall back to mocks - fail fast with clear, context-specific error
+            error_str = str(e).lower()
+
+            # Provide context-specific error messages based on error type
+            if "timeout" in error_str or "timed out" in error_str:
+                raise RuntimeError(
+                    f"Scene parsing failed: {e}\n\n"
+                    "The API request timed out. This can happen when:\n"
+                    "  • OpenRouter is experiencing high load\n"
+                    "  • The request is too large/complex for the model to complete in time\n"
+                    "  • Network connectivity issues\n\n"
+                    "Solutions:\n"
+                    "  • Try again (API may be less busy)\n"
+                    "  • Reduce scale (fewer entities/timepoints)\n"
+                    "  • Use a faster model (though less capable)"
+                ) from e
+
+            elif "json" in error_str or "parse" in error_str or "parsing" in error_str:
+                raise RuntimeError(
+                    f"Scene parsing failed: {e}\n\n"
+                    "Failed to parse LLM response as valid JSON. This usually means:\n"
+                    "  • The response was truncated (model hit token limit)\n"
+                    "  • The JSON structure is incomplete or malformed\n"
+                    "  • The requested scale is too large for the model\n\n"
+                    "Solutions:\n"
+                    "  • Reduce scale (fewer entities/timepoints)\n"
+                    "  • Check logs/llm_calls/*.jsonl for the actual response\n"
+                    "  • For very large scales, use standard mode instead of MAX mode"
+                ) from e
+
+            elif "validation" in error_str or "field required" in error_str or "pydantic" in error_str:
+                raise RuntimeError(
+                    f"Scene parsing failed: {e}\n\n"
+                    "Response validation failed (schema mismatch). This usually means:\n"
+                    "  • LLM didn't generate required fields\n"
+                    "  • Field types don't match expected schema\n"
+                    "  • Response structure is incorrect\n\n"
+                    "Solutions:\n"
+                    "  • Check logs/llm_calls/*.jsonl for the actual response\n"
+                    "  • Try again (LLM may generate valid response next time)\n"
+                    "  • Report issue if consistently failing"
+                ) from e
+
+            else:
+                # Generic fallback for other errors
+                raise RuntimeError(
+                    f"Scene parsing failed: {e}\n\n"
+                    "An unexpected error occurred during scene generation.\n"
+                    "Check logs/llm_calls/*.jsonl for details."
+                ) from e
 
     def _mock_scene_specification(self) -> SceneSpecification:
         """Generate mock scene specification for testing"""

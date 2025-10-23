@@ -389,7 +389,8 @@ class CharacterEngine:
                         "max_entities": max_config.entities.count,
                         "max_timepoints": num_timepoints,
                         "temporal_mode": "pearl",
-                        "require_trained_resolution": True  # Force TRAINED for main characters
+                        "require_trained_resolution": True,  # Force TRAINED for main characters
+                        "require_exact_counts": True  # MAX mode: enforce exact entity/timepoint counts
                     },
                     save_to_db=False
                 )

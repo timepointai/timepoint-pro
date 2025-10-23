@@ -90,7 +90,17 @@ class ResponseParser:
         if self._is_valid_json(text_stripped):
             return text_stripped
 
-        raise ParseError(f"No valid JSON found in response: {text[:200]}...")
+        # Provide helpful error message
+        preview = text[:500] if len(text) > 500 else text
+        raise ParseError(
+            f"No valid JSON found in response.\n"
+            f"Response preview (first 500 chars):\n{preview}\n\n"
+            f"This usually means:\n"
+            f"1. The LLM response was truncated (check token limits)\n"
+            f"2. The JSON is malformed or incomplete\n"
+            f"3. The response contains text but no JSON structure\n"
+            f"4. The requested generation was too large for the model"
+        )
 
     def parse_structured(
         self,
@@ -144,7 +154,9 @@ class ResponseParser:
             try:
                 return schema(**fixed_data)
             except ValidationError as e:
-                # Last resort: return null instance
+                # Last resort: return null instance (only if not strict)
+                if self.strict:
+                    raise ParseError(f"Schema validation failed: {e}")
                 return self._create_null_instance(schema)
 
     def parse_json(self, text: str) -> Dict[str, Any]:
