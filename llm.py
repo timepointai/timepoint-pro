@@ -459,6 +459,98 @@ Return only valid JSON, no other text."""
         self.cost += 0.02  # Estimate for dialog generation
         return response
 
+    def generate_structured(
+        self,
+        prompt: str,
+        response_model: type,
+        model: Optional[str] = None,
+        temperature: float = 0.7,
+        max_tokens: int = 4000,
+        timeout: float = 120.0
+    ):
+        """
+        Generate structured output conforming to a Pydantic model.
+
+        Args:
+            prompt: The prompt to send to the LLM
+            response_model: Pydantic BaseModel class to validate response against
+            model: Model identifier (defaults to instance default_model)
+            temperature: Sampling temperature
+            max_tokens: Maximum tokens to generate
+            timeout: Request timeout in seconds
+
+        Returns:
+            Instance of response_model populated from LLM response
+        """
+        if self.dry_run:
+            # Return empty instance for dry run
+            return response_model()
+
+        # Use provided model or default to Llama model
+        selected_model = model or self.default_model
+
+        # Build schema hint from Pydantic model
+        schema_hint = self._build_schema_hint(response_model)
+        enhanced_prompt = f"{prompt}\n\n{schema_hint}\n\nReturn only valid JSON, no other text."
+
+        def _api_call():
+            # Temporarily increase timeout for large requests
+            original_timeout = self.client.client.timeout
+            self.client.client.timeout = httpx.Timeout(timeout)
+
+            try:
+                response = self.client.chat.completions.create(
+                    model=selected_model,
+                    messages=[{"role": "user", "content": enhanced_prompt}],
+                    temperature=temperature,
+                    max_tokens=max_tokens
+                )
+                # Extract content from response
+                content = response["choices"][0]["message"]["content"]
+
+                # Clean up JSON - remove markdown code blocks if present
+                content = content.strip()
+                if content.startswith("```json"):
+                    content = content[7:]  # Remove ```json
+                if content.startswith("```"):
+                    content = content[3:]  # Remove ```
+                if content.endswith("```"):
+                    content = content[:-3]  # Remove trailing ```
+                content = content.strip()
+
+                # Parse JSON and validate against model
+                try:
+                    data = json.loads(content)
+                    return response_model(**data)
+                except (json.JSONDecodeError, ValueError) as e:
+                    raise Exception(f"Failed to parse LLM response as JSON: {e}. Content preview: {content[:500]}")
+            finally:
+                # Restore original timeout
+                self.client.client.timeout = original_timeout
+
+        result = retry_with_backoff(_api_call, max_retries=3, base_delay=2.0)
+
+        # Update token count and cost estimates
+        self.token_count += max_tokens
+        self.cost += (max_tokens / 1000) * 0.02  # Rough estimate
+
+        return result
+
+    def _build_schema_hint(self, response_model: type) -> str:
+        """Build a JSON schema hint from a Pydantic model"""
+        try:
+            schema = response_model.model_json_schema()
+            # Simplify schema for prompt
+            return f"Expected JSON schema:\n{json.dumps(schema, indent=2)}"
+        except:
+            # Fallback to simple field listing
+            try:
+                fields = response_model.model_fields
+                field_hints = [f"  - {name}: {field.annotation}" for name, field in fields.items()]
+                return f"Expected fields:\n" + "\n".join(field_hints)
+            except:
+                return "Return a valid JSON object matching the expected structure."
+
     def _heuristic_relevance_score(self, query: str, knowledge_item: str) -> float:
         """Fallback heuristic relevance scoring"""
         query_words = set(query.lower().split())
