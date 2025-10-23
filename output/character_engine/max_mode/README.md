@@ -1,6 +1,6 @@
 # Timepoint MAX Mode Training Data
 
-**Generated:** 2025-10-22T20:19:13.583784
+**Generated:** 2025-10-23T06:42:43.062868
 
 ## Overview
 
@@ -8,9 +8,9 @@ This repository contains training data from Timepoint's **MAX Mode** - a single 
 
 ## Configuration
 
-- **Entities:** 24
-- **Timepoints:** 20
-- **Training Examples:** 52
+- **Entities:** 50
+- **Timepoints:** 100
+- **Training Examples:** 225
 - **Character Perspectives:** 4 (detective, doctor, villain, witness)
 - **Resolution:** Hour-by-hour temporal tracking
 - **Mechanisms:** All 17 Timepoint mechanisms demonstrated
@@ -62,7 +62,7 @@ To fine-tune a model on this data:
 
 ```
 Timepoint-Daedalus MAX Mode Training Data
-Generated: 2025-10-22
-Entities: 24, Timepoints: 20
-Examples: 52
+Generated: 2025-10-23
+Entities: 50, Timepoints: 100
+Examples: 225
 ```

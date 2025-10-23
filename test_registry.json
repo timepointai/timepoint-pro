@@ -1,0 +1,211 @@
+{
+  "tests": {
+    "test_0001": {
+      "id": "test_0001",
+      "template": "jefferson_dinner",
+      "template_info": {
+        "name": "Jefferson's Compromise Dinner",
+        "description": "Historical negotiation scenario",
+        "mode": "pearl",
+        "entities": 3,
+        "timepoints": 7,
+        "mechanisms": [
+          1,
+          2,
+          3,
+          4,
+          7,
+          8,
+          14
+        ],
+        "expected_examples": 21,
+        "cost_estimate": "$0.10-0.50",
+        "runtime_estimate": "1-2min"
+      },
+      "pid": 17303,
+      "log_file": "logs/test_runs/test_0001_jefferson_dinner.log",
+      "status": "failed",
+      "started_at": "2025-10-23T07:08:00.880754",
+      "progress": {
+        "log_size": 530,
+        "last_modified": "2025-10-23T07:08:00.926197",
+        "success": false,
+        "errors": []
+      },
+      "completed_at": "2025-10-23T07:08:18.200941"
+    },
+    "test_0002": {
+      "id": "test_0002",
+      "template": "jefferson_dinner",
+      "template_info": {
+        "name": "Jefferson's Compromise Dinner",
+        "description": "Historical negotiation scenario",
+        "mode": "pearl",
+        "entities": 3,
+        "timepoints": 7,
+        "mechanisms": [
+          1,
+          2,
+          3,
+          4,
+          7,
+          8,
+          14
+        ],
+        "expected_examples": 21,
+        "cost_estimate": "$0.10-0.50",
+        "runtime_estimate": "1-2min"
+      },
+      "pid": 17846,
+      "log_file": "logs/test_runs/test_0002_jefferson_dinner.log",
+      "status": "failed",
+      "started_at": "2025-10-23T07:09:16.300602",
+      "progress": {
+        "log_size": 64,
+        "last_modified": "2025-10-23T07:09:16.314876",
+        "success": false,
+        "errors": []
+      },
+      "completed_at": "2025-10-23T07:09:36.540734"
+    },
+    "test_0003": {
+      "id": "test_0003",
+      "template": "jefferson_dinner",
+      "template_info": {
+        "name": "Jefferson's Compromise Dinner",
+        "description": "Historical negotiation scenario",
+        "mode": "pearl",
+        "entities": 3,
+        "timepoints": 7,
+        "mechanisms": [
+          1,
+          2,
+          3,
+          4,
+          7,
+          8,
+          14
+        ],
+        "expected_examples": 21,
+        "cost_estimate": "$0.10-0.50",
+        "runtime_estimate": "1-2min"
+      },
+      "pid": 18123,
+      "log_file": "logs/test_runs/test_0003_jefferson_dinner.log",
+      "status": "failed",
+      "started_at": "2025-10-23T07:10:04.696305",
+      "progress": {
+        "log_size": 64,
+        "last_modified": "2025-10-23T07:10:04.702280",
+        "success": false,
+        "errors": []
+      },
+      "completed_at": "2025-10-23T07:14:15.970179"
+    },
+    "test_0004": {
+      "id": "test_0004",
+      "template": "jefferson_dinner",
+      "template_info": {
+        "name": "Jefferson's Compromise Dinner",
+        "description": "Historical negotiation scenario",
+        "mode": "pearl",
+        "entities": 3,
+        "timepoints": 7,
+        "mechanisms": [
+          1,
+          2,
+          3,
+          4,
+          7,
+          8,
+          14
+        ],
+        "expected_examples": 21,
+        "cost_estimate": "$0.10-0.50",
+        "runtime_estimate": "1-2min"
+      },
+      "pid": 18317,
+      "log_file": "logs/test_runs/test_0004_jefferson_dinner.log",
+      "status": "failed",
+      "started_at": "2025-10-23T07:10:51.982716",
+      "progress": {
+        "log_size": 274,
+        "last_modified": "2025-10-23T07:10:52.026785",
+        "success": false,
+        "errors": []
+      },
+      "completed_at": "2025-10-23T07:14:15.969762"
+    },
+    "test_0005": {
+      "id": "test_0005",
+      "template": "jefferson_dinner",
+      "template_info": {
+        "name": "Jefferson's Compromise Dinner",
+        "description": "Historical negotiation scenario",
+        "mode": "pearl",
+        "entities": 3,
+        "timepoints": 7,
+        "mechanisms": [
+          1,
+          2,
+          3,
+          4,
+          7,
+          8,
+          14
+        ],
+        "expected_examples": 21,
+        "cost_estimate": "$0.10-0.50",
+        "runtime_estimate": "1-2min"
+      },
+      "pid": 18560,
+      "log_file": "logs/test_runs/test_0005_jefferson_dinner.log",
+      "status": "failed",
+      "started_at": "2025-10-23T07:11:34.304683",
+      "progress": {
+        "log_size": 915,
+        "last_modified": "2025-10-23T07:11:36.788685",
+        "success": false,
+        "errors": [
+          "\u274c FAILED: create_entity_training_workflow() missing 1 required positional argument: 'store'"
+        ]
+      },
+      "completed_at": "2025-10-23T07:14:15.969373"
+    },
+    "test_0006": {
+      "id": "test_0006",
+      "template": "jefferson_dinner",
+      "template_info": {
+        "name": "Jefferson's Compromise Dinner",
+        "description": "Historical negotiation scenario",
+        "mode": "pearl",
+        "entities": 3,
+        "timepoints": 7,
+        "mechanisms": [
+          1,
+          2,
+          3,
+          4,
+          7,
+          8,
+          14
+        ],
+        "expected_examples": 21,
+        "cost_estimate": "$0.10-0.50",
+        "runtime_estimate": "1-2min"
+      },
+      "pid": 19013,
+      "log_file": "logs/test_runs/test_0006_jefferson_dinner.log",
+      "status": "completed",
+      "started_at": "2025-10-23T07:12:56.411783",
+      "progress": {
+        "log_size": 1507,
+        "last_modified": "2025-10-23T07:13:03.547736",
+        "success": true,
+        "errors": []
+      },
+      "completed_at": "2025-10-23T07:14:09.680567"
+    }
+  },
+  "next_id": 7
+}

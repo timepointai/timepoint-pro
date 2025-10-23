@@ -20,6 +20,7 @@ from typing import List, Dict, Optional, Any, Tuple
 from datetime import datetime, timedelta
 from pydantic import BaseModel
 import json
+import time
 import networkx as nx
 
 from schemas import (
@@ -96,14 +97,19 @@ class SceneParser:
             SceneSpecification with entities, timepoints, relationships
         """
         context = context or {}
+        max_entities = context.get("max_entities", 20)
+        max_timepoints = context.get("max_timepoints", 10)
 
-        prompt = self._build_parsing_prompt(event_description, context)
-
-        # Use LLM to generate structured scene specification
-        # Pass context for auto-scaling token limits and model selection
-        response = self._call_llm_structured(prompt, SceneSpecification, context)
-
-        return response
+        # Decide: Single-pass or chunked generation?
+        if self._should_use_chunked_generation(max_entities, max_timepoints):
+            # Use multi-pass chunked generation for large requests
+            return self._generate_chunked(event_description, context, max_entities, max_timepoints)
+        else:
+            # Use single-pass generation for smaller requests
+            prompt = self._build_parsing_prompt(event_description, context)
+            # Pass context for auto-scaling token limits and model selection
+            response = self._call_llm_structured(prompt, SceneSpecification, context)
+            return response
 
     def _build_parsing_prompt(self, event_description: str, context: Dict) -> str:
         """Build prompt for scene parsing"""
@@ -281,6 +287,397 @@ Schema:
                     "An unexpected error occurred during scene generation.\n"
                     "Check logs/llm_calls/*.jsonl for details."
                 ) from e
+
+    def _should_use_chunked_generation(self, max_entities: int, max_timepoints: int) -> bool:
+        """
+        Determine if request is too large for single-pass generation.
+
+        Thresholds:
+        - >40 entities OR >80 timepoints: Use chunking
+        - Estimated >12K tokens: Use chunking
+        """
+        estimated_tokens = (max_entities * 50) + (max_timepoints * 100) + 1000
+        return max_entities > 40 or max_timepoints > 80 or estimated_tokens > 12000
+
+    def _generate_chunked(
+        self,
+        event_description: str,
+        context: Dict,
+        max_entities: int,
+        max_timepoints: int
+    ) -> SceneSpecification:
+        """
+        Multi-pass chunked generation for very large scenes.
+
+        Pass 1: Generate entity roster (names, roles, types only)
+        Pass 2: Generate timepoint skeleton (ids, timestamps, causal chain)
+        Pass 3: Fill entity details in batches (knowledge, relationships)
+        Pass 4: Fill timepoint details in batches (descriptions, participants)
+
+        This allows generating 124×200 scenes that would fail in one call.
+        """
+        print("\n🔄 CHUNKED GENERATION MODE")
+        print(f"   Request: {max_entities} entities × {max_timepoints} timepoints")
+        print(f"   Strategy: Multi-pass hierarchical generation")
+        print()
+
+        # Pass 1: Generate entity roster (lightweight)
+        print("📋 Pass 1/4: Generating entity roster...")
+        entity_roster = self._generate_entity_roster(event_description, context, max_entities)
+        print(f"   ✓ Generated {len(entity_roster)} entities")
+
+        # Pass 2: Generate timepoint skeleton
+        print("\n⏰ Pass 2/4: Generating timepoint skeleton...")
+        timepoint_skeleton = self._generate_timepoint_skeleton(event_description, context, max_timepoints, entity_roster)
+        print(f"   ✓ Generated {len(timepoint_skeleton)} timepoints")
+
+        # Pass 3: Fill entity details in batches
+        print("\n👥 Pass 3/4: Filling entity details...")
+        filled_entities = self._fill_entity_details(event_description, entity_roster, timepoint_skeleton, context)
+        print(f"   ✓ Filled details for {len(filled_entities)} entities")
+
+        # Pass 4: Fill timepoint details in batches
+        print("\n📝 Pass 4/4: Filling timepoint details...")
+        filled_timepoints = self._fill_timepoint_details(event_description, timepoint_skeleton, filled_entities, context)
+        print(f"   ✓ Filled details for {len(filled_timepoints)} timepoints")
+
+        # Extract temporal scope from context or use defaults
+        preferred_mode = context.get("temporal_mode", "pearl")
+        temporal_scope = context.get("temporal_scope", {
+            "start_date": "2024-01-01T00:00:00",
+            "end_date": "2024-12-31T23:59:59",
+            "location": "Unknown"
+        })
+
+        # Assemble final SceneSpecification
+        scene_spec = SceneSpecification(
+            scene_title=context.get("scene_title", f"Large Scene: {event_description[:50]}..."),
+            scene_description=event_description,
+            temporal_mode=preferred_mode,
+            temporal_scope=temporal_scope,
+            entities=filled_entities,
+            timepoints=filled_timepoints,
+            global_context=f"Generated via chunked multi-pass generation. {event_description}"
+        )
+
+        print("\n✅ Chunked generation complete!")
+        return scene_spec
+
+    def _generate_entity_roster(
+        self,
+        event_description: str,
+        context: Dict,
+        count: int
+    ) -> List[EntityRosterItem]:
+        """Pass 1: Generate entity roster with minimal details"""
+
+        prompt = f"""You are generating an entity roster for a historical simulation.
+
+Event: {event_description}
+
+Generate EXACTLY {count} entities (people, places, objects, concepts) involved in this event.
+
+For each entity, provide ONLY:
+- entity_id: unique lowercase identifier (e.g., "thomas_jefferson")
+- entity_type: type (human, animal, building, object, abstract)
+- role: importance (primary, secondary, background, environment)
+- description: ONE sentence description
+
+Do NOT include knowledge or relationships yet - just the roster.
+
+Return a JSON object with this structure:
+{{
+  "entities": [
+    {{
+      "entity_id": "string",
+      "entity_type": "string",
+      "role": "primary|secondary|background|environment",
+      "description": "string",
+      "initial_knowledge": [],
+      "relationships": {{}}
+    }}
+  ]
+}}
+
+Return EXACTLY {count} entities. This is critical."""
+
+        # Use smaller token limit for roster generation
+        max_tokens = min((count * 100) + 1000, 16000)
+
+        # Try with 70B first, escalate to 405B if needed
+        model = None  # Use default 70B
+        retry_count = 0
+        max_retries = 2
+
+        while retry_count <= max_retries:
+            try:
+                result = self.llm.generate_structured(
+                    prompt=prompt,
+                    response_model=type('EntityList', (BaseModel,), {
+                        '__annotations__': {'entities': List[EntityRosterItem]}
+                    }),
+                    model=model,
+                    temperature=0.5,
+                    max_tokens=max_tokens,
+                    timeout=180.0
+                )
+
+                # Validate we got the right count
+                if len(result.entities) < count * 0.8:  # Allow 20% tolerance
+                    print(f"   ⚠️  Only got {len(result.entities)}/{count} entities, retrying...")
+                    retry_count += 1
+                    if retry_count <= max_retries:
+                        # Escalate to 405B on retry
+                        model = "meta-llama/llama-3.1-405b-instruct"
+                        max_tokens = min((count * 120) + 2000, 100000)
+                        continue
+
+                return result.entities
+
+            except Exception as e:
+                retry_count += 1
+                if retry_count > max_retries:
+                    raise RuntimeError(f"Failed to generate entity roster after {max_retries + 1} attempts: {e}") from e
+
+                print(f"   ⚠️  Attempt {retry_count} failed: {e}")
+                print(f"   🚀 Escalating to Llama 405B...")
+                model = "meta-llama/llama-3.1-405b-instruct"
+                max_tokens = min((count * 120) + 2000, 100000)
+                time.sleep(2 ** retry_count)  # Exponential backoff
+
+        # Should never reach here, but just in case
+        raise RuntimeError("Failed to generate entity roster")
+
+    def _generate_timepoint_skeleton(
+        self,
+        event_description: str,
+        context: Dict,
+        count: int,
+        entity_roster: List[EntityRosterItem]
+    ) -> List[TimepointSpec]:
+        """Pass 2: Generate timepoint skeleton with minimal details"""
+
+        entity_ids = [e.entity_id for e in entity_roster[:20]]  # Sample for context
+
+        prompt = f"""You are generating a timepoint sequence for a historical simulation.
+
+Event: {event_description}
+
+Available entities (first 20): {', '.join(entity_ids)}
+
+Generate EXACTLY {count} timepoints (key moments in the event sequence).
+
+For each timepoint, provide ONLY:
+- timepoint_id: unique identifier (e.g., "tp_001_opening")
+- timestamp: ISO datetime
+- event_description: BRIEF 1-sentence description
+- entities_present: [] (empty for now, will fill later)
+- importance: float 0.0-1.0
+- causal_parent: previous timepoint_id (null for first)
+
+Return a JSON object with this structure:
+{{
+  "timepoints": [
+    {{
+      "timepoint_id": "string",
+      "timestamp": "ISO datetime",
+      "event_description": "string",
+      "entities_present": [],
+      "importance": 0.5,
+      "causal_parent": "string or null"
+    }}
+  ]
+}}
+
+Return EXACTLY {count} timepoints. This is critical."""
+
+        max_tokens = min((count * 80) + 1000, 16000)
+        model = None  # Use default 70B
+        retry_count = 0
+        max_retries = 2
+
+        while retry_count <= max_retries:
+            try:
+                result = self.llm.generate_structured(
+                    prompt=prompt,
+                    response_model=type('TimepointList', (BaseModel,), {
+                        '__annotations__': {'timepoints': List[TimepointSpec]}
+                    }),
+                    model=model,
+                    temperature=0.5,
+                    max_tokens=max_tokens,
+                    timeout=180.0
+                )
+
+                if len(result.timepoints) < count * 0.8:
+                    print(f"   ⚠️  Only got {len(result.timepoints)}/{count} timepoints, retrying...")
+                    retry_count += 1
+                    if retry_count <= max_retries:
+                        model = "meta-llama/llama-3.1-405b-instruct"
+                        max_tokens = min((count * 100) + 2000, 100000)
+                        continue
+
+                return result.timepoints
+
+            except Exception as e:
+                retry_count += 1
+                if retry_count > max_retries:
+                    raise RuntimeError(f"Failed to generate timepoint skeleton after {max_retries + 1} attempts: {e}") from e
+
+                print(f"   ⚠️  Attempt {retry_count} failed: {e}")
+                print(f"   🚀 Escalating to Llama 405B...")
+                model = "meta-llama/llama-3.1-405b-instruct"
+                max_tokens = min((count * 100) + 2000, 100000)
+                time.sleep(2 ** retry_count)
+
+        raise RuntimeError("Failed to generate timepoint skeleton")
+
+    def _fill_entity_details(
+        self,
+        event_description: str,
+        entity_roster: List[EntityRosterItem],
+        timepoint_skeleton: List[TimepointSpec],
+        context: Dict
+    ) -> List[EntityRosterItem]:
+        """Pass 3: Fill in entity details in batches"""
+
+        batch_size = 30  # Process 30 entities at a time
+        filled_entities = []
+
+        for i in range(0, len(entity_roster), batch_size):
+            batch = entity_roster[i:i + batch_size]
+            batch_num = (i // batch_size) + 1
+            total_batches = (len(entity_roster) + batch_size - 1) // batch_size
+
+            print(f"   Processing batch {batch_num}/{total_batches} ({len(batch)} entities)...")
+
+            # Get other entity ids for relationships
+            all_entity_ids = [e.entity_id for e in entity_roster]
+
+            prompt = f"""Fill in details for these entities in the event: {event_description}
+
+Entities to fill:
+{json.dumps([{'entity_id': e.entity_id, 'description': e.description} for e in batch], indent=2)}
+
+Available entities for relationships:
+{', '.join(all_entity_ids[:50])}
+
+For each entity, add:
+- initial_knowledge: List of 3-8 knowledge items this entity knows at start
+- relationships: Dict mapping other entity_ids to relationship types (ally, rival, mentor, etc.)
+  - Choose 2-5 relationships from the available entities list
+  - Use relationship types: ally, friend, colleague, rival, enemy, mentor, student, family, neutral
+
+Return JSON matching this structure:
+{{
+  "entities": [
+    {{
+      "entity_id": "same as input",
+      "initial_knowledge": ["fact1", "fact2", ...],
+      "relationships": {{"entity_id": "relationship_type", ...}}
+    }}
+  ]
+}}"""
+
+            try:
+                result = self.llm.generate_structured(
+                    prompt=prompt,
+                    response_model=type('EntityDetailsList', (BaseModel,), {
+                        '__annotations__': {'entities': List[Dict]}
+                    }),
+                    model=None,
+                    temperature=0.6,
+                    max_tokens=min(len(batch) * 200 + 1000, 16000),
+                    timeout=120.0
+                )
+
+                # Merge details back into original roster
+                for orig_entity in batch:
+                    # Find matching detailed entity
+                    detailed = next((e for e in result.entities if e.get('entity_id') == orig_entity.entity_id), None)
+                    if detailed:
+                        orig_entity.initial_knowledge = detailed.get('initial_knowledge', [])
+                        orig_entity.relationships = detailed.get('relationships', {})
+
+                filled_entities.extend(batch)
+
+            except Exception as e:
+                print(f"   ⚠️  Batch {batch_num} failed: {e}. Using partial data...")
+                # Use entities with empty knowledge/relationships on failure
+                filled_entities.extend(batch)
+
+        return filled_entities
+
+    def _fill_timepoint_details(
+        self,
+        event_description: str,
+        timepoint_skeleton: List[TimepointSpec],
+        entity_roster: List[EntityRosterItem],
+        context: Dict
+    ) -> List[TimepointSpec]:
+        """Pass 4: Fill in timepoint details in batches"""
+
+        batch_size = 40  # Process 40 timepoints at a time
+        filled_timepoints = []
+        entity_ids = [e.entity_id for e in entity_roster]
+
+        for i in range(0, len(timepoint_skeleton), batch_size):
+            batch = timepoint_skeleton[i:i + batch_size]
+            batch_num = (i // batch_size) + 1
+            total_batches = (len(timepoint_skeleton) + batch_size - 1) // batch_size
+
+            print(f"   Processing batch {batch_num}/{total_batches} ({len(batch)} timepoints)...")
+
+            prompt = f"""Fill in participant lists for these timepoints in the event: {event_description}
+
+Timepoints to fill:
+{json.dumps([{'timepoint_id': t.timepoint_id, 'timestamp': t.timestamp, 'event_description': t.event_description} for t in batch], indent=2)}
+
+Available entities:
+{', '.join(entity_ids[:100])}
+
+For each timepoint, add:
+- entities_present: List of entity_ids present at this moment (3-20 entities typically)
+  - Choose relevant entities from the available list
+  - Consider the timepoint description when selecting
+
+Return JSON matching this structure:
+{{
+  "timepoints": [
+    {{
+      "timepoint_id": "same as input",
+      "entities_present": ["entity_id1", "entity_id2", ...]
+    }}
+  ]
+}}"""
+
+            try:
+                result = self.llm.generate_structured(
+                    prompt=prompt,
+                    response_model=type('TimepointDetailsList', (BaseModel,), {
+                        '__annotations__': {'timepoints': List[Dict]}
+                    }),
+                    model=None,
+                    temperature=0.5,
+                    max_tokens=min(len(batch) * 100 + 1000, 16000),
+                    timeout=120.0
+                )
+
+                # Merge details back into skeleton
+                for orig_tp in batch:
+                    detailed = next((t for t in result.timepoints if t.get('timepoint_id') == orig_tp.timepoint_id), None)
+                    if detailed:
+                        orig_tp.entities_present = detailed.get('entities_present', [])
+                        # Validate entity IDs exist
+                        orig_tp.entities_present = [eid for eid in orig_tp.entities_present if eid in entity_ids]
+
+                filled_timepoints.extend(batch)
+
+            except Exception as e:
+                print(f"   ⚠️  Batch {batch_num} failed: {e}. Using partial data...")
+                filled_timepoints.extend(batch)
+
+        return filled_timepoints
 
     def _mock_scene_specification(self) -> SceneSpecification:
         """Generate mock scene specification for testing"""
