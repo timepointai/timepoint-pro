@@ -111,7 +111,7 @@ def main():
     print("STEP 3: Initialize LLM client and storage")
     print("-" * 80)
     api_key = os.getenv("OPENROUTER_API_KEY")
-    llm = LLMClient(api_key=api_key, dry_run=False)
+    llm = LLMClient(api_key=api_key)
 
     if llm.dry_run:
         print("❌ CRITICAL: LLM in dry_run mode!")

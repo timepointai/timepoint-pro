@@ -43,7 +43,7 @@ def llm_client():
     """Create LLM client (dry run for fast tests)"""
     api_key = os.getenv("OPENROUTER_API_KEY", "test_key")
     # Use dry_run=True for unit tests, False for integration tests
-    return LLMClient(api_key=api_key, dry_run=True)
+    return LLMClient(api_key=api_key)
 
 
 @pytest.fixture
@@ -52,7 +52,7 @@ def real_llm_client():
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
         pytest.skip("OPENROUTER_API_KEY not set, skipping real LLM tests")
-    return LLMClient(api_key=api_key, dry_run=False)
+    return LLMClient(api_key=api_key)
 
 
 @pytest.fixture

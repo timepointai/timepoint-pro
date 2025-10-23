@@ -674,6 +674,176 @@ class SimulationConfig(BaseModel):
             }
         )
 
+    @classmethod
+    def example_hospital_crisis(cls) -> "SimulationConfig":
+        """
+        Emergency room crisis demonstrating embodied states and circadian patterns.
+
+        Hospital Night Shift Crisis: Track an ER physician and injured patient through
+        a critical night shift (22:00-06:00). Demonstrates M8 (Embodied States) via
+        pain/illness affecting cognition, and M14 (Circadian Patterns) via fatigue
+        accumulation and reduced cognitive function during night hours.
+        """
+        return cls(
+            scenario_description=(
+                "Emergency room during night shift. Dr. Elena Martinez, an experienced ER physician "
+                "suffering from chronic back pain and accumulated shift fatigue, treats Michael Chen, "
+                "a car accident victim with severe injuries (high pain, developing infection). Track "
+                "through 3 timepoints across critical night hours (22:00, 02:00, 06:00). M8 tracks "
+                "how pain_level > 0.7 and fever > 38.5°C couple body states to cognitive processing. "
+                "M14 tracks how night hours (energy_penalty multiplier) and fatigue accumulation affect "
+                "decision quality and reaction time. High-stakes medical decisions under physical duress."
+            ),
+            world_id="hospital_crisis",
+            entities=EntityConfig(
+                count=2,
+                types=["human"],
+                initial_resolution=ResolutionLevel.TRAINED,  # High detail for body-mind coupling
+                animism_level=0  # Focus on human embodiment
+            ),
+            timepoints=TimepointConfig(
+                count=3,  # 22:00, 02:00, 06:00 - circadian transitions
+                resolution="hour"
+            ),
+            temporal=TemporalConfig(
+                mode=TemporalMode.PEARL  # Standard causality
+            ),
+            outputs=OutputConfig(
+                formats=["jsonl", "json"],
+                include_dialogs=True,
+                include_relationships=True,
+                export_ml_dataset=True
+            ),
+            metadata={
+                "mechanisms_featured": [
+                    "M8_embodied_states_pain_illness",
+                    "M14_circadian_night_shift_fatigue"
+                ],
+                "embodied_constraints": {
+                    "dr_martinez": {"pain_level": 0.3, "fatigue": 0.7, "age": 42},
+                    "patient_chen": {"pain_level": 0.9, "fever": 39.2, "consciousness": 0.4}
+                },
+                "circadian_config": {
+                    "timepoints": ["22:00", "02:00", "06:00"],
+                    "fatigue_multipliers": [1.3, 1.7, 1.5],  # Peak fatigue at 02:00
+                    "activity_type": "high_stress_medical"
+                }
+            }
+        )
+
+    @classmethod
+    def example_kami_shrine(cls) -> "SimulationConfig":
+        """
+        Animistic shrine ritual demonstrating non-human entity agency.
+
+        Kami Shrine Ritual: A traditional Japanese shrine where all things possess spirit (kami).
+        The shrine building, fox deity, and messenger animal all have rich internal states.
+        Demonstrates M16 (Animistic Entities) with animism_level=6, treating buildings,
+        spirits, and animals as full entities with consciousness, memory, and agency.
+        """
+        return cls(
+            scenario_description=(
+                "A pilgrim visits Fushimi Inari Shrine for guidance. The shrine building itself "
+                "(centuries-old wood structure) has consciousness and memory of countless visitors. "
+                "Inari Okami, the fox deity, manifests to offer wisdom. A white fox messenger "
+                "observes and communicates. All three non-human entities have rich internal states: "
+                "the shrine remembers prayers, the deity processes worshiper intent, the fox evaluates "
+                "sincerity. Demonstrates M16 with full animistic entity modeling—consciousness vectors, "
+                "spiritual power metrics, and non-verbal communication patterns for buildings, spirits, "
+                "and animals."
+            ),
+            world_id="kami_shrine",
+            entities=EntityConfig(
+                count=4,  # pilgrim + shrine + deity + fox
+                types=["human", "building", "kami", "animal"],
+                initial_resolution=ResolutionLevel.TRAINED,
+                animism_level=6  # Maximum animism - all types have full agency
+            ),
+            timepoints=TimepointConfig(
+                count=1,  # Single ritual moment
+                resolution="minute"
+            ),
+            temporal=TemporalConfig(
+                mode=TemporalMode.PEARL
+            ),
+            outputs=OutputConfig(
+                formats=["jsonl", "json"],
+                include_dialogs=True,  # Non-verbal "dialog" between entities
+                include_relationships=True,
+                export_ml_dataset=True
+            ),
+            metadata={
+                "mechanisms_featured": [
+                    "M16_animistic_entities_full_spectrum"
+                ],
+                "animistic_entities": {
+                    "shrine_building": {"consciousness": 0.7, "memory_depth": "centuries", "spiritual_power": 0.9},
+                    "inari_okami": {"consciousness": 1.0, "domain": "rice_prosperity_foxes", "manifestation_strength": 0.95},
+                    "white_fox": {"consciousness": 0.8, "can_speak": True, "divine_messenger": True}
+                },
+                "animism_level_description": "Full animism (level 6): buildings, spirits, animals all possess consciousness and agency"
+            }
+        )
+
+    @classmethod
+    def example_detective_prospection(cls) -> "SimulationConfig":
+        """
+        Detective prospection demonstrating future state modeling.
+
+        Detective's Deduction: Holmes explicitly models Moriarty's future actions across
+        24-hour time horizon. Demonstrates M15 (Entity Prospection) where one entity
+        generates detailed predictions of another entity's future states, plans, and
+        decision branches. Prospection accuracy depends on theory-of-mind capability.
+        """
+        return cls(
+            scenario_description=(
+                "Sherlock Holmes has 24 hours to predict where criminal mastermind Moriarty will "
+                "strike next. Holmes explicitly models Moriarty's planning process: generates "
+                "prospective states for multiple time horizons (6h, 12h, 24h), considers Moriarty's "
+                "resource constraints, anticipates decision branches, and evaluates contingency plans. "
+                "Demonstrates M15 where Holmes's cognitive_tensor includes prospection_ability=0.95 "
+                "and theory_of_mind=0.9. System generates detailed ProspectiveState objects: "
+                "expected knowledge Moriarty will have, likely emotional states, predicted action "
+                "sequences, and anxiety levels about being predicted."
+            ),
+            world_id="detective_prospection",
+            entities=EntityConfig(
+                count=2,  # Holmes + Moriarty
+                types=["human"],
+                initial_resolution=ResolutionLevel.TRAINED,  # High detail for cognitive modeling
+                animism_level=3  # Mild animism for London city as informant
+            ),
+            timepoints=TimepointConfig(
+                count=2,  # Present + 24h prospective future
+                resolution="hour"
+            ),
+            temporal=TemporalConfig(
+                mode=TemporalMode.PEARL
+            ),
+            outputs=OutputConfig(
+                formats=["jsonl", "json"],
+                include_dialogs=True,
+                include_relationships=True,
+                export_ml_dataset=True
+            ),
+            metadata={
+                "mechanisms_featured": [
+                    "M15_entity_prospection_strategic"
+                ],
+                "prospection_config": {
+                    "modeling_entity": "holmes",
+                    "target_entity": "moriarty",
+                    "time_horizons": ["6h", "12h", "24h"],
+                    "prospection_ability": 0.95,
+                    "theory_of_mind": 0.9
+                },
+                "cognitive_traits": {
+                    "holmes": {"prospection_ability": 0.95, "theory_of_mind": 0.9, "pattern_recognition": 0.98},
+                    "moriarty": {"strategic_planning": 0.96, "deception_skill": 0.92, "counter_modeling": 0.88}
+                }
+            }
+        )
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization"""
         return self.model_dump()

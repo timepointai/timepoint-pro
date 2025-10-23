@@ -216,11 +216,8 @@ class ResolutionEngine:
         entity.resolution_level = target_resolution
 
         # Enrich knowledge based on the target resolution level
-        if self.llm_client and not self.llm_client.dry_run:
+        if self.llm_client:
             self._enrich_entity_knowledge(entity, target_resolution, timepoint)
-        elif self.llm_client and self.llm_client.dry_run:
-            # For dry-run testing, add mock knowledge items
-            self._add_mock_knowledge_for_testing(entity, target_resolution)
 
         # Save the updated entity
         self.store.save_entity(entity)
@@ -281,7 +278,7 @@ Return only the knowledge items as a JSON array of strings."""
 
             # Parse the response
             import json
-            response_text = response.choices[0].message.content.strip()
+            response_text = response["choices"][0]["message"]["content"].strip()
 
             # Try to extract JSON array
             try:

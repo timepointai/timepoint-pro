@@ -147,8 +147,11 @@ def test_scene_query_integration():
 
     try:
         # Initialize components
+        import os
         store = GraphStore(f"sqlite:///{test_db}")
-        llm_client = LLMClient(api_key="dummy_key", dry_run=True)
+        # Use real API key from environment (required - no mock mode)
+        api_key = os.getenv("OPENROUTER_API_KEY", "dummy_key_will_fail")
+        llm_client = LLMClient(api_key=api_key)
         query_interface = QueryInterface(store, llm_client)
 
         # Create a test timepoint

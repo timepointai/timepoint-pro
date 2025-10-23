@@ -180,7 +180,7 @@ class FullE2EWorkflowRunner:
             if not api_key:
                 raise ValueError("OPENROUTER_API_KEY not set")
 
-            llm = LLMClient(api_key=api_key, dry_run=False)
+            llm = LLMClient(api_key=api_key)
 
             # Initialize storage
             db_path = tempfile.mktemp(suffix=".db")
@@ -194,7 +194,8 @@ class FullE2EWorkflowRunner:
                 context={
                     "max_entities": config.entities.count,
                     "max_timepoints": 1,  # Just initial scene
-                    "temporal_mode": config.temporal.mode.value
+                    "temporal_mode": config.temporal.mode.value,
+                    "entity_metadata": config.metadata  # Pass rich metadata for specialized mechanisms
                 },
                 save_to_db=True
             )

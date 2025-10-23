@@ -19,14 +19,36 @@ class GraphStore:
     def save_entity(self, entity: Entity) -> Entity:
         from sqlalchemy.orm.attributes import flag_modified
         with Session(self.engine) as session:
-            # Use merge to handle both insert and update (upsert behavior)
-            # This prevents UNIQUE constraint errors when entity already exists
-            merged_entity = session.merge(entity)
-            # Mark entity_metadata as modified since it's a JSON column
-            flag_modified(merged_entity, "entity_metadata")
-            session.commit()
-            session.refresh(merged_entity)
-            return merged_entity
+            # Check if entity already exists by entity_id (unique constraint)
+            existing = session.exec(
+                select(Entity).where(Entity.entity_id == entity.entity_id)
+            ).first()
+
+            if existing:
+                # Update existing entity with new values
+                existing.entity_type = entity.entity_type
+                existing.timepoint = entity.timepoint
+                existing.temporal_span_start = entity.temporal_span_start
+                existing.temporal_span_end = entity.temporal_span_end
+                existing.tensor = entity.tensor
+                existing.training_count = entity.training_count
+                existing.query_count = entity.query_count
+                existing.eigenvector_centrality = entity.eigenvector_centrality
+                existing.resolution_level = entity.resolution_level
+                existing.entity_metadata = entity.entity_metadata
+                # Mark entity_metadata as modified since it's a JSON column
+                flag_modified(existing, "entity_metadata")
+                session.add(existing)
+                session.commit()
+                session.refresh(existing)
+                return existing
+            else:
+                # Insert new entity
+                session.add(entity)
+                flag_modified(entity, "entity_metadata")
+                session.commit()
+                session.refresh(entity)
+                return entity
 
     def save_exposure_event(self, event: ExposureEvent) -> ExposureEvent:
         """Save a single exposure event"""
@@ -43,10 +65,24 @@ class GraphStore:
                 session.add(event)
             session.commit()
 
-    def get_exposure_events(self, entity_id: str) -> list[ExposureEvent]:
-        """Get all exposure events for an entity"""
+    def get_exposure_events(self, entity_id: str, limit: Optional[int] = None) -> list[ExposureEvent]:
+        """
+        Get exposure events for an entity.
+
+        Args:
+            entity_id: Entity identifier
+            limit: Optional maximum number of events to return (most recent first if limited)
+
+        Returns:
+            List of exposure events
+        """
         with Session(self.engine) as session:
             statement = select(ExposureEvent).where(ExposureEvent.entity_id == entity_id)
+
+            # If limit specified, order by timestamp descending and apply limit
+            if limit is not None:
+                statement = statement.order_by(ExposureEvent.timestamp.desc()).limit(limit)
+
             return list(session.exec(statement).all())
 
     def save_timepoint(self, timepoint: Timepoint) -> Timepoint:

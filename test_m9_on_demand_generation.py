@@ -13,8 +13,11 @@ from schemas import Entity, Timepoint, ResolutionLevel
 @pytest.fixture
 def setup_m9():
     """Setup for M9 tests with minimal entities"""
+    import os
     store = GraphStore("sqlite:///:memory:")
-    llm = LLMClient(api_key="test_key", dry_run=True)
+    # Use real API key from environment (required - no mock mode)
+    api_key = os.getenv("OPENROUTER_API_KEY", "dummy_key_will_fail")
+    llm = LLMClient(api_key=api_key)
     query_interface = QueryInterface(store, llm)
 
     # Create a test timepoint with some known entities

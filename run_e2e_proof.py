@@ -65,13 +65,10 @@ def main():
     # Step 2: Initialize LLM and storage
     print("Step 2: Initializing LLM client...")
     api_key = os.getenv("OPENROUTER_API_KEY")
-    llm = LLMClient(api_key=api_key, dry_run=False)
+    llm = LLMClient(api_key=api_key)
 
-    if llm.dry_run:
-        print("❌ CRITICAL: LLM in dry_run mode!")
-        sys.exit(1)
-
-    print(f"✓ LLM Client ready (dry_run={llm.dry_run})")
+    # No dry_run mode - always use real LLM
+    print(f"✓ LLM Client ready (real LLM mode)")
 
     db_path = tempfile.mktemp(suffix=".db")
     store = GraphStore(f"sqlite:///{db_path}")

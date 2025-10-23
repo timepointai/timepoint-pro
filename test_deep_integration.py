@@ -43,7 +43,7 @@ class TestDeepEntityGeneration:
         api_key = os.getenv('OPENROUTER_API_KEY')
         if not api_key:
             pytest.skip("OPENROUTER_API_KEY not set - skipping real LLM tests")
-        return LLMClient(api_key=api_key, dry_run=False)
+        return LLMClient(api_key=api_key)
 
     @pytest.fixture
     def temp_store(self):
@@ -164,7 +164,7 @@ class TestDeepTemporalWorkflows:
         api_key = os.getenv('OPENROUTER_API_KEY')
         if not api_key:
             pytest.skip("OPENROUTER_API_KEY not set - skipping real LLM tests")
-        return LLMClient(api_key=api_key, dry_run=False)
+        return LLMClient(api_key=api_key)
 
     @pytest.fixture
     def temp_store(self):
@@ -311,7 +311,7 @@ class TestDeepAIServiceIntegration:
         api_key = os.getenv('OPENROUTER_API_KEY')
         if not api_key:
             pytest.skip("OPENROUTER_API_KEY not set - skipping real LLM tests")
-        return LLMClient(api_key=api_key, dry_run=False)
+        return LLMClient(api_key=api_key)
 
     def test_ai_entity_service_initialization(self, llm_client):
         """Test AI entity service initialization"""
@@ -410,7 +410,7 @@ class TestDeepPerformanceValidation:
         api_key = os.getenv('OPENROUTER_API_KEY')
         if not api_key:
             pytest.skip("OPENROUTER_API_KEY not set - skipping real LLM tests")
-        return LLMClient(api_key=api_key, dry_run=False)
+        return LLMClient(api_key=api_key)
 
     def test_llm_response_consistency(self, llm_client):
         """Test LLM response consistency across multiple calls"""

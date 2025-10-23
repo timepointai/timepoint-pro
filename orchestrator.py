@@ -34,6 +34,37 @@ from metadata.tracking import track_mechanism
 
 
 # ============================================================================
+# Helper Functions
+# ============================================================================
+
+def parse_iso_datetime(iso_string: str) -> datetime:
+    """
+    Parse ISO datetime string, handling 'Z' UTC suffix.
+
+    Python 3.10's datetime.fromisoformat() doesn't accept 'Z' suffix.
+    This helper converts 'Z' to '+00:00' for compatibility.
+
+    Args:
+        iso_string: ISO 8601 datetime string (e.g., "2023-03-01T00:00:00Z")
+
+    Returns:
+        datetime object
+
+    Examples:
+        >>> parse_iso_datetime("2023-03-01T00:00:00Z")
+        datetime(2023, 3, 1, 0, 0, 0, tzinfo=timezone.utc)
+        >>> parse_iso_datetime("2023-03-01T00:00:00")
+        datetime(2023, 3, 1, 0, 0, 0)
+    """
+    # Handle 'Z' suffix (UTC timezone indicator)
+    if iso_string.endswith('Z'):
+        # Replace 'Z' with '+00:00' for fromisoformat compatibility
+        iso_string = iso_string[:-1] + '+00:00'
+
+    return datetime.fromisoformat(iso_string)
+
+
+# ============================================================================
 # Structured Output Schemas for LLM Responses
 # ============================================================================
 
@@ -197,13 +228,8 @@ Schema:
         """Call LLM and parse structured response - REQUIRES REAL LLM"""
         import os
 
-        # CRITICAL: Reject dry_run mode - no mocks allowed
-        if self.llm.dry_run:
-            raise RuntimeError(
-                "Orchestrator requires REAL LLM integration. "
-                "Mock mode is disabled. Set LLM_SERVICE_ENABLED=true and provide OPENROUTER_API_KEY."
-            )
-
+        # No dry_run mode - always use real LLM
+        # Real LLM integration required: Set LLM_SERVICE_ENABLED=true and provide OPENROUTER_API_KEY
         context = context or {}
         max_entities = context.get("max_entities", 20)
         max_timepoints = context.get("max_timepoints", 10)
@@ -781,8 +807,8 @@ class KnowledgeSeeder:
         """
         exposure_map = {}
 
-        # Parse temporal scope start time
-        start_time = datetime.fromisoformat(spec.temporal_scope["start_date"])
+        # Parse temporal scope start time (handle 'Z' suffix)
+        start_time = parse_iso_datetime(spec.temporal_scope["start_date"])
 
         for entity_item in spec.entities:
             events = []
@@ -1079,7 +1105,7 @@ class OrchestratorAgent:
 
         # Step 5: Create Entity objects
         print("\n👥 Step 5: Creating entity objects...")
-        entities = self._create_entities(spec, resolution_assignments, exposure_events)
+        entities = self._create_entities(spec, resolution_assignments, exposure_events, context)
 
         # Step 6: Create Timepoint objects
         print("\n⏰ Step 6: Creating timepoint objects...")
@@ -1117,14 +1143,36 @@ class OrchestratorAgent:
             "estimated_cost": cost_estimate
         }
 
+    def _fuzzy_match_entity(self, entity_id: str, metadata_dict: Dict) -> Optional[Dict]:
+        """Fuzzy match entity_id to metadata keys using partial name matching"""
+        # Try exact match first
+        if entity_id in metadata_dict:
+            return metadata_dict[entity_id]
+
+        # Try partial matching - split on underscore and check if key contains any part
+        entity_parts = entity_id.lower().split('_')
+        for key, value in metadata_dict.items():
+            key_lower = key.lower()
+            # Check if any significant part of entity_id appears in the key
+            for part in entity_parts:
+                if len(part) > 3 and part in key_lower:  # Ignore short parts like "dr"
+                    return value
+
+        return None
+
     def _create_entities(
         self,
         spec: SceneSpecification,
         resolution_assignments: Dict[str, ResolutionLevel],
-        exposure_events: Dict[str, List[ExposureEvent]]
+        exposure_events: Dict[str, List[ExposureEvent]],
+        context: Optional[Dict] = None
     ) -> List[Entity]:
         """Create Entity objects from specification"""
+        from schemas import PhysicalTensor
+
         entities = []
+        context = context or {}
+        entity_metadata_config = context.get("entity_metadata", {})
 
         for entity_item in spec.entities:
             # Create cognitive tensor with initial knowledge
@@ -1144,18 +1192,55 @@ class OrchestratorAgent:
             # Get first timepoint for temporal assignment
             first_tp = spec.timepoints[0] if spec.timepoints else None
 
+            # Build entity metadata
+            metadata = {
+                "cognitive_tensor": cognitive.model_dump(),
+                "role": entity_item.role,
+                "description": entity_item.description,
+                "scene_context": spec.global_context,
+                "orchestrated": True
+            }
+
+            # M8: Initialize physical_tensor if embodied_constraints exist (fuzzy match)
+            embodied_dict = entity_metadata_config.get("embodied_constraints", {})
+            embodied = self._fuzzy_match_entity(entity_item.entity_id, embodied_dict) or {}
+            if embodied:
+                physical = PhysicalTensor(
+                    age=embodied.get("age", 30),
+                    pain_level=embodied.get("pain_level", 0.0),
+                    fever=embodied.get("fever", 0.0),
+                    fatigue=embodied.get("fatigue", 0.0),
+                    fitness=embodied.get("fitness", 0.5)
+                )
+                metadata["physical_tensor"] = physical.dict()
+
+            # M14: Initialize circadian attributes if circadian_config exists
+            circadian = entity_metadata_config.get("circadian_config", {})
+            if circadian:
+                metadata["circadian"] = circadian
+
+            # M15: Initialize prospection attributes
+            prospection = entity_metadata_config.get("prospection_config", {})
+            if entity_item.entity_id == prospection.get("modeling_entity"):
+                metadata["prospection_ability"] = prospection.get("prospection_ability", 0.0)
+                metadata["theory_of_mind"] = prospection.get("theory_of_mind", 0.0)
+                metadata["target_entity"] = prospection.get("target_entity")
+
+            # M16: Initialize animistic consciousness (fuzzy match)
+            animistic_dict = entity_metadata_config.get("animistic_entities", {})
+            animistic = self._fuzzy_match_entity(entity_item.entity_id, animistic_dict) or {}
+            if animistic:
+                metadata["consciousness"] = animistic.get("consciousness", 0.0)
+                metadata["spiritual_power"] = animistic.get("spiritual_power", 0.0)
+                metadata["memory_depth"] = animistic.get("memory_depth", "")
+                metadata["manifestation_strength"] = animistic.get("manifestation_strength", 0.0)
+
             entity = Entity(
                 entity_id=entity_item.entity_id,
                 entity_type=entity_item.entity_type,
                 timepoint=first_tp.timepoint_id if first_tp else None,
                 resolution_level=resolution,
-                entity_metadata={
-                    "cognitive_tensor": cognitive.model_dump(),
-                    "role": entity_item.role,
-                    "description": entity_item.description,
-                    "scene_context": spec.global_context,
-                    "orchestrated": True
-                }
+                entity_metadata=metadata
             )
 
             entities.append(entity)
@@ -1168,7 +1253,8 @@ class OrchestratorAgent:
         timepoints = []
 
         for tp_spec in spec.timepoints:
-            timestamp = datetime.fromisoformat(tp_spec.timestamp)
+            # Parse timestamp (handle 'Z' suffix)
+            timestamp = parse_iso_datetime(tp_spec.timestamp)
 
             timepoint = Timepoint(
                 timepoint_id=tp_spec.timepoint_id,

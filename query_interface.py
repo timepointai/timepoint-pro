@@ -21,6 +21,21 @@ _query_cache: Dict[str, Tuple[str, datetime]] = {}
 CACHE_TTL = timedelta(hours=1)
 
 
+def strip_markdown_json(content: str) -> str:
+    """Strip markdown code fences from JSON responses"""
+    content = content.strip()
+    # Remove ```json prefix
+    if content.startswith("```json"):
+        content = content[7:]
+    # Remove ``` prefix
+    elif content.startswith("```"):
+        content = content[3:]
+    # Remove ``` suffix
+    if content.endswith("```"):
+        content = content[:-3]
+    return content.strip()
+
+
 class QueryIntent(BaseModel):
     """Parsed intent from natural language query"""
     target_entity: Optional[str] = None
@@ -91,10 +106,7 @@ class QueryInterface:
 
     def parse_query(self, query: str) -> QueryIntent:
         """Parse natural language query into structured intent using LLM"""
-        if self.llm_client.dry_run:
-            # Fallback to simple rule-based parsing in dry-run mode
-            return self._parse_query_simple(query)
-
+        # Always use LLM for parsing (no dry_run mode)
         # Get available entities and timepoints for context
         entities = self._get_all_entity_names()
         timepoints = self.store.get_all_timepoints()
@@ -128,7 +140,7 @@ Return only valid JSON, no other text."""
             # Extract and parse JSON response manually
             content = response["choices"][0]["message"]["content"]
             try:
-                data = json.loads(content.strip())
+                data = json.loads(strip_markdown_json(content))
                 query_intent = QueryIntent(**data)
             except (json.JSONDecodeError, ValueError) as e:
                 raise Exception(f"Failed to parse LLM response as JSON: {e}. Content: {content}")
@@ -1240,7 +1252,7 @@ Return only valid JSON."""
             )
 
             content = response["choices"][0]["message"]["content"]
-            entity_data = json.loads(content.strip())
+            entity_data = json.loads(strip_markdown_json(content))
 
             # Create entity with generated data
             entity = Entity(

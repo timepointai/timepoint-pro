@@ -70,16 +70,44 @@ def create_entity_training_workflow(llm_client: LLMClient, store: GraphStore):
         return state
     
     def aggregate_populations(state: WorkflowState) -> WorkflowState:
-        """Aggregate parallel entity populations into entities list"""
-        entities = []
+        """Aggregate parallel entity populations into entities list, preserving existing metadata"""
+        # Get existing entities from state (may have been created by orchestrator with rich metadata)
+        existing_entities = state.get("entities", [])
+        existing_entities_map = {e.entity_id: e for e in existing_entities}
+
         populations = state.get("entity_populations", {})
+        updated_entities = []
 
         for entity_id, population in populations.items():
-            # Convert EntityPopulation to Entity object
-            entity = Entity(
+            # Check if entity already exists with metadata from orchestrator
+            existing_entity = existing_entities_map.get(entity_id)
+
+            if existing_entity:
+                # PRESERVE existing metadata, UPDATE with new LLM-generated cognitive data
+                existing_metadata = existing_entity.entity_metadata.copy()
+                existing_metadata.update({
+                    "knowledge_state": population.knowledge_state,
+                    "energy_budget": population.energy_budget,
+                    "personality_traits": population.personality_traits,
+                    "temporal_awareness": population.temporal_awareness,
+                    "confidence": population.confidence,
+                    "current_timepoint": state["timepoint"]
+                })
+                # Create updated entity preserving type, resolution, and ALL metadata
+                entity = Entity(
                     entity_id=entity_id,
-                    entity_type="historical_person",  # Default type
-                    temporal_span_start=None,  # Will be set when entity joins timeline
+                    entity_type=existing_entity.entity_type,
+                    temporal_span_start=existing_entity.temporal_span_start,
+                    temporal_span_end=existing_entity.temporal_span_end,
+                    resolution_level=existing_entity.resolution_level,
+                    entity_metadata=existing_metadata
+                )
+            else:
+                # Create new entity (no existing metadata to preserve)
+                entity = Entity(
+                    entity_id=entity_id,
+                    entity_type="historical_person",
+                    temporal_span_start=None,
                     temporal_span_end=None,
                     resolution_level=state["resolution"],
                     entity_metadata={
@@ -88,12 +116,12 @@ def create_entity_training_workflow(llm_client: LLMClient, store: GraphStore):
                         "personality_traits": population.personality_traits,
                         "temporal_awareness": population.temporal_awareness,
                         "confidence": population.confidence,
-                        "current_timepoint": state["timepoint"]  # Store current timepoint in metadata
+                        "current_timepoint": state["timepoint"]
                     }
                 )
-            entities.append(entity)
+            updated_entities.append(entity)
 
-        state["entities"] = entities
+        state["entities"] = updated_entities
         state["results"] = {"populations": list(populations.values())}
         return state
     
@@ -105,6 +133,23 @@ def create_entity_training_workflow(llm_client: LLMClient, store: GraphStore):
         for entity in state["entities"]:
             all_entity_knowledge[entity.entity_id] = entity.entity_metadata.get("knowledge_state", [])
 
+        # Build circadian config for M14 (Circadian Patterns) tracking
+        from datetime import datetime
+        circadian_config = {
+            "energy_multipliers": {
+                "base_fatigue_threshold": 16,
+                "night_penalty": 1.5,
+                "fatigue_accumulation": 0.5
+            },
+            "activity_probabilities": {
+                "work": {"hours": list(range(8, 18)), "probability": 0.8},
+                "sleep": {"hours": list(range(22, 24)) + list(range(0, 6)), "probability": 0.9}
+            }
+        }
+
+        # Get timepoint object if available
+        timepoint_obj = state.get("timepoint_obj")
+
         for entity in state["entities"]:
             context = {
                 "exposure_history": [],  # Could be populated from exposure events
@@ -113,6 +158,9 @@ def create_entity_training_workflow(llm_client: LLMClient, store: GraphStore):
                 "previous_knowledge": [],  # Could be populated from previous timepoint data
                 "previous_personality": [],  # Could be populated from previous timepoint data
                 "timepoint_id": state["timepoint"],  # For temporal causality validation
+                "timepoint": timepoint_obj,  # For circadian validation
+                "circadian_config": circadian_config,  # For M14 tracking
+                "activity_type": "work",  # Default activity type for validation
                 "store": None  # Would need to be passed in for full validation
             }
             entity_violations = Validator.validate_all(entity, context)
@@ -123,9 +171,12 @@ def create_entity_training_workflow(llm_client: LLMClient, store: GraphStore):
     def compress_tensors(state: WorkflowState) -> WorkflowState:
         from schemas import ResolutionLevel
 
+        entities_compressed = 0
         for entity in state["entities"]:
-            if entity.tensor:
-                ttm = TTMTensor(**json.loads(entity.tensor))
+            # Use defensive check for tensor attribute
+            tensor = getattr(entity, 'tensor', None)
+            if tensor:
+                ttm = TTMTensor(**json.loads(tensor))
                 context, biology, behavior = ttm.to_arrays()
 
                 # Apply compression based on resolution level
@@ -147,6 +198,16 @@ def create_entity_training_workflow(llm_client: LLMClient, store: GraphStore):
                     }
                     entity.entity_metadata["compressed"] = {k: v.tolist() for k, v in compressed.items()}
                     # Keep full tensor for detailed operations
+
+                entities_compressed += 1
+            else:
+                # Entity doesn't have tensor attribute - skip with warning
+                print(f"  ⚠️  Skipping tensor compression for {entity.entity_id} - no tensor attribute")
+
+        if entities_compressed > 0:
+            print(f"✓ Compressed tensors for {entities_compressed} entities")
+        else:
+            print("⚠️  No entities had tensor attributes for compression")
 
         return state
 
@@ -1075,22 +1136,12 @@ Return a JSON object with these fields:
 
 Return only valid JSON, no other text."""
 
-    if llm.dry_run:
-        # Mock response for dry run
-        response = {
-            "summary": f"Analysis of {len(entities)} entities in dry-run mode",
-            "key_differences": ["Mock difference 1", "Mock difference 2"],
-            "relationship_dynamics": {"mock": "stable"},
-            "contradictions_identified": [],
-            "personality_influences": {eid: "mock_trait" for eid in entities},
-            "knowledge_gaps": ["Mock knowledge gap"]
-        }
-    else:
-        response_data = llm.generate_dialog(prompt, max_tokens=1500)
-        # Parse the response as JSON
-        try:
-            response = json.loads(response_data)
-        except:
+    # Always use real LLM (no dry_run mode)
+    response_data = llm.generate_dialog(prompt, max_tokens=1500)
+    # Parse the response as JSON
+    try:
+        response = json.loads(response_data)
+    except:
             response = {"error": "Failed to parse LLM response"}
 
     return response

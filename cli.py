@@ -69,12 +69,11 @@ def main(cfg: DictConfig) -> None:
     # Use new centralized LLM service
     llm_client = LLMClient.from_hydra_config(cfg, use_centralized_service=True)
 
-    # Add cost warning for real API calls
-    if not llm_client.dry_run:
-        print("\n" + "="*60)
-        print("REAL LLM MODE ACTIVE - API calls will incur costs")
-        print(f"API: {cfg.llm.base_url}")
-        print("="*60 + "\n")
+    # Add cost warning for real API calls (always real LLM mode now)
+    print("\n" + "="*60)
+    print("REAL LLM MODE ACTIVE - API calls will incur costs")
+    print(f"API: {cfg.llm.base_url}")
+    print("="*60 + "\n")
     
     # Run autopilot mode
     if cfg.mode == "autopilot":
@@ -152,13 +151,11 @@ def run_model_management(cfg: DictConfig, llm_client: LLMClient):
                 print(f"❌ Invalid model ID: {model_id}")
 
         elif choice == "4":
-            if llm_client.dry_run:
-                print("ℹ️  Dry-run mode - no actual API call will be made")
-            else:
-                print("🧪 Testing model with a simple query...")
-                try:
-                    # Test with a simple relevance scoring call
-                    score = llm_client.score_relevance("test query", "test knowledge")
+            # Always use real LLM (no dry_run mode)
+            print("🧪 Testing model with a simple query...")
+            try:
+                # Test with a simple relevance scoring call
+                score = llm_client.score_relevance("test query", "test knowledge")
                     print(f"✅ Model test successful - relevance score: {score}")
                 except Exception as e:
                     print(f"❌ Model test failed: {e}")

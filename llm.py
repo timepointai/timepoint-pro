@@ -22,10 +22,12 @@ class OpenRouterClient:
         self.base_url = base_url.rstrip('/')
         self.client = httpx.Client(timeout=60.0)
 
+    @property
     def chat(self):
         """Return self to mimic OpenAI client structure"""
         return self
 
+    @property
     def completions(self):
         """Return self to mimic OpenAI client structure"""
         return self
@@ -238,10 +240,16 @@ class ValidationResult(BaseModel):
     reasoning: str
 
 class LLMClient:
-    """Unified LLM client with cost tracking, dry-run support, and model selection"""
+    """Unified LLM client with cost tracking and model selection (REAL LLM only)"""
 
-    def __init__(self, api_key: str, base_url: str = "https://openrouter.ai/api/v1", dry_run: bool = False, default_model: Optional[str] = None, model_cache_ttl_hours: int = 24):
-        self.dry_run = dry_run
+    def __init__(self, api_key: str, base_url: str = "https://openrouter.ai/api/v1", default_model: Optional[str] = None, model_cache_ttl_hours: int = 24):
+        # VALIDATION: API key is required
+        if not api_key:
+            raise ValueError(
+                "API key is REQUIRED. This system only supports real LLM integration. "
+                "Mock/dry-run mode has been removed from this codebase."
+            )
+
         self.token_count = 0
         self.cost = 0.0
         self.api_key = api_key
@@ -257,19 +265,13 @@ class LLMClient:
             self.default_model = self.model_manager.get_default_model()
 
         print(f"🦙 Using LLM model: {self.default_model}")
-        if not dry_run:
-            print(f"📋 Available Llama models: {len(self.model_manager.get_llama_models())} cached")
+        print(f"📋 Available Llama models: {len(self.model_manager.get_llama_models())} cached")
 
-        if not dry_run:
-            self.client = OpenRouterClient(api_key=api_key, base_url=base_url)
-        else:
-            self.client = None
+        # Always create real OpenRouter client
+        self.client = OpenRouterClient(api_key=api_key, base_url=base_url)
     
     def populate_entity(self, entity_schema: Dict, context: Dict, previous_knowledge: List[str] = None, model: Optional[str] = None) -> EntityPopulation:
-        """Populate entity with structured output"""
-        if self.dry_run:
-            return self._mock_entity_population(entity_schema, previous_knowledge)
-
+        """Populate entity with structured output (REAL LLM only)"""
         # Include previous knowledge in the prompt for causal evolution
         previous_context = ""
         if previous_knowledge:
@@ -317,10 +319,7 @@ Return only valid JSON, no other text."""
         return response
     
     def validate_consistency(self, entities: List[Dict], timepoint: datetime, model: Optional[str] = None) -> ValidationResult:
-        """Validate temporal consistency"""
-        if self.dry_run:
-            return ValidationResult(is_valid=True, violations=[], confidence=1.0, reasoning="Dry run mock")
-
+        """Validate temporal consistency (REAL LLM only)"""
         prompt = f"""Validate temporal consistency of entities at {timepoint}.
 Entities: {entities}
 Check for: anachronisms, biological impossibilities, knowledge contradictions.
@@ -359,15 +358,7 @@ Return only valid JSON, no other text."""
         return response
 
     def score_relevance(self, query: str, knowledge_item: str, model: Optional[str] = None) -> float:
-        """Score how relevant a knowledge item is to a query (0.0-1.0)"""
-        if self.dry_run:
-            # Simple heuristic scoring for dry run
-            query_words = set(query.lower().split())
-            knowledge_words = set(knowledge_item.lower().split())
-            overlap = len(query_words.intersection(knowledge_words))
-            total_words = len(query_words.union(knowledge_words))
-            return min(1.0, overlap / max(1, total_words / 2))  # Scale to 0-1
-
+        """Score how relevant a knowledge item is to a query (0.0-1.0) (REAL LLM only)"""
         prompt = f"""Rate how relevant this knowledge item is to the query on a scale of 0.0 to 1.0.
 
 Query: "{query}"
@@ -396,7 +387,7 @@ Relevance score:"""
         try:
             response = retry_with_backoff(_api_call, max_retries=3, base_delay=1.0)
 
-            score_text = response.choices[0].message.content.strip()
+            score_text = response["choices"][0]["message"]["content"].strip()
             # Extract numeric score
             try:
                 score = float(score_text)
@@ -410,10 +401,7 @@ Relevance score:"""
             return self._heuristic_relevance_score(query, knowledge_item)
 
     def generate_dialog(self, prompt: str, max_tokens: int = 2000, model: Optional[str] = None):
-        """Generate dialog with structured output"""
-        if self.dry_run:
-            return self._mock_dialog_generation()
-
+        """Generate dialog with structured output (REAL LLM only)"""
         # Use provided model or default to Llama model
         selected_model = model or self.default_model
 
@@ -482,10 +470,6 @@ Return only valid JSON, no other text."""
         Returns:
             Instance of response_model populated from LLM response
         """
-        if self.dry_run:
-            # Return empty instance for dry run
-            return response_model()
-
         # Use provided model or default to Llama model
         selected_model = model or self.default_model
 
@@ -559,58 +543,4 @@ Return only valid JSON, no other text."""
         total_words = len(query_words.union(knowledge_words))
         return min(1.0, overlap / max(1, total_words / 2))
     
-    def _mock_entity_population(self, entity_schema: Dict, previous_knowledge: List[str] = None) -> EntityPopulation:
-        """Deterministic mock for dry-run mode"""
-        import hashlib
-        seed = int(hashlib.md5(entity_schema['entity_id'].encode()).hexdigest(), 16) % 10000
-        np.random.seed(seed)
-
-        # If previous knowledge exists, generate evolved state
-        if previous_knowledge:
-            # Add some new knowledge while keeping some old
-            existing_count = len(previous_knowledge)
-            new_facts = [f"fact_{existing_count + i}" for i in range(3)]  # Add 3 new facts
-            knowledge_state = previous_knowledge + new_facts
-        else:
-            knowledge_state = [f"fact_{i}" for i in range(5)]
-
-        return EntityPopulation(
-            entity_id=entity_schema['entity_id'],
-            knowledge_state=knowledge_state,
-            energy_budget=np.random.uniform(50, 100),
-            personality_traits=np.random.uniform(-1, 1, 5).tolist(),
-            temporal_awareness=f"Aware of events up to {entity_schema.get('timestamp', 'unknown')}",
-            confidence=0.8
-        )
-
-    def _mock_dialog_generation(self):
-        """Deterministic mock for dialog generation in dry-run mode"""
-        from schemas import DialogTurn, DialogData
-        from datetime import datetime
-
-        # Generate mock dialog turns
-        turns = []
-        speakers = ["washington", "jefferson", "hamilton", "adams"]
-        base_time = datetime.now()
-
-        for i in range(8):
-            speaker = speakers[i % len(speakers)]
-            turn = DialogTurn(
-                speaker=speaker,
-                content=f"This is a mock dialog turn {i+1} from {speaker} about historical matters.",
-                timestamp=base_time.replace(second=i*30),  # 30 second intervals
-                emotional_tone="neutral",
-                knowledge_references=["mock_fact_1", "mock_fact_2"],
-                confidence=0.9,
-                physical_state_influence="none"
-            )
-            turns.append(turn)
-
-        return DialogData(
-            turns=turns,
-            total_duration=240,  # 4 minutes
-            information_exchanged=["mock_fact_1", "mock_fact_2", "mock_fact_3"],
-            relationship_impacts={"washington_jefferson": 0.1, "hamilton_adams": -0.05},
-            atmosphere_evolution=[]
-        )
 

@@ -46,7 +46,6 @@ class LLMClient:
         self,
         api_key: str,
         base_url: str = "https://openrouter.ai/api/v1",
-        dry_run: bool = False,
         default_model: Optional[str] = None,
         model_cache_ttl_hours: int = 24,
         use_centralized_service: bool = True,  # Enable new service by default
@@ -56,25 +55,22 @@ class LLMClient:
         Initialize LLM client.
 
         Args:
-            api_key: OpenRouter API key (REQUIRED for real operations)
+            api_key: OpenRouter API key (REQUIRED)
             base_url: API base URL
-            dry_run: If True, return mock responses (NOT RECOMMENDED - use for testing only)
             default_model: Default model identifier
             model_cache_ttl_hours: Model cache TTL
             use_centralized_service: Use new centralized service (recommended)
             service_config: Optional pre-built service config
         """
-        # VALIDATION: Reject dry_run mode unless explicitly testing
-        if dry_run and not os.getenv("ALLOW_MOCK_MODE"):
+        # VALIDATION: API key is required
+        if not api_key:
             raise ValueError(
-                "Mock/dry-run mode is disabled by default. "
-                "This system requires REAL LLM integration. "
-                "Set ALLOW_MOCK_MODE=true ONLY for unit testing."
+                "API key is REQUIRED. This system only supports real LLM integration. "
+                "Mock/dry-run mode has been removed from this codebase."
             )
 
         self.api_key = api_key
         self.base_url = base_url
-        self.dry_run = dry_run
         self.default_model = default_model or "meta-llama/llama-3.1-70b-instruct"
         self.use_centralized_service = use_centralized_service
 
@@ -92,7 +88,7 @@ class LLMClient:
                     provider="custom",
                     base_url=base_url,
                     api_keys=APIKeyConfig(primary=api_key),
-                    mode=ServiceMode.DRY_RUN if dry_run else ServiceMode.PRODUCTION,
+                    mode=ServiceMode.PRODUCTION,  # Always use PRODUCTION mode
                     defaults=DefaultParametersConfig(model=self.default_model),
                 )
                 self.service = LLMService(config)
@@ -100,8 +96,30 @@ class LLMClient:
             # Use legacy implementation
             from llm import OpenRouterClient, ModelManager
 
-            self.client = OpenRouterClient(api_key=api_key, base_url=base_url) if not dry_run else None
+            self._client = OpenRouterClient(api_key=api_key, base_url=base_url)
             self.model_manager = ModelManager(api_key, model_cache_ttl_hours)
+
+    @property
+    def client(self):
+        """
+        Provide backward-compatible access to underlying OpenAI-compatible client.
+
+        This property allows code that expects llm.client.chat.completions.create()
+        to work with both centralized service and legacy modes.
+        """
+        if self.use_centralized_service:
+            # Access the underlying OpenAI client from the centralized service
+            # Chain: service → provider → client
+            return self.service.provider.client
+        else:
+            # Return the legacy OpenRouter client
+            return self._client
+
+    @client.setter
+    def client(self, value):
+        """Allow setting client in legacy mode"""
+        if not self.use_centralized_service:
+            self._client = value
 
     def populate_entity(
         self,
@@ -265,13 +283,10 @@ Return ONLY valid JSON with ALL fields populated, no other text."""
         previous_knowledge: List[str] = None,
         model: Optional[str] = None
     ) -> EntityPopulation:
-        """Legacy implementation for fallback"""
-        if self.dry_run:
-            return self._mock_entity_population(entity_schema, previous_knowledge)
-
+        """Legacy implementation for fallback (real LLM calls only)"""
         # Use original implementation from llm.py
         from llm import LLMClient as LegacyClient
-        legacy = LegacyClient(self.api_key, self.base_url, self.dry_run)
+        legacy = LegacyClient(self.api_key, self.base_url)
         return legacy.populate_entity(entity_schema, context, previous_knowledge, model)
 
     def validate_consistency(
@@ -340,12 +355,9 @@ Return only valid JSON, no other text."""
         timepoint: datetime,
         model: Optional[str] = None
     ) -> ValidationResult:
-        """Legacy implementation"""
-        if self.dry_run:
-            return ValidationResult(is_valid=True, violations=[], confidence=1.0, reasoning="Dry run mock")
-
+        """Legacy implementation (real LLM calls only)"""
         from llm import LLMClient as LegacyClient
-        legacy = LegacyClient(self.api_key, self.base_url, self.dry_run)
+        legacy = LegacyClient(self.api_key, self.base_url)
         return legacy.validate_consistency(entities, timepoint, model)
 
     def score_relevance(self, query: str, knowledge_item: str, model: Optional[str] = None) -> float:
@@ -402,12 +414,9 @@ Relevance score:"""
             return self._heuristic_relevance_score(query, knowledge_item)
 
     def _score_relevance_legacy(self, query: str, knowledge_item: str, model: Optional[str] = None) -> float:
-        """Legacy implementation"""
-        if self.dry_run:
-            return self._heuristic_relevance_score(query, knowledge_item)
-
+        """Legacy implementation (real LLM calls only)"""
         from llm import LLMClient as LegacyClient
-        legacy = LegacyClient(self.api_key, self.base_url, self.dry_run)
+        legacy = LegacyClient(self.api_key, self.base_url)
         return legacy.score_relevance(query, knowledge_item, model)
 
     def generate_structured(self, prompt: str, response_model: type, model: Optional[str] = None, **kwargs):
@@ -906,12 +915,9 @@ Return a JSON object with:
         return result
 
     def _generate_dialog_legacy(self, prompt: str, max_tokens: int = 2000, model: Optional[str] = None):
-        """Legacy implementation"""
-        if self.dry_run:
-            return self._mock_dialog_generation()
-
+        """Legacy implementation (real LLM calls only)"""
         from llm import LLMClient as LegacyClient
-        legacy = LegacyClient(self.api_key, self.base_url, self.dry_run)
+        legacy = LegacyClient(self.api_key, self.base_url)
         return legacy.generate_dialog(prompt, max_tokens, model)
 
     def _heuristic_relevance_score(self, query: str, knowledge_item: str) -> float:
@@ -922,57 +928,7 @@ Return a JSON object with:
         total_words = len(query_words.union(knowledge_words))
         return min(1.0, overlap / max(1, total_words / 2))
 
-    def _mock_entity_population(self, entity_schema: Dict, previous_knowledge: List[str] = None) -> EntityPopulation:
-        """Deterministic mock for dry-run mode"""
-        import hashlib
-        seed = int(hashlib.md5(entity_schema['entity_id'].encode()).hexdigest(), 16) % 10000
-        np.random.seed(seed)
 
-        if previous_knowledge:
-            existing_count = len(previous_knowledge)
-            new_facts = [f"fact_{existing_count + i}" for i in range(3)]
-            knowledge_state = previous_knowledge + new_facts
-        else:
-            knowledge_state = [f"fact_{i}" for i in range(5)]
-
-        return EntityPopulation(
-            entity_id=entity_schema['entity_id'],
-            knowledge_state=knowledge_state,
-            energy_budget=np.random.uniform(50, 100),
-            personality_traits=np.random.uniform(-1, 1, 5).tolist(),
-            temporal_awareness=f"Aware of events up to {entity_schema.get('timestamp', 'unknown')}",
-            confidence=0.8
-        )
-
-    def _mock_dialog_generation(self):
-        """Deterministic mock for dialog generation"""
-        from schemas import DialogTurn, DialogData
-        from datetime import datetime
-
-        turns = []
-        speakers = ["washington", "jefferson", "hamilton", "adams"]
-        base_time = datetime.now()
-
-        for i in range(8):
-            speaker = speakers[i % len(speakers)]
-            turn = DialogTurn(
-                speaker=speaker,
-                content=f"This is a mock dialog turn {i+1} from {speaker} about historical matters.",
-                timestamp=base_time.replace(second=i*30),
-                emotional_tone="neutral",
-                knowledge_references=["mock_fact_1", "mock_fact_2"],
-                confidence=0.9,
-                physical_state_influence="none"
-            )
-            turns.append(turn)
-
-        return DialogData(
-            turns=turns,
-            total_duration=240,
-            information_exchanged=["mock_fact_1", "mock_fact_2", "mock_fact_3"],
-            relationship_impacts={"washington_jefferson": 0.1, "hamilton_adams": -0.05},
-            atmosphere_evolution=[]
-        )
 
     @classmethod
     def from_hydra_config(cls, cfg: Any, use_centralized_service: bool = True) -> "LLMClient":
@@ -992,7 +948,6 @@ Return a JSON object with:
             return cls(
                 api_key=cfg.llm.api_key,
                 base_url=cfg.llm.base_url,
-                dry_run=cfg.llm.dry_run,
                 default_model=cfg.llm.model,
                 use_centralized_service=True,
                 service_config=service_config,
@@ -1002,7 +957,6 @@ Return a JSON object with:
             return cls(
                 api_key=cfg.llm.api_key,
                 base_url=cfg.llm.base_url,
-                dry_run=cfg.llm.dry_run,
                 default_model=cfg.llm.model,
                 model_cache_ttl_hours=cfg.llm.model_cache_ttl_hours,
                 use_centralized_service=False,

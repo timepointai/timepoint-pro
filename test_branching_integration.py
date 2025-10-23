@@ -24,10 +24,16 @@ def test_counterfactual_parsing():
     print("🧪 Testing counterfactual query parsing...")
 
     # Create mock store and LLM client
+    import os
     config = load_config()
     store = GraphStore(config["database"]["url"])
-    llm_client = LLMClient(config["llm"])
-    llm_client.dry_run = True  # Use dry run to avoid API calls
+    # Use real API key from environment (required - no mock mode)
+    api_key = os.getenv("OPENROUTER_API_KEY")
+    if not api_key:
+        raise ValueError("OPENROUTER_API_KEY environment variable required for tests")
+    llm_config = config["llm"].copy()
+    llm_config["api_key"] = api_key
+    llm_client = LLMClient(llm_config)
 
     query_interface = QueryInterface(store, llm_client)
 
@@ -56,10 +62,16 @@ def test_counterfactual_response():
     print("\n🧪 Testing counterfactual response generation...")
 
     # Create mock store and LLM client
+    import os
     config = load_config()
     store = GraphStore(config["database"]["url"])
-    llm_client = LLMClient(config["llm"])
-    llm_client.dry_run = True  # Use dry run to avoid API calls
+    # Use real API key from environment (required - no mock mode)
+    api_key = os.getenv("OPENROUTER_API_KEY")
+    if not api_key:
+        raise ValueError("OPENROUTER_API_KEY environment variable required for tests")
+    llm_config = config["llm"].copy()
+    llm_config["api_key"] = api_key
+    llm_client = LLMClient(llm_config)
 
     query_interface = QueryInterface(store, llm_client)
 

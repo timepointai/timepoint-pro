@@ -37,7 +37,7 @@ class TestPhase3DialogSynthesis:
         """Set up test fixtures"""
         self.store = Mock(spec=GraphStore)
         self.llm = Mock(spec=LLMClient)
-        self.llm.dry_run = False
+        # Note: Using Mock for LLM in unit tests - integration tests should use real LLM
 
         # Create test entities with physical and cognitive states
         self.washington = Entity(
@@ -288,7 +288,7 @@ class TestPhase3MultiEntityAnalysis:
 
         self.store.get_relationship_trajectory_between.return_value = None
         self.store.get_dialogs_for_entities.return_value = []
-        self.llm.dry_run = True
+        # Note: Using Mock for LLM - real LLM calls not needed for this test
 
         response = synthesize_multi_entity_response(
             entities, query, [], self.llm, self.store
@@ -346,7 +346,7 @@ class TestPhase3Integration:
         self.store.get_entity.return_value = Mock()
         self.store.get_relationship_trajectory_between.return_value = None
         self.store.get_dialogs_for_entities.return_value = []
-        self.llm.dry_run = True
+        # Note: Using Mock for LLM - real LLM calls not needed for this test
 
         response = self.query_interface._synthesize_relationship_response(query_intent)
 

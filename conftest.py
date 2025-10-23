@@ -276,7 +276,7 @@ def llm_client(llm_api_key, request):
             pytest.skip("Real LLM test requires OPENROUTER_API_KEY")
 
         # Real LLM client
-        client = LLMClient(api_key=llm_api_key, dry_run=False)
+        client = LLMClient(api_key=llm_api_key)
 
         # Track costs
         start_time = time.time()
@@ -287,8 +287,8 @@ def llm_client(llm_api_key, request):
         if execution_time > 5:  # Log if took more than 5 seconds
             print(f"\n💰 LLM test '{request.node.name}' took {execution_time:.2f}s")
     else:
-        # Mock LLM client
-        client = LLMClient(api_key='test', dry_run=True)
+        # Mock LLM client - use dummy key
+        client = LLMClient(api_key='test')
         yield client
 
 
@@ -304,7 +304,7 @@ def real_llm_client(llm_api_key):
     if not llm_api_key or llm_api_key == 'test':
         pytest.skip("OPENROUTER_API_KEY not set - skipping real LLM test")
 
-    return LLMClient(api_key=llm_api_key, dry_run=False)
+    return LLMClient(api_key=llm_api_key)
 
 
 # ============================================================================
