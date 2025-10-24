@@ -905,41 +905,38 @@ Return a JSON object with:
         # Add explicit schema instructions to the user prompt to ensure correct field names
         enhanced_prompt = f"""{prompt}
 
-CRITICAL SCHEMA REQUIREMENTS:
-1. Dialog turns MUST use "content" field, NOT "text" or "utterance"
-2. Each turn needs "timestamp" field (ISO format datetime string)
-3. total_duration must be an INTEGER (seconds, not a string like "45 minutes")
-4. relationship_impacts must map entity pairs to FLOAT deltas (e.g. {{"alice-bob": 0.1}})
-5. atmosphere_evolution must be array of objects with:
-   - "timestamp": NUMBER (seconds from dialog start, e.g. 0.0, 30.5, 120.0 - NOT a datetime string!)
-   - "atmosphere": NUMBER (0.0-1.0 representing atmosphere intensity)
+CRITICAL: Return a SINGLE JSON object (NOT multiple objects, NOT markdown formatting).
 
-Example correct turn:
+Schema requirements:
 {{
-  "speaker": "alice",
-  "content": "What do you think?",
-  "timestamp": "2023-03-15T13:00:00",
-  "emotional_tone": "curious",
-  "knowledge_references": [],
-  "confidence": 1.0,
-  "physical_state_influence": null
+  "turns": [array of turn objects],
+  "total_duration": integer (seconds),
+  "information_exchanged": [array of strings],
+  "relationship_impacts": {{entity pairs to float deltas}},
+  "atmosphere_evolution": [array of objects]
 }}
 
-Example correct atmosphere_evolution:
-[
-  {{"timestamp": 0.0, "atmosphere": 0.5}},
-  {{"timestamp": 60.0, "atmosphere": 0.7}},
-  {{"timestamp": 180.0, "atmosphere": 0.6}}
-]
+Each turn object must have:
+- "speaker": string (entity_id)
+- "content": string (what was said - use "content" NOT "text")
+- "timestamp": string (ISO datetime like "2023-03-15T13:00:00")
+- "emotional_tone": string or null
+- "knowledge_references": array of strings
+- "confidence": number (0.0-1.0)
+- "physical_state_influence": string or null
 
-Follow the DialogData schema EXACTLY."""
+atmosphere_evolution objects must have:
+- "timestamp": number (seconds from start, e.g. 0.0, 60.0)
+- "atmosphere": number (0.0-1.0)
+
+Return ONLY a single valid JSON object. Do NOT add markdown formatting or multiple objects."""
 
         result = self.service.structured_call(
             system=system_prompt,
             user=enhanced_prompt,
             schema=DialogData,
             temperature=0.7,
-            max_tokens=max_tokens,
+            max_tokens=max(max_tokens, 3000),  # Increase minimum to avoid truncation
             model=model,
             call_type="generate_dialog",
         )

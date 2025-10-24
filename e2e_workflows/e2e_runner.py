@@ -336,12 +336,6 @@ class FullE2EWorkflowRunner:
                     all_timepoints.append(next_timepoint)
                     current_timepoint = next_timepoint
 
-                    self.logfire.metric(
-                        "timepoints_generated",
-                        len(all_timepoints),
-                        run_id=run_id
-                    )
-
                 except Exception as e:
                     print(f"  Warning: Failed to generate timepoint {i+1}: {e}")
                     # Continue with what we have
@@ -519,6 +513,10 @@ class FullE2EWorkflowRunner:
 
                 except Exception as e:
                     print(f"  ⚠️  Failed to synthesize dialog for {timepoint.timepoint_id}: {e}")
+                    # Print traceback for debugging datetime serialization issues
+                    if "datetime" in str(e).lower() or "json" in str(e).lower():
+                        import traceback
+                        traceback.print_exc()
                     # Continue with other timepoints
 
             print(f"✓ Synthesized {dialogs_created} dialogs")

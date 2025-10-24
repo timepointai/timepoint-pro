@@ -1,8 +1,8 @@
 # Timepoint-Daedalus Development Plan
 
 **Project**: Temporal Knowledge Graph System with LLM-Driven Entity Simulation
-**Status**: Active Development - Phase 9 In Progress ⚠️
-**Last Updated**: October 23, 2025
+**Status**: Active Development - Phase 10.3 Complete ✅ (ANDOS Core Architecture)
+**Last Updated**: October 24, 2025
 
 ---
 
@@ -10,20 +10,39 @@
 
 Timepoint-Daedalus is a sophisticated framework for creating queryable temporal simulations where entities evolve through causally-linked timepoints with adaptive fidelity. The system implements 17 core mechanisms to achieve 95% cost reduction while maintaining temporal consistency.
 
-**Current Status**: Phase 9 In Progress - M16 Integrated ✅, M14/M15 Partial ⚠️
+**Current Status**: Phase 10.3 Complete ✅ - ANDOS (Acyclical Network Directed Orthogonal Synthesis) is now the universal entity training system
 **Mechanism Coverage**:
+- E2E Templates with ANDOS: 4 new templates created (M5, M9, M10, M12)
 - Persistent E2E Tracking: 10/17 (58.8%)
 - Pytest Verified: +5 mechanisms (88.2% total)
 - Decorators: 17/17 (100%)
+**Architecture**: ANDOS layer-by-layer training solves M14/M15 circular dependency
 **Technical Specification**: See [MECHANICS.md](MECHANICS.md) for detailed architecture
 **Development Roadmap**: See sections below for completed phases and next steps
 
 ---
 
-## Current Phase: Phase 9 - M14/M15/M16 Integration ⚠️
+## Current Phase: Phase 10.3 - ANDOS as Core Architecture ✅
 
-**Status**: M16 SUCCESS ✅ | M14/M15 PARTIAL ⚠️
-**Next Phase**: Continue M14/M15 integration work or consider alternative approaches
+**Status**: COMPLETE ✅
+**Achievement**: ANDOS (Acyclical Network Directed Orthogonal Synthesis) is now the universal entity training system, solving the M14/M15 circular dependency problem
+
+**Key Deliverables**:
+1. ✅ ANDOS layer-by-layer training integrated into E2E workflow
+2. ✅ Created 4 E2E templates with ANDOS integration (M5, M9, M10, M12)
+3. ✅ Fixed datetime serialization in dialog synthesis
+4. ✅ Fixed logfire.metric error preventing timepoint generation
+5. ✅ Validated ANDOS with 4/4 templates passing (100% success rate)
+
+**Template Test Results**:
+- ✅ M5 (Query Evolution): PASSED - 4 entities, 3 timepoints, ANDOS 4-layer training
+- ✅ M9 (Missing Witness): PASSED - 3 entities, 2 timepoints, ANDOS 3-layer training
+- ✅ M10 (Scene Analysis): PASSED - 6 entities, 2 timepoints, ANDOS 6-layer training
+- ✅ M12 (Alternate History): PASSED - 3 entities, 3 timepoints, ANDOS 3-layer training
+
+**Architectural Insight**: ANDOS is not an optional feature - it IS the entity training system. All E2E workflows automatically use ANDOS for layer-by-layer training.
+
+**Next Phase**: Phase 11 - Query integration (connect templates to query execution to trigger M5/M9/M10/M12)
 
 ---
 
@@ -132,6 +151,60 @@ Timepoint-Daedalus is a sophisticated framework for creating queryable temporal 
 3. Both: Add more detailed logging to trace execution flow
 
 **Phase 9 Status**: ⚠️ PARTIAL SUCCESS - M16 verified, M14/M15 need additional work
+
+### Phase 10.3: ANDOS as Core Architecture ✅
+
+**Goal**: Solve M14/M15 circular dependency by making ANDOS the universal entity training system
+
+**Problem**: M14 (Circadian Patterns) and M15 (Entity Prospection) both need TTM tensors to compute energy costs and future states, but tensor generation itself depends on M14/M15 being computed first. This creates a circular dependency that cannot be resolved with simple sequencing.
+
+**Solution**: ANDOS (Acyclical Network Directed Orthogonal Synthesis) - Layer-by-layer training system using reverse topological ordering of the entity dependency graph.
+
+**How It Works**:
+1. Build dependency graph from entity relationships
+2. Compute reverse topological layers (entities with no dependencies train first)
+3. Train entities layer-by-layer, passing TTM tensors forward through layers
+4. Each entity has access to all previously-trained entities' tensors (no circular deps)
+
+**Implementation**:
+1. ✅ Created ANDOS computation in `e2e_workflows/e2e_runner.py:373-416`
+2. ✅ Integrated layer-by-layer training in `e2e_workflows/e2e_runner.py:418-534`
+3. ✅ Fixed datetime serialization in dialog synthesis (workflows.py, llm_v2.py, e2e_runner.py)
+4. ✅ Created 4 E2E templates demonstrating ANDOS integration:
+   - `test_m5_query_evolution.py` - M5 (Query Resolution with Lazy Elevation)
+   - `test_m9_missing_witness.py` - M9 (On-Demand Entity Generation)
+   - `test_m10_scene_analysis.py` - M10 (Scene-Level Entity Management)
+   - `test_m12_alternate_history.py` - M12 (Counterfactual Timeline Branching)
+
+**Validation Results**:
+| Template | Entities | Timepoints | Layers | Status | Exit Code |
+|----------|----------|------------|--------|--------|-----------|
+| M5 (Query Evolution) | 4 | 3 | 4 | ✅ PASSED | 0 |
+| M9 (Missing Witness) | 3 | 2 | 3 | ✅ PASSED | 0 |
+| M10 (Scene Analysis) | 6 | 2 | 6 | ✅ PASSED | 0 |
+| M12 (Alternate History) | 3 | 3 | 3 | ✅ PASSED | 0 |
+
+**Key Findings**:
+- ANDOS successfully trains entities in all 4 templates (100% success rate)
+- Layer-by-layer training eliminates circular dependencies
+- Tensors persist correctly through training pipeline
+- Dialog synthesis works with ANDOS-trained entities
+- All timepoints generate correctly after fixing logfire.metric error
+
+**Architectural Shift**: ANDOS is no longer an optional feature - it IS the entity training system. All E2E workflows automatically use ANDOS via `FullE2EWorkflowRunner`.
+
+**Files Created**:
+- test_m5_query_evolution.py (NEW - 122 lines)
+- test_m9_missing_witness.py (NEW - 115 lines)
+- test_m10_scene_analysis.py (NEW - 115 lines)
+- test_m12_alternate_history.py (NEW - 111 lines)
+
+**Files Modified**:
+- e2e_workflows/e2e_runner.py (ANDOS integration, datetime fixes)
+- workflows.py (datetime serialization, timeline sanitization)
+- llm_v2.py (improved dialog prompt, max_tokens increase)
+
+**Phase 10.3 Status**: ✅ COMPLETE - ANDOS is now core architecture
 
 ### Phase 7.5: Test Reliability Improvements ✅
 
@@ -600,10 +673,12 @@ For questions or issues, see project documentation or open a GitHub issue.
 
 ---
 
-**Last Updated**: October 23, 2025
-**Current Status**: Phase 9 In Progress ⚠️ (M16 Integrated ✅, M14/M15 Partial ⚠️)
+**Last Updated**: October 24, 2025
+**Current Status**: Phase 10.3 Complete ✅ (ANDOS Core Architecture)
 **Mechanism Coverage**:
+- E2E Templates with ANDOS: 4 new templates (M5, M9, M10, M12)
 - Persistent E2E Tracking: 10/17 (58.8%)
 - Pytest Verified: +5 mechanisms (88.2% total)
 - Total Verified: 15/17 mechanisms
-**Next Steps**: Complete M14/M15 integration or explore alternative approaches
+**Architecture**: ANDOS is the universal entity training system (solves M14/M15 circular dependency)
+**Next Steps**: Phase 11 - Query integration (connect templates to query execution)

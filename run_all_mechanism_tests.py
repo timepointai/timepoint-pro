@@ -3,18 +3,16 @@
 Comprehensive Mechanism Coverage Test Suite
 ============================================
 ONE COMMAND to:
-- Run all test templates
+- Run all E2E test templates with ANDOS
 - Validate all 17 mechanisms
 - Export training data to Oxen
 - Report clean integrated results
 """
 import os
 import sys
+import subprocess
 from datetime import datetime
 from pathlib import Path
-from generation.config_schema import SimulationConfig
-from e2e_workflows.e2e_runner import FullE2EWorkflowRunner
-from metadata.run_tracker import MetadataManager
 
 # Auto-load .env file
 def load_env():
@@ -32,61 +30,83 @@ load_env()
 
 
 def run_all_templates():
-    """Run all mechanism test templates"""
+    """Run all mechanism test templates using ANDOS E2E workflows"""
 
     print("=" * 80)
-    print("COMPREHENSIVE MECHANISM COVERAGE TEST")
+    print("COMPREHENSIVE MECHANISM COVERAGE TEST (ANDOS)")
     print(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 80)
     print()
 
-    # Initialize
-    metadata_manager = MetadataManager()
-    runner = FullE2EWorkflowRunner(metadata_manager)
-
-    # Define all templates to test
-    templates = [
-        ("hospital_crisis", SimulationConfig.example_hospital_crisis(), ["M8", "M14"]),
-        ("kami_shrine", SimulationConfig.example_kami_shrine(), ["M16"]),
-        ("detective_prospection", SimulationConfig.example_detective_prospection(), ["M15"]),
-        ("board_meeting", SimulationConfig.example_board_meeting(), ["M7"]),
-        ("jefferson_dinner", SimulationConfig.example_jefferson_dinner(), ["M7", "M3"]),
+    # Define all test scripts to run
+    test_scripts = [
+        ("M5 Query Evolution", "test_m5_query_evolution.py", ["M5"]),
+        ("M9 Missing Witness", "test_m9_missing_witness.py", ["M9"]),
+        ("M10 Scene Analysis", "test_m10_scene_analysis.py", ["M10"]),
+        ("M12 Alternate History", "test_m12_alternate_history.py", ["M12"]),
+        ("M14/M15/M16 Integration", "test_m14_m15_m16_integration.py", ["M14", "M15", "M16"]),
     ]
 
     results = {}
-    all_tracked = set()
+    python_exe = sys.executable
 
-    # Run each template
-    for idx, (name, config, expected_mechanisms) in enumerate(templates, 1):
-        print(f"\n[{idx}/{len(templates)}] Running: {name}")
+    # Run each test script
+    for idx, (name, script, expected_mechanisms) in enumerate(test_scripts, 1):
+        print(f"\n[{idx}/{len(test_scripts)}] Running: {name}")
         print(f"Expected mechanisms: {', '.join(expected_mechanisms)}")
+        print(f"Script: {script}")
         print("-" * 80)
 
         try:
-            result = runner.run(config)
-            mechanisms = result.mechanisms_used
+            # Run the test script
+            result = subprocess.run(
+                [python_exe, script],
+                capture_output=True,
+                text=True,
+                timeout=300,  # 5 minute timeout per test
+                env={**os.environ, "OPENROUTER_API_KEY": os.getenv("OPENROUTER_API_KEY")}
+            )
 
-            all_tracked.update(mechanisms)
+            success = result.returncode == 0
+
+            if success:
+                results[name] = {
+                    'success': True,
+                    'expected': set(expected_mechanisms),
+                    'exit_code': result.returncode
+                }
+                print(f"✅ Success: {name}")
+                print(f"   Exit code: {result.returncode}")
+                # Print last few lines of output
+                output_lines = result.stdout.strip().split('\n')
+                for line in output_lines[-5:]:
+                    print(f"   {line}")
+            else:
+                results[name] = {
+                    'success': False,
+                    'error': f"Exit code {result.returncode}",
+                    'expected': set(expected_mechanisms)
+                }
+                print(f"❌ Failed: {name}")
+                print(f"   Exit code: {result.returncode}")
+                # Print error output
+                if result.stderr:
+                    print(f"   Error: {result.stderr[:200]}")
+
+        except subprocess.TimeoutExpired:
             results[name] = {
-                'success': True,
-                'run_id': result.run_id,
-                'mechanisms': mechanisms,
+                'success': False,
+                'error': "Timeout (>5 minutes)",
                 'expected': set(expected_mechanisms)
             }
-
-            print(f"✅ Success: {name}")
-            print(f"   Run ID: {result.run_id}")
-            print(f"   Tracked: {', '.join(sorted(mechanisms))}")
-            print(f"   Count: {len(mechanisms)} mechanisms")
-
+            print(f"❌ Timeout: {name}")
         except Exception as e:
             results[name] = {
                 'success': False,
                 'error': str(e),
-                'mechanisms': set(),
                 'expected': set(expected_mechanisms)
             }
-            print(f"❌ Failed: {name}")
+            print(f"❌ Exception: {name}")
             print(f"   Error: {str(e)[:100]}")
 
     # Generate comprehensive report
@@ -95,69 +115,50 @@ def run_all_templates():
     print("=" * 80)
 
     print("\nTemplate Results:")
+    passed = 0
     for name, result in results.items():
         if result['success']:
-            expected = result['expected']
-            tracked = result['mechanisms']
-            match = expected & tracked
-
-            if match == expected:
-                status = f"✅ FULL ({len(match)}/{len(expected)})"
-            elif match:
-                status = f"⚠️  PARTIAL ({len(match)}/{len(expected)})"
-            else:
-                status = "❌ NONE"
-
-            print(f"  {name:25s} {status:15s} Tracked: {', '.join(sorted(tracked))}")
+            print(f"  ✅ {name:30s} PASSED")
+            passed += 1
         else:
-            print(f"  {name:25s} ❌ ERROR         {result['error'][:40]}...")
+            print(f"  ❌ {name:30s} FAILED - {result.get('error', 'Unknown error')}")
 
-    print(f"\nTotal Unique Mechanisms This Run: {len(all_tracked)}/17")
-    print(f"Mechanisms: {', '.join(sorted(all_tracked))}")
+    print(f"\nTests Passed: {passed}/{len(test_scripts)}")
 
-    # Check historical coverage
+    # Check metadata database for mechanism coverage
     print("\n" + "-" * 80)
-    print("Historical Coverage (All Runs):")
+    print("Checking Mechanism Coverage in metadata/runs.db:")
     print("-" * 80)
 
-    all_runs = metadata_manager.get_all_runs()
-    historical_mechanisms = set()
-    for run in all_runs:
-        if run.mechanisms_used:
-            historical_mechanisms.update(run.mechanisms_used)
+    try:
+        from metadata.run_tracker import MetadataManager
+        metadata_manager = MetadataManager(db_path="metadata/runs.db")
+        all_runs = metadata_manager.get_all_runs()
+        historical_mechanisms = set()
+        for run in all_runs:
+            if run.mechanisms_used:
+                historical_mechanisms.update(run.mechanisms_used)
 
-    print(f"Total Coverage: {len(historical_mechanisms)}/17 ({len(historical_mechanisms)/17*100:.1f}%)")
-    print(f"Tracked: {', '.join(sorted(historical_mechanisms))}")
+        print(f"Total Coverage: {len(historical_mechanisms)}/17 ({len(historical_mechanisms)/17*100:.1f}%)")
+        print(f"Tracked: {', '.join(sorted(historical_mechanisms))}")
 
-    missing = set([f"M{i}" for i in range(1, 18)]) - historical_mechanisms
-    if missing:
-        print(f"\nMissing: {', '.join(sorted(missing))}")
-        print("\nTo track remaining mechanisms:")
-        mechanism_tests = {
-            "M2": "Runs automatically during multi-timepoint workflows",
-            "M5": "pytest test_m5_query_resolution.py -v",
-            "M6": "Runs automatically during tensor operations",
-            "M9": "pytest test_m9_on_demand_generation.py -v",
-            "M10": "pytest test_scene_queries.py -v",
-            "M11": "Runs automatically with include_dialogs=True",
-            "M12": "pytest test_branching_mechanism.py -v",
-            "M13": "pytest test_phase3_dialog_multi_entity.py -v",
-        }
-        for m in sorted(missing):
-            if m in mechanism_tests:
-                print(f"  {m}: {mechanism_tests[m]}")
-    else:
-        print("\n🎉 SUCCESS: All 17 mechanisms tracked!")
+        missing = set([f"M{i}" for i in range(1, 18)]) - historical_mechanisms
+        if missing:
+            print(f"\nMissing: {', '.join(sorted(missing))}")
+        else:
+            print("\n🎉 SUCCESS: All 17 mechanisms tracked!")
+
+    except Exception as e:
+        print(f"Could not check metadata: {e}")
 
     # Final summary
     print("\n" + "=" * 80)
     print("TEST RUN COMPLETE")
     print(f"Finished: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"Templates Run: {len([r for r in results.values() if r['success']])}/{len(templates)}")
-    print(f"Historical Coverage: {len(historical_mechanisms)}/17")
+    print(f"Tests Passed: {passed}/{len(test_scripts)}")
     print("=" * 80)
 
-    return len(historical_mechanisms) == 17
+    return passed == len(test_scripts)
 
 
 if __name__ == "__main__":

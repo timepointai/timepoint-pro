@@ -800,6 +800,18 @@ def synthesize_dialog(
 ) -> Dialog:
     """Generate conversation with full physical/emotional/temporal context"""
 
+    # Sanitize timeline to ensure all datetime objects are converted to strings
+    sanitized_timeline = []
+    for item in timeline:
+        sanitized_item = {}
+        for key, value in item.items():
+            if hasattr(value, 'isoformat'):  # datetime object
+                sanitized_item[key] = value.isoformat()
+            else:
+                sanitized_item[key] = value
+        sanitized_timeline.append(sanitized_item)
+    timeline = sanitized_timeline
+
     # Build comprehensive context for each participant
     participants_context = []
     for entity in entities:
@@ -998,11 +1010,20 @@ Generate 8-12 dialog turns showing realistic interaction given these constraints
                             store=store
                         )
 
+    # Convert dialog turns to JSON-serializable format (handle datetime objects)
+    turns_data = []
+    for turn in dialog_data.turns:
+        turn_dict = turn.dict() if hasattr(turn, 'dict') else turn.model_dump()
+        # Convert any datetime objects to ISO strings
+        if 'timestamp' in turn_dict and hasattr(turn_dict['timestamp'], 'isoformat'):
+            turn_dict['timestamp'] = turn_dict['timestamp'].isoformat()
+        turns_data.append(turn_dict)
+
     return Dialog(
         dialog_id=f"dialog_{timepoint.timepoint_id}_{'_'.join([e.entity_id for e in entities])}",
         timepoint_id=timepoint.timepoint_id,
         participants=json.dumps([e.entity_id for e in entities]),
-        turns=json.dumps([t.dict() for t in dialog_data.turns]),
+        turns=json.dumps(turns_data),  # Use sanitized turns
         context_used=json.dumps({
             "physical_states_applied": True,
             "emotional_states_applied": True,
