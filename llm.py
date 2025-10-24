@@ -408,21 +408,29 @@ Relevance score:"""
         # Add structured output instruction to prompt
         structured_prompt = f"""{prompt}
 
-Return a JSON object with these exact fields:
+Return a JSON object with these EXACT fields (follow this schema precisely):
 - turns: array of objects, each with:
   - speaker: string (entity_id)
-  - content: string (what was said)
-  - timestamp: string (ISO format datetime)
-  - emotional_tone: string (optional inferred tone)
-  - knowledge_references: array of strings (optional knowledge items mentioned)
+  - content: string (what was said - THIS FIELD MUST BE NAMED 'content' NOT 'text')
+  - timestamp: string (ISO format datetime like "2023-03-15T13:00:00")
+  - emotional_tone: string or null (optional inferred tone)
+  - knowledge_references: array of strings (default empty array [])
   - confidence: number (0.0-1.0, default 1.0)
-  - physical_state_influence: string (optional how physical state affected utterance)
-- total_duration: number (optional estimated seconds)
+  - physical_state_influence: string or null (optional how physical state affected utterance)
+- total_duration: integer number of seconds (e.g. 1800 for 30 minutes - MUST BE AN INTEGER NOT A STRING)
 - information_exchanged: array of strings (knowledge items passed between entities)
-- relationship_impacts: object (optional entity_pair -> delta relationship change)
-- atmosphere_evolution: array of objects (optional atmosphere changes over time)
+- relationship_impacts: object mapping entity pairs to float deltas (e.g. {{"alice-bob": 0.1, "bob-charlie": -0.05}})
+- atmosphere_evolution: array of objects, each with:
+  - timestamp: number (seconds from start, e.g. 0.0, 30.5, 60.0)
+  - atmosphere: number (0.0-1.0 representing atmosphere intensity)
 
-Return only valid JSON, no other text."""
+CRITICAL:
+- Use "content" not "text" for dialog turns
+- total_duration must be an integer (seconds)
+- relationship_impacts values must be floats, not objects
+- atmosphere_evolution objects need timestamp and atmosphere as numbers
+
+Return only valid JSON matching this schema exactly, no other text."""
 
         def _api_call():
             response = self.client.chat.completions.create(

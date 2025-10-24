@@ -30,6 +30,34 @@ from oxen_integration.data_formatters import EntityEvolutionFormatter
 from metadata.run_tracker import MetadataManager, RunMetadata
 from metadata.tracking import set_current_run_id, clear_current_run_id, set_metadata_manager
 from metadata import logfire_setup
+from andos.layer_computer import compute_andos_layers, validate_andos_layers
+
+
+def _infer_interaction_graph(entities: List[Entity]) -> Dict:
+    """
+    Infer interaction graph for templates without explicit graph.
+
+    Heuristics:
+    - If <= 3 entities: sequential chain (simple interaction)
+    - If > 3 entities: sequential chain (conservative approach)
+    - Target entity: first entity in list
+
+    Returns:
+        Dict with 'interactions' list in ANDOS format
+    """
+    if len(entities) <= 1:
+        # Single entity - no interactions
+        return {"interactions": []}
+
+    # Sequential chain: entity[0] → entity[1] → entity[2] → ...
+    interactions = []
+    for i in range(len(entities) - 1):
+        interactions.append({
+            "from": entities[i].entity_id,
+            "to": entities[i + 1].entity_id
+        })
+
+    return {"interactions": interactions}
 
 
 class FullE2EWorkflowRunner:
@@ -93,9 +121,13 @@ class FullE2EWorkflowRunner:
                     scene_result, config, run_id
                 )
 
-                # Step 4: Train entities (progressive elevation)
+                # Step 3.5: Compute ANDOS training layers
+                entities = scene_result["entities"]
+                andos_layers = self._compute_andos_layers(entities, run_id)
+
+                # Step 4: Train entities layer-by-layer (ANDOS-aware)
                 trained_entities = self._train_entities(
-                    scene_result, all_timepoints, run_id
+                    scene_result, all_timepoints, andos_layers, run_id
                 )
 
                 # Step 4.5: Synthesize dialogs (M11)
@@ -217,6 +249,55 @@ class FullE2EWorkflowRunner:
 
             return result
 
+    def _compute_andos_layers(
+        self, entities: List[Entity], run_id: str
+    ) -> List[List[Entity]]:
+        """Step 3.5: Compute ANDOS training layers via reverse topological ordering"""
+        with self.logfire.span("step:andos_computation"):
+            print("\nStep 3.5: Computing ANDOS training layers...")
+
+            if len(entities) < 2:
+                print("  ⚠️  Less than 2 entities - single layer")
+                return [entities]
+
+            # Infer interaction graph (templates don't have explicit graphs yet)
+            interaction_graph = _infer_interaction_graph(entities)
+            target_entity_id = entities[0].entity_id if entities else None
+
+            if not target_entity_id:
+                print("  ⚠️  No entities - empty layers")
+                return [[]]
+
+            try:
+                # Compute ANDOS layers
+                print(f"  Computing layers for {len(entities)} entities...")
+                layers = compute_andos_layers(entities, target_entity_id, interaction_graph)
+
+                print(f"  ✓ ANDOS computed {len(layers)} layers:")
+                for idx, layer in enumerate(layers):
+                    layer_ids = [e.entity_id for e in layer]
+                    print(f"    Layer {idx} ({len(layer)} entities): {layer_ids}")
+
+                # Validate layers
+                valid, violations = validate_andos_layers(layers, interaction_graph)
+                if not valid:
+                    print(f"  ⚠️  ANDOS validation failed:")
+                    for v in violations[:3]:
+                        print(f"    - {v}")
+
+                self.logfire.info(
+                    "ANDOS layers computed",
+                    num_layers=len(layers),
+                    total_entities=len(entities)
+                )
+
+                return layers
+
+            except Exception as e:
+                print(f"  ⚠️  ANDOS computation failed: {e}")
+                print("  Falling back to single-layer training")
+                return [entities]  # Fallback: all entities in one layer
+
     def _generate_all_timepoints(
         self, scene_result: Dict, config: SimulationConfig, run_id: str
     ) -> List[Timepoint]:
@@ -276,13 +357,13 @@ class FullE2EWorkflowRunner:
             return all_timepoints
 
     def _train_entities(
-        self, scene_result: Dict, timepoints: List[Timepoint], run_id: str
+        self, scene_result: Dict, timepoints: List[Timepoint], andos_layers: List[List[Entity]], run_id: str
     ) -> List[Entity]:
-        """Step 4: Train entities with progressive resolution elevation using full LangGraph workflow"""
+        """Step 4: Train entities layer-by-layer using ANDOS ordering"""
         with self.logfire.span("step:entity_training"):
-            print("\nStep 4: Training entities with full workflow...")
+            print(f"\nStep 4: Training entities layer-by-layer (ANDOS)...")
+            print(f"  {len(andos_layers)} layers, {len(timepoints)} timepoints")
 
-            entities = scene_result["entities"]
             llm = scene_result["llm_client"]
             store = scene_result["store"]
             graph = scene_result.get("graph")
@@ -290,63 +371,102 @@ class FullE2EWorkflowRunner:
             # Create the full entity training workflow
             workflow = create_entity_training_workflow(llm, store)
 
-            # Prepare workflow state for each timepoint
-            trained_entities = []
+            # Train layer-by-layer and update layers in place
+            for layer_idx in range(len(andos_layers)):
+                layer_entities = andos_layers[layer_idx]
 
-            for timepoint in timepoints:
-                print(f"  Processing timepoint: {timepoint.timepoint_id}")
+                print(f"\n  🔷 ANDOS Layer {layer_idx}/{len(andos_layers)-1}: Training {len(layer_entities)} entities")
+                layer_ids = [e.entity_id for e in layer_entities]
+                print(f"     Entities: {layer_ids}")
 
-                # Build workflow state
-                workflow_state = {
-                    "graph": graph if graph else store.load_graph(timepoint.timepoint_id),
-                    "entities": entities,
-                    "timepoint": timepoint.timepoint_id,
-                    "timepoint_obj": timepoint,  # Pass full timepoint for knowledge enrichment
-                    "resolution": ResolutionLevel.SCENE,  # Default resolution
-                    "violations": [],
-                    "results": {},
-                    "entity_populations": {}
-                }
+                # Train each entity in this layer across all timepoints
+                for timepoint in timepoints:
+                    # Build workflow state for entities in this layer
+                    workflow_state = {
+                        "graph": graph if graph else store.load_graph(timepoint.timepoint_id),
+                        "entities": layer_entities,  # Only train current layer
+                        "timepoint": timepoint.timepoint_id,
+                        "timepoint_obj": timepoint,
+                        "resolution": ResolutionLevel.SCENE,
+                        "violations": [],
+                        "results": {},
+                        "entity_populations": {}
+                    }
 
-                try:
-                    # Run the full workflow (includes validation, compression, progressive training)
-                    # This invokes M2, M4, M6, M14 mechanisms
-                    result_state = workflow.invoke(workflow_state)
+                    try:
+                        # Run workflow for this layer
+                        result_state = workflow.invoke(workflow_state)
 
-                    # Extract trained entities from result
-                    if "entities" in result_state:
-                        entities = result_state["entities"]
+                        # Extract trained entities from result and UPDATE the layer
+                        if "entities" in result_state:
+                            layer_entities = result_state["entities"]
+                            andos_layers[layer_idx] = layer_entities  # Update layer in place!
 
-                    # Report violations if any
-                    violations = result_state.get("violations", [])
-                    if violations:
-                        print(f"  ⚠️  Found {len(violations)} validation violations")
-                        for v in violations[:3]:  # Show first 3
-                            print(f"    - {v.get('severity', 'UNKNOWN')}: {v.get('message', 'No message')}")
+                        # Report violations if any
+                        violations = result_state.get("violations", [])
+                        if violations and layer_idx == 0:  # Only show for first layer to reduce noise
+                            print(f"     ⚠️  Found {len(violations)} validation violations")
 
-                except Exception as e:
-                    print(f"  ⚠️  Workflow execution error: {e}")
-                    # Continue with entities as-is
+                    except Exception as e:
+                        print(f"     ⚠️  Training error: {e}")
 
-            # Record all entity resolutions
-            for entity in entities:
-                self.metadata_manager.record_resolution(
-                    run_id,
-                    entity.entity_id,
-                    entity.resolution_level,
-                    timepoints[0].timepoint_id
-                )
-                trained_entities.append(entity)
+                # Mark layer as complete and record metadata
+                for entity in andos_layers[layer_idx]:
+                    entity.entity_metadata["andos_layer"] = layer_idx
+                    self.metadata_manager.record_resolution(
+                        run_id,
+                        entity.entity_id,
+                        entity.resolution_level,
+                        timepoints[0].timepoint_id if timepoints else "unknown"
+                    )
 
-            print(f"✓ Trained {len(trained_entities)} entities through full workflow")
+                print(f"     ✓ Layer {layer_idx} complete")
+
+            # Flatten updated layers and deduplicate by entity_id (keep last version)
+            entity_map = {}
+            for layer in andos_layers:
+                for entity in layer:
+                    entity_map[entity.entity_id] = entity  # Last version wins
+
+            all_entities = list(entity_map.values())
+
+            # PART 3 FIX: Post-training validation - ensure all human entities have physical_tensor
+            from schemas import PhysicalTensor
+            entities_fixed = 0
+            for entity in all_entities:
+                if entity.entity_type == "human":
+                    # Check if physical_tensor exists and is valid
+                    physical_data = entity.entity_metadata.get("physical_tensor", {})
+                    if not physical_data or 'age' not in physical_data:
+                        # Recreate physical_tensor from defaults
+                        physical = PhysicalTensor(
+                            age=35.0,
+                            health_status=1.0,
+                            pain_level=0.0,
+                            pain_location=None,
+                            fever=36.5,
+                            mobility=1.0,
+                            stamina=1.0,
+                            sensory_acuity={"vision": 1.0, "hearing": 1.0},
+                            location=None
+                        )
+                        entity.entity_metadata["physical_tensor"] = physical.model_dump()
+                        entities_fixed += 1
+                        print(f"     ⚠️  Regenerated physical_tensor for {entity.entity_id}")
+
+            if entities_fixed > 0:
+                print(f"  ✓ Validated and fixed {entities_fixed} entities")
+
+            print(f"\n✓ Trained {len(all_entities)} unique entities across {len(andos_layers)} layers")
 
             self.logfire.info(
-                "Entity training complete with workflow",
-                entities=len(trained_entities),
+                "ANDOS layer-by-layer training complete",
+                entities=len(all_entities),
+                layers=len(andos_layers),
                 timepoints_processed=len(timepoints)
             )
 
-            return trained_entities
+            return all_entities
 
     def _synthesize_dialogs(
         self,
@@ -355,22 +475,21 @@ class FullE2EWorkflowRunner:
         scene_result: Dict,
         run_id: str
     ) -> None:
-        """Step 4.5: Synthesize dialogs between entities (M11)"""
+        """Step 4.5: Synthesize dialogs (M11) - entities already trained via ANDOS"""
         with self.logfire.span("step:dialog_synthesis"):
             print("\nStep 4.5: Synthesizing dialogs...")
+
+            if len(entities) < 2:
+                print("  ⚠️  Less than 2 entities - skipping dialog synthesis")
+                return
 
             llm = scene_result["llm_client"]
             store = scene_result["store"]
 
-            # Synthesize dialogs for each timepoint with 2+ entities
+            # Synthesize dialogs for each timepoint
             dialogs_created = 0
 
             for timepoint in timepoints:
-                # Get entities present at this timepoint
-                if len(entities) < 2:
-                    print(f"  ⚠️  Skipping {timepoint.timepoint_id} - need at least 2 entities for dialog")
-                    continue
-
                 try:
                     # Select a subset of entities for dialog (2-4 entities)
                     import random
@@ -379,10 +498,11 @@ class FullE2EWorkflowRunner:
 
                     print(f"  Generating dialog for {timepoint.timepoint_id} with {num_participants} entities...")
 
-                    # Build timeline context (simplified)
-                    timeline = [{"event_description": tp.event_description, "timestamp": tp.timestamp} for tp in timepoints]
+                    # Build timeline context (simplified) - convert timestamps to ISO strings for JSON serialization
+                    timeline = [{"event_description": tp.event_description, "timestamp": tp.timestamp.isoformat() if hasattr(tp.timestamp, 'isoformat') else str(tp.timestamp)} for tp in timepoints]
 
                     # Synthesize dialog (this invokes M11)
+                    # Entities should now have tensors from ANDOS layer-by-layer training
                     dialog = synthesize_dialog(
                         dialog_participants,
                         timepoint,

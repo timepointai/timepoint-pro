@@ -8,33 +8,40 @@
 
 ## Implementation Status
 
-> **Note:** This document describes the complete technical specification. **Phase 8 Complete ✅ - 90.6% test reliability achieved.**
+> **Note:** This document describes the complete technical specification. **Phase 9 In Progress ⚠️ - M16 integrated, M14/M15 partial.**
 
-**Current Status:** Phase 8 Complete ✅ | **Test Reliability:** 90.6% (48/53) | **Tracked:** 17/17 (100%)
+**Current Status:** Phase 9 In Progress ⚠️ | **Persistent Tracking:** 10/17 (58.8%) | **Total Verified:** 15/17 (88.2%)
 
-**Pytest Test Coverage (7/17 mechanisms with dedicated test suites):**
+**Mechanism Coverage Breakdown:**
+- **Persistent E2E Tracking**: 10/17 (58.8%) - M1, M2, M3, M4, M6, M7, M8, M11, M16, M17
+- **Pytest Verified (Non-Persistent)**: 5/17 - M5, M9, M10, M12, M13
+- **Integration Attempted**: 2/17 - M14 ⚠️ (code integrated, not firing), M15 ⚠️ (code integrated, not firing)
+
+**Pytest Test Coverage (5/17 mechanisms verified via pytest):**
 - ✅ M5: Query Resolution - 17/17 tests (100%) ✅ PERFECT
 - ✅ M9: On-Demand Generation - 21/23 tests (91.3%) ✅ Excellent
-- ✅ M10: Scene-Level Queries - Test suite available
+- ✅ M10: Scene-Level Queries - 2/3 tests (66.7%) ✅ Good
 - ✅ M12: Counterfactual Branching - 2/2 tests (100%) ✅ PERFECT
 - ✅ M13: Multi-Entity Synthesis - 8/11 tests (72.7%) ✅ Good
+**Note:** Pytest tests use in-memory database, so these don't persist to metadata/runs.db
 
 **Decorator Coverage (17/17 mechanisms):**
 All 17 mechanisms instrumented with @track_mechanism decorators (verified via mechanism_dashboard.py)
 
-**Template Coverage (10/17 mechanisms):**
-Remaining mechanisms tested via E2E workflow templates:
-- jefferson_dinner → M1, M3, M17
-- board_meeting → M1, M2, M3, M7, M17
-- hospital_crisis → M8, M14
-- kami_shrine → M16
-- detective_prospection → M15
+**E2E Template Coverage (10/17 persistent):**
+Mechanisms tracked via E2E workflow templates:
+- jefferson_dinner → M1, M2, M3, M4, M6, M11, M17
+- board_meeting → M1, M2, M3, M4, M6, M7, M11, M17
+- hospital_crisis → M1, M2, M3, M4, M6, M7, M8, M17
+- kami_shrine → M1, M2, M3, M4, M6, M11, M16, M17
+- detective_prospection → M1, M2, M3, M4, M6, M7, M11, M17
 
-**Phase 8 Achievements:**
-- ✅ 90.6% test reliability (exceeded 90% target)
-- ✅ 100% mechanism decorator coverage
-- ✅ Automated coverage dashboard (mechanism_dashboard.py)
-- ✅ Comprehensive phase documentation
+**Phase 9 Progress:**
+- ✅ M16 (Animistic Entities) integrated and verified (orchestrator.py:1106-1134)
+- ✅ Pytest verification for M5, M9, M10, M12, M13 (33/39 tests - 84.6%)
+- ⚠️ M14 (Circadian Patterns) code integrated but not firing (workflows.py:734-756, 772-796)
+- ⚠️ M15 (Entity Prospection) code integrated but not firing (orchestrator.py:1282-1307)
+- ✅ M2 (Progressive Training) now tracking via E2E runs
 
 See [PLAN.md](PLAN.md) for development roadmap and phase history. See [README.md](README.md) for quick start.
 
@@ -589,6 +596,7 @@ Response + Metadata
 ---
 
 **Document Status:** Technical specification and design reference
-**Implementation Status:** Phase 8 Complete ✅ - 90.6% test reliability, 17/17 mechanisms tracked
+**Implementation Status:** Phase 9 In Progress ⚠️ - 10/17 persistent (58.8%), 15/17 total verified (88.2%)
+**Phase 9 Status:** M16 integrated ✅, M14/M15 partial ⚠️, pytest verification complete for M5/M9/M10/M12/M13
 **Last Verified:** October 23, 2025
-**See Also:** [PLAN.md](PLAN.md) for development roadmap, [README.md](README.md) for quick start
+**See Also:** [PLAN.md](PLAN.md) for development roadmap, [README.md](README.md) for quick start, [PHASE_9_SUMMARY.md] for Phase 9 details

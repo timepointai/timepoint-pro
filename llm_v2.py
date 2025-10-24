@@ -902,9 +902,41 @@ Return a JSON object with:
 
         system_prompt = "You are an expert at generating realistic historical dialogs."
 
+        # Add explicit schema instructions to the user prompt to ensure correct field names
+        enhanced_prompt = f"""{prompt}
+
+CRITICAL SCHEMA REQUIREMENTS:
+1. Dialog turns MUST use "content" field, NOT "text" or "utterance"
+2. Each turn needs "timestamp" field (ISO format datetime string)
+3. total_duration must be an INTEGER (seconds, not a string like "45 minutes")
+4. relationship_impacts must map entity pairs to FLOAT deltas (e.g. {{"alice-bob": 0.1}})
+5. atmosphere_evolution must be array of objects with:
+   - "timestamp": NUMBER (seconds from dialog start, e.g. 0.0, 30.5, 120.0 - NOT a datetime string!)
+   - "atmosphere": NUMBER (0.0-1.0 representing atmosphere intensity)
+
+Example correct turn:
+{{
+  "speaker": "alice",
+  "content": "What do you think?",
+  "timestamp": "2023-03-15T13:00:00",
+  "emotional_tone": "curious",
+  "knowledge_references": [],
+  "confidence": 1.0,
+  "physical_state_influence": null
+}}
+
+Example correct atmosphere_evolution:
+[
+  {{"timestamp": 0.0, "atmosphere": 0.5}},
+  {{"timestamp": 60.0, "atmosphere": 0.7}},
+  {{"timestamp": 180.0, "atmosphere": 0.6}}
+]
+
+Follow the DialogData schema EXACTLY."""
+
         result = self.service.structured_call(
             system=system_prompt,
-            user=prompt,
+            user=enhanced_prompt,
             schema=DialogData,
             temperature=0.7,
             max_tokens=max_tokens,

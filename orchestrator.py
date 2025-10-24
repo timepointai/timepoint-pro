@@ -1103,6 +1103,36 @@ class OrchestratorAgent:
         print("\n🎯 Step 4: Assigning resolution levels...")
         resolution_assignments, cost_estimate = self.resolution_assigner.assign_resolutions(spec, graph)
 
+        # Step 4.5: Generate animistic entities if configured (M16)
+        entity_metadata_config = context.get("entity_metadata", {})
+        animistic_config = entity_metadata_config.get("animistic_entities", {})
+        if animistic_config:
+            print("\n🌟 Step 4.5: Generating animistic entities...")
+            from workflows import generate_animistic_entities_for_scene
+
+            # Generate animistic entities using the mechanism function
+            try:
+                animistic_entities = generate_animistic_entities_for_scene(
+                    scene_context=spec,
+                    config={"animism": animistic_config}
+                )
+
+                # Convert Entity objects back to EntityRosterItem for merging into spec
+                for anim_entity in animistic_entities:
+                    roster_item = EntityRosterItem(
+                        entity_id=anim_entity.entity_id,
+                        entity_type=anim_entity.entity_type,
+                        role="environment",  # Animistic entities are environmental forces
+                        description=anim_entity.entity_metadata.get("description", f"Animistic {anim_entity.entity_type}"),
+                        initial_knowledge=[],
+                        relationships={}
+                    )
+                    spec.entities.append(roster_item)
+
+                print(f"   ✓ Generated {len(animistic_entities)} animistic entities")
+            except Exception as e:
+                print(f"   ⚠️  Animistic entity generation failed: {e}")
+
         # Step 5: Create Entity objects
         print("\n👥 Step 5: Creating entity objects...")
         entities = self._create_entities(spec, resolution_assignments, exposure_events, context)
@@ -1201,18 +1231,25 @@ class OrchestratorAgent:
                 "orchestrated": True
             }
 
-            # M8: Initialize physical_tensor if embodied_constraints exist (fuzzy match)
-            embodied_dict = entity_metadata_config.get("embodied_constraints", {})
-            embodied = self._fuzzy_match_entity(entity_item.entity_id, embodied_dict) or {}
-            if embodied:
+            # M8: Initialize physical_tensor (ALWAYS for humans, optionally from embodied_constraints)
+            if entity_item.entity_type == "human":
+                # Check for custom embodied_constraints (fuzzy match)
+                embodied_dict = entity_metadata_config.get("embodied_constraints", {})
+                embodied = self._fuzzy_match_entity(entity_item.entity_id, embodied_dict) or {}
+
+                # Create physical tensor with defaults or custom values
                 physical = PhysicalTensor(
-                    age=embodied.get("age", 30),
+                    age=embodied.get("age", 35.0),  # Default adult age
+                    health_status=embodied.get("health_status", 1.0),
                     pain_level=embodied.get("pain_level", 0.0),
-                    fever=embodied.get("fever", 0.0),
-                    fatigue=embodied.get("fatigue", 0.0),
-                    fitness=embodied.get("fitness", 0.5)
+                    pain_location=embodied.get("pain_location", None),
+                    fever=embodied.get("fever", 36.5),
+                    mobility=embodied.get("mobility", 1.0),
+                    stamina=embodied.get("stamina", 1.0),
+                    sensory_acuity=embodied.get("sensory_acuity", {"vision": 1.0, "hearing": 1.0}),
+                    location=embodied.get("location", None)
                 )
-                metadata["physical_tensor"] = physical.dict()
+                metadata["physical_tensor"] = physical.model_dump()
 
             # M14: Initialize circadian attributes if circadian_config exists
             circadian = entity_metadata_config.get("circadian_config", {})
@@ -1221,10 +1258,19 @@ class OrchestratorAgent:
 
             # M15: Initialize prospection attributes
             prospection = entity_metadata_config.get("prospection_config", {})
-            if entity_item.entity_id == prospection.get("modeling_entity"):
+            modeling_entity = prospection.get("modeling_entity")
+
+            # Debug logging for M15
+            if prospection and entity_item.entity_id in ["sherlock_holmes", "holmes", "detective", "moriarty"]:
+                print(f"   [M15 DEBUG] Entity: {entity_item.entity_id}")
+                print(f"   [M15 DEBUG] modeling_entity from config: {modeling_entity}")
+                print(f"   [M15 DEBUG] Match: {entity_item.entity_id == modeling_entity}")
+
+            if entity_item.entity_id == modeling_entity:
                 metadata["prospection_ability"] = prospection.get("prospection_ability", 0.0)
                 metadata["theory_of_mind"] = prospection.get("theory_of_mind", 0.0)
                 metadata["target_entity"] = prospection.get("target_entity")
+                print(f"   ✓ Set prospection_ability={metadata['prospection_ability']} for {entity_item.entity_id}")
 
             # M16: Initialize animistic consciousness (fuzzy match)
             animistic_dict = entity_metadata_config.get("animistic_entities", {})
@@ -1248,6 +1294,44 @@ class OrchestratorAgent:
             tensor_json = generate_ttm_tensor(entity)
             if tensor_json:
                 entity.tensor = tensor_json
+
+            # M15: Generate prospective state if entity has prospection ability
+            prospection_ability = metadata.get("prospection_ability", 0.0)
+
+            # Debug logging for prospection generation attempt
+            if entity.entity_id in ["sherlock_holmes", "holmes", "detective", "moriarty"]:
+                print(f"   [M15 DEBUG] Checking prospection generation for {entity.entity_id}")
+                print(f"   [M15 DEBUG] prospection_ability: {prospection_ability}")
+                print(f"   [M15 DEBUG] first_tp: {first_tp.timepoint_id if first_tp else None}")
+                print(f"   [M15 DEBUG] Will generate: {prospection_ability > 0.0 and first_tp}")
+
+            if prospection_ability > 0.0 and first_tp:
+                from workflows import generate_prospective_state
+                print(f"   🔮 [M15] Generating prospective state for {entity.entity_id}")
+                try:
+                    # Create Timepoint object for prospection generation
+                    first_timepoint = Timepoint(
+                        timepoint_id=first_tp.timepoint_id,
+                        timestamp=parse_iso_datetime(first_tp.timestamp),
+                        event_description=first_tp.event_description,
+                        entities_present=first_tp.entities_present
+                    )
+
+                    # Generate prospective state
+                    prospective_state = generate_prospective_state(
+                        entity,
+                        first_timepoint,
+                        self.llm,
+                        self.store
+                    )
+
+                    # Store in entity metadata
+                    entity.entity_metadata["prospective_state"] = prospective_state.model_dump()
+                    print(f"   ✓ Generated prospective state for {entity.entity_id}")
+                except Exception as e:
+                    print(f"   ⚠️  Prospection generation failed for {entity.entity_id}: {e}")
+                    import traceback
+                    traceback.print_exc()
 
             entities.append(entity)
 
