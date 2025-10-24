@@ -14,14 +14,16 @@ Timepoint-Daedalus enables you to:
 - **Export results** - Reports in Markdown, JSON, CSV with compression
 - **Optimize costs** - 95% reduction via adaptive fidelity (tensor compression)
 
-**Status**: Active Development - Phase 8 Complete ✅
-- **Test Reliability**: 90.6% (48/53 tests passing)
-- **Mechanism Coverage**: 17/17 mechanisms with tracking decorators (100%)
-- **Pytest Coverage**: 7/17 mechanisms with dedicated test suites (M5, M9, M10, M12, M13)
+**Status**: Active Development - Phase 9 In Progress ⚠️
+- **Mechanism Coverage**:
+  - Persistent E2E Tracking: 10/17 (58.8%)
+  - Pytest Verified: +5 mechanisms (88.2% total verified)
+  - M16 integrated ✅ | M14/M15 partial ⚠️
+- **Test Reliability**: 89.3% pytest (50/56 tests passing)
 - Real LLM integration required (requires `OPENROUTER_API_KEY`)
 - Complete pipeline: Natural Language → Simulation → Query → Report → Export
-- **Current Phase**: Phase 8 complete - tracking infrastructure established
-- **See**: [PLAN.md](PLAN.md) for development roadmap and next steps
+- **Current Phase**: Phase 9 in progress - M14/M15/M16 integration (M16 ✅, M14/M15 ⚠️)
+- **See**: [PLAN.md](PLAN.md) for roadmap | [PHASE_9_SUMMARY.md](PHASE_9_SUMMARY.md) for Phase 9 details
 
 ---
 
@@ -232,21 +234,24 @@ pytest -v
 
 ### Test Coverage
 
-**Phase 8 Test Results**:
+**Phase 9 Results**:
 
 | Mechanism | Test Suite | Status |
 |-----------|------------|--------|
 | **M5** | Query Resolution | 17/17 (100%) ✅ PERFECT |
 | **M9** | On-Demand Generation | 21/23 (91.3%) ✅ Excellent |
+| **M10** | Scene-Level Queries | 2/3 (66.7%) ✅ Good |
 | **M12** | Counterfactual Branching | 2/2 (100%) ✅ PERFECT |
 | **M13** | Multi-Entity Synthesis | 8/11 (72.7%) ✅ Good |
 
-**Overall Test Reliability**: 48/53 (90.6%) ✅
+**Overall Pytest Reliability**: 50/56 (89.3%) ✅
 
 **Mechanism Coverage**:
-- **Decorator Coverage**: 17/17 (100%) - all mechanisms instrumented with @track_mechanism
-- **Pytest Coverage**: 7/17 (41%) - M5, M9, M10, M12, M13 have dedicated test suites
-- **Template Coverage**: 10/17 mechanisms tested via E2E workflow templates
+- **Persistent E2E Tracking**: 10/17 (58.8%) - M1, M2, M3, M4, M6, M7, M8, M11, M16, M17
+- **Pytest Verified (Non-Persistent)**: 5/17 - M5, M9, M10, M12, M13
+- **Total Verified**: 15/17 (88.2%)
+- **Integration Attempted**: M14, M15 (code integrated but not firing)
+- **Decorator Coverage**: 17/17 (100%) - all mechanisms instrumented
 
 **Test Markers**:
 - `@pytest.mark.integration` - Multi-component tests
@@ -293,6 +298,8 @@ python run_vertical_finetune.py
 ### Phase Reports (Detailed History)
 - **MECHANISM_COVERAGE_STRATEGY.md** - Phase 6 and Phase 7.5 bug fixes and test improvements
 - **PHASE_8_SUMMARY.md** - Phase 8 tracking infrastructure and mechanism health
+- **PHASE_9_SUMMARY.md** - Phase 9 M14/M15/M16 integration attempts and pytest verification
+- **MECHANISM_COVERAGE_PHASE9.md** - Post-Phase 9 mechanism coverage snapshot (15/17 verified)
 
 ---
 
@@ -379,4 +386,4 @@ For questions or issues, please open a GitHub issue.
 
 ---
 
-**Phase 8 Complete** ✅ | **90.6% Test Reliability** | **17/17 Mechanisms Tracked** | See **PLAN.md** for roadmap
+**Phase 9 In Progress** ⚠️ | **89.3% Pytest Reliability** | **15/17 Verified** (10/17 Persistent) | See **PHASE_9_SUMMARY.md** for details

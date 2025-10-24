@@ -35,6 +35,7 @@ def create_entity_training_workflow(llm_client: LLMClient, store: GraphStore):
     """LangGraph workflow for parallel entity training"""
     workflow = StateGraph(WorkflowState)
 
+    @track_mechanism("M2", "progressive_training_elevation")
     def progressive_training_check(state: WorkflowState) -> WorkflowState:
         """Check for entities that need progressive training elevation (Mechanism 2.4)"""
         resolution_engine = ResolutionEngine(store, llm_client)
@@ -75,6 +76,13 @@ def create_entity_training_workflow(llm_client: LLMClient, store: GraphStore):
         existing_entities = state.get("entities", [])
         existing_entities_map = {e.entity_id: e for e in existing_entities}
 
+        # PART 1 FIX: Check if entities are orchestrated - if so, skip LLM population merge
+        if existing_entities and all(e.entity_metadata.get("orchestrated", False) for e in existing_entities):
+            print("  ✓ Skipping LLM population for orchestrated entities (preserving orchestrator metadata)")
+            state["entities"] = existing_entities
+            state["results"] = {"populations": []}
+            return state
+
         populations = state.get("entity_populations", {})
         updated_entities = []
 
@@ -83,16 +91,43 @@ def create_entity_training_workflow(llm_client: LLMClient, store: GraphStore):
             existing_entity = existing_entities_map.get(entity_id)
 
             if existing_entity:
-                # PRESERVE existing metadata, UPDATE with new LLM-generated cognitive data
-                existing_metadata = existing_entity.entity_metadata.copy()
+                # PRESERVE existing metadata, UPDATE cognitive_tensor with new LLM data
+                import copy
+                existing_metadata = copy.deepcopy(existing_entity.entity_metadata)
+
+                # PART 2 FIX: Backup physical_tensor before any updates
+                physical_tensor_backup = None
+                if "physical_tensor" in existing_metadata:
+                    physical_tensor_backup = copy.deepcopy(existing_metadata["physical_tensor"])
+
+                # Update cognitive_tensor dict (don't overwrite top-level keys)
+                if "cognitive_tensor" in existing_metadata:
+                    existing_metadata["cognitive_tensor"].update({
+                        "knowledge_state": population.knowledge_state,
+                        "energy_budget": population.energy_budget,
+                        "decision_confidence": population.confidence
+                    })
+                else:
+                    # No cognitive tensor yet - create one
+                    from schemas import CognitiveTensor
+                    cognitive = CognitiveTensor(
+                        knowledge_state=population.knowledge_state,
+                        energy_budget=population.energy_budget,
+                        decision_confidence=population.confidence
+                    )
+                    existing_metadata["cognitive_tensor"] = cognitive.model_dump()
+
+                # Update other metadata fields
                 existing_metadata.update({
-                    "knowledge_state": population.knowledge_state,
-                    "energy_budget": population.energy_budget,
                     "personality_traits": population.personality_traits,
                     "temporal_awareness": population.temporal_awareness,
-                    "confidence": population.confidence,
                     "current_timepoint": state["timepoint"]
                 })
+
+                # PART 2 FIX: Restore physical_tensor after updates
+                if physical_tensor_backup is not None:
+                    existing_metadata["physical_tensor"] = physical_tensor_backup
+
                 # Create updated entity preserving type, resolution, and ALL metadata
                 entity = Entity(
                     entity_id=entity_id,
@@ -730,6 +765,31 @@ def create_exposure_event(entity_id: str, information: str, source: str, event_t
     store.save_exposure_event(exposure)
 
 
+def _apply_circadian_energy_adjustment(base_energy: float, hour: int, store: Optional['GraphStore'] = None) -> float:
+    """Apply M14 circadian energy adjustment if configuration is available"""
+    # Try to get circadian config from store context
+    circadian_config = {}
+    if store and hasattr(store, 'context'):
+        circadian_config = store.context.get('circadian_config', {})
+
+    # If no config, return base energy unchanged
+    if not circadian_config:
+        return base_energy
+
+    # Import M14 mechanism function
+    from validation import compute_energy_cost_with_circadian
+
+    # Apply circadian adjustment to base energy (treat as "conversation" activity cost)
+    adjusted_energy = compute_energy_cost_with_circadian(
+        activity="conversation",
+        hour=hour,
+        base_cost=base_energy,
+        circadian_config=circadian_config
+    )
+
+    return adjusted_energy
+
+
 @track_mechanism("M11", "dialog_synthesis")
 def synthesize_dialog(
     entities: List[Entity],
@@ -743,13 +803,30 @@ def synthesize_dialog(
     # Build comprehensive context for each participant
     participants_context = []
     for entity in entities:
-        # Get current state (with defensive checks)
-        physical = getattr(entity, 'physical_tensor', None)
-        cognitive = getattr(entity, 'cognitive_tensor', None)
+        # Get current state from metadata (more defensive than property access)
+        physical_data = entity.entity_metadata.get("physical_tensor", {})
+        cognitive_data = entity.entity_metadata.get("cognitive_tensor", {})
+
+        # Try to construct tensors from metadata
+        physical = None
+        cognitive = None
+        if physical_data and 'age' in physical_data:
+            try:
+                from schemas import PhysicalTensor
+                physical = PhysicalTensor(**physical_data)
+            except Exception as e:
+                print(f"  ⚠️  Failed to construct physical tensor for {entity.entity_id}: {e}")
+
+        if cognitive_data:
+            try:
+                from schemas import CognitiveTensor
+                cognitive = CognitiveTensor(**cognitive_data)
+            except Exception as e:
+                print(f"  ⚠️  Failed to construct cognitive tensor for {entity.entity_id}: {e}")
 
         # If entity doesn't have tensor attributes, skip it with warning
         if physical is None or cognitive is None:
-            print(f"  ⚠️  Skipping {entity.entity_id} in dialog synthesis - missing tensor attributes")
+            print(f"  ⚠️  Skipping {entity.entity_id} in dialog synthesis - missing tensor data in metadata")
             continue
 
         # Apply body-mind coupling
@@ -789,7 +866,11 @@ def synthesize_dialog(
                 "valence": coupled_cognitive.emotional_valence,
                 "arousal": coupled_cognitive.emotional_arousal
             },
-            "energy_remaining": coupled_cognitive.energy_budget,
+            "energy_remaining": _apply_circadian_energy_adjustment(
+                base_energy=coupled_cognitive.energy_budget,
+                hour=timepoint.timestamp.hour,
+                store=store
+            ),
             "decision_confidence": coupled_cognitive.decision_confidence,
             "patience_level": coupled_cognitive.patience_threshold,
 
@@ -840,14 +921,27 @@ def synthesize_dialog(
         "social_constraints": ["historical_accuracy", "period_language"]
     }
 
-    # Construct rich prompt
+    # Construct rich prompt (with JSON serialization error handling)
+    try:
+        participants_json = json.dumps(participants_context, indent=2)
+    except TypeError as e:
+        print(f"  ⚠️  JSON serialization error in participants_context: {e}")
+        # Try with default handler for datetime
+        participants_json = json.dumps(participants_context, indent=2, default=str)
+
+    try:
+        scene_json = json.dumps(scene_context, indent=2)
+    except TypeError as e:
+        print(f"  ⚠️  JSON serialization error in scene_context: {e}")
+        scene_json = json.dumps(scene_context, indent=2, default=str)
+
     prompt = f"""Generate a realistic conversation between {len(entities)} historical figures.
 
 PARTICIPANTS:
-{json.dumps(participants_context, indent=2)}
+{participants_json}
 
 SCENE CONTEXT:
-{json.dumps(scene_context, indent=2)}
+{scene_json}
 
 CRITICAL INSTRUCTIONS:
 1. Physical state affects participation:
@@ -1269,9 +1363,9 @@ def compute_anxiety_from_expectations(expectations: List['Expectation']) -> floa
     return min(1.0, max(0.0, base_anxiety))
 
 
-def estimate_energy_cost_for_preparation(action: str) -> float:
-    """Estimate energy cost for a preparation action"""
-    # Simple cost estimation - could be made more sophisticated
+def estimate_energy_cost_for_preparation(action: str, hour: Optional[int] = None, circadian_config: Optional[Dict] = None) -> float:
+    """Estimate energy cost for a preparation action with optional M14 circadian adjustment"""
+    # Base cost estimation
     action_costs = {
         "prepare_speech": 8.0,
         "gather_information": 5.0,
@@ -1282,7 +1376,19 @@ def estimate_energy_cost_for_preparation(action: str) -> float:
         "stock_supplies": 5.0,
         "plan_escape": 6.0
     }
-    return action_costs.get(action, 5.0)  # Default cost
+    base_cost = action_costs.get(action, 5.0)  # Default cost
+
+    # Apply M14 circadian adjustment if hour and config provided
+    if hour is not None and circadian_config:
+        from validation import compute_energy_cost_with_circadian
+        return compute_energy_cost_with_circadian(
+            activity=action,
+            hour=hour,
+            base_cost=base_cost,
+            circadian_config=circadian_config
+        )
+
+    return base_cost
 
 
 @track_mechanism("M15", "entity_prospection")

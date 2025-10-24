@@ -831,14 +831,14 @@ class SimulationConfig(BaseModel):
                     "M15_entity_prospection_strategic"
                 ],
                 "prospection_config": {
-                    "modeling_entity": "holmes",
+                    "modeling_entity": "sherlock_holmes",
                     "target_entity": "moriarty",
                     "time_horizons": ["6h", "12h", "24h"],
                     "prospection_ability": 0.95,
                     "theory_of_mind": 0.9
                 },
                 "cognitive_traits": {
-                    "holmes": {"prospection_ability": 0.95, "theory_of_mind": 0.9, "pattern_recognition": 0.98},
+                    "sherlock_holmes": {"prospection_ability": 0.95, "theory_of_mind": 0.9, "pattern_recognition": 0.98},
                     "moriarty": {"strategic_planning": 0.96, "deception_skill": 0.92, "counter_modeling": 0.88}
                 }
             }
