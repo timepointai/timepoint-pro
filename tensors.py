@@ -33,12 +33,50 @@ class TensorCompressor:
 
 @TensorCompressor.register("pca")
 def pca_compress(tensor: np.ndarray, n_components: int = 8) -> np.ndarray:
+    """
+    Compress tensor using PCA with validation.
+
+    Validates:
+    - Minimum samples (n_samples >= 2 for PCA)
+    - No NaN or inf values
+    - Valid numerical data
+
+    Raises:
+        ValueError: If tensor data is invalid for PCA compression
+    """
     if len(tensor.shape) == 1:
         tensor = tensor.reshape(1, -1)
+
+    # VALIDATION 1: Check for NaN/inf values
+    if np.any(np.isnan(tensor)):
+        raise ValueError("PCA compression failed: tensor contains NaN values")
+    if np.any(np.isinf(tensor)):
+        raise ValueError("PCA compression failed: tensor contains inf values")
+
+    # VALIDATION 2: Check minimum samples for PCA
+    # PCA requires n_samples >= 2 to avoid division by zero in variance calculation
+    n_samples, n_features = tensor.shape
+    if n_samples < 2:
+        # For single sample, PCA will cause division by zero warning
+        # Return the tensor as-is (no compression possible)
+        import warnings
+        warnings.warn(
+            f"PCA compression skipped: requires at least 2 samples, got {n_samples}. "
+            "Returning uncompressed tensor.",
+            RuntimeWarning
+        )
+        return tensor.flatten()
+
     # For 1D tensors reshaped to (1, n_features), we can't compress below 1 component
-    n_components = min(n_components, tensor.shape[1], tensor.shape[0])
-    pca = PCA(n_components=max(1, n_components))  # Ensure at least 1 component
-    return pca.fit_transform(tensor).flatten()
+    n_components = min(n_components, n_features, n_samples)
+    n_components = max(1, n_components)  # Ensure at least 1 component
+
+    try:
+        pca = PCA(n_components=n_components)
+        compressed = pca.fit_transform(tensor)
+        return compressed.flatten()
+    except Exception as e:
+        raise ValueError(f"PCA compression failed: {e}")
 
 @TensorCompressor.register("svd")
 def svd_compress(tensor: np.ndarray, n_components: int = 8) -> np.ndarray:

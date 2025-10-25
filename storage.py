@@ -376,3 +376,32 @@ class GraphStore:
                 QueryHistory.resolution_elevated == True
             )
             return len(list(session.exec(statement).all()))
+
+    # ============================================================================
+    # Prospective State Storage (Mechanism 15: Entity Prospection)
+    # ============================================================================
+
+    def save_prospective_state(self, prospective_state) -> None:
+        """Save a prospective state for an entity"""
+        from schemas import ProspectiveState
+        with Session(self.engine) as session:
+            session.add(prospective_state)
+            session.commit()
+            session.refresh(prospective_state)
+            return prospective_state
+
+    def get_prospective_state(self, prospective_id: str):
+        """Get a prospective state by ID"""
+        from schemas import ProspectiveState
+        with Session(self.engine) as session:
+            statement = select(ProspectiveState).where(ProspectiveState.prospective_id == prospective_id)
+            return session.exec(statement).first()
+
+    def get_prospective_states_for_entity(self, entity_id: str):
+        """Get all prospective states for an entity"""
+        from schemas import ProspectiveState
+        with Session(self.engine) as session:
+            statement = select(ProspectiveState).where(
+                ProspectiveState.entity_id == entity_id
+            ).order_by(ProspectiveState.created_at.desc())
+            return list(session.exec(statement).all())

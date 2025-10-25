@@ -838,7 +838,11 @@ def synthesize_dialog(
 
         # If entity doesn't have tensor attributes, skip it with warning
         if physical is None or cognitive is None:
-            print(f"  ⚠️  Skipping {entity.entity_id} in dialog synthesis - missing tensor data in metadata")
+            # Check if entity has TTM tensor (prospection-only entities)
+            if hasattr(entity, 'tensor') and entity.tensor:
+                print(f"  ⚠️  Skipping {entity.entity_id} in dialog synthesis - has TTM tensor but not trained (no physical/cognitive tensors)")
+            else:
+                print(f"  ⚠️  Skipping {entity.entity_id} in dialog synthesis - missing tensor data")
             continue
 
         # Apply body-mind coupling

@@ -116,6 +116,9 @@ class FullE2EWorkflowRunner:
                 # Step 2: Generate initial scene
                 scene_result = self._generate_initial_scene(config, run_id)
 
+                # Step 2.5: Synthesize prospection for tensor initialization (NEW - MANDATORY)
+                self._synthesize_prospection(scene_result, run_id)
+
                 # Step 3: Generate all timepoints
                 all_timepoints = self._generate_all_timepoints(
                     scene_result, config, run_id
@@ -248,6 +251,119 @@ class FullE2EWorkflowRunner:
             )
 
             return result
+
+    def _synthesize_prospection(
+        self, scene_result: Dict, run_id: str
+    ) -> None:
+        """
+        Step 2.5: Synthesize prospection for ALL entities (MANDATORY).
+
+        This provides tensor initialization before ANDOS ordering.
+        Prospection is no longer optional - it's the foundation of entity training.
+
+        Architectural insight:
+        - Prospection (M15) is not just a mechanism - it's tensor initialization
+        - ProspectiveState → TTM tensor creation
+        - This feeds ANDOS with real data to order
+        - Solves circular dependency: entities need tensors before ANDOS
+        """
+        with self.logfire.span("step:prospection_synthesis"):
+            print("\nStep 2.5: Synthesizing prospection (tensor initialization)...")
+
+            entities = scene_result["entities"]
+            timepoints = scene_result["timepoints"]
+            first_timepoint = timepoints[0] if timepoints else None
+
+            if not first_timepoint:
+                print("  ⚠️  No timepoints - skipping prospection")
+                return
+
+            llm = scene_result["llm_client"]
+            store = scene_result["store"]
+
+            # Import functions
+            from workflows import generate_prospective_state
+            from tensor_initialization import (
+                initialize_tensor_from_prospection,
+                create_fallback_tensor,
+                validate_tensor_initialization
+            )
+
+            entities_initialized = 0
+            entities_failed = 0
+
+            for entity in entities:
+                try:
+                    print(f"  Generating prospection for {entity.entity_id}...")
+
+                    # Generate prospective state (M15)
+                    prospective_state = generate_prospective_state(
+                        entity, first_timepoint, llm, store
+                    )
+
+                    # Initialize tensor from prospection
+                    tensor = initialize_tensor_from_prospection(
+                        entity, prospective_state, first_timepoint
+                    )
+
+                    # Validate tensor
+                    valid, error_msg = validate_tensor_initialization(tensor)
+                    if not valid:
+                        print(f"  ⚠️  Tensor validation failed for {entity.entity_id}: {error_msg}")
+                        # Use fallback
+                        tensor = create_fallback_tensor()
+
+                    # Set entity tensor (base64-encoded JSON string, matching expected format)
+                    import base64
+                    import json
+                    entity.tensor = json.dumps({
+                        "context_vector": base64.b64encode(tensor.context_vector).decode('utf-8'),
+                        "biology_vector": base64.b64encode(tensor.biology_vector).decode('utf-8'),
+                        "behavior_vector": base64.b64encode(tensor.behavior_vector).decode('utf-8')
+                    })
+                    entity.entity_metadata["prospection_initialized"] = True
+                    entity.entity_metadata["prospective_id"] = prospective_state.prospective_id
+
+                    # Save prospective state to store
+                    try:
+                        store.save_prospective_state(prospective_state)
+                    except Exception as e:
+                        print(f"  ⚠️  Failed to save prospective state: {e}")
+                        # Non-fatal - continue
+
+                    entities_initialized += 1
+                    print(f"  ✓ {entity.entity_id}: tensor initialized from prospection")
+
+                except Exception as e:
+                    print(f"  ⚠️  Failed to initialize {entity.entity_id}: {e}")
+                    entities_failed += 1
+
+                    # Create fallback minimal tensor (ALWAYS initialize)
+                    try:
+                        from tensor_initialization import create_fallback_tensor
+                        import base64
+                        import json
+                        fallback_tensor = create_fallback_tensor()
+                        entity.tensor = json.dumps({
+                            "context_vector": base64.b64encode(fallback_tensor.context_vector).decode('utf-8'),
+                            "biology_vector": base64.b64encode(fallback_tensor.biology_vector).decode('utf-8'),
+                            "behavior_vector": base64.b64encode(fallback_tensor.behavior_vector).decode('utf-8')
+                        })
+                        entity.entity_metadata["prospection_initialized"] = False
+                        entity.entity_metadata["fallback_tensor"] = True
+                        entities_initialized += 1
+                    except Exception as fallback_err:
+                        print(f"  ❌ Fatal: Even fallback failed for {entity.entity_id}: {fallback_err}")
+
+            print(f"✓ Initialized {entities_initialized} entities with prospection tensors")
+            if entities_failed > 0:
+                print(f"  ⚠️  {entities_failed} entities used fallback tensors")
+
+            self.logfire.info(
+                "Prospection synthesis complete",
+                entities_initialized=entities_initialized,
+                entities_failed=entities_failed
+            )
 
     def _compute_andos_layers(
         self, entities: List[Entity], run_id: str
