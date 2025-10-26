@@ -22,23 +22,35 @@ class RateLimiter:
 
     Uses a sliding window to track requests and enforces rate limits
     across all instances (global tracking).
+
+    Modes:
+    - "free": Conservative limits for free tier (20 req/min, burst 5)
+    - "paid": Aggressive limits for paid tier (1000 req/min, burst 50)
     """
     # Class-level (global) tracking across all instances
     _global_lock = threading.Lock()
     _global_request_times: deque = deque()
     _global_enabled = True
+    _global_mode = "paid"  # Current mode: "free" or "paid" (DEFAULT: paid)
 
-    def __init__(self, max_requests_per_minute: int = 20, burst_size: int = 5):
+    def __init__(
+        self,
+        max_requests_per_minute: int = 1000,
+        burst_size: int = 50,
+        mode: str = "paid"
+    ):
         """
         Initialize rate limiter.
 
         Args:
-            max_requests_per_minute: Maximum requests allowed per minute (default: 20)
-            burst_size: Maximum burst size (default: 5)
+            max_requests_per_minute: Maximum requests allowed per minute
+            burst_size: Maximum burst size
+            mode: Rate limit mode ("free" or "paid")
         """
+        self.mode = mode
         self.max_requests_per_minute = max_requests_per_minute
         self.burst_size = burst_size
-        self.min_interval = 60.0 / max_requests_per_minute  # Seconds between requests
+        self.min_interval = 60.0 / max_requests_per_minute if max_requests_per_minute > 0 else 0.0
 
     def wait_if_needed(self) -> float:
         """
@@ -101,6 +113,19 @@ class RateLimiter:
         print("✓ Rate limiting ENABLED globally")
 
     @classmethod
+    def set_mode(cls, mode: str):
+        """Set global rate limiting mode"""
+        if mode not in ["free", "paid"]:
+            raise ValueError(f"Invalid mode: {mode}. Must be 'free' or 'paid'")
+        cls._global_mode = mode
+        print(f"🔄 Rate limiter mode set to: {mode.upper()}")
+
+    @classmethod
+    def get_mode(cls) -> str:
+        """Get current global mode"""
+        return cls._global_mode
+
+    @classmethod
     def reset(cls):
         """Reset global rate limit tracking"""
         with cls._global_lock:
@@ -117,6 +142,7 @@ class RateLimiter:
 
             return {
                 "enabled": cls._global_enabled,
+                "mode": cls._global_mode,
                 "total_requests": len(cls._global_request_times),
                 "requests_last_minute": recent_1min,
                 "requests_last_5sec": recent_5sec,
@@ -130,17 +156,20 @@ class OpenRouterClient:
         self,
         api_key: str,
         base_url: str = "https://openrouter.ai/api/v1",
-        max_requests_per_minute: int = 20,
-        burst_size: int = 5
+        max_requests_per_minute: int = 1000,
+        burst_size: int = 50,
+        mode: str = "paid"
     ):
         self.api_key = api_key
         self.base_url = base_url.rstrip('/')
         self.client = httpx.Client(timeout=60.0)
 
         # Initialize rate limiter
+        self.mode = mode
         self.rate_limiter = RateLimiter(
             max_requests_per_minute=max_requests_per_minute,
-            burst_size=burst_size
+            burst_size=burst_size,
+            mode=mode
         )
 
     @property
@@ -396,8 +425,9 @@ class LLMClient:
         base_url: str = "https://openrouter.ai/api/v1",
         default_model: Optional[str] = None,
         model_cache_ttl_hours: int = 24,
-        max_requests_per_minute: int = 20,
-        burst_size: int = 5
+        max_requests_per_minute: int = 1000,
+        burst_size: int = 50,
+        mode: str = "paid"
     ):
         # VALIDATION: API key is required
         if not api_key:
@@ -410,29 +440,50 @@ class LLMClient:
         self.cost = 0.0
         self.api_key = api_key
         self.base_url = base_url
+        self.mode = mode
 
         # Initialize model manager for Llama models
         self.model_manager = ModelManager(api_key, model_cache_ttl_hours)
 
-        # Set default model (prefer Llama 70B, fallback to first available Llama)
+        # Set default model based on mode
         if default_model:
             self.default_model = default_model
+        elif mode == "paid":
+            # Paid mode: Use official Meta Llama 3.1 70B (131K context, unlimited rate)
+            self.default_model = "meta-llama/llama-3.1-70b-instruct"
         else:
+            # Free mode: Use model manager's default selection
             self.default_model = self.model_manager.get_default_model()
 
-        print(f"🦙 Using LLM model: {self.default_model}")
+        # Set model for complex tasks (405B for paid, same as default for free)
+        if mode == "paid":
+            self.complex_model = "meta-llama/llama-3.1-405b-instruct"
+        else:
+            self.complex_model = self.default_model
+
+        print(f"🦙 LLM Mode: {mode.upper()}")
+        print(f"   Default model: {self.default_model}")
+        if mode == "paid":
+            print(f"   Complex tasks: {self.complex_model}")
         print(f"📋 Available Llama models: {len(self.model_manager.get_llama_models())} cached")
+
+        # Set global rate limiter mode
+        RateLimiter.set_mode(mode)
 
         # Always create real OpenRouter client with rate limiting
         self.client = OpenRouterClient(
             api_key=api_key,
             base_url=base_url,
             max_requests_per_minute=max_requests_per_minute,
-            burst_size=burst_size
+            burst_size=burst_size,
+            mode=mode
         )
 
         # Print rate limit configuration
-        print(f"⏱️  Rate limiting: {max_requests_per_minute} requests/min, burst size: {burst_size}")
+        if mode == "paid":
+            print(f"⏱️  Rate limiting: {max_requests_per_minute} requests/min (PAID - unlimited tier)")
+        else:
+            print(f"⏱️  Rate limiting: {max_requests_per_minute} requests/min, burst size: {burst_size}")
     
     def populate_entity(self, entity_schema: Dict, context: Dict, previous_knowledge: List[str] = None, model: Optional[str] = None) -> EntityPopulation:
         """Populate entity with structured output (REAL LLM only)"""
