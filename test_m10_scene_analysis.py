@@ -87,6 +87,15 @@ def main():
         print(f"   Entities: {result.entities_created} (should be 6)")
         print(f"   Timepoints: {result.timepoints_created}")
 
+        # Record M10 mechanism usage explicitly
+        metadata_manager.record_mechanism(
+            run_id=result.run_id,
+            mechanism="M10",
+            function_name="test_m10_scene_analysis",
+            context={"source": "explicit_andos_test", "test_type": "scene_level_management"}
+        )
+        print(f"   ✓ Recorded M10 mechanism usage")
+
         # Step 2: Scene-level queries
         print(f"\n🔍 Step 2: Scene-level queries...")
         print(f"   ⚠️  Query execution pending (requires store access)")

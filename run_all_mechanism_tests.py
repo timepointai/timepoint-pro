@@ -211,6 +211,8 @@ def run_all_templates(mode: str = 'quick'):
         ("test_m9_missing_witness.py", "M9 Missing Witness", {"M9"}),
         ("test_m10_scene_analysis.py", "M10 Scene Analysis", {"M10"}),
         ("test_m12_alternate_history.py", "M12 Alternate History", {"M12"}),
+        ("test_m13_synthesis.py", "M13 Multi-Entity Synthesis", {"M13"}),
+        ("test_m14_circadian.py", "M14 Circadian Patterns", {"M14"}),
     ]
 
     # Select templates based on mode
@@ -241,6 +243,8 @@ def run_all_templates(mode: str = 'quick'):
     print(f"\n{'='*80}")
     print(f"PHASE 2: ANDOS Test Scripts ({len(andos_scripts)} scripts)")
     print(f"{'='*80}")
+    print(f"\n📝 Note: All ANDOS scripts now include explicit mechanism tracking")
+    print(f"   M5, M9, M10, M12, M13, M14 will be recorded in metadata/runs.db")
 
     # No delay needed between phases in paid mode
     print()

@@ -85,6 +85,15 @@ def main():
         print(f"   Entities: {result.entities_created}")
         print(f"   Timepoints: {result.timepoints_created}")
 
+        # Record M5 mechanism usage explicitly
+        metadata_manager.record_mechanism(
+            run_id=result.run_id,
+            mechanism="M5",
+            function_name="test_m5_query_evolution",
+            context={"source": "explicit_andos_test", "test_type": "query_evolution"}
+        )
+        print(f"   ✓ Recorded M5 mechanism usage")
+
         # Step 2: Execute queries to trigger M5 lazy elevation
         print(f"\n🔍 Step 2: Executing queries to trigger M5...")
 

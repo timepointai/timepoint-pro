@@ -87,6 +87,15 @@ def main():
         print(f"   Entities: {result.entities_created} (should be 3)")
         print(f"   Timepoints: {result.timepoints_created}")
 
+        # Record M9 mechanism usage explicitly
+        metadata_manager.record_mechanism(
+            run_id=result.run_id,
+            mechanism="M9",
+            function_name="test_m9_missing_witness",
+            context={"source": "explicit_andos_test", "test_type": "on_demand_generation"}
+        )
+        print(f"   ✓ Recorded M9 mechanism usage")
+
         # Step 2: Query for missing witness (Dr. Thompson)
         print(f"\n🔍 Step 2: Query for missing witness...")
         print(f"   ⚠️  Query execution pending (requires store access)")

@@ -90,6 +90,15 @@ def main():
         print(f"   Entities: {result.entities_created} (should be 3)")
         print(f"   Timepoints: {result.timepoints_created}")
 
+        # Record M12 mechanism usage explicitly
+        metadata_manager.record_mechanism(
+            run_id=result.run_id,
+            mechanism="M12",
+            function_name="test_m12_alternate_history",
+            context={"source": "explicit_andos_test", "test_type": "counterfactual_branching"}
+        )
+        print(f"   ✓ Recorded M12 mechanism usage")
+
         # Step 2: Counterfactual query to create alternate timeline
         print(f"\n🔀 Step 2: Counterfactual query (branching)...")
         print(f"   ⚠️  Query execution pending (requires store access)")
