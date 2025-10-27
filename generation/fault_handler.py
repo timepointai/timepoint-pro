@@ -90,18 +90,34 @@ class FaultHandler:
         """Build list of error classification rules"""
         classifiers = []
 
-        # Rate limit errors - retryable
-        def classify_rate_limit(exc: Exception) -> Optional[ErrorSeverity]:
+        # OpenRouter-specific rate limit errors - retryable with longer backoff
+        def classify_openrouter_rate_limit(exc: Exception) -> Optional[ErrorSeverity]:
             exc_str = str(exc).lower()
-            if any(keyword in exc_str for keyword in ["rate limit", "quota", "429"]):
+            if any(keyword in exc_str for keyword in [
+                "rate limit", "rate_limit", "ratelimit",
+                "requests per", "too many requests",
+                "429", "quota exceeded", "quota_exceeded"
+            ]):
                 return ErrorSeverity.RETRYABLE
             return None
-        classifiers.append(classify_rate_limit)
+        classifiers.append(classify_openrouter_rate_limit)
+
+        # OpenRouter API unavailable - retryable
+        def classify_openrouter_unavailable(exc: Exception) -> Optional[ErrorSeverity]:
+            exc_str = str(exc).lower()
+            if any(keyword in exc_str for keyword in [
+                "503", "502", "504",
+                "service unavailable", "bad gateway", "gateway timeout",
+                "openrouter", "model unavailable"
+            ]):
+                return ErrorSeverity.RETRYABLE
+            return None
+        classifiers.append(classify_openrouter_unavailable)
 
         # Network/timeout errors - retryable
         def classify_network(exc: Exception) -> Optional[ErrorSeverity]:
             exc_str = str(exc).lower()
-            if any(keyword in exc_str for keyword in ["timeout", "connection", "network"]):
+            if any(keyword in exc_str for keyword in ["timeout", "connection", "network", "timed out"]):
                 return ErrorSeverity.RETRYABLE
             return None
         classifiers.append(classify_network)
@@ -109,7 +125,7 @@ class FaultHandler:
         # Authentication errors - critical (can't recover)
         def classify_auth(exc: Exception) -> Optional[ErrorSeverity]:
             exc_str = str(exc).lower()
-            if any(keyword in exc_str for keyword in ["auth", "unauthorized", "401", "403"]):
+            if any(keyword in exc_str for keyword in ["auth", "unauthorized", "401", "403", "invalid api key", "api_key"]):
                 return ErrorSeverity.CRITICAL
             return None
         classifiers.append(classify_auth)
@@ -125,7 +141,7 @@ class FaultHandler:
         # Invalid config - critical
         def classify_config(exc: Exception) -> Optional[ErrorSeverity]:
             exc_str = str(exc).lower()
-            if "config" in exc_str or "invalid" in exc_str:
+            if "config" in exc_str and ("invalid" in exc_str or "missing" in exc_str):
                 return ErrorSeverity.CRITICAL
             return None
         classifiers.append(classify_config)
@@ -151,17 +167,28 @@ class FaultHandler:
         # Default: retryable for unknown errors
         return ErrorSeverity.RETRYABLE
 
-    def calculate_backoff(self, retry_count: int) -> float:
+    def calculate_backoff(self, retry_count: int, adaptive: bool = True) -> float:
         """
-        Calculate exponential backoff delay.
+        Calculate exponential backoff delay with optional adaptive increase.
 
         Args:
             retry_count: Current retry attempt number (0-indexed)
+            adaptive: If True, increase delays if error pattern persists
 
         Returns:
             Backoff delay in seconds
         """
         delay = self.initial_backoff * (self.backoff_multiplier ** retry_count)
+
+        # Adaptive backoff: If we've had many recent errors, increase delay
+        if adaptive and len(self.error_history) >= 5:
+            recent_errors = self.error_history[-5:]
+            recent_retryable = sum(1 for e in recent_errors if e.severity == ErrorSeverity.RETRYABLE)
+            if recent_retryable >= 4:  # 4 out of last 5 were retryable
+                # Increase delay by 50% for persistent issues
+                delay *= 1.5
+                logger.info(f"Adaptive backoff: Increased delay to {delay:.1f}s due to persistent errors")
+
         return min(delay, self.max_backoff)
 
     def with_retry(

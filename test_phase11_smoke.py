@@ -11,7 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from e2e_workflows.e2e_runner import FullE2EWorkflowRunner
+from generation.resilience_orchestrator import ResilientE2EWorkflowRunner
 from generation.config_schema import SimulationConfig, EntityConfig, TimepointConfig, TemporalConfig, TemporalMode
 from metadata.run_tracker import MetadataManager
 
@@ -49,7 +49,7 @@ def test_simple_scenario():
     print("✓ Metadata manager created")
 
     # Create E2E runner
-    runner = FullE2EWorkflowRunner(manager)
+    runner = ResilientE2EWorkflowRunner(manager)
     print("✓ E2E runner created")
 
     try:

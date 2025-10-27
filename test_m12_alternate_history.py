@@ -19,7 +19,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from generation.config_schema import SimulationConfig, TemporalConfig, EntityConfig, TimepointConfig
-from e2e_workflows.e2e_runner import FullE2EWorkflowRunner
+from generation.resilience_orchestrator import ResilientE2EWorkflowRunner
 from metadata.run_tracker import MetadataManager
 from schemas import TemporalMode
 
@@ -75,7 +75,7 @@ def main():
     metadata_manager = MetadataManager(db_path="metadata/runs.db")
 
     # Create E2E runner
-    runner = FullE2EWorkflowRunner(metadata_manager)
+    runner = ResilientE2EWorkflowRunner(metadata_manager)
 
     # Create config
     config = create_alternate_history_config()

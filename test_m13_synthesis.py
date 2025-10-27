@@ -19,7 +19,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from generation.config_schema import SimulationConfig
-from e2e_workflows.e2e_runner import FullE2EWorkflowRunner
+from generation.resilience_orchestrator import ResilientE2EWorkflowRunner
 from metadata.run_tracker import MetadataManager
 
 
@@ -38,7 +38,7 @@ def main():
     metadata_manager = MetadataManager(db_path="metadata/runs.db")
 
     # Create E2E runner
-    runner = FullE2EWorkflowRunner(metadata_manager)
+    runner = ResilientE2EWorkflowRunner(metadata_manager)
 
     # Use empty_house_flashback template which explicitly demonstrates M13
     # This template has multiple entities and relationship evolution

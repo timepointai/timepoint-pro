@@ -165,7 +165,7 @@ def run_andos_script(script: str, name: str, expected_mechanisms: Set[str]) -> D
 def run_all_templates(mode: str = 'quick'):
     """Run all mechanism test templates"""
     from generation.config_schema import SimulationConfig
-    from e2e_workflows.e2e_runner import FullE2EWorkflowRunner
+    from generation.resilience_orchestrator import ResilientE2EWorkflowRunner
     from metadata.run_tracker import MetadataManager
 
     print("=" * 80)
@@ -182,7 +182,7 @@ def run_all_templates(mode: str = 'quick'):
 
     # Initialize
     metadata_manager = MetadataManager(db_path="metadata/runs.db")
-    runner = FullE2EWorkflowRunner(metadata_manager)
+    runner = ResilientE2EWorkflowRunner(metadata_manager)
 
     # Define templates
     # Quick mode: safe, fast templates

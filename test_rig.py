@@ -34,7 +34,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 
-# Prebaked template definitions - now matching FullE2EWorkflowRunner
+# Prebaked template definitions - now matching ResilientE2EWorkflowRunner
 TEMPLATES = {
     "jefferson_dinner": {
         "name": "Jefferson's Compromise Dinner",
@@ -117,7 +117,7 @@ TEMPLATES = {
 
 
 class TestRig:
-    """Simple test monitor - runs FullE2EWorkflowRunner and tracks results"""
+    """Simple test monitor - runs ResilientE2EWorkflowRunner and tracks results"""
 
     def __init__(self, workspace_dir: str = "."):
         self.workspace = Path(workspace_dir)
@@ -164,7 +164,7 @@ class TestRig:
             print(f"     Cost: {info['cost_estimate']}, Runtime: {info['runtime_estimate']}")
 
     def run_template(self, template_id: str) -> str:
-        """Run a prebaked template using FullE2EWorkflowRunner"""
+        """Run a prebaked template using ResilientE2EWorkflowRunner"""
         if template_id not in TEMPLATES:
             print(f"❌ Unknown template: {template_id}")
             print(f"Available: {', '.join(TEMPLATES.keys())}")
@@ -180,12 +180,12 @@ class TestRig:
         print(f"📋 Template: {template_id}")
         print(f"📝 Log: {log_file}")
 
-        # Write Python code using FullE2EWorkflowRunner
+        # Write Python code using ResilientE2EWorkflowRunner
         script_file = self.log_dir / f"{test_id}_{template_id}.py"
         python_code = f'''
 import os
 from generation.config_schema import SimulationConfig
-from e2e_workflows.e2e_runner import FullE2EWorkflowRunner
+from generation.resilience_orchestrator import ResilientE2EWorkflowRunner
 from metadata.run_tracker import MetadataManager
 import logging
 
@@ -195,16 +195,16 @@ logging.basicConfig(level=logging.INFO)
 config = SimulationConfig.example_{template_id}()
 
 print("\\n" + "="*80)
-print(f"RUNNING FULL E2E WORKFLOW: {{config.world_id}}")
-print(f"6-Step Pipeline: scene → temporal → training → format → oxen → metadata")
+print(f"RUNNING RESILIENT E2E WORKFLOW: {{config.world_id}}")
+print(f"6-Step Pipeline with Fault Tolerance: scene → temporal → training → format → oxen → metadata")
 print("="*80 + "\\n")
 
 try:
     # Initialize metadata manager
     metadata_manager = MetadataManager("metadata/runs.db")
 
-    # Initialize E2E runner
-    runner = FullE2EWorkflowRunner(metadata_manager)
+    # Initialize Resilient E2E runner
+    runner = ResilientE2EWorkflowRunner(metadata_manager)
 
     # Run complete workflow
     metadata = runner.run(config)

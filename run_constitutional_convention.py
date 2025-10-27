@@ -36,7 +36,7 @@ from datetime import datetime
 sys.path.insert(0, str(Path(__file__).parent))
 
 from generation.config_schema import SimulationConfig
-from e2e_workflows.e2e_runner import FullE2EWorkflowRunner
+from generation.resilience_orchestrator import ResilientE2EWorkflowRunner
 from metadata.run_tracker import MetadataManager
 
 
@@ -124,10 +124,10 @@ def main():
     print("  ✓ Metadata manager initialized")
     print()
 
-    # Create E2E runner
-    print("Step 3: Creating E2E workflow runner...")
-    runner = FullE2EWorkflowRunner(metadata_manager)
-    print("  ✓ E2E runner created")
+    # Create Resilient E2E runner (with fault tolerance)
+    print("Step 3: Creating resilient E2E workflow runner...")
+    runner = ResilientE2EWorkflowRunner(metadata_manager)
+    print("  ✓ Resilient E2E runner created (fault tolerance enabled)")
     print()
 
     # Load Constitutional Convention config

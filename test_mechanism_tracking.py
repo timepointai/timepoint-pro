@@ -4,7 +4,7 @@ Test mechanism tracking by running one template.
 """
 import sys
 from generation.config_schema import SimulationConfig
-from e2e_workflows.e2e_runner import FullE2EWorkflowRunner
+from generation.resilience_orchestrator import ResilientE2EWorkflowRunner
 from metadata.run_tracker import MetadataManager
 from metadata.coverage_matrix import CoverageMatrix
 
@@ -12,7 +12,7 @@ from metadata.coverage_matrix import CoverageMatrix
 metadata_manager = MetadataManager()
 
 # Initialize E2E runner
-runner = FullE2EWorkflowRunner(metadata_manager)
+runner = ResilientE2EWorkflowRunner(metadata_manager)
 
 # Run jefferson_dinner template
 print("=" * 80)

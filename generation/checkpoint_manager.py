@@ -11,6 +11,9 @@ from datetime import datetime
 import json
 import hashlib
 import logging
+import fcntl
+import tempfile
+import os
 
 
 logger = logging.getLogger(__name__)
@@ -136,7 +139,10 @@ class CheckpointManager:
         state: Dict[str, Any]
     ):
         """
-        Save checkpoint state to disk.
+        Save checkpoint state to disk with atomic writes and locking.
+
+        Uses temporary file + rename for atomicity.
+        Uses file locking to prevent concurrent writes.
 
         Args:
             job_id: Job identifier
@@ -157,18 +163,67 @@ class CheckpointManager:
             "metadata": metadata["metadata"]
         }
 
-        # Save checkpoint
+        # ATOMIC WRITE: Write to temp file, then rename
         checkpoint_path = self._get_checkpoint_path(job_id, checkpoint_index)
-        with open(checkpoint_path, 'w') as f:
-            json.dump(checkpoint_data, f, indent=2)
 
-        # Update metadata
+        # Create temp file in same directory for atomic rename
+        temp_fd, temp_path = tempfile.mkstemp(
+            dir=checkpoint_path.parent,
+            prefix=f".{checkpoint_path.name}.",
+            suffix=".tmp"
+        )
+
+        try:
+            # Write to temp file with exclusive lock
+            with os.fdopen(temp_fd, 'w') as f:
+                fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+                try:
+                    json.dump(checkpoint_data, f, indent=2)
+                    f.flush()
+                    os.fsync(f.fileno())  # Force write to disk
+                finally:
+                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+
+            # Atomic rename (POSIX guarantees atomicity)
+            os.rename(temp_path, checkpoint_path)
+
+        except Exception as e:
+            # Cleanup temp file on error
+            try:
+                os.unlink(temp_path)
+            except:
+                pass
+            raise RuntimeError(f"Failed to save checkpoint: {e}") from e
+
+        # Update metadata (also atomic)
         metadata["checkpoint_count"] += 1
         metadata["last_checkpoint_at"] = checkpoint_data["saved_at"]
 
-        # Save updated metadata
-        with open(self._get_metadata_path(job_id), 'w') as f:
-            json.dump(metadata, f, indent=2)
+        metadata_path = self._get_metadata_path(job_id)
+        temp_metadata_fd, temp_metadata_path = tempfile.mkstemp(
+            dir=metadata_path.parent,
+            prefix=f".{metadata_path.name}.",
+            suffix=".tmp"
+        )
+
+        try:
+            with os.fdopen(temp_metadata_fd, 'w') as f:
+                fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+                try:
+                    json.dump(metadata, f, indent=2)
+                    f.flush()
+                    os.fsync(f.fileno())
+                finally:
+                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+
+            os.rename(temp_metadata_path, metadata_path)
+
+        except Exception as e:
+            try:
+                os.unlink(temp_metadata_path)
+            except:
+                pass
+            logger.warning(f"Failed to update metadata: {e}")
 
         # Cleanup old checkpoints
         self._cleanup_old_checkpoints(job_id)

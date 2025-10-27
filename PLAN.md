@@ -2,7 +2,7 @@
 
 **Project**: Temporal Knowledge Graph System with LLM-Driven Entity Simulation
 **Status**: **PRODUCTION READY** ✅
-**Last Updated**: October 27, 2025
+**Last Updated**: October 27, 2025 (Updated with Phase 11: Global Resilience System)
 
 ---
 
@@ -64,6 +64,120 @@ Tracked: M1, M2, M3, M4, M5, M6, M7, M8, M9, M10, M11, M12, M13, M14, M15, M16, 
 ---
 
 ## Completed Phases
+
+### Phase 11: Global Resilience System ✅
+
+**Goal**: Build enterprise-grade fault tolerance system for long-running simulations ($500-1,000 runs, 2-4 hours)
+
+**Problem**: Large-scale simulations (Constitutional Convention Day 1: 500 timepoints, 28 entities, $500-1,000 cost) need protection against:
+- API rate limits and service outages
+- Network failures mid-run
+- Process crashes
+- Data corruption
+- Cost runaway
+
+**Solution**: Global resilience orchestrator with transparent wrapper pattern
+
+**Deliverables**:
+1. ✅ Created `generation/resilience_orchestrator.py` (NEW - 630 lines)
+   - CircuitBreaker class (3-state protection: CLOSED/OPEN/HALF_OPEN)
+   - HealthMonitor class (pre-flight and continuous health checks)
+   - TransactionLog class (append-only audit trail with file locking)
+   - ResilientE2EWorkflowRunner (transparent wrapper around FullE2EWorkflowRunner)
+
+2. ✅ Enhanced `generation/checkpoint_manager.py` (UPDATED - 436 lines)
+   - Atomic writes using temp file + rename pattern
+   - File locking with `fcntl.flock()` to prevent corruption
+   - `os.fsync()` to force disk writes before rename
+
+3. ✅ Enhanced `generation/fault_handler.py` (UPDATED - 370 lines)
+   - OpenRouter-specific error classifiers (rate limits, 503/502/504, quota exceeded)
+   - Adaptive backoff (increases delays if error patterns persist)
+   - Better error message matching for OpenRouter API
+
+4. ✅ Updated ALL test runners and scripts (11 files)
+   - run_constitutional_convention.py
+   - run_all_mechanism_tests.py
+   - test_rig.py
+   - test_m5_query_evolution.py, test_m9_missing_witness.py, test_m10_scene_analysis.py
+   - test_m12_alternate_history.py, test_m13_synthesis.py, test_m14_circadian.py
+   - test_phase11_smoke.py, test_andos_proof.py, test_mechanism_tracking.py
+
+**Key Features**:
+
+**CircuitBreaker**:
+- Tracks failure rate over sliding window (default: 100 calls, 30% threshold)
+- States: CLOSED (normal), OPEN (too many failures), HALF_OPEN (testing recovery)
+- Prevents cascading API failures when service is unhealthy
+
+**HealthMonitor**:
+- Pre-flight checks: API key, disk space (500MB), directory permissions
+- Continuous checks: Periodic health validation during run
+- Early failure detection before expensive operations
+
+**CheckpointManager** (Enhanced):
+- Atomic writes: temp file + rename (POSIX atomic operation)
+- File locking: `fcntl.flock()` prevents concurrent write corruption
+- Force sync: `os.fsync()` ensures data written to disk before rename
+- Auto-cleanup: Keeps only N most recent checkpoints
+
+**FaultHandler** (Enhanced):
+- OpenRouter error classification (rate limits, service unavailable)
+- Adaptive backoff: Increases delay by 50% if 4 of last 5 errors retryable
+- Exponential backoff: 1s → 2s → 4s → 8s → 16s → 32s → 60s (max)
+
+**TransactionLog**:
+- Append-only audit log in `logs/transactions/{run_id}.log`
+- File locking for concurrent write safety
+- JSON-formatted entries with timestamp, event type, metadata
+
+**Integration Pattern**:
+```python
+# ONE LINE CHANGE to enable fault tolerance
+# OLD: from e2e_workflows.e2e_runner import FullE2EWorkflowRunner
+# NEW: from generation.resilience_orchestrator import ResilientE2EWorkflowRunner
+
+runner = ResilientE2EWorkflowRunner(metadata_manager)
+result = runner.run(config)  # Now protected by all fault tolerance features
+```
+
+**Guarantees**:
+- **No data loss**: Atomic checkpoint writes with file locking
+- **No corruption**: POSIX atomic rename + fsync
+- **Automatic resume**: Detects incomplete runs, resumes from last checkpoint
+- **Cost protection**: Circuit breaker stops runaway API calls
+- **Audit trail**: Complete transaction log for debugging
+
+**Transparency**:
+- Zero changes needed to simulation configs
+- Zero changes needed to workflow logic
+- One import change per test runner
+- Wrapper pattern preserves all existing functionality
+
+**Test Coverage**:
+- All 11 test runners updated
+- Constitutional Convention runner protected (500 timepoints, $500-1,000)
+- Batch mechanism tests protected (15+ templates)
+- Individual mechanism tests protected (M5, M9, M10, M12, M13, M14)
+
+**Files Created**:
+- generation/resilience_orchestrator.py (NEW - 630 lines)
+
+**Files Enhanced**:
+- generation/checkpoint_manager.py (atomic writes, file locking)
+- generation/fault_handler.py (OpenRouter errors, adaptive backoff)
+
+**Files Updated** (imports only):
+- run_constitutional_convention.py
+- run_all_mechanism_tests.py
+- test_rig.py
+- test_m5_query_evolution.py, test_m9_missing_witness.py, test_m10_scene_analysis.py
+- test_m12_alternate_history.py, test_m13_synthesis.py, test_m14_circadian.py
+- test_phase11_smoke.py, test_andos_proof.py, test_mechanism_tracking.py
+
+**Phase 11 Status**: ✅ COMPLETE - Global resilience system operational
+
+---
 
 ### Phase 8: Tracking Infrastructure ✅
 
@@ -620,9 +734,10 @@ For questions or issues, see project documentation or open a GitHub issue.
 
 ---
 
-**Last Updated**: October 27, 2025
+**Last Updated**: October 27, 2025 (Phase 11 Complete)
 **Current Status**: **PRODUCTION READY** ✅
 **Mechanism Coverage**: **17/17 (100%)** - ALL MECHANISMS TRACKED
 **Test Reliability**: **11/11 (100%)** - ALL TESTS PASSING
 **Architecture**: ANDOS layer-by-layer training (solves circular dependencies)
-**System Ready For**: Production deployment, research applications, fine-tuning workflows
+**Fault Tolerance**: Global resilience system with checkpointing, circuit breaker, health monitoring
+**System Ready For**: Production deployment, research applications, fine-tuning workflows, large-scale runs

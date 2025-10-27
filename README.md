@@ -19,6 +19,7 @@ Timepoint-Daedalus enables you to:
 - **Test Reliability**: 11/11 tests passing (100%) ✅
 - **Architecture**: ANDOS layer-by-layer training (solves circular dependencies)
 - **Cost Optimization**: 95% reduction via adaptive fidelity + tensor compression
+- **Fault Tolerance**: Global resilience system with checkpointing, circuit breaker, health monitoring
 - Real LLM integration with OpenRouter (requires `OPENROUTER_API_KEY`)
 - Complete pipeline: Natural Language → Simulation → Query → Report → Export
 - **Documentation**: [MECHANICS.md](MECHANICS.md) for architecture | [PLAN.md](PLAN.md) for roadmap
@@ -206,6 +207,36 @@ exporter.export_batch(
 **Supported Formats**: JSON, JSONL, Markdown, CSV, SQLite
 **Compression**: gzip, bz2 (50-70% size reduction)
 
+### 6. Fault Tolerance & Resilience
+
+Global resilience system protects long-running simulations:
+
+```python
+from generation.resilience_orchestrator import ResilientE2EWorkflowRunner
+from metadata.run_tracker import MetadataManager
+
+# Create resilient runner (transparently wraps E2E workflow)
+metadata_manager = MetadataManager(db_path="metadata/runs.db")
+runner = ResilientE2EWorkflowRunner(metadata_manager)
+
+# Run simulation with fault tolerance enabled
+result = runner.run(config)
+```
+
+**Features**:
+- **Circuit Breaker**: Stops API calls if failure rate exceeds threshold (prevents cascading failures)
+- **Health Monitoring**: Pre-flight checks for API key, disk space, directory permissions
+- **Automatic Checkpointing**: Saves progress every N timepoints with atomic writes
+- **Resume Capability**: Automatically resumes from last checkpoint on failure
+- **Adaptive Retry**: Exponential backoff with adaptive increases for persistent errors
+- **Transaction Logging**: Append-only audit trail in `logs/transactions/{run_id}.log`
+
+**Guarantees**:
+- Atomic checkpoint writes (temp file + rename)
+- File locking prevents corruption
+- OpenRouter-specific error handling (rate limits, 503/502/504)
+- No data loss on crash/network failure
+
 ---
 
 ## Testing
@@ -302,13 +333,7 @@ python run_vertical_finetune.py
 ### Core Documentation
 - **README.md** (this file) - Quick start guide and overview
 - **MECHANICS.md** - Technical architecture and 17 core mechanisms
-- **PLAN.md** - Development roadmap and phase history
-
-### Phase Reports (Detailed History)
-- **MECHANISM_COVERAGE_STRATEGY.md** - Phase 6 and Phase 7.5 bug fixes and test improvements
-- **PHASE_8_SUMMARY.md** - Phase 8 tracking infrastructure and mechanism health
-- **PHASE_9_SUMMARY.md** - Phase 9 M14/M15/M16 integration attempts and pytest verification
-- **MECHANISM_COVERAGE_PHASE9.md** - Post-Phase 9 mechanism coverage snapshot (15/17 verified)
+- **PLAN.md** - Development roadmap and phase history (includes Phase 11: Resilience System)
 
 ---
 
@@ -358,8 +383,9 @@ python run_vertical_finetune.py
 - `horizontal_generator.py` - Variation generation
 - `vertical_generator.py` - Temporal depth expansion
 - `progress_tracker.py` - Real-time metrics
-- `fault_handler.py` - Error recovery
-- `checkpoint_manager.py` - State persistence
+- `resilience_orchestrator.py` - Global fault tolerance (circuit breaker, health monitoring, transaction log)
+- `fault_handler.py` - Error recovery with adaptive retry
+- `checkpoint_manager.py` - Atomic checkpointing with file locking
 
 ---
 
