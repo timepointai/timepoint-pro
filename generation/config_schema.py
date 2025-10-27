@@ -57,7 +57,7 @@ class EntityConfig(BaseModel):
 
 class TimepointConfig(BaseModel):
     """Configuration for timepoint structure"""
-    count: int = Field(ge=1, le=100, default=1, description="Number of timepoints to generate")
+    count: int = Field(ge=1, le=1000, default=1, description="Number of timepoints to generate")
     start_time: Optional[datetime] = Field(
         default=None,
         description="Start time for simulation (defaults to now)"
@@ -1000,11 +1000,11 @@ class SimulationConfig(BaseModel):
                     {"name": "Pierce Butler", "state": "South Carolina", "role": "aristocrat", "age": 43, "key_trait": "property_rights_defender"},
                     {"name": "Charles Cotesworth Pinckney", "state": "South Carolina", "role": "military_hero", "age": 41, "key_trait": "martial_honor"}
                 ],
-                "animistic_entities": [
-                    {"name": "Independence Hall", "type": "building", "age_years": 44, "consciousness": 0.8, "memory": "witnessed_declaration_1776"},
-                    {"name": "Confederation", "type": "abstract", "concept": "articles_of_confederation", "strength": 0.2, "status": "failing"},
-                    {"name": "Union", "type": "abstract", "concept": "unified_nation", "strength": 0.4, "status": "aspiration"}
-                ],
+                "animistic_entities": {
+                    "independence_hall": {"name": "Independence Hall", "type": "building", "age_years": 44, "consciousness": 0.8, "memory": "witnessed_declaration_1776"},
+                    "confederation": {"name": "Confederation", "type": "abstract", "concept": "articles_of_confederation", "strength": 0.2, "status": "failing"},
+                    "union": {"name": "Union", "type": "abstract", "concept": "unified_nation", "strength": 0.4, "status": "aspiration"}
+                },
                 "factions": {
                     "large_states": ["Virginia", "Pennsylvania", "Massachusetts"],
                     "small_states": ["Delaware", "New Jersey", "Connecticut"],
