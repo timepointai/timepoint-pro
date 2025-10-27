@@ -58,13 +58,7 @@ def pca_compress(tensor: np.ndarray, n_components: int = 8) -> np.ndarray:
     n_samples, n_features = tensor.shape
     if n_samples < 2:
         # For single sample, PCA will cause division by zero warning
-        # Return the tensor as-is (no compression possible)
-        import warnings
-        warnings.warn(
-            f"PCA compression skipped: requires at least 2 samples, got {n_samples}. "
-            "Returning uncompressed tensor.",
-            RuntimeWarning
-        )
+        # Return the tensor as-is silently (no compression possible)
         return tensor.flatten()
 
     # For 1D tensors reshaped to (1, n_features), we can't compress below 1 component

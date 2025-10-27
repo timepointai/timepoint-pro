@@ -1500,7 +1500,7 @@ def generate_prospective_state(
         entity_id=entity.entity_id,
         timepoint_id=timepoint.timepoint_id,
         forecast_horizon_days=forecast_horizon,
-        expectations=[exp.dict() for exp in expectations],  # Store as dict for JSON
+        expectations=[exp.model_dump(mode='json') for exp in expectations],  # Store as dict for JSON
         contingency_plans=contingency_plans,
         anxiety_level=anxiety_level,
         forecast_confidence=getattr(entity, 'forecast_confidence', 1.0)

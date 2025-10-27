@@ -57,8 +57,8 @@ class ConfigManager:
         """
         config = OxenConfig()
 
-        # Check environment variable first
-        env_token = os.getenv("OXEN_API_TOKEN")
+        # Check environment variable first (check both OXEN_API_TOKEN and OXEN_API_KEY)
+        env_token = os.getenv("OXEN_API_TOKEN") or os.getenv("OXEN_API_KEY")
         if env_token:
             config.api_token = env_token
 

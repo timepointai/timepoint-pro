@@ -449,22 +449,25 @@ class LLMClient:
         if default_model:
             self.default_model = default_model
         elif mode == "paid":
-            # Paid mode: Use official Meta Llama 3.1 70B (131K context, unlimited rate)
-            self.default_model = "meta-llama/llama-3.1-70b-instruct"
+            # Paid mode: Use Llama 4 Scout (327K context, unlimited rate, JSON mode support)
+            self.default_model = "meta-llama/llama-4-scout"
         else:
             # Free mode: Use model manager's default selection
             self.default_model = self.model_manager.get_default_model()
 
-        # Set model for complex tasks (405B for paid, same as default for free)
+        # Set model for ultra-complex tasks (405B for paid, same as default for free)
         if mode == "paid":
-            self.complex_model = "meta-llama/llama-3.1-405b-instruct"
+            self.ultra_complex_model = "meta-llama/llama-3.1-405b-instruct"  # For >50k token tasks
+            self.complex_model = "meta-llama/llama-4-scout"  # Standard complex tasks
         else:
+            self.ultra_complex_model = self.default_model
             self.complex_model = self.default_model
 
         print(f"🦙 LLM Mode: {mode.upper()}")
         print(f"   Default model: {self.default_model}")
         if mode == "paid":
             print(f"   Complex tasks: {self.complex_model}")
+            print(f"   Ultra-complex: {self.ultra_complex_model}")
         print(f"📋 Available Llama models: {len(self.model_manager.get_llama_models())} cached")
 
         # Set global rate limiter mode
@@ -512,7 +515,8 @@ Return only valid JSON, no other text."""
                 model=selected_model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.7,
-                max_tokens=1000
+                max_tokens=12000,  # Increased from 1000 for Llama 4 Scout
+                response_format={"type": "json_object"}  # Force JSON mode
             )
             # Extract content from response
             content = response["choices"][0]["message"]["content"]
@@ -555,7 +559,8 @@ Return only valid JSON, no other text."""
                 model=selected_model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.1,
-                max_tokens=800
+                max_tokens=8000,  # Increased from 800 for Llama 4 Scout
+                response_format={"type": "json_object"}  # Force JSON mode
             )
             # Extract content from response
             content = response["choices"][0]["message"]["content"]
@@ -615,7 +620,7 @@ Relevance score:"""
             print(f"LLM relevance scoring failed after retries: {e}")
             return self._heuristic_relevance_score(query, knowledge_item)
 
-    def generate_dialog(self, prompt: str, max_tokens: int = 2000, model: Optional[str] = None):
+    def generate_dialog(self, prompt: str, max_tokens: int = 16000, model: Optional[str] = None):  # Increased from 2000
         """Generate dialog with structured output (REAL LLM only)"""
         # Use provided model or default to Llama model
         selected_model = model or self.default_model
@@ -634,7 +639,7 @@ Return a JSON object with these EXACT fields (follow this schema precisely):
   - physical_state_influence: string or null (optional how physical state affected utterance)
 - total_duration: integer number of seconds (e.g. 1800 for 30 minutes - MUST BE AN INTEGER NOT A STRING)
 - information_exchanged: array of strings (knowledge items passed between entities)
-- relationship_impacts: object mapping entity pairs to float deltas (e.g. {{"alice-bob": 0.1, "bob-charlie": -0.05}})
+- relationship_impacts: object mapping EACH entity_id to a SINGLE float showing their overall relationship change (e.g. {{"alice": 0.1, "bob": -0.05}} means alice's relationships improved overall, bob's declined)
 - atmosphere_evolution: array of objects, each with:
   - timestamp: number (seconds from start, e.g. 0.0, 30.5, 60.0)
   - atmosphere: number (0.0-1.0 representing atmosphere intensity)
@@ -652,7 +657,8 @@ Return only valid JSON matching this schema exactly, no other text."""
                 model=selected_model,
                 messages=[{"role": "user", "content": structured_prompt}],
                 temperature=0.7,
-                max_tokens=max_tokens
+                max_tokens=max_tokens,
+                response_format={"type": "json_object"}  # Force JSON mode
             )
             # Extract content from response
             content = response["choices"][0]["message"]["content"]
@@ -676,7 +682,7 @@ Return only valid JSON matching this schema exactly, no other text."""
         response_model: type,
         model: Optional[str] = None,
         temperature: float = 0.7,
-        max_tokens: int = 4000,
+        max_tokens: int = 24000,  # Increased from 4000 for Llama 4 Scout
         timeout: float = 120.0
     ):
         """
@@ -710,7 +716,8 @@ Return only valid JSON matching this schema exactly, no other text."""
                     model=selected_model,
                     messages=[{"role": "user", "content": enhanced_prompt}],
                     temperature=temperature,
-                    max_tokens=max_tokens
+                    max_tokens=max_tokens,
+                    response_format={"type": "json_object"}  # Force JSON mode
                 )
                 # Extract content from response
                 content = response["choices"][0]["message"]["content"]

@@ -316,8 +316,8 @@ def main():
 """)
 
     # Check environment
-    if not os.getenv("OXEN_API_TOKEN"):
-        print("❌ Error: OXEN_API_TOKEN not set")
+    if not (os.getenv("OXEN_API_TOKEN") or os.getenv("OXEN_API_KEY")):
+        print("❌ Error: OXEN_API_TOKEN or OXEN_API_KEY not set")
         print("   Set it with: export OXEN_API_TOKEN=your_token")
         return 1
 

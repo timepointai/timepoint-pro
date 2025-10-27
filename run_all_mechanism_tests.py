@@ -41,6 +41,10 @@ def load_env():
 
 load_env()
 
+# Map OXEN_API_KEY from .env to OXEN_API_TOKEN (used by oxen_integration)
+if os.getenv("OXEN_API_KEY") and not os.getenv("OXEN_API_TOKEN"):
+    os.environ["OXEN_API_TOKEN"] = os.environ["OXEN_API_KEY"]
+
 
 def run_template(runner, config, name: str, expected_mechanisms: Set[str]) -> Dict:
     """Run a single template and return results"""
@@ -103,8 +107,21 @@ def run_andos_script(script: str, name: str, expected_mechanisms: Set[str]) -> D
         success = result.returncode == 0
 
         if success:
+            # Parse run_id from output
+            run_id = None
+            for line in result.stdout.split('\n'):
+                if 'Run ID:' in line or 'run_id:' in line:
+                    # Extract run_id from lines like "Run ID: run_20251026_220100_2487a596"
+                    parts = line.split(':')
+                    if len(parts) >= 2:
+                        run_id = parts[-1].strip()
+                        break
+
             print(f"✅ Success: {name}")
             print(f"   Exit code: {result.returncode}")
+            if run_id:
+                print(f"   Run ID: {run_id}")
+
             # Print last few lines
             output_lines = result.stdout.strip().split('\n')
             for line in output_lines[-3:]:
@@ -112,6 +129,7 @@ def run_andos_script(script: str, name: str, expected_mechanisms: Set[str]) -> D
 
             return {
                 'success': True,
+                'run_id': run_id,
                 'expected': expected_mechanisms,
                 'exit_code': result.returncode
             }
@@ -156,10 +174,10 @@ def run_all_templates(mode: str = 'quick'):
     print("=" * 80)
     print()
     print("⏱️  Rate Limiting Strategy:")
-    print("   - 10s cooldown between templates")
-    print("   - 15s cooldown between ANDOS scripts")
-    print("   - 15s cooldown between Phase 1 and Phase 2")
-    print("   - This prevents API rate limit errors")
+    print("   - Paid mode (1000 req/min): Minimal delays")
+    print("   - Templates: 0s cooldown (16.67 req/sec available)")
+    print("   - ANDOS scripts: 0s cooldown")
+    print("   - Phase transition: 0s")
     print()
 
     # Initialize
@@ -217,20 +235,14 @@ def run_all_templates(mode: str = 'quick'):
         results[name] = result
         total_cost += result.get('cost', 0.0)
 
-        # Add delay between templates to respect rate limits
-        if idx < len(templates_to_run):
-            print(f"\n⏱️  Cooling down for 10s before next template (rate limit prevention)...")
-            time.sleep(10)
+        # No delay needed in paid mode (1000 req/min = 16.67 req/sec)
 
     # Run ANDOS test scripts
     print(f"\n{'='*80}")
     print(f"PHASE 2: ANDOS Test Scripts ({len(andos_scripts)} scripts)")
     print(f"{'='*80}")
 
-    # Cool down between phases
-    if templates_to_run:
-        print(f"\n⏱️  Cooling down for 15s before ANDOS scripts (rate limit prevention)...")
-        time.sleep(15)
+    # No delay needed between phases in paid mode
     print()
 
     for idx, (script, name, expected) in enumerate(andos_scripts, 1):
@@ -238,10 +250,7 @@ def run_all_templates(mode: str = 'quick'):
         result = run_andos_script(script, name, expected)
         results[name] = result
 
-        # Add delay between ANDOS scripts to respect rate limits
-        if idx < len(andos_scripts):
-            print(f"\n⏱️  Cooling down for 15s before next script (rate limit prevention)...")
-            time.sleep(15)
+        # No delay needed between ANDOS scripts in paid mode
 
     # Generate comprehensive report
     print("\n" + "=" * 80)

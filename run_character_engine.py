@@ -1003,7 +1003,7 @@ def main():
     # Check environment variables
     llm_enabled = os.getenv("LLM_SERVICE_ENABLED", "false").lower() == "true"
     openrouter_key = os.getenv("OPENROUTER_API_KEY")
-    oxen_token = os.getenv("OXEN_API_TOKEN")
+    oxen_token = os.getenv("OXEN_API_TOKEN") or os.getenv("OXEN_API_KEY")
 
     if not llm_enabled or not openrouter_key:
         logger.warning("LLM service not enabled or API key not set")

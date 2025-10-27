@@ -206,8 +206,9 @@ def trigger_prospection_for_entity(
             entity,
             timepoint,
             llm_client,
-            store,
-            **params  # Pass prospection parameters
+            store
+            # Note: params (time_horizons, etc.) are not passed to generate_prospective_state
+            # because they're handled internally by the prospection mechanism
         )
 
         # Save to store
@@ -305,12 +306,20 @@ def refine_tensor_from_prospection(
     tensor_dict = json.loads(entity.tensor)
     context = np.array(msgspec.msgpack.decode(base64.b64decode(tensor_dict["context_vector"])))
 
-    # Parse expectations
-    from tensor_initialization import _parse_expectations
-    expectations = _parse_expectations(prospective_state)
+    # Get expectations from prospective_state
+    # ProspectiveState.expectations is a string field, so we need to parse it or use a default
+    # For now, just use the number of expectations if available, otherwise use 0
+    expectations_count = 0
+    if hasattr(prospective_state, 'expectations') and prospective_state.expectations:
+        # If expectations is a list, count it; if string, estimate from length
+        if isinstance(prospective_state.expectations, list):
+            expectations_count = len(prospective_state.expectations)
+        elif isinstance(prospective_state.expectations, str):
+            # Rough estimate: one expectation per 100 characters
+            expectations_count = len(prospective_state.expectations) // 100
 
     # Refinement adjustments (small, additive)
-    expectation_boost = min(len(expectations) / 10.0, 0.2)  # Max +0.2
+    expectation_boost = min(expectations_count / 10.0, 0.2)  # Max +0.2
     context[0] = min(context[0] + expectation_boost, 1.5)
 
     # Anxiety adjustment

@@ -241,17 +241,17 @@ Schema:
             # Estimate: ~50 tokens per entity + ~100 tokens per timepoint + ~1000 overhead
             estimated_tokens = (max_entities * 50) + (max_timepoints * 100) + 1000
 
-            if estimated_tokens > 15000:
-                # Large scenario - use Llama 405B with extended token limit
+            if estimated_tokens > 50000:
+                # Ultra-large scenario - use Llama 405B with extended token limit
                 model = "meta-llama/llama-3.1-405b-instruct"
                 max_output_tokens = min(int(estimated_tokens * 1.5), 100000)  # 1.5x safety margin, cap at 100k
-                print(f"   🚀 Large scenario detected: Using Llama 405B with {max_output_tokens:,} token limit")
+                print(f"   🚀 Ultra-large scenario detected: Using Llama 405B with {max_output_tokens:,} token limit")
                 print(f"   📊 Estimated: {max_entities} entities × {max_timepoints} timepoints = ~{estimated_tokens:,} tokens")
             else:
-                # Medium scenario - use Llama 70B
-                model = None  # Use default (70B)
-                max_output_tokens = min(int(estimated_tokens * 2.5), 16000)  # 2.5x safety margin, cap at 16k
-                print(f"   ✅ Standard scenario: Using Llama 70B with {max_output_tokens:,} token limit")
+                # Standard/large scenario - use Llama 4 Scout (327K context)
+                model = None  # Use default (Scout)
+                max_output_tokens = min(int(estimated_tokens * 2.0), 42000)  # 2x safety margin, cap at 42k
+                print(f"   ✅ Standard scenario: Using Llama 4 Scout with {max_output_tokens:,} token limit")
 
             result = self.llm.generate_structured(
                 prompt=prompt,
@@ -428,8 +428,8 @@ Return a JSON object with this structure:
 
 Return EXACTLY {count} entities. This is critical."""
 
-        # Use smaller token limit for roster generation
-        max_tokens = min((count * 100) + 1000, 16000)
+        # Use larger token limit for roster generation (Llama 4 Scout supports 327K)
+        max_tokens = min((count * 100) + 1000, 42000)
 
         # Try with 70B first, escalate to 405B if needed
         model = None  # Use default 70B
@@ -518,7 +518,7 @@ Return a JSON object with this structure:
 
 Return EXACTLY {count} timepoints. This is critical."""
 
-        max_tokens = min((count * 80) + 1000, 16000)
+        max_tokens = min((count * 80) + 1000, 42000)
         model = None  # Use default 70B
         retry_count = 0
         max_retries = 2
@@ -614,7 +614,7 @@ Return JSON matching this structure:
                     }),
                     model=None,
                     temperature=0.6,
-                    max_tokens=min(len(batch) * 200 + 1000, 16000),
+                    max_tokens=min(len(batch) * 200 + 1000, 24000),
                     timeout=120.0
                 )
 
@@ -686,7 +686,7 @@ Return JSON matching this structure:
                     }),
                     model=None,
                     temperature=0.5,
-                    max_tokens=min(len(batch) * 100 + 1000, 16000),
+                    max_tokens=min(len(batch) * 100 + 1000, 24000),
                     timeout=120.0
                 )
 
@@ -1232,6 +1232,7 @@ class OrchestratorAgent:
             }
 
             # M8: Initialize physical_tensor (ALWAYS for humans, optionally from embodied_constraints)
+            # Also create minimal physical tensors for non-humans to enable dialog participation
             if entity_item.entity_type == "human":
                 # Check for custom embodied_constraints (fuzzy match)
                 embodied_dict = entity_metadata_config.get("embodied_constraints", {})
@@ -1248,6 +1249,21 @@ class OrchestratorAgent:
                     stamina=embodied.get("stamina", 1.0),
                     sensory_acuity=embodied.get("sensory_acuity", {"vision": 1.0, "hearing": 1.0}),
                     location=embodied.get("location", None)
+                )
+                metadata["physical_tensor"] = physical.model_dump()
+            else:
+                # Create minimal physical tensor for non-human entities (buildings, spirits, animals)
+                # This enables them to participate in dialogs as present entities
+                physical = PhysicalTensor(
+                    age=100.0,  # Generic "age" for non-humans
+                    health_status=1.0,
+                    pain_level=0.0,
+                    pain_location=None,
+                    fever=0.0,  # No body temperature for non-humans (0.0 = no fever tracking)
+                    mobility=0.0,  # Non-humans typically don't move
+                    stamina=1.0,
+                    sensory_acuity={"vision": 0.5, "hearing": 0.5},  # Limited sensory capabilities
+                    location=None
                 )
                 metadata["physical_tensor"] = physical.model_dump()
 
@@ -1325,8 +1341,8 @@ class OrchestratorAgent:
                         self.store
                     )
 
-                    # Store in entity metadata
-                    entity.entity_metadata["prospective_state"] = prospective_state.model_dump()
+                    # Store in entity metadata (use mode='json' to serialize datetime fields)
+                    entity.entity_metadata["prospective_state"] = prospective_state.model_dump(mode='json')
                     print(f"   ✓ Generated prospective state for {entity.entity_id}")
                 except Exception as e:
                     print(f"   ⚠️  Prospection generation failed for {entity.entity_id}: {e}")

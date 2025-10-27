@@ -47,7 +47,7 @@ class AuthManager:
         # No token found
         if not interactive:
             raise AuthenticationError(
-                "No Oxen API token found. Set OXEN_API_TOKEN environment variable "
+                "No Oxen API token found. Set OXEN_API_TOKEN or OXEN_API_KEY environment variable "
                 "or run with interactive=True to enter token."
             )
 
