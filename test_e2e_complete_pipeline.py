@@ -299,6 +299,71 @@ class TestCompleteE2EPipeline:
         print(f"   Size: {compressed_size} bytes")
         print(f"   Compression: {compression_ratio:.1f}% reduction")
 
+        # Export 4: Fountain Script export
+        print("\nExport 4: Exporting screenplay in Fountain format...")
+
+        # Attach store to query engine for script generation
+        query_engine.store = self.storage
+
+        fountain_result = export_pipeline.export_report(
+            world_id=world_id,
+            report_type="script",
+            export_format="fountain",
+            output_path=os.path.join(export_dir, "screenplay"),
+            title=f"Simulation: {simulation_id}"
+        )
+
+        fountain_path = fountain_result['output_path']
+        assert os.path.exists(fountain_path), "Fountain script export not created"
+        fountain_size = fountain_result['file_size_bytes']
+
+        print(f"✅ Fountain script export created")
+        print(f"   Path: {fountain_path}")
+        print(f"   Size: {fountain_size} bytes")
+
+        # Export 5: Storyboard JSON export
+        print("\nExport 5: Exporting storyboard in JSON format...")
+
+        storyboard_result = export_pipeline.export_report(
+            world_id=world_id,
+            report_type="script",
+            export_format="storyboard",
+            output_path=os.path.join(export_dir, "storyboard"),
+            title=f"Simulation: {simulation_id}"
+        )
+
+        storyboard_path = storyboard_result['output_path']
+        assert os.path.exists(storyboard_path), "Storyboard JSON export not created"
+        storyboard_size = storyboard_result['file_size_bytes']
+
+        print(f"✅ Storyboard JSON export created")
+        print(f"   Path: {storyboard_path}")
+        print(f"   Size: {storyboard_size} bytes")
+
+        # Export 6: PDF screenplay export
+        print("\nExport 6: Exporting screenplay in PDF format...")
+
+        pdf_result = export_pipeline.export_report(
+            world_id=world_id,
+            report_type="script",
+            export_format="pdf",
+            output_path=os.path.join(export_dir, "screenplay"),
+            title=f"Simulation: {simulation_id}"
+        )
+
+        pdf_path = pdf_result['output_path']
+        assert os.path.exists(pdf_path), "PDF screenplay export not created"
+        pdf_size = pdf_result['file_size_bytes']
+
+        # Verify it's a valid PDF
+        with open(pdf_path, 'rb') as f:
+            pdf_header = f.read(4)
+            assert pdf_header == b'%PDF', "PDF file is invalid"
+
+        print(f"✅ PDF screenplay export created")
+        print(f"   Path: {pdf_path}")
+        print(f"   Size: {pdf_size} bytes")
+
         # ================================================================
         # PHASE 6: Verification
         # ================================================================
@@ -321,6 +386,9 @@ class TestCompleteE2EPipeline:
             "Sprint 2: JSON export created": os.path.exists(json_path),
             "Sprint 2: Markdown export created": os.path.exists(md_path),
             "Sprint 2: Compressed export created": os.path.exists(compressed_path),
+            "Sprint 2: Fountain script export created": os.path.exists(fountain_path),
+            "Sprint 2: Storyboard JSON export created": os.path.exists(storyboard_path),
+            "Sprint 2: PDF screenplay export created": os.path.exists(pdf_path),
         }
 
         print("\nVerification Results:")
@@ -343,7 +411,7 @@ class TestCompleteE2EPipeline:
         print(f"  2. Orchestrator:                {len(result['entities'])} entities created")
         print(f"  3. Sprint 1 (Query):            {stats.get('queries_executed', 0)} queries executed")
         print(f"  4. Sprint 2 (Reports):          {report_stats['formats_generated']} report formats generated")
-        print(f"  5. Sprint 2 (Export):           3 export formats created")
+        print(f"  5. Sprint 2 (Export):           6 export formats created (JSON, MD, compressed, Fountain, Storyboard, PDF)")
         print("\nAll Sprints Verified:")
         print("  ✅ Sprint 1: Query Interface")
         print("  ✅ Sprint 2: Reporting & Export")

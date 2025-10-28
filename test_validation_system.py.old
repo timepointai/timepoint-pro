@@ -1,0 +1,582 @@
+#!/usr/bin/env python3
+"""
+test_validation_system.py - Comprehensive Test Validation and Autopilot System
+
+Analyzes, validates, and integrates test suites for Timepoint-Daedalus.
+Provides quality assessment, cleanup recommendations, and automated execution.
+"""
+import ast
+import importlib.util
+import inspect
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Dict, List, Any, Optional, Tuple, Set
+import argparse
+
+
+@dataclass
+class TestAnalysis:
+    """Results of test file analysis"""
+    file_path: str
+    test_classes: List[str]
+    test_methods: List[str]
+    total_tests: int
+    imports: Set[str]
+    dependencies: Set[str]
+    quality_score: float
+    issues: List[str]
+    recommendations: List[str]
+    execution_time: Optional[float] = None
+    passed: Optional[int] = None
+    failed: Optional[int] = None
+
+
+@dataclass
+class ValidationReport:
+    """Overall validation report"""
+    total_files: int
+    total_tests: int
+    quality_score: float
+    critical_issues: List[str]
+    warnings: List[str]
+    recommendations: List[str]
+    execution_summary: Dict[str, Any]
+    autopilot_ready: bool
+
+
+class TestValidator:
+    """Comprehensive test validation system"""
+
+    def __init__(self):
+        self.analysis_results: Dict[str, TestAnalysis] = {}
+        self.quality_threshold = 0.7  # Minimum quality score to pass
+        self.critical_patterns = [
+            r'assert True\b',  # Meaningless assertions (word boundary to avoid matching pytest assertions)
+            r'assert False\b(?!\s*,)',  # Always failing tests (but allow pytest-style assert False, "message")
+            r'^\s*pass\s*$',  # Empty test methods
+            r'raise NotImplementedError',  # Placeholder implementations
+            r'time\.sleep\(\d+\)',  # Unnecessary delays
+        ]
+        self.warning_patterns = [
+            r'print\(',  # Debug prints in tests
+            r'pdb\.set_trace',  # Debug breakpoints
+            r'# TODO',  # Incomplete implementations
+            r'except.*:',  # Bare except clauses
+        ]
+
+    def analyze_test_file(self, file_path: str) -> TestAnalysis:
+        """Analyze a single test file for quality and structure"""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+        except Exception as e:
+            return TestAnalysis(
+                file_path=file_path,
+                test_classes=[],
+                test_methods=[],
+                total_tests=0,
+                imports=set(),
+                dependencies=set(),
+                quality_score=0.0,
+                issues=[f"Cannot read file: {e}"],
+                recommendations=["Fix file reading issues"]
+            )
+
+        # Parse AST to extract structure
+        try:
+            tree = ast.parse(content, filename=file_path)
+        except SyntaxError as e:
+            return TestAnalysis(
+                file_path=file_path,
+                test_classes=[],
+                test_methods=[],
+                total_tests=0,
+                imports=set(),
+                dependencies=set(),
+                quality_score=0.0,
+                issues=[f"Syntax error: {e}"],
+                recommendations=["Fix syntax errors"]
+            )
+
+        # Extract test classes and methods
+        test_classes = []
+        test_methods = []
+        imports = set()
+        dependencies = set()
+
+        for node in ast.walk(tree):
+            # Extract imports
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    imports.add(alias.name.split('.')[0])
+            elif isinstance(node, ast.ImportFrom):
+                if node.module:
+                    imports.add(node.module.split('.')[0])
+
+            # Extract test classes
+            if isinstance(node, ast.ClassDef) and node.name.startswith('Test'):
+                test_classes.append(node.name)
+
+                # Extract test methods from this class
+                for item in node.body:
+                    if isinstance(item, ast.FunctionDef) and item.name.startswith('test_'):
+                        test_methods.append(f"{node.name}.{item.name}")
+
+        # Also detect standalone test functions (not in classes)
+        for node in ast.iter_child_nodes(tree):
+            if isinstance(node, ast.FunctionDef) and node.name.startswith('test_'):
+                # Only add if not already in a test class
+                if f"{node.name}" not in [m.split('.')[-1] for m in test_methods]:
+                    test_methods.append(node.name)
+
+        # Analyze quality issues
+        issues = []
+        recommendations = []
+
+        # Separate critical issues from warnings
+        critical_issues = []
+        warnings = []
+
+        # Check for critical patterns
+        for pattern in self.critical_patterns:
+            if re.search(pattern, content, re.MULTILINE):
+                critical_issues.append(f"Critical pattern found: {pattern}")
+
+        # Check for warning patterns (these don't heavily impact quality)
+        for pattern in self.warning_patterns:
+            if re.search(pattern, content, re.MULTILINE):
+                warnings.append(f"Warning pattern found: {pattern}")
+
+        # Check test coverage
+        if len(test_methods) == 0:
+            critical_issues.append("No test methods found")
+            recommendations.append("Add test methods or remove empty test file")
+
+        # Check for proper test structure (relaxed - many tests use pytest without explicit import)
+        # Only warn if there are no test-related imports at all
+        has_test_imports = any('unittest' in imp or 'pytest' in imp or 'mock' in imp for imp in imports)
+        if not has_test_imports and len(test_methods) > 0:
+            warnings.append("Missing test framework imports")
+            recommendations.append("Add proper test framework imports")
+
+        # Combine issues for backward compatibility
+        issues = critical_issues + warnings
+
+        # Check for fixtures and setup
+        has_setup = 'setUp' in content or 'setup_method' in content or 'setup_class' in content
+        if len(test_methods) > 5 and not has_setup:
+            recommendations.append("Consider adding test fixtures for setup/teardown")
+
+        # Calculate quality score (only critical issues heavily penalize)
+        quality_score = self._calculate_quality_score(len(test_methods), len(critical_issues), len(warnings), len(recommendations))
+
+        return TestAnalysis(
+            file_path=file_path,
+            test_classes=test_classes,
+            test_methods=test_methods,
+            total_tests=len(test_methods),
+            imports=imports,
+            dependencies=dependencies,
+            quality_score=quality_score,
+            issues=issues,
+            recommendations=recommendations
+        )
+
+    def _calculate_quality_score(self, test_count: int, critical_count: int, warning_count: int = 0, rec_count: int = 0) -> float:
+        """Calculate quality score based on various factors
+
+        Args:
+            test_count: Number of test methods
+            critical_count: Number of critical issues (heavily penalized)
+            warning_count: Number of warnings (lightly penalized)
+            rec_count: Number of recommendations (small bonus)
+        """
+        if test_count == 0:
+            return 0.0
+
+        # Base score from test count (more tests = higher score)
+        base_score = min(1.0, test_count / 20.0)  # Cap at 20 tests
+
+        # Heavy penalty for critical issues
+        critical_penalty = min(0.6, critical_count * 0.3)
+
+        # Light penalty for warnings (don't heavily impact quality)
+        warning_penalty = min(0.2, warning_count * 0.02)
+
+        # Bonus for recommendations (shows thoughtful design)
+        rec_bonus = min(0.1, rec_count * 0.02)
+
+        return max(0.0, min(1.0, base_score - critical_penalty - warning_penalty + rec_bonus))
+
+    def run_test_execution(self, file_path: str) -> Tuple[int, int, float]:
+        """Execute a test file and return results"""
+        start_time = time.time()
+
+        try:
+            # Run with pytest
+            result = subprocess.run([
+                sys.executable, '-m', 'pytest', file_path,
+                '-v', '--tb=short', '--disable-warnings'
+            ], capture_output=True, text=True, timeout=300)
+
+            execution_time = time.time() - start_time
+
+            # Parse results
+            output = result.stdout + result.stderr
+
+            # Debug: print output if no tests found
+            if 'no tests ran' in output.lower() or 'collected 0 items' in output.lower():
+                print(f"\n⚠️  Warning: No tests collected for {file_path}")
+                print(f"   pytest output (first 500 chars): {output[:500]}")
+
+            # Extract passed/failed counts from pytest output
+            passed_match = re.search(r'(\d+) passed', output)
+            failed_match = re.search(r'(\d+) failed', output)
+
+            passed = int(passed_match.group(1)) if passed_match else 0
+            failed = int(failed_match.group(1)) if failed_match else 0
+
+            return passed, failed, execution_time
+
+        except subprocess.TimeoutExpired:
+            return 0, 1, time.time() - start_time
+        except Exception as e:
+            print(f"Error executing {file_path}: {e}")
+            return 0, 1, time.time() - start_time
+
+    def validate_all_tests(self, test_files: List[str], execute: bool = False) -> ValidationReport:
+        """Validate all test files and generate comprehensive report"""
+        print("🔍 Analyzing test files...")
+
+        total_tests = 0
+        quality_scores = []
+        all_issues = []
+        all_warnings = []
+        all_recommendations = []
+        execution_summary = {}
+
+        for file_path in test_files:
+            print(f"  Analyzing {file_path}...")
+            analysis = self.analyze_test_file(file_path)
+            self.analysis_results[file_path] = analysis
+
+            total_tests += analysis.total_tests
+            quality_scores.append(analysis.quality_score)
+
+            # Categorize issues
+            for issue in analysis.issues:
+                if any(word in issue.lower() for word in ['critical', 'cannot', 'syntax', 'no test']):
+                    all_issues.append(f"{file_path}: {issue}")
+                else:
+                    all_warnings.append(f"{file_path}: {issue}")
+
+            all_recommendations.extend([f"{file_path}: {rec}" for rec in analysis.recommendations])
+
+            # Execute tests if requested
+            if execute:
+                print(f"  Executing {file_path}...")
+                passed, failed, exec_time = self.run_test_execution(file_path)
+                analysis.passed = passed
+                analysis.failed = failed
+                analysis.execution_time = exec_time
+
+                execution_summary[file_path] = {
+                    'passed': passed,
+                    'failed': failed,
+                    'time': exec_time,
+                    'total': passed + failed
+                }
+
+        # Calculate overall metrics
+        avg_quality = sum(quality_scores) / len(quality_scores) if quality_scores else 0.0
+        critical_count = len(all_issues)
+
+        # Determine if ready for autopilot
+        autopilot_ready = (
+            avg_quality >= self.quality_threshold and
+            critical_count == 0 and
+            total_tests > 0
+        )
+
+        return ValidationReport(
+            total_files=len(test_files),
+            total_tests=total_tests,
+            quality_score=avg_quality,
+            critical_issues=all_issues,
+            warnings=all_warnings,
+            recommendations=all_recommendations,
+            execution_summary=execution_summary,
+            autopilot_ready=autopilot_ready
+        )
+
+    def generate_report(self, report: ValidationReport) -> str:
+        """Generate formatted validation report"""
+        lines = []
+        lines.append("🧪 Test Validation Report")
+        lines.append("=" * 50)
+        lines.append(f"Total Files Analyzed: {report.total_files}")
+        lines.append(f"Total Test Methods: {report.total_tests}")
+        lines.append(f"Average Quality Score: {report.quality_score:.2f}")
+        lines.append(f"Autopilot Ready: {'✅ Yes' if report.autopilot_ready else '❌ No'}")
+        lines.append("")
+
+        if report.critical_issues:
+            lines.append("🚨 Critical Issues:")
+            for issue in report.critical_issues:
+                lines.append(f"  • {issue}")
+            lines.append("")
+
+        if report.warnings:
+            lines.append("⚠️  Warnings:")
+            for warning in report.warnings[:10]:  # Limit to first 10
+                lines.append(f"  • {warning}")
+            if len(report.warnings) > 10:
+                lines.append(f"  ... and {len(report.warnings) - 10} more")
+            lines.append("")
+
+        if report.execution_summary:
+            lines.append("⚡ Execution Summary:")
+            total_passed = sum(stats['passed'] for stats in report.execution_summary.values())
+            total_failed = sum(stats['failed'] for stats in report.execution_summary.values())
+            total_time = sum(stats['time'] for stats in report.execution_summary.values())
+
+            lines.append(f"  Total Passed: {total_passed}")
+            lines.append(f"  Total Failed: {total_failed}")
+            lines.append(f"  Total Time: {total_time:.2f}s")
+            lines.append("")
+
+        if report.recommendations:
+            lines.append("💡 Recommendations:")
+            for rec in report.recommendations[:10]:  # Limit to first 10
+                lines.append(f"  • {rec}")
+            if len(report.recommendations) > 10:
+                lines.append(f"  ... and {len(report.recommendations) - 10} more")
+
+        return "\n".join(lines)
+
+
+class AutopilotSystem:
+    """Automated test execution system"""
+
+    def __init__(self, test_files: List[str]):
+        self.test_files = test_files
+        self.validator = TestValidator()
+        self.execution_results = {}
+
+    def run_autopilot(self, dry_run: bool = False, parallel: bool = False) -> Dict[str, Any]:
+        """Run the complete autopilot system"""
+        print("🚀 Starting Autopilot Test System")
+
+        # Phase 1: Validation
+        print("\n📋 Phase 1: Test Validation")
+        report = self.validator.validate_all_tests(self.test_files, execute=not dry_run)
+
+        if not report.autopilot_ready and not dry_run:
+            print("❌ Tests not ready for autopilot. Run with --dry-run to see issues.")
+            return {
+                'status': 'failed_validation',
+                'report': report
+            }
+
+        # Phase 2: Execution Planning
+        print("\n📋 Phase 2: Execution Planning")
+        execution_plan = self._create_execution_plan(report)
+
+        if dry_run:
+            print("🏃 Phase 3: Dry Run (Validation Only)")
+            return {
+                'status': 'dry_run_complete',
+                'report': report,
+                'execution_plan': execution_plan
+            }
+
+        # Phase 3: Parallel/Serial Execution
+        print("\n🏃 Phase 3: Test Execution")
+        if parallel:
+            results = self._run_parallel_execution(execution_plan)
+        else:
+            results = self._run_serial_execution(execution_plan)
+
+        # Phase 4: Results Analysis
+        print("\n📊 Phase 4: Results Analysis")
+        analysis = self._analyze_results(results, report)
+
+        return {
+            'status': 'complete',
+            'validation_report': report,
+            'execution_results': results,
+            'analysis': analysis
+        }
+
+    def _create_execution_plan(self, report: ValidationReport) -> List[Dict[str, Any]]:
+        """Create execution plan based on validation results"""
+        plan = []
+
+        for file_path in self.test_files:
+            if file_path in self.validator.analysis_results:
+                analysis = self.validator.analysis_results[file_path]
+                plan.append({
+                    'file': file_path,
+                    'priority': 'high' if analysis.quality_score >= 0.8 else 'medium',
+                    'estimated_tests': analysis.total_tests,
+                    'quality_score': analysis.quality_score,
+                    'has_issues': len(analysis.issues) > 0
+                })
+
+        # Sort by priority and quality
+        plan.sort(key=lambda x: (x['priority'] != 'high', -x['quality_score']))
+
+        return plan
+
+    def _run_serial_execution(self, plan: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Run tests serially"""
+        results = {}
+        total_start = time.time()
+
+        for item in plan:
+            file_path = item['file']
+            print(f"  Executing {file_path}...")
+
+            start_time = time.time()
+            passed, failed, exec_time = self.validator.run_test_execution(file_path)
+            results[file_path] = {
+                'passed': passed,
+                'failed': failed,
+                'time': exec_time,
+                'total': passed + failed
+            }
+
+        results['_summary'] = {
+            'total_time': time.time() - total_start,
+            'total_files': len(plan),
+            'total_passed': sum(r['passed'] for r in results.values() if isinstance(r, dict) and 'passed' in r),
+            'total_failed': sum(r['failed'] for r in results.values() if isinstance(r, dict) and 'failed' in r)
+        }
+
+        return results
+
+    def _run_parallel_execution(self, plan: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Run tests in parallel (simplified version)"""
+        # For now, just run serially but mark as parallel attempt
+        print("  Note: Parallel execution not fully implemented yet")
+        return self._run_serial_execution(plan)
+
+    def _analyze_results(self, results: Dict[str, Any], report: ValidationReport) -> Dict[str, Any]:
+        """Analyze execution results"""
+        summary = results.get('_summary', {})
+
+        analysis = {
+            'total_passed': summary.get('total_passed', 0),
+            'total_failed': summary.get('total_failed', 0),
+            'total_time': summary.get('total_time', 0),
+            'success_rate': 0.0,
+            'failed_files': [],
+            'performance_insights': []
+        }
+
+        if summary.get('total_passed', 0) + summary.get('total_failed', 0) > 0:
+            analysis['success_rate'] = summary['total_passed'] / (summary['total_passed'] + summary['total_failed'])
+
+        # Identify failed files
+        for file_path, result in results.items():
+            if file_path != '_summary' and result.get('failed', 0) > 0:
+                analysis['failed_files'].append(file_path)
+
+        # Performance insights
+        if analysis['success_rate'] >= 0.95:
+            analysis['performance_insights'].append("Excellent test suite reliability")
+        elif analysis['success_rate'] >= 0.80:
+            analysis['performance_insights'].append("Good test suite with minor issues")
+        else:
+            analysis['performance_insights'].append("Test suite needs attention")
+
+        return analysis
+
+
+def main():
+    """Main entry point"""
+    parser = argparse.ArgumentParser(description="Test Validation and Autopilot System")
+    parser.add_argument("--validate-only", action="store_true",
+                       help="Only validate tests, don't execute")
+    parser.add_argument("--dry-run", action="store_true",
+                       help="Show what would be executed without running")
+    parser.add_argument("--parallel", action="store_true",
+                       help="Run tests in parallel (not fully implemented)")
+    parser.add_argument("--files", nargs="*", default=None,
+                       help="Specific test files to process")
+    parser.add_argument("--output", type=str, default=None,
+                       help="Output results to JSON file")
+
+    args = parser.parse_args()
+
+    # Get test files
+    if args.files:
+        test_files = args.files
+    else:
+        test_files = [
+            f"./{f}" for f in os.listdir(".")
+            if f.startswith("test_") and f.endswith(".py")
+        ]
+
+    # Initialize systems
+    autopilot = AutopilotSystem(test_files)
+
+    # Run validation/execution
+    results = autopilot.run_autopilot(
+        dry_run=args.dry_run,
+        parallel=args.parallel
+    )
+
+    # Generate report
+    if 'validation_report' in results:
+        report = autopilot.validator.generate_report(results['validation_report'])
+        print("\n" + report)
+
+    # Show execution results
+    if 'execution_results' in results and not args.validate_only:
+        exec_results = results['execution_results']
+        summary = exec_results.get('_summary', {})
+
+        print("\n🏁 Execution Results:")
+        print(f"  Files: {summary.get('total_files', 0)}")
+        print(f"  Passed: {summary.get('total_passed', 0)}")
+        print(f"  Failed: {summary.get('total_failed', 0)}")
+        print(f"  Time: {summary.get('total_time', 0):.2f}s")
+
+    # Show analysis
+    if 'analysis' in results:
+        analysis = results['analysis']
+        print("\n📈 Analysis:")
+        print(f"  Success Rate: {analysis.get('success_rate', 0):.1%}")
+        if analysis['failed_files']:
+            print(f"  Failed Files: {len(analysis['failed_files'])}")
+            for failed in analysis['failed_files'][:3]:
+                print(f"    • {failed}")
+
+        for insight in analysis['performance_insights']:
+            print(f"  • {insight}")
+
+    # Save to file if requested
+    if args.output:
+        with open(args.output, 'w') as f:
+            json.dump(results, f, indent=2, default=str)
+        print(f"\n💾 Results saved to {args.output}")
+
+    # Exit with appropriate code
+    if results.get('status') == 'failed_validation':
+        sys.exit(1)
+    elif 'analysis' in results and results['analysis'].get('total_failed', 0) > 0:
+        sys.exit(1)
+    else:
+        print("\n✅ Autopilot completed successfully!")
+        sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()

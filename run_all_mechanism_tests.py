@@ -318,10 +318,24 @@ def run_all_templates(mode: str = 'quick'):
         json_files = list(datasets_dir.glob("**/*.json"))
         jsonl_files = list(datasets_dir.glob("**/*.jsonl"))
         md_files = list(datasets_dir.glob("**/*.md"))
+        fountain_files = list(datasets_dir.glob("**/*.fountain"))
+        pdf_files = list(datasets_dir.glob("**/*.pdf"))
 
         print(f"  JSON files: {len(json_files)}")
         print(f"  JSONL files: {len(jsonl_files)}")
         print(f"  Markdown files: {len(md_files)}")
+        print(f"  Fountain scripts: {len(fountain_files)}")
+        print(f"  PDF scripts: {len(pdf_files)}")
+
+        if fountain_files:
+            print(f"  ✅ Fountain export working")
+        else:
+            print(f"  ⚠️  No Fountain files found")
+
+        if pdf_files:
+            print(f"  ✅ PDF export working")
+        else:
+            print(f"  ⚠️  No PDF files found")
     else:
         print("  No datasets/ directory found")
 

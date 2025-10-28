@@ -72,10 +72,10 @@ class ExportPipeline:
 
         Args:
             world_id: World identifier
-            report_type: Report type (summary, relationships, knowledge, entity_comparison)
-            export_format: Export format (json, jsonl, csv, markdown)
+            report_type: Report type (summary, relationships, knowledge, entity_comparison, script)
+            export_format: Export format (json, jsonl, csv, markdown, fountain, storyboard, pdf)
             output_path: Output file path
-            compression: Compression format (None, 'gzip', 'bz2')
+            compression: Compression format (None, 'gzip', 'bz2') - not applicable for PDF
             **report_kwargs: Additional arguments for report generation
 
         Returns:
@@ -90,8 +90,21 @@ class ExportPipeline:
         # Normalize export format (markdown -> md)
         normalized_format = "md" if export_format.lower() in ["markdown", "md"] else export_format.lower()
 
+        # Special handling for script exports (fountain, storyboard, pdf)
+        if export_format.lower() in ["fountain", "storyboard", "pdf"]:
+            # Script exports use ScriptData directly, not string content
+            exporter = ExportFormatFactory.create(export_format, compression=compression)
+            output_path = self._add_extension(output_path, export_format)
+
+            # Export ScriptData directly (report_content is ScriptData for script reports)
+            exporter.export(report_content, output_path)
+
+            # Update output_path with compression suffix if applicable
+            if compression:
+                output_path = self._add_compression_suffix(output_path, compression)
+
         # For markdown format, write directly (it's already formatted)
-        if export_format.lower() in ["markdown", "md"]:
+        elif export_format.lower() in ["markdown", "md"]:
             output_path = self._add_extension(output_path, "md")
             if compression:
                 output_path = self._add_compression_suffix(output_path, compression)
@@ -237,7 +250,7 @@ class ExportPipeline:
         report_type: str,
         format: str,
         **kwargs
-    ) -> str:
+    ) -> Any:
         """Generate report content based on type"""
         report_type_lower = report_type.lower()
 
@@ -270,11 +283,50 @@ class ExportPipeline:
                 format=format,
                 **kwargs
             )
+        elif report_type_lower == "script":
+            # Script/storyboard generation
+            return self._generate_script_report(world_id, format, **kwargs)
         else:
             raise ValueError(
                 f"Unsupported report type: {report_type}. "
-                f"Supported: summary, relationships, knowledge, entity_comparison"
+                f"Supported: summary, relationships, knowledge, entity_comparison, script"
             )
+
+    def _generate_script_report(
+        self,
+        world_id: str,
+        format: str,
+        **kwargs
+    ) -> Any:
+        """Generate script/storyboard from simulation data"""
+        from .script_generator import ScriptGenerator
+        from storage import GraphStore
+
+        # Get database connection from query engine
+        # This is a workaround - ideally ExportPipeline would have direct access to store
+        if hasattr(self.query_engine, 'base_query') and hasattr(self.query_engine.base_query, 'store'):
+            store = self.query_engine.base_query.store
+        elif hasattr(self.query_engine, 'store'):
+            store = self.query_engine.store
+        else:
+            # Fallback: create new store connection
+            # You may need to adjust the database path
+            store = GraphStore("sqlite:///timepoint.db")
+
+        # Generate script structure
+        generator = ScriptGenerator(store)
+
+        # Get optional parameters
+        title = kwargs.get("title")
+        temporal_mode = kwargs.get("temporal_mode", "pearl")
+
+        script_data = generator.generate_script_structure(
+            world_id=world_id,
+            title=title,
+            temporal_mode=temporal_mode
+        )
+
+        return script_data
 
     def _prepare_export_data(self, report_content: str, export_format: str) -> Any:
         """Prepare report content for export format"""

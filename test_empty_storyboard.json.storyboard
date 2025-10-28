@@ -1,0 +1,11 @@
+{
+  "title": "Empty Test Storyboard",
+  "world_id": "test_world",
+  "generated_at": "2025-10-28T15:18:18.852691",
+  "temporal_mode": "pearl",
+  "scenes": [],
+  "characters": [],
+  "metadata": {
+    "error": "No timepoints found for world_id"
+  }
+}

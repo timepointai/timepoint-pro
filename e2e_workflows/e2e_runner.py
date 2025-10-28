@@ -145,7 +145,7 @@ class FullE2EWorkflowRunner:
 
                 # Step 6: Upload to Oxen
                 oxen_repo_url, oxen_dataset_url = self._upload_to_oxen(
-                    training_data, config, run_id
+                    training_data, scene_result, all_timepoints, trained_entities, config, run_id
                 )
 
                 # Step 7: Complete metadata
@@ -708,8 +708,78 @@ class FullE2EWorkflowRunner:
 
             return training_examples
 
+    def _generate_script_exports(
+        self,
+        all_timepoints: List[Timepoint],
+        trained_entities: List[Entity],
+        scene_result: Dict,
+        output_dir: Path,
+        config: SimulationConfig,
+        timestamp: str
+    ) -> Dict[str, Path]:
+        """
+        Generate Fountain and PDF script exports.
+
+        Args:
+            all_timepoints: Complete list of all timepoints (including generated ones)
+            trained_entities: Complete list of trained entities
+            scene_result: Scene result dictionary (for store access)
+            output_dir: Output directory
+            config: Simulation configuration
+            timestamp: Timestamp string for filenames
+
+        Returns:
+            Dict with 'fountain' and 'pdf' file paths
+        """
+        print("\n  📝 Generating script exports...")
+
+        try:
+            from reporting.script_generator import ScriptGenerator
+            from reporting.export_formats import FountainExporter, PDFExporter
+
+            store = scene_result.get("store")
+            if not store:
+                print("    ⚠️  No store available - skipping script export")
+                return {}
+
+            if not all_timepoints:
+                print("    ⚠️  No timepoints available - skipping script export")
+                return {}
+
+            # Generate script structure using in-memory data (all timepoints + trained entities)
+            generator = ScriptGenerator(store)
+            script_data = generator.generate_script_structure_from_data(
+                timepoints=all_timepoints,
+                entities=trained_entities,
+                world_id=config.world_id,
+                title=f"{config.world_id} - {timestamp}",
+                temporal_mode=config.temporal.mode.value
+            )
+
+            # Export Fountain script
+            fountain_file = output_dir / f"screenplay_{timestamp}.fountain"
+            fountain_exporter = FountainExporter()
+            fountain_exporter.export(script_data, str(fountain_file))
+            print(f"    ✓ Fountain script: {fountain_file.name} ({fountain_file.stat().st_size} bytes)")
+
+            # Export PDF script
+            pdf_file = output_dir / f"screenplay_{timestamp}.pdf"
+            pdf_exporter = PDFExporter()
+            pdf_exporter.export(script_data, str(pdf_file))
+            print(f"    ✓ PDF script: {pdf_file.name} ({pdf_file.stat().st_size} bytes)")
+
+            return {
+                'fountain': fountain_file,
+                'pdf': pdf_file
+            }
+
+        except Exception as e:
+            print(f"    ⚠️  Script export failed: {e}")
+            # Non-fatal - continue with upload
+            return {}
+
     def _upload_to_oxen(
-        self, training_data: List[Dict], config: SimulationConfig, run_id: str
+        self, training_data: List[Dict], scene_result: Dict, all_timepoints: List[Timepoint], trained_entities: List[Entity], config: SimulationConfig, run_id: str
     ) -> tuple[Optional[str], Optional[str]]:
         """Step 6: Upload to Oxen"""
         with self.logfire.span("step:oxen_upload"):
@@ -734,6 +804,12 @@ class FullE2EWorkflowRunner:
                     f.write(json.dumps(example) + '\n')
 
             print(f"  Saved locally: {output_file}")
+
+            # Generate script exports (Fountain and PDF)
+            # Pass all_timepoints and trained_entities instead of scene_result which only has initial data
+            script_files = self._generate_script_exports(
+                all_timepoints, trained_entities, scene_result, output_dir, config, timestamp
+            )
 
             # Create Oxen client with separate repo per template
             repo_name = f"timepoint-{config.world_id}"

@@ -1,0 +1,63 @@
+{
+  "job_id": "query_evolution_test_latest",
+  "checkpoint_index": 0,
+  "saved_at": "2025-10-28T20:02:42.135121",
+  "items_completed": 0,
+  "state": {
+    "checkpoint_step": 0,
+    "status": "running",
+    "started_at": "2025-10-28T13:02:42.135119"
+  },
+  "metadata": {
+    "run_id": "run_20251028_130242_3c962958",
+    "world_id": "query_evolution_test",
+    "config": {
+      "scenario_description": "A university faculty meeting with 4 professors: Dr. Adams (department chair),\n    Dr. Baker (senior professor), Dr. Chen (associate professor), and Dr. Davis (assistant professor).\n    The meeting progresses through 3 timepoints: opening remarks, budget discussion, and adjournment.",
+      "world_id": "query_evolution_test",
+      "entities": {
+        "count": 4,
+        "types": [
+          "human"
+        ],
+        "initial_resolution": "tensor_only",
+        "animism_level": 0
+      },
+      "timepoints": {
+        "count": 3,
+        "start_time": null,
+        "resolution": "hour",
+        "before_count": 0,
+        "after_count": 0
+      },
+      "temporal": {
+        "mode": "pearl",
+        "narrative_arc": null,
+        "dramatic_tension": 0.5,
+        "cycle_length": null,
+        "prophecy_accuracy": 0.5,
+        "enable_counterfactuals": false
+      },
+      "outputs": {
+        "formats": [
+          "json"
+        ],
+        "include_dialogs": true,
+        "include_relationships": true,
+        "include_knowledge_flow": true,
+        "export_ml_dataset": false
+      },
+      "variations": {
+        "enabled": false,
+        "count": 1,
+        "strategies": [
+          "vary_personalities"
+        ],
+        "deduplication_threshold": 0.9
+      },
+      "metadata": {},
+      "max_cost_usd": null,
+      "enable_checkpoints": true,
+      "checkpoint_interval": 10
+    }
+  }
+}

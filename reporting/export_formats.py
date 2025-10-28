@@ -260,6 +260,289 @@ class SQLiteExporter(ExportFormat):
             conn.close()
 
 
+class FountainExporter(ExportFormat):
+    """
+    Export screenplay data in Fountain format (.fountain).
+
+    Fountain is a plain text markup language for screenwriting.
+    This exporter works with ScriptData structures and outputs
+    industry-standard Fountain format.
+    """
+
+    def export(self, script_data: Any, output_path: str) -> None:
+        """
+        Export ScriptData to Fountain format.
+
+        Args:
+            script_data: ScriptData structure from ScriptGenerator
+            output_path: Output file path (e.g., 'screenplay.fountain')
+        """
+        from .formatters import FountainFormatter
+
+        output_path = self._add_compression_suffix(output_path)
+
+        # Format script as Fountain text
+        formatter = FountainFormatter()
+        fountain_text = formatter.format(script_data)
+
+        # Write to file
+        with self._open_file(output_path, 'w') as f:
+            f.write(fountain_text)
+
+
+class StoryboardJSONExporter(ExportFormat):
+    """
+    Export storyboard data as structured JSON.
+
+    Provides detailed scene-by-scene breakdown with production metadata,
+    suitable for programmatic access and visual storyboard tools.
+    """
+
+    def __init__(self, compression: Optional[str] = None, indent: int = 2):
+        """
+        Args:
+            compression: Compression format (None, 'gzip', 'bz2')
+            indent: Indentation level for pretty printing
+        """
+        super().__init__(compression)
+        self.indent = indent
+
+    def export(self, script_data: Any, output_path: str) -> None:
+        """
+        Export ScriptData to storyboard JSON format.
+
+        Args:
+            script_data: ScriptData structure from ScriptGenerator
+            output_path: Output file path (e.g., 'storyboard.json')
+        """
+        from .formatters import StoryboardJSONFormatter
+
+        output_path = self._add_compression_suffix(output_path)
+
+        # Format script as storyboard JSON
+        formatter = StoryboardJSONFormatter()
+        storyboard_data = formatter.format(script_data)
+
+        # Write to file
+        with self._open_file(output_path, 'w') as f:
+            json.dump(storyboard_data, f, indent=self.indent, default=str)
+
+
+class PDFExporter(ExportFormat):
+    """
+    Export screenplay data as PDF.
+
+    Generates industry-standard screenplay PDFs with:
+    - Courier 12pt font
+    - Proper margins (1.5" left, 1" right, 1" top, 1" bottom)
+    - Correct formatting for scene headings, action, character, dialog
+    """
+
+    def __init__(self, compression: Optional[str] = None):
+        """
+        Args:
+            compression: Not applicable for PDF (binary format)
+        """
+        super().__init__(compression=None)  # PDF doesn't support text compression
+
+    def export(self, script_data: Any, output_path: str) -> None:
+        """
+        Export ScriptData to PDF format.
+
+        Args:
+            script_data: ScriptData structure from ScriptGenerator
+            output_path: Output file path (e.g., 'screenplay.pdf')
+        """
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib.units import inch
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.styles import ParagraphStyle
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
+        from reportlab.lib.enums import TA_LEFT, TA_CENTER
+
+        # Ensure .pdf extension
+        if not output_path.endswith('.pdf'):
+            output_path = output_path + '.pdf'
+
+        # Create PDF document
+        doc = SimpleDocTemplate(
+            output_path,
+            pagesize=letter,
+            leftMargin=1.5 * inch,
+            rightMargin=1.0 * inch,
+            topMargin=1.0 * inch,
+            bottomMargin=1.0 * inch
+        )
+
+        # Build content
+        story = []
+
+        # Title page
+        story.extend(self._build_title_page(script_data))
+        story.append(PageBreak())
+
+        # Screenplay content
+        for scene in script_data.scenes:
+            story.extend(self._build_scene(scene))
+
+        # Build PDF
+        doc.build(story)
+
+    def _build_title_page(self, script_data) -> List:
+        """Build title page elements"""
+        from reportlab.platypus import Paragraph, Spacer
+        from reportlab.lib.styles import ParagraphStyle
+        from reportlab.lib.enums import TA_CENTER
+        from reportlab.lib.units import inch
+
+        elements = []
+
+        # Title style
+        title_style = ParagraphStyle(
+            'Title',
+            fontName='Courier-Bold',
+            fontSize=24,
+            alignment=TA_CENTER,
+            spaceAfter=12
+        )
+
+        # Subtitle style
+        subtitle_style = ParagraphStyle(
+            'Subtitle',
+            fontName='Courier',
+            fontSize=12,
+            alignment=TA_CENTER,
+            spaceAfter=6
+        )
+
+        # Add vertical space
+        elements.append(Spacer(1, 2 * inch))
+
+        # Title
+        elements.append(Paragraph(script_data.title, title_style))
+        elements.append(Spacer(1, 0.5 * inch))
+
+        # Metadata
+        if script_data.world_id:
+            elements.append(Paragraph(f"World ID: {script_data.world_id}", subtitle_style))
+
+        elements.append(Paragraph(f"Temporal Mode: {script_data.temporal_mode.title()}", subtitle_style))
+        elements.append(Spacer(1, 0.25 * inch))
+
+        # Generated timestamp
+        timestamp = script_data.generated_at.strftime("%B %d, %Y")
+        elements.append(Paragraph(timestamp, subtitle_style))
+
+        elements.append(Spacer(1, 0.5 * inch))
+        elements.append(Paragraph("Generated by Timepoint-Daedalus", subtitle_style))
+
+        return elements
+
+    def _build_scene(self, scene) -> List:
+        """Build scene elements"""
+        from reportlab.platypus import Paragraph, Spacer
+        from reportlab.lib.styles import ParagraphStyle
+        from reportlab.lib.enums import TA_LEFT
+        from reportlab.lib.units import inch
+
+        elements = []
+
+        # Scene heading style (ALL CAPS, bold)
+        heading_style = ParagraphStyle(
+            'SceneHeading',
+            fontName='Courier-Bold',
+            fontSize=12,
+            alignment=TA_LEFT,
+            spaceAfter=12,
+            spaceBefore=12
+        )
+
+        # Action style
+        action_style = ParagraphStyle(
+            'Action',
+            fontName='Courier',
+            fontSize=12,
+            alignment=TA_LEFT,
+            spaceAfter=12
+        )
+
+        # Character style (ALL CAPS, indented)
+        character_style = ParagraphStyle(
+            'Character',
+            fontName='Courier',
+            fontSize=12,
+            alignment=TA_LEFT,
+            leftIndent=2.2 * inch,
+            spaceAfter=0
+        )
+
+        # Dialog style (indented)
+        dialog_style = ParagraphStyle(
+            'Dialog',
+            fontName='Courier',
+            fontSize=12,
+            alignment=TA_LEFT,
+            leftIndent=1.0 * inch,
+            rightIndent=1.5 * inch,
+            spaceAfter=12
+        )
+
+        # Parenthetical style (indented more)
+        paren_style = ParagraphStyle(
+            'Parenthetical',
+            fontName='Courier',
+            fontSize=12,
+            alignment=TA_LEFT,
+            leftIndent=1.5 * inch,
+            spaceAfter=0
+        )
+
+        # Scene heading
+        elements.append(Paragraph(scene.heading, heading_style))
+
+        # Scene description
+        if scene.description:
+            elements.append(Paragraph(scene.description, action_style))
+
+        # Interleave action beats and dialog (matching FountainFormatter approach)
+        if scene.dialog:
+            action_idx = 0
+            dialog_idx = 0
+
+            while action_idx < len(scene.action_beats) or dialog_idx < len(scene.dialog):
+                # Add action beat
+                if action_idx < len(scene.action_beats):
+                    elements.append(Paragraph(scene.action_beats[action_idx], action_style))
+                    action_idx += 1
+
+                # Add dialog line
+                if dialog_idx < len(scene.dialog):
+                    dialog_line = scene.dialog[dialog_idx]
+
+                    # Character name (all caps)
+                    character_name = dialog_line.speaker.replace("_", " ").upper()
+                    elements.append(Paragraph(character_name, character_style))
+
+                    # Parenthetical (if present)
+                    if dialog_line.parenthetical:
+                        paren_text = f"({dialog_line.parenthetical})"
+                        elements.append(Paragraph(paren_text, paren_style))
+
+                    # Dialog text
+                    elements.append(Paragraph(dialog_line.content, dialog_style))
+
+                    dialog_idx += 1
+        else:
+            # No dialog, just action beats
+            for beat in scene.action_beats:
+                elements.append(Paragraph(beat, action_style))
+
+        # Add space after scene
+        elements.append(Spacer(1, 0.25 * inch))
+
+        return elements
+
+
 class ExportFormatFactory:
     """Factory for creating export format instances"""
 
@@ -268,7 +551,10 @@ class ExportFormatFactory:
         "json": JSONExporter,
         "csv": CSVExporter,
         "sqlite": SQLiteExporter,
-        "db": SQLiteExporter  # Alias
+        "db": SQLiteExporter,  # Alias
+        "fountain": FountainExporter,
+        "storyboard": StoryboardJSONExporter,
+        "pdf": PDFExporter
     }
 
     @classmethod
