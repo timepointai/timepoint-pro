@@ -678,7 +678,17 @@ class FullE2EWorkflowRunner:
         with self.logfire.span("step:format_training_data"):
             print("\nStep 5: Formatting training data...")
 
-            formatter = EntityEvolutionFormatter()
+            # Get store and llm from scene_result for rich context extraction
+            store = scene_result.get("store")
+            llm = scene_result.get("llm_client")
+
+            # Initialize formatter with context manager support
+            formatter = EntityEvolutionFormatter(store=store, llm=llm)
+
+            if store and llm:
+                print("  ✓ Context manager enabled (M3, M6, M7, M10, M11, M13, M14)")
+            else:
+                print("  ⚠️  Context manager disabled (missing store or llm)")
 
             # Create result structure that formatter expects
             formatted_result = {
@@ -782,20 +792,46 @@ class FullE2EWorkflowRunner:
         with self.logfire.span("step:complete_metadata"):
             print("\nStep 7: Completing metadata...")
 
-            # Estimate cost (rough approximation)
-            # TODO: Track actual token usage from LLM client
             entities_count = len(scene_result["entities"])
             timepoints_count = len(timepoints)
-            estimated_cost = (entities_count * timepoints_count * 0.01)  # Rough estimate
+
+            # FIX BUG #4: Get REAL cost/token tracking from LLM client
+            llm = scene_result.get("llm_client")
+            if llm and hasattr(llm, 'service'):
+                # Get statistics from centralized service
+                stats = llm.service.get_statistics()
+                actual_cost = stats.get("total_cost", 0.0)
+                logger_stats = stats.get("logger_stats", {})
+                actual_tokens = logger_stats.get("total_tokens", 0)
+                actual_calls = logger_stats.get("total_calls", 0)
+
+                print(f"  📊 Real metrics from LLM service:")
+                print(f"     Cost: ${actual_cost:.4f} (not placeholder!)")
+                print(f"     Tokens: {actual_tokens:,}")
+                print(f"     Calls: {actual_calls}")
+            elif llm:
+                # Fallback to legacy client stats if available
+                actual_cost = getattr(llm, 'cost', 0.0)
+                actual_tokens = getattr(llm, 'token_count', 0)
+                actual_calls = timepoints_count  # Rough estimate only for legacy
+
+                print(f"  ⚠️  Using legacy client stats (may be incomplete)")
+            else:
+                # Final fallback: use conservative estimates
+                actual_cost = (entities_count * timepoints_count * 0.01)
+                actual_tokens = entities_count * timepoints_count * 1000
+                actual_calls = timepoints_count
+
+                print(f"  ⚠️  No LLM client found, using estimates")
 
             metadata = self.metadata_manager.complete_run(
                 run_id=run_id,
                 entities_created=entities_count,
                 timepoints_created=timepoints_count,
                 training_examples=len(training_data),
-                cost_usd=estimated_cost,
-                llm_calls=timepoints_count,  # Rough estimate
-                tokens_used=entities_count * timepoints_count * 1000,  # Rough estimate
+                cost_usd=actual_cost,  # REAL cost, not estimate
+                llm_calls=actual_calls,  # REAL call count
+                tokens_used=actual_tokens,  # REAL token count
                 oxen_repo_url=oxen_repo_url,
                 oxen_dataset_url=oxen_dataset_url
             )
@@ -805,14 +841,18 @@ class FullE2EWorkflowRunner:
             print(f"  - Entities: {entities_count}")
             print(f"  - Timepoints: {timepoints_count}")
             print(f"  - Training Examples: {len(training_data)}")
-            print(f"  - Estimated Cost: ${estimated_cost:.2f}")
+            print(f"  - Actual Cost: ${actual_cost:.4f}")
+            print(f"  - Actual Tokens: {actual_tokens:,}")
+            print(f"  - Actual LLM Calls: {actual_calls}")
             if oxen_repo_url:
                 print(f"  - Oxen Repo: {oxen_repo_url}")
 
             self.logfire.info(
                 "Metadata tracking complete",
                 run_id=run_id,
-                cost=estimated_cost
+                cost=actual_cost,
+                tokens=actual_tokens,
+                calls=actual_calls
             )
 
             return metadata

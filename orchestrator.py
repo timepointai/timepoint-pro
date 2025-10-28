@@ -1099,6 +1099,13 @@ class OrchestratorAgent:
         print("\n🕸️  Step 3: Building relationship graph...")
         graph = self.relationship_extractor.build_graph(spec)
 
+        # Step 3.5: Create relationship trajectories from graph edges (FIX BUG #4)
+        relationship_trajectories = []
+        if save_to_db:
+            print("\n💑 Step 3.5: Creating relationship trajectories...")
+            relationship_trajectories = self._create_relationship_trajectories(graph, spec, save_to_db=True)
+            print(f"   ✓ Created {len(relationship_trajectories)} relationship trajectories")
+
         # Step 4: Assign resolution levels
         print("\n🎯 Step 4: Assigning resolution levels...")
         resolution_assignments, cost_estimate = self.resolution_assigner.assign_resolutions(spec, graph)
@@ -1168,6 +1175,7 @@ class OrchestratorAgent:
             "timepoints": timepoints,
             "graph": graph,
             "exposure_events": exposure_events,
+            "relationship_trajectories": relationship_trajectories,
             "temporal_agent": temporal_agent,
             "resolution_assignments": resolution_assignments,
             "estimated_cost": cost_estimate
@@ -1379,6 +1387,88 @@ class OrchestratorAgent:
 
         print(f"   ✓ Created {len(timepoints)} timepoint objects")
         return timepoints
+
+    def _create_relationship_trajectories(
+        self,
+        graph: nx.Graph,
+        spec: SceneSpecification,
+        save_to_db: bool = True
+    ):
+        """
+        Create initial relationship trajectories from graph edges.
+
+        FIX BUG #4: Orchestrator builds NetworkX graph but never saves RelationshipTrajectory
+        records to database. M13 context manager queries these records and finds nothing,
+        resulting in empty relationship context in training data.
+
+        This method creates minimal RelationshipTrajectory records for initial relationships.
+        For multi-timepoint scenarios, these will be updated by analyze_relationship_evolution().
+
+        Args:
+            graph: NetworkX graph with relationship edges
+            spec: Scene specification
+            save_to_db: Whether to save trajectories to database
+
+        Returns:
+            List of created RelationshipTrajectory objects
+        """
+        from schemas import RelationshipTrajectory
+
+        trajectories = []
+        first_tp = spec.timepoints[0] if spec.timepoints else None
+
+        if not first_tp:
+            return trajectories
+
+        # Parse timestamp for initial state
+        timestamp = parse_iso_datetime(first_tp.timestamp)
+
+        # Iterate through all edges in the graph
+        for entity_a, entity_b, edge_data in graph.edges(data=True):
+            relationship_type = edge_data.get('relationship', 'unknown')
+            weight = edge_data.get('weight', 0.5)
+
+            # Create relationship metrics based on type
+            # Higher weights for positive relationships
+            metrics = {
+                'trust': weight,
+                'affection': weight if relationship_type in ['friend', 'ally', 'family'] else 0.3,
+                'respect': weight,
+                'cooperation': weight if relationship_type in ['colleague', 'ally'] else 0.5
+            }
+
+            # Create initial state (will be serialized to JSON)
+            state = {
+                'entity_a': entity_a,
+                'entity_b': entity_b,
+                'timestamp': timestamp.isoformat(),  # Convert to ISO string for JSON
+                'timepoint_id': first_tp.timepoint_id,
+                'metrics': metrics,
+                'recent_events': []
+            }
+
+            # Create trajectory
+            trajectory = RelationshipTrajectory(
+                trajectory_id=f"trajectory_{entity_a}_{entity_b}_{first_tp.timepoint_id}",
+                entity_a=entity_a,
+                entity_b=entity_b,
+                start_timepoint=first_tp.timepoint_id,
+                end_timepoint=first_tp.timepoint_id,
+                states=json.dumps([state]),  # Serialize to JSON string
+                overall_trend='stable',  # Initial relationships are stable
+                key_events=[],
+                relationship_type=relationship_type,
+                current_strength=weight,
+                context_summary=f"Initial {relationship_type} relationship between {entity_a} and {entity_b}"
+            )
+
+            trajectories.append(trajectory)
+
+            # Save to database
+            if save_to_db and self.store:
+                self.store.save_relationship_trajectory(trajectory)
+
+        return trajectories
 
 
 # ============================================================================

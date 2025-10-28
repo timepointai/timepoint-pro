@@ -12,12 +12,20 @@ import json
 import logging
 import uuid
 
+# Import run_id tracking for integration with metadata system
+try:
+    from metadata.tracking import get_current_run_id
+except ImportError:
+    def get_current_run_id():
+        return None
+
 
 @dataclass
 class CallMetadata:
     """Metadata for an LLM call"""
     timestamp: str
     session_id: str
+    run_id: Optional[str]  # ADDED: Integration with e2e run tracking
     call_type: str
     model: str
     parameters: Dict[str, Any]
@@ -120,10 +128,14 @@ class CallLogger:
         # Get session ID
         session_id = self.current_session.session_id if self.current_session else "no_session"
 
+        # FIX BUG #3: Get run_id from thread-local tracking system
+        run_id = get_current_run_id()
+
         # Build metadata
         metadata = CallMetadata(
             timestamp=datetime.now().isoformat(),
             session_id=session_id,
+            run_id=run_id,  # ADDED: Include run_id for e2e workflow tracking
             call_type=call_type,
             model=model,
             parameters=parameters,

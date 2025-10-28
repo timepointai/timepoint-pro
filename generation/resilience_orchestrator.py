@@ -485,8 +485,9 @@ class ResilientE2EWorkflowRunner:
 
             if checkpoint_data:
                 # Resume from checkpoint
-                print(f"\n📦 RESUMING from checkpoint (step {checkpoint_data['checkpoint_step']})")
-                self.transaction_log.log("resume", f"Resuming from step {checkpoint_data['checkpoint_step']}")
+                checkpoint_step = checkpoint_data.get('state', {}).get('checkpoint_step', 'unknown')
+                print(f"\n📦 RESUMING from checkpoint (step {checkpoint_step})")
+                self.transaction_log.log("resume", f"Resuming from step {checkpoint_step}")
                 result = self._resume_from_checkpoint(run_id, config, checkpoint_data)
             else:
                 # Fresh run

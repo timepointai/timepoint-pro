@@ -2466,8 +2466,18 @@ class TemporalAgent:
 
         context = context or {}
 
-        # Generate next timepoint ID
-        next_id = f"{current_timepoint.timepoint_id}_next_{uuid.uuid4().hex[:8]}"
+        # FIX BUG #2: Generate sequential timepoint ID instead of chaining
+        # Extract sequence number from current ID or generate new one
+        import re
+        current_id = current_timepoint.timepoint_id
+        # Try to extract sequence number (e.g., "tp_001" -> 1)
+        match = re.match(r'tp_(\d+)', current_id)
+        if match:
+            next_seq = int(match.group(1)) + 1
+            next_id = f"tp_{next_seq:03d}"
+        else:
+            # Fallback: append sequential suffix
+            next_id = f"{current_id.split('_next_')[0]}_seq_{uuid.uuid4().hex[:8]}"
 
         # Determine time delta based on mode
         if self.mode == TemporalMode.DIRECTORIAL:
@@ -2482,11 +2492,14 @@ class TemporalAgent:
 
         next_timestamp = current_timepoint.timestamp + time_delta
 
-        # Generate event description
+        # FIX BUG #1: Generate proper event description instead of concatenation
         if "next_event" in context:
             event_description = context["next_event"]
         else:
-            event_description = f"Continuation from {current_timepoint.event_description}"
+            # Generate meaningful progression description instead of concatenating
+            iteration = context.get("iteration", 0)
+            total = context.get("total", 1)
+            event_description = f"Timepoint {iteration + 1}/{total}: Events continue to unfold"
 
         # Create next timepoint
         next_timepoint = Timepoint(
@@ -2502,4 +2515,43 @@ class TemporalAgent:
         if self.store:
             self.store.save_timepoint(next_timepoint)
 
+            # FIX BUG #6: Create exposure events for entities experiencing this event
+            # This ensures entities learn knowledge from events they participate in
+            self._create_exposure_events_for_timepoint(next_timepoint)
+
         return next_timepoint
+
+    def _create_exposure_events_for_timepoint(self, timepoint):
+        """
+        Create exposure events for entities present at a timepoint.
+
+        Bug Fix: Previously, exposure events were only created for initial knowledge.
+        Entities never learned anything from subsequent events they experienced.
+        This method creates exposure events so entities acquire knowledge from participation.
+
+        Args:
+            timepoint: The Timepoint object to create exposure events for
+        """
+        from schemas import ExposureEvent
+        from datetime import datetime
+
+        # Create a knowledge item representing the event experience
+        # This is a basic "entity experienced event" record
+        # More sophisticated knowledge extraction would come from LLM population
+        event_knowledge = f"Experienced event: {timepoint.event_description[:200]}"
+
+        # Create exposure event for each entity present
+        for entity_id in timepoint.entities_present:
+            exposure_event = ExposureEvent(
+                entity_id=entity_id,
+                event_type="experienced",  # They directly experienced the event
+                information=event_knowledge,
+                source=f"timepoint_{timepoint.timepoint_id}",
+                timestamp=timepoint.timestamp,
+                confidence=1.0,  # They were definitely present
+                timepoint_id=timepoint.timepoint_id
+            )
+
+            # Save to database
+            if self.store:
+                self.store.save_exposure_event(exposure_event)

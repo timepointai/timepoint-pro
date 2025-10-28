@@ -299,6 +299,9 @@ class RelationshipTrajectory(SQLModel, table=True):
     states: str = Field(sa_column=Column(JSON))  # JSON list of RelationshipState dicts
     overall_trend: str  # "improving", "deteriorating", "stable", "volatile"
     key_events: List[str] = Field(default_factory=list, sa_column=Column(JSON))
+    relationship_type: Optional[str] = Field(default=None)  # "ally", "rival", "friend", etc.
+    current_strength: Optional[float] = Field(default=None)  # 0.0-1.0 relationship weight
+    context_summary: Optional[str] = Field(default=None)  # Brief description of relationship
 
 
 class Contradiction(BaseModel):
