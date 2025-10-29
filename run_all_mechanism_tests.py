@@ -46,6 +46,37 @@ if os.getenv("OXEN_API_KEY") and not os.getenv("OXEN_API_TOKEN"):
     os.environ["OXEN_API_TOKEN"] = os.environ["OXEN_API_KEY"]
 
 
+def confirm_expensive_run(mode: str, min_cost: float, max_cost: float, runtime_min: int) -> bool:
+    """
+    Ask user to confirm expensive test runs.
+
+    Args:
+        mode: The mode name
+        min_cost: Minimum estimated cost in USD
+        max_cost: Maximum estimated cost in USD
+        runtime_min: Estimated runtime in minutes
+
+    Returns:
+        True if user confirms, False otherwise
+    """
+    print("\n" + "="*80)
+    print("⚠️  EXPENSIVE RUN CONFIRMATION REQUIRED")
+    print("="*80)
+    print(f"Mode: {mode}")
+    print(f"Estimated Cost: ${min_cost:.0f}-${max_cost:.0f}")
+    print(f"Estimated Runtime: {runtime_min} minutes")
+    print()
+
+    response = input("Do you want to proceed? [y/N]: ").strip().lower()
+
+    if response in ['y', 'yes']:
+        print("✓ Confirmed. Starting test run...")
+        return True
+    else:
+        print("❌ Cancelled by user")
+        return False
+
+
 def run_template(runner, config, name: str, expected_mechanisms: Set[str]) -> Dict:
     """Run a single template and return results"""
     print(f"\n{'='*80}")
@@ -225,6 +256,44 @@ def run_all_templates(mode: str = 'quick'):
         ("timepoint_personality_archetypes", SimulationConfig.timepoint_founder_personality_archetypes(), {"M12", "M13", "M8", "M7", "M11"}),
         ("timepoint_charismatic_founder", SimulationConfig.timepoint_charismatic_founder_archetype(), {"M12", "M13", "M8", "M11", "M7"}),
         ("timepoint_demanding_genius", SimulationConfig.timepoint_demanding_genius_archetype(), {"M12", "M13", "M8", "M7", "M15", "M11"}),
+        # AI marketplace competitive dynamics (NEW - Phase 11)
+        ("timepoint_ai_pricing_war", SimulationConfig.timepoint_ai_pricing_war(), {"M12", "M7", "M13", "M15", "M8"}),
+        ("timepoint_ai_capability_leapfrog", SimulationConfig.timepoint_ai_capability_leapfrog(), {"M12", "M9", "M10", "M13"}),
+        ("timepoint_ai_business_model_evolution", SimulationConfig.timepoint_ai_business_model_evolution(), {"M12", "M7", "M13", "M15", "M8"}),
+        ("timepoint_ai_regulatory_divergence", SimulationConfig.timepoint_ai_regulatory_divergence(), {"M12", "M7", "M13", "M14"}),
+    ]
+
+    # PORTAL mode templates (backward temporal reasoning)
+    portal_templates = [
+        ("portal_presidential_election", SimulationConfig.portal_presidential_election(), {"M17", "M15", "M12", "M7", "M13"}),
+        ("portal_startup_unicorn", SimulationConfig.portal_startup_unicorn(), {"M17", "M13", "M8", "M11", "M15", "M7"}),
+        ("portal_academic_tenure", SimulationConfig.portal_academic_tenure(), {"M17", "M15", "M3", "M14", "M13"}),
+        ("portal_startup_failure", SimulationConfig.portal_startup_failure(), {"M17", "M12", "M8", "M13", "M15", "M11"}),
+    ]
+
+    # PORTAL mode with SIMULATION-BASED JUDGING (enhanced quality)
+    # Quick variants: 1 forward step, no dialog (~2x cost)
+    portal_templates_simjudged_quick = [
+        ("portal_presidential_election_simjudged_quick", SimulationConfig.portal_presidential_election_simjudged_quick(), {"M17", "M15", "M12", "M7", "M13"}),
+        ("portal_startup_unicorn_simjudged_quick", SimulationConfig.portal_startup_unicorn_simjudged_quick(), {"M17", "M13", "M8", "M11", "M15", "M7"}),
+        ("portal_academic_tenure_simjudged_quick", SimulationConfig.portal_academic_tenure_simjudged_quick(), {"M17", "M15", "M3", "M14", "M13"}),
+        ("portal_startup_failure_simjudged_quick", SimulationConfig.portal_startup_failure_simjudged_quick(), {"M17", "M12", "M8", "M13", "M15", "M11"}),
+    ]
+
+    # Standard variants: 2 forward steps, dialog enabled (~3x cost)
+    portal_templates_simjudged = [
+        ("portal_presidential_election_simjudged", SimulationConfig.portal_presidential_election_simjudged(), {"M17", "M15", "M12", "M7", "M13"}),
+        ("portal_startup_unicorn_simjudged", SimulationConfig.portal_startup_unicorn_simjudged(), {"M17", "M13", "M8", "M11", "M15", "M7"}),
+        ("portal_academic_tenure_simjudged", SimulationConfig.portal_academic_tenure_simjudged(), {"M17", "M15", "M3", "M14", "M13"}),
+        ("portal_startup_failure_simjudged", SimulationConfig.portal_startup_failure_simjudged(), {"M17", "M12", "M8", "M13", "M15", "M11"}),
+    ]
+
+    # Thorough variants: 3 forward steps, extra analysis (~4-5x cost)
+    portal_templates_simjudged_thorough = [
+        ("portal_presidential_election_simjudged_thorough", SimulationConfig.portal_presidential_election_simjudged_thorough(), {"M17", "M15", "M12", "M7", "M13"}),
+        ("portal_startup_unicorn_simjudged_thorough", SimulationConfig.portal_startup_unicorn_simjudged_thorough(), {"M17", "M13", "M8", "M11", "M15", "M7"}),
+        ("portal_academic_tenure_simjudged_thorough", SimulationConfig.portal_academic_tenure_simjudged_thorough(), {"M17", "M15", "M3", "M14", "M13"}),
+        ("portal_startup_failure_simjudged_thorough", SimulationConfig.portal_startup_failure_simjudged_thorough(), {"M17", "M12", "M8", "M13", "M15", "M11"}),
     ]
 
     # ANDOS test scripts (always run)
@@ -244,18 +313,86 @@ def run_all_templates(mode: str = 'quick'):
         print("⚠️  FULL MODE: Running expensive templates!")
         print("   Estimated cost: $20-50, Runtime: 30-60 minutes")
         print()
+    elif mode == 'portal':
+        templates_to_run = portal_templates
+        print("🌀 PORTAL MODE: Backward Temporal Reasoning (Standard)")
+        print("   Running 4 PORTAL mode templates (M17 - Modal Temporal Causality):")
+        print("   - portal_presidential_election: Tech exec → President (15 years)")
+        print("   - portal_startup_unicorn: Idea → $1B+ valuation (6 years)")
+        print("   - portal_academic_tenure: PhD → Tenure (10 years)")
+        print("   - portal_startup_failure: Seed → Shutdown (4 years)")
+        print("   Estimated cost: $5-10, Runtime: 10-15 minutes")
+        print("   Each template generates multiple backward paths with coherence scoring")
+        print()
+    elif mode == 'portal_simjudged_quick':
+        templates_to_run = portal_templates_simjudged_quick
+        print("🎬 PORTAL MODE: Simulation-Judged QUICK (Enhanced Quality)")
+        print("   Running 4 PORTAL templates with lightweight simulation judging:")
+        print("   - 1 forward step per candidate antecedent")
+        print("   - No dialog generation (faster)")
+        print("   - Judge LLM: Llama 3.1 70B")
+        print("   Estimated cost: $10-20 (~2x standard), Runtime: 20-30 minutes")
+        print("   Quality: Good - captures basic emergent behaviors")
+        print()
+    elif mode == 'portal_simjudged':
+        templates_to_run = portal_templates_simjudged
+        print("🎬 PORTAL MODE: Simulation-Judged STANDARD (High Quality)")
+        print("   Running 4 PORTAL templates with standard simulation judging:")
+        print("   - 2 forward steps per candidate antecedent")
+        print("   - Dialog generation enabled")
+        print("   - Judge LLM: Llama 3.1 405B")
+        print("   Estimated cost: $15-30 (~3x standard), Runtime: 30-45 minutes")
+        print("   Quality: High - captures dialog realism and emergent patterns")
+        print()
+    elif mode == 'portal_simjudged_thorough':
+        templates_to_run = portal_templates_simjudged_thorough
+        print("🎬 PORTAL MODE: Simulation-Judged THOROUGH (Maximum Quality)")
+        print("   Running 4 PORTAL templates with thorough simulation judging:")
+        print("   - 3 forward steps per candidate antecedent")
+        print("   - Dialog generation + extra analysis")
+        print("   - Judge LLM: Llama 3.1 405B (low temperature)")
+        print("   - More candidates per step for better exploration")
+        print("   Estimated cost: $25-50 (~4-5x standard), Runtime: 45-60 minutes")
+        print("   Quality: Maximum - research-grade path generation")
+        print()
+    elif mode == 'portal_all':
+        templates_to_run = portal_templates + portal_templates_simjudged_quick + portal_templates_simjudged + portal_templates_simjudged_thorough
+        print("🎬🌀 PORTAL MODE: ALL VARIANTS (Comprehensive)")
+        print("   Running ALL 16 PORTAL templates:")
+        print("   - 4 standard PORTAL templates")
+        print("   - 4 simulation-judged QUICK variants")
+        print("   - 4 simulation-judged STANDARD variants")
+        print("   - 4 simulation-judged THOROUGH variants")
+        print("   Estimated cost: $55-110, Runtime: 105-150 minutes")
+        print("   Use this for comprehensive quality comparison across all approaches")
+        print()
     elif mode == 'timepoint_corporate':
         templates_to_run = timepoint_corporate_templates
         print("🏢 TIMEPOINT CORPORATE ANALYSIS MODE")
-        print("   Running 11 Timepoint-specific corporate templates:")
+        print("   Running 15 Timepoint-specific corporate templates:")
         print("   - 6 formation analysis templates (IPO, acquisition, cofounder configs, equity, decisions, success/failure)")
         print("   - 2 emergent growth templates (marketing campaigns, staffing & growth)")
         print("   - 3 personality × governance templates (archetypes, charismatic founder, demanding genius)")
-        print("   Estimated cost: $10-20, Runtime: 20-40 minutes")
+        print("   - 4 AI marketplace dynamics templates (pricing war, capability leapfrog, business model evolution, regulatory divergence)")
+        print("   Estimated cost: $15-30, Runtime: 30-60 minutes")
         print()
 
     results = {}
     total_cost = 0.0
+
+    # Confirmation for expensive runs
+    expensive_modes = {
+        'full': (20, 50, 45),
+        'portal_simjudged': (15, 30, 38),
+        'portal_simjudged_thorough': (25, 50, 53),
+        'portal_all': (55, 110, 128)
+    }
+
+    if mode in expensive_modes:
+        min_cost, max_cost, runtime = expensive_modes[mode]
+        if not confirm_expensive_run(mode.upper(), min_cost, max_cost, runtime):
+            print("\nTest run cancelled.")
+            sys.exit(0)
 
     # Run pre-programmed templates
     print(f"\n{'='*80}")
@@ -402,9 +539,34 @@ if __name__ == "__main__":
         help="Run all templates including expensive ones (default: quick mode)"
     )
     parser.add_argument(
+        "--portal-test-only",
+        action="store_true",
+        help="Run ONLY PORTAL mode backward simulation tests (4 templates)"
+    )
+    parser.add_argument(
         "--timepoint-corporate-analysis-only",
         action="store_true",
         help="Run ONLY Timepoint corporate formation scenarios (VC pitches + formation analysis)"
+    )
+    parser.add_argument(
+        "--portal-simjudged-quick-only",
+        action="store_true",
+        help="Run ONLY PORTAL simulation-judged QUICK variants (1 step, ~2x cost, 4 templates)"
+    )
+    parser.add_argument(
+        "--portal-simjudged-only",
+        action="store_true",
+        help="Run ONLY PORTAL simulation-judged STANDARD variants (2 steps + dialog, ~3x cost, 4 templates)"
+    )
+    parser.add_argument(
+        "--portal-simjudged-thorough-only",
+        action="store_true",
+        help="Run ONLY PORTAL simulation-judged THOROUGH variants (3 steps + analysis, ~4-5x cost, 4 templates)"
+    )
+    parser.add_argument(
+        "--portal-all",
+        action="store_true",
+        help="Run ALL PORTAL tests (standard + all 3 simulation-judged variants = 16 templates total)"
     )
     args = parser.parse_args()
 
@@ -418,7 +580,17 @@ if __name__ == "__main__":
     print()
 
     # Determine mode
-    if args.timepoint_corporate_analysis_only:
+    if args.portal_test_only:
+        mode = 'portal'
+    elif args.portal_simjudged_quick_only:
+        mode = 'portal_simjudged_quick'
+    elif args.portal_simjudged_only:
+        mode = 'portal_simjudged'
+    elif args.portal_simjudged_thorough_only:
+        mode = 'portal_simjudged_thorough'
+    elif args.portal_all:
+        mode = 'portal_all'
+    elif args.timepoint_corporate_analysis_only:
         mode = 'timepoint_corporate'
     elif args.full:
         mode = 'full'

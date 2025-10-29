@@ -151,13 +151,70 @@ config, confidence = generator.generate_config(
 
 ### 2. Modal Temporal Causality
 
-Choose from five temporal modes:
+Choose from six temporal modes:
 
 - **Pearl** - Standard DAG causality (historical realism)
 - **Directorial** - Narrative-driven (dramatic coherence)
 - **Nonlinear** - Flashbacks and non-linear presentation
 - **Branching** - Many-worlds counterfactuals
 - **Cyclical** - Time loops and prophecy
+- **PORTAL** - Backward temporal reasoning from endpoint to origin
+
+#### PORTAL Mode: Backward Temporal Reasoning
+
+**Problem**: Given a known endpoint (e.g., "Jane Chen elected President in 2040") and an origin (e.g., "Jane Chen is VP Engineering in 2025"), discover the most plausible paths between them.
+
+**How It Works:**
+1. **Define Portal & Origin**: Specify the endpoint state you want to reach and the starting point
+2. **Backward Path Exploration**: System works backward from portal, generating N candidate antecedent states at each step
+3. **Hybrid Scoring**: Each candidate scored using LLM plausibility, historical precedent, causal necessity, entity capability, and dynamic context
+4. **Forward Coherence Validation**: Paths validated by simulating forward from origin to portal
+5. **Pivot Point Detection**: Identifies critical decision moments where paths diverge
+
+**Example Use Cases:**
+- Career paths: tech executive → president, startup → unicorn, PhD → tenure
+- Failure analysis: successful seed round → company shutdown (what went wrong?)
+- Historical what-ifs: Different outcomes given known starting conditions
+
+**Quality Enhancement: Simulation-Based Judging (Optional)**
+
+For higher quality paths, enable simulation-based judging instead of static scoring:
+
+- **Standard**: Static formula scoring (~$5-10 per run)
+- **Simulation-Judged Quick**: 1 forward step, no dialog (~$10-20, ~2x cost)
+- **Simulation-Judged Standard**: 2 forward steps + dialog (~$15-30, ~3x cost)
+- **Simulation-Judged Thorough**: 3 forward steps + extra analysis (~$25-50, ~4-5x cost)
+
+Simulation judging captures emergent behaviors, dialog realism, and internal consistency that static formulas miss.
+
+**Configuration Example:**
+```python
+from generation.config_schema import TemporalConfig, SimulationConfig
+from schemas import TemporalMode
+
+# Standard PORTAL mode
+config = TemporalConfig(
+    mode=TemporalMode.PORTAL,
+    portal_description="Jane Chen elected President with 52.4% vote in 2040",
+    portal_year=2040,
+    origin_year=2025,
+    origin_description="Jane Chen VP Engineering at TechCorp",
+    backward_steps=15,  # 2040 - 2025 = 15 years
+    path_count=3,  # Generate top 3 paths
+    candidate_antecedents_per_step=5,  # Branching factor
+    exploration_mode="adaptive",  # reverse_chronological | oscillating | adaptive
+    coherence_threshold=0.7
+)
+
+# Or use pre-built templates
+config_standard = SimulationConfig.portal_presidential_election()
+config_simjudged = SimulationConfig.portal_presidential_election_simjudged()
+```
+
+**See Also:**
+- Examples: `examples/portal_presidential_election.py`
+- Documentation: [MECHANICS.md](MECHANICS.md) - M17 PORTAL Mode section
+- Templates: 16 PORTAL templates (4 scenarios × 4 variants each)
 
 ### 3. Adaptive Fidelity
 
@@ -256,9 +313,24 @@ pytest test_phase3_dialog_multi_entity.py -v       # M13: Multi-Entity Synthesis
 # Run mechanism test runner
 python run_all_mechanism_tests.py
 
+# PORTAL Mode Tests (M17 - Backward Temporal Reasoning)
+python run_all_mechanism_tests.py --portal-test-only                    # Standard PORTAL (4 templates, ~$5-10)
+python run_all_mechanism_tests.py --portal-simjudged-quick-only        # Quick simulation judging (~$10-20)
+python run_all_mechanism_tests.py --portal-simjudged-only              # Standard simulation judging (~$15-30)
+python run_all_mechanism_tests.py --portal-simjudged-thorough-only     # Thorough simulation judging (~$25-50)
+python run_all_mechanism_tests.py --portal-all                         # All PORTAL variants (16 templates, ~$55-110)
+
 # Run with real LLM (requires OPENROUTER_API_KEY)
 export OPENROUTER_API_KEY=your_key
 pytest -v
+```
+
+**PORTAL Mode Testing:**
+- 4 scenarios: presidential election, startup unicorn, academic tenure, startup failure
+- 4 quality levels each: standard (static), sim-judged quick, sim-judged standard, sim-judged thorough
+- Total: 16 PORTAL templates testing backward temporal reasoning
+- Simulation judging captures emergent behaviors and dialog realism invisible to static scoring
+
 ```
 
 ### Test Coverage

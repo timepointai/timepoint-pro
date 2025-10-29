@@ -160,6 +160,7 @@ class TemporalMode(str, Enum):
     NONLINEAR = "nonlinear"
     BRANCHING = "branching"
     CYCLICAL = "cyclical"
+    PORTAL = "portal"  # Backward inference from fixed endpoint to origin
 
 
 class EntityConfig(BaseModel):
@@ -207,7 +208,7 @@ class CompanyConfig(BaseModel):
     @field_validator('resolution')
     @classmethod
     def validate_resolution(cls, v):
-        valid_resolutions = {"year", "month", "day", "hour", "minute", "second"}
+        valid_resolutions = {"year", "quarter", "month", "day", "hour", "minute", "second"}
         if v not in valid_resolutions:
             raise ValueError(f"Invalid resolution. Must be one of: {valid_resolutions}")
         return v
@@ -241,6 +242,102 @@ class TemporalConfig(BaseModel):
     enable_counterfactuals: bool = Field(
         default=False,
         description="Enable counterfactual branch generation"
+    )
+
+    # Portal mode settings (backward inference from endpoint to origin)
+    portal_description: Optional[str] = Field(
+        default=None,
+        description="Description of the endpoint state (e.g., 'John Doe elected President 2040')"
+    )
+    portal_year: Optional[int] = Field(
+        default=None,
+        description="Year of the portal/endpoint state"
+    )
+    origin_year: Optional[int] = Field(
+        default=None,
+        description="Year of the origin/starting state (e.g., 2025)"
+    )
+    backward_steps: int = Field(
+        ge=1, le=100, default=15,
+        description="Number of intermediate steps between origin and portal"
+    )
+    exploration_mode: str = Field(
+        default="adaptive",
+        description="Exploration strategy: 'reverse_chronological', 'oscillating', 'random', 'adaptive'"
+    )
+    oscillation_complexity_threshold: int = Field(
+        default=10,
+        description="If backward_steps > threshold, use oscillating strategy"
+    )
+    candidate_antecedents_per_step: int = Field(
+        ge=1, le=50, default=10,
+        description="How many candidate previous states to generate per step"
+    )
+    path_count: int = Field(
+        ge=1, le=100, default=5,
+        description="Number of complete paths to find and rank"
+    )
+    coherence_threshold: float = Field(
+        ge=0.0, le=1.0, default=0.7,
+        description="Minimum coherence score for valid path"
+    )
+    checkpoint_interval: int = Field(
+        ge=1, default=3,
+        description="Retrain entity tensors every N years"
+    )
+    llm_scoring_weight: float = Field(
+        ge=0.0, le=1.0, default=0.3,
+        description="Weight for LLM-based plausibility scoring"
+    )
+    historical_precedent_weight: float = Field(
+        ge=0.0, le=1.0, default=0.2,
+        description="Weight for historical precedent scoring"
+    )
+    causal_necessity_weight: float = Field(
+        ge=0.0, le=1.0, default=0.3,
+        description="Weight for causal necessity scoring"
+    )
+    entity_capability_weight: float = Field(
+        ge=0.0, le=1.0, default=0.2,
+        description="Weight for entity capability scoring"
+    )
+    max_backtrack_depth: int = Field(
+        ge=0, le=10, default=3,
+        description="How many steps to backtrack before pruning path"
+    )
+    portal_relaxation_enabled: bool = Field(
+        default=True,
+        description="Allow relaxing portal/endpoint if no coherent paths found"
+    )
+
+    # Simulation-based judging settings (M17 PORTAL enhancement)
+    use_simulation_judging: bool = Field(
+        default=False,
+        description="Enable simulation-based evaluation instead of static scoring"
+    )
+    simulation_forward_steps: int = Field(
+        ge=1, le=10, default=2,
+        description="How many forward steps to simulate per candidate antecedent"
+    )
+    simulation_max_entities: int = Field(
+        ge=1, le=50, default=5,
+        description="Limit number of entities tracked in mini-simulations for performance"
+    )
+    simulation_include_dialog: bool = Field(
+        default=True,
+        description="Generate dialog in mini-simulations for realism assessment"
+    )
+    judge_model: Optional[str] = Field(
+        default="meta-llama/llama-3.1-405b-instruct",
+        description="LLM model to use for judging simulation realism"
+    )
+    judge_temperature: float = Field(
+        ge=0.0, le=2.0, default=0.3,
+        description="Temperature for judge LLM (lower = more consistent)"
+    )
+    simulation_cache_results: bool = Field(
+        default=True,
+        description="Cache simulation results to avoid redundant computation"
     )
 
 
@@ -2298,7 +2395,7 @@ class SimulationConfig(BaseModel):
                 "\n\n"
                 "**Timeline B: Paid Acquisition + Growth Hacking (Fast Burn)**"
                 "\n"
-                "Timeline B pursues aggressive paid acquisition: Google Ads, LinkedIn campaigns, retargeting, "
+                "Timeline B pursues aggressive paid acquisition: search ads, professional network campaigns, retargeting, "
                 "growth hacking experiments. Founders allocate $60K to paid channels {monthly_ad_budget}. "
                 "Month 1-3: They experiment with messaging {ad_creative_variations}, targeting {audience_segments}, "
                 "and channels {channel_mix}. Early CAC is high {cac_month_3} but they gain rapid learning "
@@ -2549,9 +2646,16 @@ class SimulationConfig(BaseModel):
         Comprehensive founder personality × governance structure matrix.
 
         Test 6 founder personality archetypes × 2 governance structures (optimal vs suboptimal).
-        Demonstrates which personalities need which governance models. Based on real patterns:
-        Palmer Luckey (Anduril), Elon + Gwynne (SpaceX), Brian Chesky (Airbnb), Zuck + Sheryl,
-        Larry/Sergey + Eric Schmidt, Steve Jobs fired/returned. Twelve parallel timelines.
+        Demonstrates which personalities need which governance models. Based on observed patterns
+        across technology companies:
+        - Charismatic Engineer + Operational Executive (defense tech)
+        - Technical Visionary + COO (aerospace manufacturing)
+        - Design Perfectionist + Strategic Advisor (hospitality tech)
+        - Young Technical Founder + Experienced Executive (social platform)
+        - Technical Co-founders + Professional CEO (search/advertising)
+        - Visionary Founder fired then rehired with governance changes (consumer electronics)
+
+        Twelve parallel timelines testing personality × governance fit.
         """
         return cls(
             scenario_description=(
@@ -3122,6 +3226,1103 @@ class SimulationConfig(BaseModel):
                 "meta_lesson": "Fort-holder COO model unlocks demanding genius founders—significant equity reflects critical role",
                 "emergent_format": True,
                 "uses_profile_system": True
+            }
+        )
+
+    # ============================================================================
+    # PORTAL Mode Templates (Mechanism 17 - Backward Temporal Reasoning)
+    # ============================================================================
+
+    @classmethod
+    def portal_presidential_election(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Presidential election backward simulation.
+
+        Portal: Jane Chen elected President in 2040
+        Origin: Jane Chen VP Engineering in 2025
+        Goal: Find plausible career paths from tech → politics
+
+        Demonstrates M17 (PORTAL mode backward inference), M15 (career prospection),
+        M12 (alternate path analysis), M7 (causal chain validation).
+        """
+        return cls(
+            scenario_description=(
+                "Backward simulation from presidential election victory to tech career origin. "
+                "Jane Chen wins 2040 presidential race with 326-212 electoral college victory, "
+                "52.4% popular vote. Work backward to discover plausible paths from her 2025 position "
+                "as VP Engineering at TechCorp startup (Series B, 150 employees). "
+                "\n\n"
+                "System generates multiple paths exploring different routes: early political entry "
+                "(runs for city council 2027) vs gradual transition (book publication 2029, media "
+                "presence), crisis response opportunities (tech regulation fight 2031 raises profile), "
+                "network building strategies (VC connections → political donors), educational credibility "
+                "(evening MBA 2028-2030 vs Kennedy School fellowship 2032). "
+                "\n\n"
+                "Each path scored for coherence: Can VP Engineering realistically pivot? Does timeline "
+                "allow skill development? Are networks plausible? Forward validation ensures origin → portal "
+                "makes causal sense. Pivot points identify critical decision moments where paths diverge most: "
+                "year 2027 (stay in tech vs political entry), 2031 (crisis response), 2034 (campaign infrastructure)."
+            ),
+            world_id="portal_presidential_election",
+            entities=EntityConfig(
+                count=5,  # Jane Chen + mentor + rival politician + campaign manager + family member
+                types=["human"],
+                initial_resolution=ResolutionLevel.TRAINED
+            ),
+            timepoints=CompanyConfig(
+                count=1,  # Placeholder - PORTAL mode generates backward states based on backward_steps
+                resolution="year"
+            ),
+            temporal=TemporalConfig(
+                mode=TemporalMode.PORTAL,
+                portal_description="Jane Chen elected President with 52.4% popular vote, 326 electoral votes, strong tech sector support",
+                portal_year=2040,
+                origin_year=2025,
+                backward_steps=15,
+                path_count=3,
+                candidate_antecedents_per_step=5,
+                exploration_mode="adaptive",
+                coherence_threshold=0.7,
+                llm_scoring_weight=0.35,
+                historical_precedent_weight=0.20,
+                causal_necessity_weight=0.25,
+                entity_capability_weight=0.15
+            ),
+            outputs=OutputConfig(
+                formats=["json", "markdown"],
+                include_relationships=True,
+                include_knowledge_flow=True
+            ),
+            metadata={
+                "portal_type": "presidential_election",
+                "mechanisms_featured": [
+                    "M17_modal_causality_portal",
+                    "M15_career_prospection",
+                    "M12_alternate_path_analysis",
+                    "M7_causal_chain_validation",
+                    "M13_relationship_networks"
+                ],
+                "expected_paths": 3,
+                "expected_pivot_points": "4-6",
+                "career_transition": "tech_executive_to_president",
+                "key_questions": [
+                    "What minimum political experience enables presidential candidacy?",
+                    "How does tech background affect campaign narrative?",
+                    "What pivot points determine tech→politics feasibility?"
+                ]
+            }
+        )
+
+    @classmethod
+    def portal_startup_unicorn(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Unicorn startup backward simulation.
+
+        Portal: Company valued at $1B+ (unicorn) in 2030
+        Origin: Two founders with idea, no funding in 2024
+        Goal: Find plausible growth paths to unicorn status
+
+        Demonstrates M17 (PORTAL), M13 (multi-entity synthesis), M8 (founder stress),
+        M11 (fundraising dialogs), M15 (strategic planning).
+        """
+        return cls(
+            scenario_description=(
+                "Backward simulation from $1.2B Series C valuation to pre-seed founding moment. "
+                "Company achieves unicorn status March 2030: $1.2B post-money, $120M ARR, 450 employees, "
+                "strong unit economics (85% gross margin, 3.5x LTV/CAC). Work backward to April 2024 when "
+                "two technical founders had vision but zero funding, no product, no customers. "
+                "\n\n"
+                "System explores multiple scaling paths: (A) Enterprise-first strategy (land Fortune 500 early, "
+                "slow but steady $1M+ ACVs), (B) Viral PLG motion (100K users, convert to paid, expand upmarket), "
+                "(C) Vertical domination (own healthcare vertical completely, then expand). Each path has different "
+                "fundraising requirements (seed, A, B, C rounds at different milestones), hiring patterns "
+                "(sales-heavy vs eng-heavy), burn rates, and risk profiles. "
+                "\n\n"
+                "Validation checks: Is growth rate sustainable? Do founders have credibility for strategy? "
+                "Are market conditions plausible? Forward coherence ensures April 2024 → March 2030 arc makes sense. "
+                "Pivot points: initial GTM choice (2024), product-market fit moment (2025-2026), Series A strategy "
+                "(2026), expansion decision (2028)."
+            ),
+            world_id="portal_startup_unicorn",
+            entities=EntityConfig(
+                count=6,  # 2 founders + investor + key hire + customer + advisor
+                types=["human"],
+                initial_resolution=ResolutionLevel.DIALOG
+            ),
+            timepoints=CompanyConfig(
+                count=1,  # Placeholder - PORTAL mode generates backward states based on backward_steps
+                resolution="quarter"  # Quarterly milestones
+            ),
+            temporal=TemporalConfig(
+                mode=TemporalMode.PORTAL,
+                portal_description="$1.2B Series C valuation, $120M ARR, 450 employees, 85% gross margin",
+                portal_year=2030,
+                origin_year=2024,
+                backward_steps=24,  # 6 years × 4 quarters
+                path_count=3,
+                candidate_antecedents_per_step=7,
+                exploration_mode="adaptive",
+                coherence_threshold=0.65,
+                llm_scoring_weight=0.30,
+                historical_precedent_weight=0.25,  # Strong historical precedent for unicorn paths
+                causal_necessity_weight=0.25,
+                entity_capability_weight=0.15
+            ),
+            outputs=OutputConfig(
+                formats=["json", "jsonl", "markdown"],
+                include_dialogs=True,  # Fundraising pitches crucial
+                include_relationships=True,
+                export_ml_dataset=True
+            ),
+            metadata={
+                "portal_type": "unicorn_startup",
+                "mechanisms_featured": [
+                    "M17_modal_causality_portal",
+                    "M13_multi_entity_synthesis",
+                    "M8_founder_stress_burnout",
+                    "M11_fundraising_dialog",
+                    "M15_strategic_planning_prospection",
+                    "M7_causal_milestone_chains"
+                ],
+                "expected_paths": 3,
+                "expected_pivot_points": "5-8",
+                "growth_strategies": ["enterprise_first", "plg_viral", "vertical_domination"],
+                "key_milestones": ["pmf", "series_a", "series_b", "series_c"],
+                "key_questions": [
+                    "What GTM strategy enables unicorn trajectory?",
+                    "How do funding rounds correlate with growth milestones?",
+                    "What founder traits predict successful scaling?"
+                ]
+            }
+        )
+
+    @classmethod
+    def portal_academic_tenure(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Academic tenure backward simulation.
+
+        Portal: Dr. Martinez achieves tenure at top university in 2035
+        Origin: Martinez completes PhD in 2025
+        Goal: Find plausible research/publication paths to tenure
+
+        Demonstrates M17 (PORTAL), M15 (career planning), M3 (knowledge accumulation),
+        M14 (circadian research patterns), M13 (collaboration networks).
+        """
+        return cls(
+            scenario_description=(
+                "Backward simulation from tenure achievement to post-PhD starting point. "
+                "Dr. Elena Martinez receives tenure notification April 2035 at prestigious research university: "
+                "14 publications (5 first-author in top venues), $2.8M in grants, strong teaching reviews, "
+                "established research group (3 postdocs, 5 PhD students), respected in field. Work backward "
+                "to May 2025 when she completed PhD and started assistant professor position. "
+                "\n\n"
+                "System explores publication strategies: (A) High-volume incremental work (publish often, "
+                "build citation count steadily), (B) High-impact moonshot approach (3-4 major papers in Nature/Science), "
+                "(C) Balanced portfolio (mix of quick wins and ambitious long-term projects). Each strategy affects "
+                "grant funding, collaboration patterns, teaching load negotiation, lab building timeline. "
+                "\n\n"
+                "Validation: Does publication rate align with tenure standards? Are grant amounts realistic for career stage? "
+                "Is teaching/research balance sustainable? Forward check: May 2025 → April 2035 progression makes sense. "
+                "Pivot points: first major grant (2027), key paper acceptance/rejection (2028), lab expansion decision (2030), "
+                "tenure packet preparation (2033-2034)."
+            ),
+            world_id="portal_academic_tenure",
+            entities=EntityConfig(
+                count=5,  # Dr. Martinez + department chair + collaborator + student + competitor
+                types=["human"],
+                initial_resolution=ResolutionLevel.SCENE
+            ),
+            timepoints=CompanyConfig(
+                count=1,  # Placeholder - PORTAL mode generates backward states based on backward_steps
+                resolution="year"
+            ),
+            temporal=TemporalConfig(
+                mode=TemporalMode.PORTAL,
+                portal_description="Tenure achieved: 14 publications, $2.8M grants, established research group",
+                portal_year=2035,
+                origin_year=2025,
+                backward_steps=10,
+                path_count=3,
+                candidate_antecedents_per_step=4,
+                exploration_mode="reverse_chronological",  # Simpler than startup - sequential progression
+                coherence_threshold=0.75,  # Academic careers more predictable
+                llm_scoring_weight=0.25,
+                historical_precedent_weight=0.35,  # Strong historical patterns in academia
+                causal_necessity_weight=0.20,
+                entity_capability_weight=0.15
+            ),
+            outputs=OutputConfig(
+                formats=["json", "markdown"],
+                include_relationships=True,
+                include_knowledge_flow=True
+            ),
+            metadata={
+                "portal_type": "academic_tenure",
+                "mechanisms_featured": [
+                    "M17_modal_causality_portal",
+                    "M15_career_planning_prospection",
+                    "M3_knowledge_accumulation_publications",
+                    "M14_circadian_research_patterns",
+                    "M13_collaboration_networks"
+                ],
+                "expected_paths": 3,
+                "expected_pivot_points": "3-5",
+                "publication_strategies": ["high_volume", "high_impact", "balanced_portfolio"],
+                "key_milestones": ["first_grant", "major_publication", "lab_establishment", "tenure_review"],
+                "key_questions": [
+                    "What publication strategy optimizes tenure probability?",
+                    "How do teaching vs research allocations affect outcomes?",
+                    "What role do collaborations play in tenure success?"
+                ]
+            }
+        )
+
+    @classmethod
+    def portal_startup_failure(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Startup failure backward simulation.
+
+        Portal: Company shuts down, founders broke in 2028
+        Origin: Company raises seed round in 2024
+        Goal: Find decision paths that led to failure (negative outcome)
+
+        Demonstrates M17 (PORTAL), M12 (what-if scenarios), M8 (burnout),
+        M13 (relationship breakdown), M15 (bad decisions).
+        """
+        return cls(
+            scenario_description=(
+                "Backward simulation from startup shutdown to promising seed round. "
+                "August 2028: Company officially shuts down. Assets sold for $200K (barely covers severance). "
+                "Founders personally broke after 4 years, relationships destroyed, team dispersed. Investors "
+                "lost $3.2M. Work backward to January 2024 when company raised $1.2M seed from top-tier VC, "
+                "strong team (technical founders + 3 engineers), working MVP, 50 beta users giving positive feedback. "
+                "\n\n"
+                "System explores failure paths: (A) Wrong market timing (built too early, market not ready), "
+                "(B) Founder conflict (CEO-CTO relationship broke down month 18, paralysis), (C) Bad pivot "
+                "(abandoned working product for shiny new idea, lost traction), (D) Ignored metrics (vanity metrics "
+                "looked good, unit economics terrible). Each path shows warning signs, bad decisions, missed "
+                "opportunities to course-correct. "
+                "\n\n"
+                "Validation: Are failure modes realistic? Do decision chains make sense? Could founders have "
+                "caught issues earlier? Forward coherence: January 2024 → August 2028 failure trajectory is plausible. "
+                "Pivot points: hiring mistake (mid-2024), ignored warning sign (2025), founder conflict (2026), "
+                "failed rescue attempt (2027)."
+            ),
+            world_id="portal_startup_failure",
+            entities=EntityConfig(
+                count=5,  # 2 founders + investor + key employee who quit + customer who churned
+                types=["human"],
+                initial_resolution=ResolutionLevel.DIALOG
+            ),
+            timepoints=CompanyConfig(
+                count=1,  # Placeholder - PORTAL mode generates backward states based on backward_steps
+                resolution="quarter"
+            ),
+            temporal=TemporalConfig(
+                mode=TemporalMode.PORTAL,
+                portal_description="Startup shuts down: $200K asset sale, founders broke, $3.2M investor loss",
+                portal_year=2028,
+                origin_year=2024,
+                backward_steps=16,  # 4 years × 4 quarters
+                path_count=4,  # More paths for failure modes
+                candidate_antecedents_per_step=6,
+                exploration_mode="adaptive",
+                coherence_threshold=0.60,  # Lower threshold - failure paths often chaotic
+                llm_scoring_weight=0.30,
+                historical_precedent_weight=0.25,  # Many historical failure examples
+                causal_necessity_weight=0.25,
+                entity_capability_weight=0.15
+            ),
+            outputs=OutputConfig(
+                formats=["json", "markdown"],
+                include_dialogs=True,  # Crucial conflict conversations
+                include_relationships=True,  # Relationship breakdown tracking
+                export_ml_dataset=True
+            ),
+            metadata={
+                "portal_type": "startup_failure",
+                "mechanisms_featured": [
+                    "M17_modal_causality_portal",
+                    "M12_counterfactual_what_ifs",
+                    "M8_founder_burnout_stress",
+                    "M13_relationship_breakdown",
+                    "M15_bad_decision_prospection",
+                    "M11_difficult_conversations"
+                ],
+                "expected_paths": 4,
+                "expected_pivot_points": "6-10",
+                "failure_modes": ["wrong_timing", "founder_conflict", "bad_pivot", "ignored_metrics"],
+                "warning_signs": ["burn_rate", "churn_rate", "team_turnover", "founder_stress"],
+                "key_questions": [
+                    "What warning signs preceded failure?",
+                    "Could failure have been prevented? When?",
+                    "What founder behaviors correlated with shutdown?",
+                    "How do successful vs failed paths diverge early?"
+                ]
+            }
+        )
+
+    # =========================================================================
+    # SIMULATION-BASED JUDGING VARIANTS (M17 PORTAL Enhancement)
+    # =========================================================================
+    # These templates enable simulation-based judging instead of static scoring.
+    # At each backward step, the system:
+    # 1. Generates N candidate antecedents
+    # 2. Runs forward mini-simulations from each candidate
+    # 3. Uses judge LLM to holistically evaluate simulation realism
+    # 4. Selects most plausible candidate
+    #
+    # Three quality levels per scenario:
+    # - _simjudged_quick: 1 step, no dialog (~2x cost, fast)
+    # - _simjudged: 2 steps, dialog enabled (~3x cost, medium quality)
+    # - _simjudged_thorough: 3 steps, extra analysis (~4-5x cost, highest quality)
+    # =========================================================================
+
+    @classmethod
+    def portal_presidential_election_simjudged_quick(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Presidential election with QUICK simulation-based judging.
+
+        Same scenario as portal_presidential_election but uses lightweight
+        simulation judging for candidate evaluation (1 forward step, no dialog).
+
+        Cost: ~2x standard | Speed: Fast | Quality: Good
+        """
+        base = cls.portal_presidential_election()
+        base.temporal.use_simulation_judging = True
+        base.temporal.simulation_forward_steps = 1
+        base.temporal.simulation_max_entities = 3
+        base.temporal.simulation_include_dialog = False
+        base.temporal.judge_model = "meta-llama/llama-3.1-70b-instruct"  # Faster model
+        base.temporal.judge_temperature = 0.3
+        base.temporal.simulation_cache_results = True
+        base.world_id = "portal_presidential_election_simjudged_quick"
+        base.metadata["simulation_judging"] = {
+            "enabled": True,
+            "quality_level": "quick",
+            "forward_steps": 1,
+            "dialog_enabled": False,
+            "cost_multiplier": "~2x",
+            "use_case": "Fast exploration, budget-constrained runs"
+        }
+        return base
+
+    @classmethod
+    def portal_presidential_election_simjudged(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Presidential election with STANDARD simulation-based judging.
+
+        Same scenario as portal_presidential_election but uses standard
+        simulation judging for candidate evaluation (2 forward steps, dialog enabled).
+
+        Cost: ~3x standard | Speed: Medium | Quality: High
+        """
+        base = cls.portal_presidential_election()
+        base.temporal.use_simulation_judging = True
+        base.temporal.simulation_forward_steps = 2
+        base.temporal.simulation_max_entities = 5
+        base.temporal.simulation_include_dialog = True
+        base.temporal.judge_model = "meta-llama/llama-3.1-405b-instruct"  # High-quality judge
+        base.temporal.judge_temperature = 0.3
+        base.temporal.simulation_cache_results = True
+        base.world_id = "portal_presidential_election_simjudged"
+        base.metadata["simulation_judging"] = {
+            "enabled": True,
+            "quality_level": "standard",
+            "forward_steps": 2,
+            "dialog_enabled": True,
+            "cost_multiplier": "~3x",
+            "use_case": "Production runs, high-quality path generation"
+        }
+        return base
+
+    @classmethod
+    def portal_presidential_election_simjudged_thorough(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Presidential election with THOROUGH simulation-based judging.
+
+        Same scenario as portal_presidential_election but uses thorough
+        simulation judging for candidate evaluation (3 forward steps, dialog + extra analysis).
+
+        Cost: ~4-5x standard | Speed: Slow | Quality: Highest
+        """
+        base = cls.portal_presidential_election()
+        base.temporal.use_simulation_judging = True
+        base.temporal.simulation_forward_steps = 3
+        base.temporal.simulation_max_entities = 7
+        base.temporal.simulation_include_dialog = True
+        base.temporal.candidate_antecedents_per_step = 7  # More candidates to evaluate
+        base.temporal.judge_model = "meta-llama/llama-3.1-405b-instruct"
+        base.temporal.judge_temperature = 0.2  # Lower temp for highest consistency
+        base.temporal.simulation_cache_results = True
+        base.world_id = "portal_presidential_election_simjudged_thorough"
+        base.metadata["simulation_judging"] = {
+            "enabled": True,
+            "quality_level": "thorough",
+            "forward_steps": 3,
+            "dialog_enabled": True,
+            "cost_multiplier": "~4-5x",
+            "use_case": "Research runs, maximum quality path generation"
+        }
+        return base
+
+    @classmethod
+    def portal_startup_unicorn_simjudged_quick(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Unicorn startup with QUICK simulation-based judging.
+
+        Same scenario as portal_startup_unicorn but uses lightweight
+        simulation judging for candidate evaluation.
+
+        Cost: ~2x standard | Speed: Fast | Quality: Good
+        """
+        base = cls.portal_startup_unicorn()
+        base.temporal.use_simulation_judging = True
+        base.temporal.simulation_forward_steps = 1
+        base.temporal.simulation_max_entities = 3
+        base.temporal.simulation_include_dialog = False
+        base.temporal.judge_model = "meta-llama/llama-3.1-70b-instruct"
+        base.temporal.judge_temperature = 0.3
+        base.temporal.simulation_cache_results = True
+        base.world_id = "portal_startup_unicorn_simjudged_quick"
+        base.metadata["simulation_judging"] = {
+            "enabled": True,
+            "quality_level": "quick",
+            "forward_steps": 1,
+            "dialog_enabled": False,
+            "cost_multiplier": "~2x",
+            "use_case": "Fast unicorn path exploration"
+        }
+        return base
+
+    @classmethod
+    def portal_startup_unicorn_simjudged(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Unicorn startup with STANDARD simulation-based judging.
+
+        Same scenario as portal_startup_unicorn but uses standard
+        simulation judging for candidate evaluation.
+
+        Cost: ~3x standard | Speed: Medium | Quality: High
+        """
+        base = cls.portal_startup_unicorn()
+        base.temporal.use_simulation_judging = True
+        base.temporal.simulation_forward_steps = 2
+        base.temporal.simulation_max_entities = 6
+        base.temporal.simulation_include_dialog = True
+        base.temporal.judge_model = "meta-llama/llama-3.1-405b-instruct"
+        base.temporal.judge_temperature = 0.3
+        base.temporal.simulation_cache_results = True
+        base.world_id = "portal_startup_unicorn_simjudged"
+        base.metadata["simulation_judging"] = {
+            "enabled": True,
+            "quality_level": "standard",
+            "forward_steps": 2,
+            "dialog_enabled": True,
+            "cost_multiplier": "~3x",
+            "use_case": "High-quality unicorn path generation with dialog"
+        }
+        return base
+
+    @classmethod
+    def portal_startup_unicorn_simjudged_thorough(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Unicorn startup with THOROUGH simulation-based judging.
+
+        Same scenario as portal_startup_unicorn but uses thorough
+        simulation judging for candidate evaluation.
+
+        Cost: ~4-5x standard | Speed: Slow | Quality: Highest
+        """
+        base = cls.portal_startup_unicorn()
+        base.temporal.use_simulation_judging = True
+        base.temporal.simulation_forward_steps = 3
+        base.temporal.simulation_max_entities = 8
+        base.temporal.simulation_include_dialog = True
+        base.temporal.candidate_antecedents_per_step = 8  # More candidates
+        base.temporal.judge_model = "meta-llama/llama-3.1-405b-instruct"
+        base.temporal.judge_temperature = 0.2
+        base.temporal.simulation_cache_results = True
+        base.world_id = "portal_startup_unicorn_simjudged_thorough"
+        base.metadata["simulation_judging"] = {
+            "enabled": True,
+            "quality_level": "thorough",
+            "forward_steps": 3,
+            "dialog_enabled": True,
+            "cost_multiplier": "~4-5x",
+            "use_case": "Research-grade unicorn path generation"
+        }
+        return base
+
+    @classmethod
+    def portal_academic_tenure_simjudged_quick(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Academic tenure with QUICK simulation-based judging.
+
+        Same scenario as portal_academic_tenure but uses lightweight
+        simulation judging for candidate evaluation.
+
+        Cost: ~2x standard | Speed: Fast | Quality: Good
+        """
+        base = cls.portal_academic_tenure()
+        base.temporal.use_simulation_judging = True
+        base.temporal.simulation_forward_steps = 1
+        base.temporal.simulation_max_entities = 3
+        base.temporal.simulation_include_dialog = False
+        base.temporal.judge_model = "meta-llama/llama-3.1-70b-instruct"
+        base.temporal.judge_temperature = 0.3
+        base.temporal.simulation_cache_results = True
+        base.world_id = "portal_academic_tenure_simjudged_quick"
+        base.metadata["simulation_judging"] = {
+            "enabled": True,
+            "quality_level": "quick",
+            "forward_steps": 1,
+            "dialog_enabled": False,
+            "cost_multiplier": "~2x",
+            "use_case": "Fast tenure path exploration"
+        }
+        return base
+
+    @classmethod
+    def portal_academic_tenure_simjudged(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Academic tenure with STANDARD simulation-based judging.
+
+        Same scenario as portal_academic_tenure but uses standard
+        simulation judging for candidate evaluation.
+
+        Cost: ~3x standard | Speed: Medium | Quality: High
+        """
+        base = cls.portal_academic_tenure()
+        base.temporal.use_simulation_judging = True
+        base.temporal.simulation_forward_steps = 2
+        base.temporal.simulation_max_entities = 5
+        base.temporal.simulation_include_dialog = True
+        base.temporal.judge_model = "meta-llama/llama-3.1-405b-instruct"
+        base.temporal.judge_temperature = 0.3
+        base.temporal.simulation_cache_results = True
+        base.world_id = "portal_academic_tenure_simjudged"
+        base.metadata["simulation_judging"] = {
+            "enabled": True,
+            "quality_level": "standard",
+            "forward_steps": 2,
+            "dialog_enabled": True,
+            "cost_multiplier": "~3x",
+            "use_case": "High-quality tenure path with research dialogs"
+        }
+        return base
+
+    @classmethod
+    def portal_academic_tenure_simjudged_thorough(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Academic tenure with THOROUGH simulation-based judging.
+
+        Same scenario as portal_academic_tenure but uses thorough
+        simulation judging for candidate evaluation.
+
+        Cost: ~4-5x standard | Speed: Slow | Quality: Highest
+        """
+        base = cls.portal_academic_tenure()
+        base.temporal.use_simulation_judging = True
+        base.temporal.simulation_forward_steps = 3
+        base.temporal.simulation_max_entities = 6
+        base.temporal.simulation_include_dialog = True
+        base.temporal.candidate_antecedents_per_step = 6
+        base.temporal.judge_model = "meta-llama/llama-3.1-405b-instruct"
+        base.temporal.judge_temperature = 0.2
+        base.temporal.simulation_cache_results = True
+        base.world_id = "portal_academic_tenure_simjudged_thorough"
+        base.metadata["simulation_judging"] = {
+            "enabled": True,
+            "quality_level": "thorough",
+            "forward_steps": 3,
+            "dialog_enabled": True,
+            "cost_multiplier": "~4-5x",
+            "use_case": "Research-grade academic career path generation"
+        }
+        return base
+
+    @classmethod
+    def portal_startup_failure_simjudged_quick(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Startup failure with QUICK simulation-based judging.
+
+        Same scenario as portal_startup_failure but uses lightweight
+        simulation judging for candidate evaluation.
+
+        Cost: ~2x standard | Speed: Fast | Quality: Good
+        """
+        base = cls.portal_startup_failure()
+        base.temporal.use_simulation_judging = True
+        base.temporal.simulation_forward_steps = 1
+        base.temporal.simulation_max_entities = 3
+        base.temporal.simulation_include_dialog = False
+        base.temporal.judge_model = "meta-llama/llama-3.1-70b-instruct"
+        base.temporal.judge_temperature = 0.3
+        base.temporal.simulation_cache_results = True
+        base.world_id = "portal_startup_failure_simjudged_quick"
+        base.metadata["simulation_judging"] = {
+            "enabled": True,
+            "quality_level": "quick",
+            "forward_steps": 1,
+            "dialog_enabled": False,
+            "cost_multiplier": "~2x",
+            "use_case": "Fast failure mode exploration"
+        }
+        return base
+
+    @classmethod
+    def portal_startup_failure_simjudged(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Startup failure with STANDARD simulation-based judging.
+
+        Same scenario as portal_startup_failure but uses standard
+        simulation judging for candidate evaluation.
+
+        Cost: ~3x standard | Speed: Medium | Quality: High
+        """
+        base = cls.portal_startup_failure()
+        base.temporal.use_simulation_judging = True
+        base.temporal.simulation_forward_steps = 2
+        base.temporal.simulation_max_entities = 5
+        base.temporal.simulation_include_dialog = True
+        base.temporal.judge_model = "meta-llama/llama-3.1-405b-instruct"
+        base.temporal.judge_temperature = 0.3
+        base.temporal.simulation_cache_results = True
+        base.world_id = "portal_startup_failure_simjudged"
+        base.metadata["simulation_judging"] = {
+            "enabled": True,
+            "quality_level": "standard",
+            "forward_steps": 2,
+            "dialog_enabled": True,
+            "cost_multiplier": "~3x",
+            "use_case": "High-quality failure mode analysis with dialogs"
+        }
+        return base
+
+    @classmethod
+    def portal_startup_failure_simjudged_thorough(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Startup failure with THOROUGH simulation-based judging.
+
+        Same scenario as portal_startup_failure but uses thorough
+        simulation judging for candidate evaluation.
+
+        Cost: ~4-5x standard | Speed: Slow | Quality: Highest
+        """
+        base = cls.portal_startup_failure()
+        base.temporal.use_simulation_judging = True
+        base.temporal.simulation_forward_steps = 3
+        base.temporal.simulation_max_entities = 6
+        base.temporal.simulation_include_dialog = True
+        base.temporal.candidate_antecedents_per_step = 8  # More failure modes to explore
+        base.temporal.judge_model = "meta-llama/llama-3.1-405b-instruct"
+        base.temporal.judge_temperature = 0.2
+        base.temporal.simulation_cache_results = True
+        base.world_id = "portal_startup_failure_simjudged_thorough"
+        base.metadata["simulation_judging"] = {
+            "enabled": True,
+            "quality_level": "thorough",
+            "forward_steps": 3,
+            "dialog_enabled": True,
+            "cost_multiplier": "~4-5x",
+            "use_case": "Research-grade failure mode analysis with conflict dialogs"
+        }
+        return base
+
+    # ============================================================================
+    # AI Marketplace Competitive Dynamics Templates
+    # ============================================================================
+
+    @classmethod
+    def timepoint_ai_pricing_war(cls) -> "SimulationConfig":
+        """
+        AI model marketplace pricing competition over 3 years (2025-2028).
+
+        Three competitive strategies explored in parallel timelines:
+        - Timeline A: Race to bottom (commoditization)
+        - Timeline B: Quality premium (differentiation)
+        - Timeline C: Hybrid tiered pricing
+
+        Tracks market share, profitability, customer retention, capability development.
+        Tests M12 (branching), M7 (causal chains), M13 (relationships), M15 (prospection).
+        """
+        return cls(
+            scenario_description=(
+                "**January 2025: AI Model Pricing War Begins** - Four major providers compete in "
+                "a rapidly commoditizing market. Provider A (incumbent leader), Provider B (quality challenger), "
+                "Provider C (aggressive startup), Enterprise Customer, VC Investor. Each provider must decide: "
+                "race to bottom on price, defend quality premium, or pursue hybrid strategy?"
+                "\n\n"
+                "**Timeline A: Race to Bottom (Commoditization Strategy)**"
+                "\n"
+                "Provider C launches at $0.10/M tokens (50% below market). Q1 2025: Providers A+B must respond. "
+                "Provider A cuts prices {price_cut_a} to defend market share {market_share_a_q1}. Provider B holds "
+                "premium {premium_defense_b}. Q2: Provider C gains {customer_count_c_q2} customers but burns "
+                "${cash_burn_c_q2}/month. Provider A's margins compress {margin_a_q2}. Enterprise Customer evaluates "
+                "switching cost {switching_cost}. Q3: Does Provider A match aggressive pricing {match_pricing}? "
+                "Provider B loses share {market_share_b_q3} but maintains margins {margin_b_q3}. Q4: Provider C "
+                "runs low on cash {runway_c_q4}. Year 2 2026: Consolidation begins. Provider C acquired or fails "
+                "{provider_c_outcome}. Provider A dominates on volume {volume_a_2026} but profits thin {profit_a_2026}. "
+                "Provider B retreats to niche {niche_strategy_b}. Year 3 2027-2028: Market stabilizes at commodity "
+                "pricing {final_price_2028}. Quality differentiation erodes {quality_gap_2028}. Winners: volume players. "
+                "Losers: premium providers."
+                "\n\n"
+                "**Timeline B: Quality Premium (Differentiation Strategy)**"
+                "\n"
+                "Provider B maintains 3x price premium {premium_multiplier_b} based on capability lead {capability_gap_b}. "
+                "Q1 2025: Enterprise Customer values {value_perception} superior performance on complex tasks "
+                "{task_performance_b}. Provider B invests {rd_investment_b} in R&D vs competing on price. Q2: Provider "
+                "B releases major capability improvement {capability_release_b_q2}. Customer retention {retention_b_q2} "
+                "justifies premium. Provider A+C compete on price while B competes on quality. Q3: Enterprise Customer "
+                "runs cost analysis {tco_analysis}: cheaper models require more tokens/retries {retry_rate}. Effective "
+                "cost {effective_cost_b} competitive despite premium. Q4: Provider B's market share {market_share_b_q4} "
+                "smaller but profit margin {margin_b_q4} highest. Year 2 2026: Provider B doubles down on enterprises "
+                "{enterprise_focus_b}. Commoditization in consumer market {consumer_price_2026} doesn't affect B. Year 3 "
+                "2027-2028: Provider B builds moat through reliability {uptime_b_2028}, support {support_quality_b}, "
+                "compliance {compliance_certifications_b}. Final outcome {outcome_b}: smaller revenue but sustainable "
+                "profitability {profit_margin_b_2028}."
+                "\n\n"
+                "**Timeline C: Hybrid Tiered Pricing (Segmentation Strategy)**"
+                "\n"
+                "Provider A launches tiered model: $0.08/M (basic), $0.50/M (standard), $2/M (premium). Q1 2025: "
+                "Segments market {market_segments} by use case. Basic tier competes with Provider C {basic_adoption_q1}, "
+                "premium competes with Provider B {premium_adoption_q1}. Q2: Provider A optimizes tier placement "
+                "{optimization_strategy_a}. Customer distribution {customer_distribution_q2} across tiers reveals "
+                "preferences. Enterprise Customer splits workloads {workload_split}: simple→basic, complex→premium. "
+                "Q3: Provider A's blended ASP {asp_a_q3} balances volume and margin. Captures share from both ends "
+                "{share_from_c_q3} {share_from_b_q3}. Q4: Competitors respond with tiering {competitor_tiering_q4}. "
+                "Year 2 2026: Market converges on tiered structure {market_structure_2026}. Provider A's first-mover "
+                "advantage {fma_value_a} in segmentation analytics. Year 3 2027-2028: Winner depends on tier execution "
+                "{tier_execution_quality}. Provider A revenue {revenue_a_2028} highest but complexity {operational_complexity_a} "
+                "challenging. Profitability {profit_a_2028} depends on cost-to-serve per tier {cost_to_serve_per_tier}."
+                "\n\n"
+                "Track 12 timepoints (quarterly over 3 years). Demonstrates M12 (three pricing strategies), "
+                "M7 (causal chains: pricing → adoption → profitability → sustainability), M13 (competitive relationships), "
+                "M15 (providers model future moves through prospection), M8 (Provider C cash burn stress)."
+            ),
+            world_id="timepoint_ai_pricing_war",
+            entities=EntityConfig(
+                count=5,  # Provider A, B, C, Enterprise Customer, VC
+                types=["human"],
+                initial_resolution=ResolutionLevel.DIALOG
+            ),
+            timepoints=CompanyConfig(
+                count=12,  # Quarterly for 3 years
+                resolution="quarter"
+            ),
+            temporal=TemporalConfig(
+                mode=TemporalMode.BRANCHING,
+                enable_counterfactuals=True
+            ),
+            outputs=OutputConfig(
+                formats=["jsonl", "json", "markdown"],
+                include_dialogs=True,
+                include_relationships=True,
+                include_knowledge_flow=True,
+                export_ml_dataset=True
+            ),
+            metadata={
+                "analysis_type": "ai_marketplace_pricing_competition",
+                "start_date": "2025-01",
+                "end_date": "2028-01",
+                "timelines": 3,
+                "mechanisms_tested": ["M12", "M7", "M13", "M15", "M8"]
+            }
+        )
+
+    @classmethod
+    def timepoint_ai_capability_leapfrog(cls) -> "SimulationConfig":
+        """
+        Sudden capability breakthrough disrupts AI marketplace hierarchy.
+
+        Four competitive outcomes in parallel timelines:
+        - Timeline A: Incumbent (GPT-style) maintains lead
+        - Timeline B: Challenger (Claude-style) leapfrogs
+        - Timeline C: New entrant disrupts
+        - Timeline D: Consortium/open-source wins
+
+        Bi-monthly timepoints over 3 years track technological races and market shifts.
+        Tests M12 (branching), M9 (on-demand generation), M10 (scene management), M13 (relationships).
+        """
+        return cls(
+            scenario_description=(
+                "**January 2025: Pre-Leapfrog Equilibrium** - Four AI providers in stable hierarchy. "
+                "Provider A (market leader, 45% share), Provider B (quality challenger, 30%), Provider C "
+                "(aggressive new entrant, 15%), Consortium (open-source collective, 10%). Two enterprise customers "
+                "evaluate switching costs and lock-in dynamics."
+                "\n\n"
+                "**Timeline A: Incumbent Maintains Lead (Provider A Victory)**"
+                "\n"
+                "March 2025: Provider A releases GPT-5 {gpt5_capabilities}. Benchmark improvements {benchmark_gains_a} "
+                "significant. Provider B's response {provider_b_response_march} lags by {capability_gap_march} months. "
+                "May: Enterprise customers renew with A {renewal_rate_a_may} based on roadmap confidence {roadmap_confidence_a}. "
+                "July: Provider B releases competitive model {model_b_july} but adoption slow {adoption_rate_b_july}. "
+                "September: Provider A's moat widens {moat_metrics_sept}: ecosystem lock-in {plugin_count_a}, enterprise "
+                "integrations {integration_count_a}, brand trust {nps_a}. November 2025: Provider C can't compete on "
+                "capabilities {capability_gap_c_nov}, pivots to price {pricing_pivot_c}. Year 2 2026: Provider A extends "
+                "lead through {competitive_advantage_2026}: data flywheel {training_data_volume_a}, talent acquisition "
+                "{key_hires_a}, partnerships {partnership_count_a}. Year 3 2027-2028: Market consolidates around A. "
+                "Final outcome {outcome_a_2028}: Provider A 60% share, sustainable dominance."
+                "\n\n"
+                "**Timeline B: Challenger Leapfrogs (Provider B Victory)**"
+                "\n"
+                "March 2025: Provider B releases breakthrough model {claude_4_capabilities} with {key_differentiator_b}. "
+                "Independent benchmarks {benchmark_results_b_march} show clear superiority on {task_categories}. May: "
+                "Enterprise Customer A evaluates {evaluation_process_may}. Switching cost analysis {switching_cost_calc} "
+                "vs performance gain {performance_value}. Decision: migrate {migration_decision_may}. July: Provider A "
+                "scrambles to respond {emergency_response_a_july}. Promises future capabilities {vaporware_concern} but "
+                "delivery uncertain {delivery_timeline_a}. September: Provider B captures {market_share_b_sept}% through "
+                "performance advantage. Provider A's brand questioned {brand_damage_a_sept}. November 2025: Provider B's "
+                "challenge: can they sustain lead {sustainability_b_nov}? R&D investment {rd_spend_b} vs Provider A's "
+                "resources {rd_spend_a}. Year 2 2026: Arms race intensifies {capability_race_2026}. Provider B maintains "
+                "narrow lead {lead_duration_b} through {innovation_strategy_b}. Year 3 2027-2028: Market leadership shifts. "
+                "Final outcome {outcome_b_2028}: Provider B 40% share, new equilibrium."
+                "\n\n"
+                "**Timeline C: New Entrant Disrupts (Provider C Victory)**"
+                "\n"
+                "March 2025: Provider C (unknown startup) releases model with {disruptive_capability_c}. Not better overall "
+                "but 10x better at {niche_capability}. May: Enterprise Customer B discovers {discovery_process_may} C's "
+                "model perfect for {specific_use_case}. Displaces incumbents {displacement_rate_may} in niche. July: "
+                "Provider C secures {funding_round_july} Series B based on traction {traction_metrics_july}. September: "
+                "Niche expands {niche_expansion_sept} as customers realize broader applicability. November 2025: Incumbents "
+                "A+B attempt to replicate {replication_attempts_nov} C's approach. C's secret sauce {competitive_moat_c}: "
+                "{technical_advantage} or {data_advantage}? Year 2 2026: Provider C scales {scaling_challenges_2026}. Can "
+                "they maintain quality {quality_maintenance} while growing {growth_rate_c}? Year 3 2027-2028: Disruption "
+                "complete or incumbents recover {recovery_attempt_incumbents}? Final outcome {outcome_c_2028}: depends on "
+                "C's ability to expand beyond niche."
+                "\n\n"
+                "**Timeline D: Consortium/Open-Source Wins**"
+                "\n"
+                "March 2025: Consortium releases open model {open_model_march} competitive with GPT-4 level. May: Enterprise "
+                "customers evaluate {evaluation_open_may}: capability sufficient {capability_threshold_open}, cost zero "
+                "{tco_open}, control maximum {control_value}. July: Adoption accelerates {adoption_rate_open_july} in "
+                "cost-sensitive segments. September: Proprietary providers forced to compete {competitive_response_sept} "
+                "with open alternative. November 2025: Consortium model improves {improvement_rate_consortium} through "
+                "community contributions {contributor_count}. Year 2 2026: Open vs closed debate {market_split_2026}. "
+                "Enterprises split: commodity workloads→open, critical workloads→proprietary. Year 3 2027-2028: Hybrid "
+                "equilibrium {hybrid_market_structure}. Final outcome {outcome_d_2028}: 40% open, 60% proprietary, "
+                "coexistence model."
+                "\n\n"
+                "Track 18 timepoints (bi-monthly over 3 years). Demonstrates M12 (four competitive outcomes), "
+                "M9 (on-demand generation of new market entrants as they emerge), M10 (scene-level management of "
+                "competitive dynamics), M13 (evolving relationships between providers and customers)."
+            ),
+            world_id="timepoint_ai_capability_leapfrog",
+            entities=EntityConfig(
+                count=6,  # 4 providers + 2 enterprise customers
+                types=["human"],
+                initial_resolution=ResolutionLevel.SCENE
+            ),
+            timepoints=CompanyConfig(
+                count=18,  # Bi-monthly for 3 years
+                resolution="month"
+            ),
+            temporal=TemporalConfig(
+                mode=TemporalMode.BRANCHING,
+                enable_counterfactuals=True
+            ),
+            outputs=OutputConfig(
+                formats=["jsonl", "json", "markdown"],
+                include_dialogs=True,
+                include_relationships=True,
+                include_knowledge_flow=True,
+                export_ml_dataset=True
+            ),
+            metadata={
+                "analysis_type": "ai_capability_disruption",
+                "start_date": "2025-01",
+                "end_date": "2028-01",
+                "timelines": 4,
+                "mechanisms_tested": ["M12", "M9", "M10", "M13"]
+            }
+        )
+
+    @classmethod
+    def timepoint_ai_business_model_evolution(cls) -> "SimulationConfig":
+        """
+        AI business model evolution from APIs → fine-tuning → agents-as-service.
+
+        Three monetization paths explored over 2 years (monthly resolution):
+        - Timeline A: API-first (current model)
+        - Timeline B: Fine-tuning platform (customization)
+        - Timeline C: Agents-as-service (outcomes vs inputs)
+
+        Tests M12 (branching paths), M7 (causal chains), M13 (customer relationships),
+        M15 (strategic prospection), M8 (stress from model transitions).
+        """
+        return cls(
+            scenario_description=(
+                "**January 2025: Business Model Inflection Point** - Three AI providers face strategic decision: "
+                "continue API-first model, pivot to fine-tuning platform, or leap to agents-as-service? Provider A "
+                "(API incumbent), Provider B (fine-tuning specialist), Provider C (agent pioneer). Enterprise customers, "
+                "partners, investors observe."
+                "\n\n"
+                "**Timeline A: API-First (Defend Current Model)**"
+                "\n"
+                "Jan-Mar 2025: Provider A doubles down on API model {api_investment_q1}. Improves pricing {pricing_v2}, "
+                "latency {latency_improvement}, reliability {uptime_target}. Customers value {customer_satisfaction_q1} "
+                "simplicity. Apr-Jun: Competition from B+C on differentiation {competitive_pressure_q2}. Provider A "
+                "defends with volume discounts {volume_pricing} and enterprise SLAs {sla_tier}. Jul-Sep: Provider A's "
+                "revenue growth {revenue_growth_q3} healthy but slowing {growth_deceleration}. Commoditization risk "
+                "{commoditization_concern} rising. Oct-Dec: Provider A explores adjacencies {adjacent_products_q4} while "
+                "maintaining API core. Year 2 2026: API model matures {market_maturity_2026}. Growth from {growth_drivers_2026}: "
+                "new use cases {use_case_expansion}, international {intl_expansion}, or plateaus {plateau_risk}? Final "
+                "outcome {outcome_a}: steady-state business or disrupted by new models?"
+                "\n\n"
+                "**Timeline B: Fine-Tuning Platform (Customization Model)**"
+                "\n"
+                "Jan-Mar 2025: Provider B launches fine-tuning platform {platform_launch_q1}. Customers can train custom "
+                "models on their data {custom_model_capability}. Pricing: $X per hour training + $Y per inference "
+                "{pricing_model_b}. Apr-Jun: Early adopters {early_adopter_count_q2} test platform. Use cases emerge "
+                "{use_cases_identified_q2}: domain-specific models, brand voice, proprietary knowledge. Jul-Sep: Provider B "
+                "discovers product-market fit {pmf_indicators_q3} in {winning_segment}. Challenge: support burden "
+                "{support_cost_q3} for custom models. Oct-Dec: Provider B builds ecosystem {ecosystem_development_q4}: "
+                "templates {template_library}, consultants {partner_network}, case studies {customer_stories}. Year 2 2026: "
+                "Fine-tuning becomes table stakes {competitive_parity_2026}. Provider B's advantage: depth of tooling "
+                "{tooling_depth} and customer expertise {customer_success_quality}. Final outcome {outcome_b}: higher ASP "
+                "{asp_b_2026} and stickiness {retention_b_2026} but smaller TAM {tam_constraint}."
+                "\n\n"
+                "**Timeline C: Agents-as-Service (Outcomes Model)**"
+                "\n"
+                "Jan-Mar 2025: Provider C launches agent platform {agent_platform_launch_q1}. Pricing shift: sell outcomes "
+                "not tokens {outcome_based_pricing}. Example: 'customer support resolution' not 'API calls'. Apr-Jun: "
+                "Customers intrigued {interest_level_q2} but adoption slow {adoption_friction_q2}. Reasons: {adoption_barriers}: "
+                "pricing uncertainty {pricing_uncertainty}, performance guarantees {guarantee_concerns}, integration complexity "
+                "{integration_difficulty}. Jul-Sep: Provider C iterates on agent capabilities {capability_iteration_q3}. "
+                "Breakthrough: autonomous workflows {workflow_automation_q3} that customers value {customer_value_q3}. "
+                "Oct-Dec: Provider C demonstrates ROI {roi_case_studies_q4} in {successful_verticals}. Year 2 2026: Agent "
+                "model gains traction {market_penetration_2026}. Incumbents A+B attempt agents {incumbent_response_2026} "
+                "but cultural resistance {organizational_inertia}. Final outcome {outcome_c}: Provider C captures high-value "
+                "segment {market_share_c_2026} but requires {critical_capabilities}: reliability {agent_reliability}, "
+                "monitoring {observability_tools}, and customer success {cs_investment}."
+                "\n\n"
+                "Track 24 timepoints (monthly over 2 years). Demonstrates M12 (three business model paths), "
+                "M7 (causal chains: model choice → customer adoption → revenue → sustainability), M13 (evolving "
+                "provider-customer relationships), M15 (providers use prospection to model future competitive "
+                "landscape), M8 (stress from revenue model transitions and cash flow uncertainty)."
+            ),
+            world_id="timepoint_ai_business_model_evolution",
+            entities=EntityConfig(
+                count=7,  # 3 providers + 2 customers + partner + investor
+                types=["human"],
+                initial_resolution=ResolutionLevel.GRAPH
+            ),
+            timepoints=CompanyConfig(
+                count=24,  # Monthly for 2 years
+                resolution="month"
+            ),
+            temporal=TemporalConfig(
+                mode=TemporalMode.BRANCHING,
+                enable_counterfactuals=True
+            ),
+            outputs=OutputConfig(
+                formats=["jsonl", "json", "markdown"],
+                include_dialogs=True,
+                include_relationships=True,
+                include_knowledge_flow=True,
+                export_ml_dataset=True
+            ),
+            metadata={
+                "analysis_type": "ai_business_model_transformation",
+                "start_date": "2025-01",
+                "end_date": "2027-01",
+                "timelines": 3,
+                "mechanisms_tested": ["M12", "M7", "M13", "M15", "M8"]
+            }
+        )
+
+    @classmethod
+    def timepoint_ai_regulatory_divergence(cls) -> "SimulationConfig":
+        """
+        AI regulation divergence across EU, US, China creates fragmented marketplace.
+
+        Three regulatory regime timelines over 3 years (quarterly resolution):
+        - Timeline A: EU-first (strict regulation, GDPR-style)
+        - Timeline B: US-first (light touch, innovation-focused)
+        - Timeline C: China-first (state control, data localization)
+
+        Tests M12 (branching), M7 (regulatory → business impact), M13 (regulator-provider relationships),
+        M14 (circadian regulatory cycles: proposal → feedback → implementation).
+        """
+        return cls(
+            scenario_description=(
+                "**Q1 2025: Global AI Regulation Begins** - EU, US, China simultaneously pursue AI governance but "
+                "with radically different approaches. Provider A (global), Provider B (US-focused), Provider C (EU-compliant), "
+                "Regulator entities, Enterprise customers navigating compliance."
+                "\n\n"
+                "**Timeline A: EU-First Regulatory Regime (Strict Compliance)**"
+                "\n"
+                "Q1 2025: EU finalizes AI Act {ai_act_final}. Requirements: {eu_requirements}: model cards {model_card_mandate}, "
+                "bias audits {bias_audit_frequency}, right to explanation {explanation_requirement}. Provider A compliance cost "
+                "{compliance_cost_a_q1}. Q2: Providers A+C adapt {adaptation_strategy_q2}. Provider B delays EU launch "
+                "{market_entry_delay_b}. Enterprise customer splits: EU data stays in EU {data_residency_eu}. Q3: Compliance "
+                "advantage emerges {compliance_moat_q3}. Provider C's early investment {early_compliance_investment} pays off "
+                "in EU market share {market_share_c_eu_q3}. Q4: Certification ecosystem develops {certification_bodies_q4}. "
+                "Year 2 2026: EU model becomes template {regulatory_export} for {adopting_countries}. Global providers must "
+                "comply {global_compliance_requirement}. Provider A builds EU-first product line {product_segmentation_2026}. "
+                "Year 3 2027-2028: Regulatory maturity {regulatory_stability_2027}. Compliance costs normalize {compliance_cost_2027} "
+                "as tooling improves {compliance_tooling}. Final outcome {outcome_a}: fragmented market, EU premium pricing "
+                "{price_premium_eu} justified by compliance."
+                "\n\n"
+                "**Timeline B: US-First Regulatory Regime (Light Touch)**"
+                "\n"
+                "Q1 2025: US takes voluntary framework approach {voluntary_framework}. Industry self-regulation {self_regulation_body}. "
+                "Providers A+B advocate for {lobbying_strategy_q1}. Q2: Minimal compliance burden {compliance_cost_us_q2} vs EU. "
+                "Provider B's US advantage {competitive_advantage_b_us}: faster iteration {release_velocity_b}, lower costs "
+                "{cost_structure_b}. Q3: US becomes innovation hub {innovation_index_us_q3}. Startups flock {startup_count_us} "
+                "to permissive regime. Q4: Tension emerges {regulatory_tension_q4}: consumer groups demand protection {consumer_advocacy}, "
+                "industry resists {industry_resistance}. Year 2 2026: Incidents occur {safety_incidents_2026} that test voluntary "
+                "model. Public pressure {public_pressure_2026} for stricter rules. Congress considers {legislation_pending} "
+                "mandatory requirements. Year 3 2027-2028: US converges toward {convergence_2027} EU model or maintains "
+                "exceptionalism {us_exceptionalism}? Final outcome {outcome_b}: innovation advantage vs safety concerns."
+                "\n\n"
+                "**Timeline C: China-First Regulatory Regime (State Control)**"
+                "\n"
+                "Q1 2025: China mandates {china_mandates}: algorithm registration {algorithm_registry}, content control "
+                "{content_filtering}, data localization {data_localization_china}. Provider A blocked {market_access_denied} "
+                "unless JV {jv_requirement}. Q2: Chinese providers advantage {domestic_advantage_q2} in domestic market. "
+                "Provider C attempts entry {entry_strategy_c_china} with local partner {partnership_c_china}. Q3: Two-tier "
+                "system emerges {china_market_structure_q3}: domestic market (Chinese providers), international market (Western "
+                "providers). Q4: Technology divergence {tech_divergence_q4} as Chinese models optimize for {chinese_requirements}. "
+                "Year 2 2026: Belt & Road {bri_influence_2026} spreads Chinese regulatory model to {adopting_countries_china}. "
+                "Global market fragments {market_fragmentation_2026}: Western sphere vs Chinese sphere. Year 3 2027-2028: "
+                "Provider A maintains two product lines {product_duplication}: China-compliant vs rest-of-world. Cost impact "
+                "{duplication_cost}. Final outcome {outcome_c}: bifurcated global market, compliance complexity maximum."
+                "\n\n"
+                "Track 12 timepoints (quarterly over 3 years). Demonstrates M12 (three regulatory regimes), "
+                "M7 (causal chains: regulation → compliance cost → competitive positioning → market structure), "
+                "M13 (evolving relationships between regulators and providers), M14 (circadian regulatory cycles: "
+                "proposal → comment period → final rule → enforcement)."
+            ),
+            world_id="timepoint_ai_regulatory_divergence",
+            entities=EntityConfig(
+                count=8,  # 3 providers + 3 regulators (EU, US, China) + 2 customers
+                types=["human"],
+                initial_resolution=ResolutionLevel.SCENE
+            ),
+            timepoints=CompanyConfig(
+                count=12,  # Quarterly for 3 years
+                resolution="quarter"
+            ),
+            temporal=TemporalConfig(
+                mode=TemporalMode.BRANCHING,
+                enable_counterfactuals=True
+            ),
+            outputs=OutputConfig(
+                formats=["jsonl", "json", "markdown"],
+                include_dialogs=True,
+                include_relationships=True,
+                include_knowledge_flow=True,
+                export_ml_dataset=True
+            ),
+            metadata={
+                "analysis_type": "ai_regulatory_fragmentation",
+                "start_date": "2025-01",
+                "end_date": "2028-01",
+                "timelines": 3,
+                "regulatory_regimes": ["EU", "US", "China"],
+                "mechanisms_tested": ["M12", "M7", "M13", "M14"]
             }
         )
 

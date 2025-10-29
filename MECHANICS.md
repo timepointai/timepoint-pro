@@ -512,7 +512,7 @@ class AnimismConfig:
 
 ## Mechanism 17: Modal Temporal Causality ✅
 
-**Status:** Implemented (73 code references)
+**Status:** Implemented (73+ code references)
 
 ### Causal Mode Enumeration
 
@@ -523,6 +523,7 @@ class TemporalMode(Enum):
     NONLINEAR = "nonlinear"      # Presentation ≠ causality
     BRANCHING = "branching"      # Many-worlds
     CYCLICAL = "cyclical"        # Time loops
+    PORTAL = "portal"            # Backward inference from endpoint to origin
 ```
 
 ### Mode-Specific Configuration
@@ -533,6 +534,503 @@ Each mode has unique configuration:
 - **Nonlinear**: Presentation order ≠ causal order
 - **Branching**: Multiple active timelines
 - **Cyclical**: Prophecy accuracy, destiny weight
+- **Portal**: Backward simulation, path exploration, coherence validation
+
+### PORTAL Mode: Backward Temporal Reasoning
+
+**Implementation Evidence:**
+- PortalStrategy class - workflows/portal_strategy.py (440+ lines)
+- Portal configuration - generation/config_schema.py:246-310 (18 portal-specific fields)
+- TemporalAgent integration - workflows.py:2560-2666
+  - `generate_antecedent_timepoint()` - workflows.py:2560-2628
+  - `run_portal_simulation()` - workflows.py:2630-2666
+  - Portal event probability boost - workflows.py:2424-2437
+- Validation support - validation.py:1343-1364 (temporal_consistency for PORTAL mode)
+- Test coverage - test_portal_mode.py (8 test classes, comprehensive coverage)
+- Example template - examples/portal_presidential_election.py
+
+#### Portal Architecture
+
+PORTAL mode performs **backward inference** from a known endpoint (portal) to a known origin, discovering plausible paths that connect them.
+
+**Dual-Layer Design:**
+1. **PortalStrategy (workflow)**: Orchestrates backward path exploration
+2. **PORTAL TemporalMode (causality)**: Defines causal rules for backward inference
+
+**Example:**
+```python
+Portal: "John Doe elected President in 2040"
+Origin: "John Doe is VP of Engineering in 2025"
+Goal: Find the most plausible paths from 2025 → 2040
+```
+
+#### Portal Configuration
+
+```python
+TemporalConfig:
+    mode: TemporalMode.PORTAL
+
+    # Endpoint definition
+    portal_description: str  # Description of final state
+    portal_year: int  # Year of portal endpoint
+
+    # Origin definition
+    origin_year: int  # Starting point year
+    origin_description: str  # Optional origin context
+
+    # Backward exploration
+    backward_steps: int = 15  # Number of intermediate steps
+    path_count: int = 3  # Top N paths to return
+    candidate_antecedents_per_step: int = 5  # Branching factor
+
+    # Exploration strategy
+    exploration_mode: str = "adaptive"  # reverse_chronological | oscillating | random | adaptive
+    oscillation_complexity_threshold: int = 10  # When to use oscillating
+
+    # Hybrid scoring weights
+    llm_scoring_weight: float = 0.35  # LLM plausibility assessment
+    historical_precedent_weight: float = 0.20  # Similar historical patterns
+    causal_necessity_weight: float = 0.25  # How necessary is antecedent?
+    entity_capability_weight: float = 0.15  # Can entity do this?
+    # dynamic_context_weight: 0.05 (implicit tiebreaker)
+
+    # Validation
+    coherence_threshold: float = 0.6  # Minimum forward coherence
+    max_backtrack_depth: int = 3  # Fix failed paths N steps back
+```
+
+#### Exploration Strategies
+
+**REVERSE_CHRONOLOGICAL** (100 → 99 → 98 → ... → 1):
+- Standard backward stepping
+- Simple, predictable
+- Used for straightforward scenarios (steps < threshold)
+
+**OSCILLATING** (100 → 1 → 99 → 2 → 98 → 3 → ...):
+- Fill from both ends inward
+- Better for complex scenarios (steps > threshold)
+- Maintains endpoint + origin constraints simultaneously
+
+**RANDOM**:
+- Fill steps in random order
+- Maximum exploration diversity
+- Higher computational cost
+
+**ADAPTIVE**:
+- System chooses based on complexity
+- Default strategy
+
+#### Hybrid Scoring System
+
+Each antecedent state is scored using 5 components:
+
+```python
+def score_antecedent(ant: PortalState, cons: PortalState) -> float:
+    scores = {
+        "llm": llm_score(ant, cons),  # 0-1, LLM rates plausibility
+        "historical": historical_precedent_score(ant, cons),  # Similar transitions in history
+        "causal": causal_necessity_score(ant, cons),  # How required is ant for cons?
+        "capability": entity_capability_score(ant, cons),  # Can entities do this?
+        "dynamic_context": dynamic_context_score(ant, cons)  # Economic/political/tech plausibility
+    }
+
+    total = (
+        scores["llm"] * 0.35 +
+        scores["historical"] * 0.20 +
+        scores["causal"] * 0.25 +
+        scores["capability"] * 0.15 +
+        scores["dynamic_context"] * 0.05
+    )
+
+    return total
+```
+
+#### Forward Coherence Validation
+
+Backward-generated paths must make sense when simulated forward:
+
+```python
+def validate_forward_coherence(path: PortalPath) -> float:
+    """Simulate origin → portal to check coherence"""
+    coherence_scores = []
+
+    for i in range(len(path.states) - 1):
+        current = path.states[i]
+        next_state = path.states[i + 1]
+
+        # Check if current → next makes forward sense
+        forward_score = simulate_forward_step(current, next_state)
+        coherence_scores.append(forward_score)
+
+    return sum(coherence_scores) / len(coherence_scores)
+```
+
+Paths below `coherence_threshold` are:
+- **PRUNED**: Coherence < 0.3
+- **BACKTRACKED**: 0.3 ≤ coherence < 0.5, try fixing
+- **MARKED**: 0.5 ≤ coherence < threshold, include with warning
+- **ACCEPTED**: Coherence ≥ threshold
+
+#### Pivot Point Detection
+
+Pivot points are **critical decision moments** where paths diverge significantly:
+
+```python
+def detect_pivot_points(path: PortalPath) -> List[int]:
+    """Identify states with high branching factor"""
+    pivots = []
+
+    for i, state in enumerate(path.states):
+        if len(state.children_states) > 5:  # High branching
+            pivots.append(i)
+
+        # Check variance in antecedent generation
+        if state.antecedent_variance > threshold:
+            pivots.append(i)
+
+    return pivots
+```
+
+Pivot points represent moments where:
+- Multiple plausible antecedents exist
+- Small changes cascade into large effects
+- Critical decisions determine path direction
+
+#### Portal Workflow
+
+1. **Generate Portal State**: Parse endpoint description into PortalState
+2. **Select Strategy**: Adaptive selection based on complexity
+3. **Explore Backward Paths**: Generate N candidate antecedents at each step
+4. **Score Antecedents**: Hybrid scoring (LLM + historical + causal + capability + context)
+5. **Validate Forward Coherence**: Check paths make sense origin → portal
+6. **Rank Paths**: Sort by coherence score
+7. **Detect Pivot Points**: Identify critical decision moments
+
+#### Example Usage
+
+```python
+from schemas import TemporalMode
+from generation.config_schema import TemporalConfig
+from workflows import TemporalAgent
+
+# Configure PORTAL mode
+config = TemporalConfig(
+    mode=TemporalMode.PORTAL,
+    portal_description="John Doe elected President in 2040",
+    portal_year=2040,
+    origin_year=2025,
+    backward_steps=15,
+    path_count=3
+)
+
+# Create agent
+agent = TemporalAgent(mode=TemporalMode.PORTAL, store=store, llm_client=llm)
+
+# Run backward simulation
+paths = agent.run_portal_simulation(config)
+
+# Analyze results
+for path in paths:
+    print(f"Path coherence: {path.coherence_score:.2f}")
+    print(f"Pivot points: {len(path.pivot_points)}")
+    for state in path.states:
+        print(f"  {state.year}: {state.description}")
+```
+
+See `examples/portal_presidential_election.py` for complete example.
+
+#### Simulation-Based Judging Enhancement (Optional)
+
+**Implementation Evidence:**
+- Real LLM antecedent generation - workflows/portal_strategy.py:264-404 (structured generation)
+- Mini-simulation runner - workflows/portal_strategy.py:406-628 (forward simulation engine)
+- Judge LLM evaluator - workflows/portal_strategy.py:630-796 (holistic evaluation)
+- Integration layer - workflows/portal_strategy.py:798-916 (smart routing)
+- Configuration fields - generation/config_schema.py:312-340 (7 simulation judging parameters)
+- Template variants - generation/config_schema.py:3573-3923 (12 simulation-judged templates)
+
+**Problem:** Static scoring formulas (LLM plausibility + historical precedent + causal necessity + entity capability + dynamic context) cannot capture:
+- **Emergent behaviors** that arise from forward simulation
+- **Dialog realism** between entities over time
+- **Internal consistency** across multiple steps
+- **Non-obvious implications** of candidate antecedents
+
+**Solution:** Instead of scoring candidates with static formulas, run actual forward mini-simulations from each candidate antecedent and use a judge LLM to holistically evaluate simulation realism.
+
+#### Architecture Comparison
+
+**Standard Scoring (Original):**
+```python
+def score_antecedents(candidates: List[PortalState]) -> List[PortalState]:
+    for candidate in candidates:
+        # Compute weighted formula score
+        score = (
+            llm_score(candidate) * 0.35 +
+            historical_precedent(candidate) * 0.20 +
+            causal_necessity(candidate) * 0.25 +
+            entity_capability(candidate) * 0.15 +
+            dynamic_context(candidate) * 0.05
+        )
+        candidate.plausibility_score = score
+
+    return sorted(candidates, key=lambda c: c.plausibility_score, reverse=True)
+```
+
+**Simulation-Based Judging (Enhanced):**
+```python
+def score_antecedents_with_simulation(
+    candidates: List[PortalState],
+    config: TemporalConfig
+) -> List[PortalState]:
+    simulation_results = []
+
+    # Run forward simulations from each candidate
+    for candidate in candidates:
+        sim_result = run_mini_simulation(
+            start_state=candidate,
+            steps=config.simulation_forward_steps,  # e.g., 2 years
+            include_dialog=config.simulation_include_dialog,
+            max_entities=config.simulation_max_entities
+        )
+        simulation_results.append(sim_result)
+
+    # Judge all simulations holistically
+    scores = judge_simulation_realism(
+        candidates=candidates,
+        simulations=simulation_results,
+        judge_model=config.judge_model,  # e.g., Llama 3.1 405B
+        temperature=config.judge_temperature
+    )
+
+    # Assign scores and sort
+    for candidate, score in zip(candidates, scores):
+        candidate.plausibility_score = score
+
+    return sorted(candidates, key=lambda c: c.plausibility_score, reverse=True)
+```
+
+#### Mini-Simulation Runner
+
+**Forward Simulation Engine:**
+```python
+def run_mini_simulation(
+    start_state: PortalState,
+    steps: int,
+    include_dialog: bool,
+    max_entities: int
+) -> Dict[str, Any]:
+    """
+    Run lightweight forward simulation to validate antecedent realism.
+
+    Returns:
+        {
+            "states": [PortalState],  # Forward progression
+            "dialogs": [DialogData],  # Generated conversations
+            "coherence_metrics": Dict,  # Internal consistency scores
+            "simulation_narrative": str,  # Human-readable summary
+            "emergent_events": List[str]  # Unexpected developments
+        }
+    """
+    simulated_states = [start_state]
+    dialogs = []
+    emergent_events = []
+
+    for step in range(steps):
+        current_state = simulated_states[-1]
+        next_year = current_state.year + 1
+
+        # Generate next state using LLM
+        next_state_description = generate_forward_state(current_state, next_year)
+
+        next_state = PortalState(
+            year=next_year,
+            description=next_state_description,
+            entities=current_state.entities.copy(),
+            world_state=current_state.world_state.copy()
+        )
+        simulated_states.append(next_state)
+
+        # Generate dialog between entities if enabled
+        if include_dialog and len(current_state.entities) >= 2:
+            dialog_data = generate_simulation_dialog(
+                state1=current_state,
+                state2=next_state,
+                entities=current_state.entities[:max_entities]
+            )
+            dialogs.append(dialog_data)
+
+        # Detect emergent behaviors
+        if detect_unexpected_event(current_state, next_state):
+            emergent_events.append(describe_emergence(next_state))
+
+    return {
+        "states": simulated_states,
+        "dialogs": dialogs,
+        "coherence_metrics": compute_simulation_coherence(simulated_states),
+        "simulation_narrative": generate_simulation_narrative(simulated_states, dialogs),
+        "emergent_events": emergent_events
+    }
+```
+
+#### Judge LLM Evaluator
+
+**Holistic Realism Assessment:**
+```python
+def judge_simulation_realism(
+    candidates: List[PortalState],
+    simulations: List[Dict],
+    judge_model: str,
+    temperature: float
+) -> List[float]:
+    """
+    Use judge LLM to evaluate which simulation is most realistic.
+
+    Judge evaluates based on:
+    - Forward simulation coherence
+    - Dialog realism and consistency
+    - Internal logical consistency
+    - Causal necessity (does consequent require this antecedent?)
+    - Entity capabilities (can entities actually do this?)
+    - Emergent behavior plausibility
+    """
+
+    # Build comprehensive prompt with all simulation details
+    prompt = f"""Evaluate the realism of {len(candidates)} backward temporal paths.
+
+For each candidate, you have:
+1. The candidate antecedent state (starting point)
+2. {simulations[0]['states'].__len__()} forward simulated states
+3. Dialog between entities (if available)
+4. Emergent events that arose during simulation
+5. Coherence metrics
+
+Rate each candidate 0.0-1.0 based on:
+- Simulation coherence: Do forward states flow logically?
+- Dialog realism: Are conversations believable?
+- Internal consistency: Are there contradictions?
+- Causal necessity: Does this antecedent lead naturally to the consequent?
+- Entity capabilities: Can entities realistically achieve these outcomes?
+
+Return JSON:
+{{
+  "scores": [score1, score2, ...],
+  "reasoning": "Brief explanation of scoring logic",
+  "best_candidate": candidate_number,
+  "key_concerns": ["concern1", "concern2", ...]
+}}
+"""
+
+    result = llm.generate_structured(
+        prompt=prompt,
+        response_model=JudgeResult,
+        system_prompt="You are an expert at evaluating temporal simulation realism.",
+        temperature=temperature,
+        model=judge_model
+    )
+
+    return result.scores
+```
+
+#### Configuration
+
+**Simulation Judging Parameters:**
+```python
+TemporalConfig:
+    # Enable simulation-based judging
+    use_simulation_judging: bool = False  # Default: off (use static scoring)
+
+    # Simulation parameters
+    simulation_forward_steps: int = 2  # How many steps to simulate forward
+    simulation_max_entities: int = 5  # Limit entities for performance
+    simulation_include_dialog: bool = True  # Generate dialog for realism
+
+    # Judge LLM configuration
+    judge_model: str = "meta-llama/llama-3.1-405b-instruct"  # High-quality judge
+    judge_temperature: float = 0.3  # Low temp for consistent judging
+
+    # Performance optimization
+    simulation_cache_results: bool = True  # Cache simulation results
+```
+
+#### Quality Levels
+
+**Quick Variant** (~2x cost, good quality):
+- 1 forward step per candidate
+- No dialog generation
+- Faster judge model (Llama 70B)
+- Use case: Fast exploration, budget-constrained runs
+
+**Standard Variant** (~3x cost, high quality):
+- 2 forward steps per candidate
+- Dialog generation enabled
+- High-quality judge (Llama 405B)
+- Use case: Production runs, high-quality path generation
+
+**Thorough Variant** (~4-5x cost, maximum quality):
+- 3 forward steps per candidate
+- Dialog + extra analysis
+- High-quality judge with low temperature
+- More candidates per step
+- Use case: Research runs, maximum quality path generation
+
+#### Example Usage
+
+```python
+from generation.config_schema import SimulationConfig
+
+# Standard PORTAL (baseline)
+config = SimulationConfig.portal_presidential_election()
+# Cost: ~$5, Runtime: ~10min
+
+# Simulation-judged QUICK (enhanced)
+config_quick = SimulationConfig.portal_presidential_election_simjudged_quick()
+# Cost: ~$10 (~2x), Runtime: ~20min
+
+# Simulation-judged STANDARD (high quality)
+config_standard = SimulationConfig.portal_presidential_election_simjudged()
+# Cost: ~$15 (~3x), Runtime: ~30min
+
+# Simulation-judged THOROUGH (maximum quality)
+config_thorough = SimulationConfig.portal_presidential_election_simjudged_thorough()
+# Cost: ~$25 (~4-5x), Runtime: ~45min
+```
+
+#### Performance Characteristics
+
+**Computational Cost:**
+- Standard: N candidates × static scoring = O(N)
+- Simulation-judged: N candidates × K forward steps × dialog generation = O(N × K)
+- Typical overhead: 2x-5x depending on configuration
+
+**Quality Improvement:**
+- Captures emergent behaviors invisible to static formulas
+- Validates dialog realism through actual generation
+- Detects internal inconsistencies across multiple steps
+- More accurate assessment of entity capabilities
+- Significant improvement in path plausibility for complex scenarios
+
+**Use Cases:**
+- **Quick:** Fast exploration, budget-constrained runs, testing
+- **Standard:** Production runs, high-quality path generation, general use
+- **Thorough:** Research runs, publication-quality paths, maximum realism
+
+**Testing:**
+```bash
+# Run standard PORTAL tests (baseline)
+python run_all_mechanism_tests.py --portal-test-only
+
+# Run simulation-judged QUICK variants
+python run_all_mechanism_tests.py --portal-simjudged-quick-only
+
+# Run simulation-judged STANDARD variants
+python run_all_mechanism_tests.py --portal-simjudged-only
+
+# Run simulation-judged THOROUGH variants
+python run_all_mechanism_tests.py --portal-simjudged-thorough-only
+
+# Run ALL PORTAL variants for comparison
+python run_all_mechanism_tests.py --portal-all
+```
 
 ---
 

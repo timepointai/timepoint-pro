@@ -21,6 +21,7 @@ class TemporalMode(str, Enum):
     NONLINEAR = "nonlinear"  # Presentation ≠ causality (flashbacks, foreshadowing)
     BRANCHING = "branching"  # Many-worlds interpretation
     CYCLICAL = "cyclical"  # Time loops and prophecy
+    PORTAL = "portal"  # Backward inference from fixed endpoint to origin
 
 class TTMTensor(SQLModel):
     """Timepoint Tensor Model - context, biology, behavior"""

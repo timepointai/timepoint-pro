@@ -21,6 +21,7 @@ from graph import create_test_graph
 from validation import Validator
 from tensors import TensorCompressor
 from metadata.tracking import track_mechanism
+from workflows.portal_strategy import PortalStrategy
 
 class WorkflowState(TypedDict):
     graph: nx.Graph
@@ -2420,6 +2421,21 @@ class TemporalAgent:
             # In branching mode, slightly increase chaos/randomness
             return base_prob * np.random.uniform(0.8, 1.2)
 
+        elif self.mode == TemporalMode.PORTAL:
+            config = context.get("portal_config", {})
+
+            # In PORTAL mode, boost events that are causally necessary for the portal endpoint
+            # Check if event is on a path to the portal
+            is_portal_antecedent = context.get("is_portal_antecedent", False)
+
+            if is_portal_antecedent:
+                # Strong boost for events that lead to the portal
+                necessity_score = config.get("causal_necessity_weight", 0.3)
+                return min(1.0, base_prob * (1 + necessity_score * 2.0))
+
+            # Default: slight reduction for events that don't advance toward portal
+            return base_prob * 0.9
+
         return base_prob  # PEARL mode or default
 
     def _advances_narrative_arc(self, event: str, narrative_arc: str) -> bool:
@@ -2555,3 +2571,111 @@ class TemporalAgent:
             # Save to database
             if self.store:
                 self.store.save_exposure_event(exposure_event)
+
+    @track_mechanism("M17", "modal_temporal_causality")
+    def generate_antecedent_timepoint(self, current_timepoint, context: Dict = None) -> "Timepoint":
+        """
+        Generate a plausible antecedent (previous) timepoint in PORTAL mode.
+
+        This is the inverse of generate_next_timepoint() - instead of forward temporal
+        progression, this generates backward inference from a known state.
+
+        Args:
+            current_timepoint: The current Timepoint object (acting as consequent)
+            context: Optional context dict with information like target_year, antecedent_description
+
+        Returns:
+            New Timepoint object representing a plausible previous state
+
+        Note:
+            This method is primarily used by PortalStrategy for backward path exploration.
+            In PORTAL mode, we work backward from endpoint to origin.
+        """
+        from schemas import Timepoint, ResolutionLevel
+        from datetime import timedelta
+        import uuid
+
+        if self.mode != TemporalMode.PORTAL:
+            raise ValueError(f"generate_antecedent_timepoint() requires mode=PORTAL, got {self.mode}")
+
+        context = context or {}
+
+        # Extract target year from context or calculate backward step
+        target_year = context.get("target_year")
+        if target_year is None:
+            # Default: go back 1 year
+            time_delta = timedelta(days=-365)
+        else:
+            # Calculate delta to reach target year
+            current_year = current_timepoint.timestamp.year
+            year_diff = current_year - target_year
+            time_delta = timedelta(days=year_diff * 365)
+
+        antecedent_timestamp = current_timepoint.timestamp - time_delta
+
+        # Generate antecedent ID
+        antecedent_id = f"tp_ante_{uuid.uuid4().hex[:8]}"
+
+        # Get antecedent description from context or generate placeholder
+        if "antecedent_description" in context:
+            event_description = context["antecedent_description"]
+        else:
+            # Placeholder - in real implementation, LLM would generate this
+            event_description = f"Antecedent state preceding: {current_timepoint.event_description[:100]}"
+
+        # Create antecedent timepoint
+        antecedent_timepoint = Timepoint(
+            timepoint_id=antecedent_id,
+            timestamp=antecedent_timestamp,
+            event_description=event_description,
+            entities_present=current_timepoint.entities_present.copy(),
+            causal_parent=None,  # Will be set during path reconstruction
+            resolution_level=current_timepoint.resolution_level
+        )
+
+        # Save to store if available
+        if self.store:
+            self.store.save_timepoint(antecedent_timepoint)
+
+            # Create exposure events for entities experiencing this antecedent state
+            self._create_exposure_events_for_timepoint(antecedent_timepoint)
+
+        return antecedent_timepoint
+
+    def run_portal_simulation(self, config) -> List:
+        """
+        Execute PORTAL mode backward simulation.
+
+        This delegates to PortalStrategy to perform backward inference from
+        a known endpoint (portal) to a known origin, discovering plausible
+        paths that connect them.
+
+        Args:
+            config: TemporalConfig with mode=PORTAL and portal settings
+
+        Returns:
+            List of PortalPath objects ranked by coherence score
+
+        Raises:
+            ValueError: If mode is not PORTAL or required config is missing
+        """
+        from generation.config_schema import TemporalConfig
+
+        if self.mode != TemporalMode.PORTAL:
+            raise ValueError(f"run_portal_simulation() requires mode=PORTAL, got {self.mode}")
+
+        # Validate config type
+        if not isinstance(config, TemporalConfig):
+            raise ValueError(f"config must be TemporalConfig, got {type(config)}")
+
+        # Create and run PortalStrategy
+        portal_strategy = PortalStrategy(
+            config=config,
+            llm_client=self.llm_client,
+            store=self.store
+        )
+
+        # Execute backward simulation
+        paths = portal_strategy.run()
+
+        return paths

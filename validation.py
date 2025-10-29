@@ -1340,4 +1340,27 @@ def validate_temporal_consistency(
         # More permissive causality in branches
         return {"valid": True, "message": "Branching mode: Multiverse causality"}
 
+    elif mode == "portal":
+        # Backward inference from endpoint to origin
+        # Validate that knowledge is either:
+        # 1. Causally necessary for reaching the portal endpoint
+        # 2. Part of a validated backward path
+        # 3. Plausible within the backward simulation context
+
+        # Check if this is part of a portal path
+        portal_path_id = context.get("portal_path_id")
+        is_portal_antecedent = context.get("is_portal_antecedent", False)
+
+        if portal_path_id or is_portal_antecedent:
+            # Knowledge is part of a validated portal path
+            return {"valid": True, "message": "Portal mode: Knowledge part of validated backward path"}
+
+        # Check if knowledge is causally necessary for portal endpoint
+        portal_indicators = ["leads to", "necessary for", "antecedent", "precursor"]
+        if any(indicator in knowledge_item.lower() for indicator in portal_indicators):
+            return {"valid": True, "message": "Portal mode: Causally necessary knowledge"}
+
+        # Default: allow but flag for review
+        return {"valid": True, "message": "Portal mode: Backward causality (review recommended)"}
+
     return {"valid": True, "message": f"Temporal mode '{mode}' validated"}
