@@ -320,6 +320,43 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False):
         ("portal_startup_failure_simjudged_thorough", SimulationConfig.portal_startup_failure_simjudged_thorough(), {"M17", "M12", "M8", "M13", "M15", "M11"}),
     ]
 
+    # PORTAL mode templates - Timepoint Corporate (real founder profiles)
+    portal_timepoint_templates = [
+        ("portal_timepoint_unicorn", SimulationConfig.portal_timepoint_unicorn(), {"M17", "M13", "M7", "M15", "M8", "M11"}),
+        ("portal_timepoint_series_a_success", SimulationConfig.portal_timepoint_series_a_success(), {"M17", "M13", "M7", "M15", "M11"}),
+        ("portal_timepoint_product_market_fit", SimulationConfig.portal_timepoint_product_market_fit(), {"M17", "M13", "M10", "M7", "M15"}),
+        ("portal_timepoint_enterprise_adoption", SimulationConfig.portal_timepoint_enterprise_adoption(), {"M17", "M13", "M7", "M15", "M11", "M8"}),
+        ("portal_timepoint_founder_transition", SimulationConfig.portal_timepoint_founder_transition(), {"M17", "M13", "M8", "M7", "M15"}),
+    ]
+
+    # PORTAL Timepoint with SIMULATION-BASED JUDGING
+    # Quick variants: 1 forward step, no dialog (~2x cost)
+    portal_timepoint_templates_simjudged_quick = [
+        ("portal_timepoint_unicorn_simjudged_quick", SimulationConfig.portal_timepoint_unicorn_simjudged_quick(), {"M17", "M13", "M7", "M15", "M8", "M11"}),
+        ("portal_timepoint_series_a_success_simjudged_quick", SimulationConfig.portal_timepoint_series_a_success_simjudged_quick(), {"M17", "M13", "M7", "M15", "M11"}),
+        ("portal_timepoint_product_market_fit_simjudged_quick", SimulationConfig.portal_timepoint_product_market_fit_simjudged_quick(), {"M17", "M13", "M10", "M7", "M15"}),
+        ("portal_timepoint_enterprise_adoption_simjudged_quick", SimulationConfig.portal_timepoint_enterprise_adoption_simjudged_quick(), {"M17", "M13", "M7", "M15", "M11", "M8"}),
+        ("portal_timepoint_founder_transition_simjudged_quick", SimulationConfig.portal_timepoint_founder_transition_simjudged_quick(), {"M17", "M13", "M8", "M7", "M15"}),
+    ]
+
+    # Standard variants: 2 forward steps, dialog enabled (~3x cost)
+    portal_timepoint_templates_simjudged = [
+        ("portal_timepoint_unicorn_simjudged", SimulationConfig.portal_timepoint_unicorn_simjudged(), {"M17", "M13", "M7", "M15", "M8", "M11"}),
+        ("portal_timepoint_series_a_success_simjudged", SimulationConfig.portal_timepoint_series_a_success_simjudged(), {"M17", "M13", "M7", "M15", "M11"}),
+        ("portal_timepoint_product_market_fit_simjudged", SimulationConfig.portal_timepoint_product_market_fit_simjudged(), {"M17", "M13", "M10", "M7", "M15"}),
+        ("portal_timepoint_enterprise_adoption_simjudged", SimulationConfig.portal_timepoint_enterprise_adoption_simjudged(), {"M17", "M13", "M7", "M15", "M11", "M8"}),
+        ("portal_timepoint_founder_transition_simjudged", SimulationConfig.portal_timepoint_founder_transition_simjudged(), {"M17", "M13", "M8", "M7", "M15"}),
+    ]
+
+    # Thorough variants: 3 forward steps, extra analysis (~4-5x cost)
+    portal_timepoint_templates_simjudged_thorough = [
+        ("portal_timepoint_unicorn_simjudged_thorough", SimulationConfig.portal_timepoint_unicorn_simjudged_thorough(), {"M17", "M13", "M7", "M15", "M8", "M11"}),
+        ("portal_timepoint_series_a_success_simjudged_thorough", SimulationConfig.portal_timepoint_series_a_success_simjudged_thorough(), {"M17", "M13", "M7", "M15", "M11"}),
+        ("portal_timepoint_product_market_fit_simjudged_thorough", SimulationConfig.portal_timepoint_product_market_fit_simjudged_thorough(), {"M17", "M13", "M10", "M7", "M15"}),
+        ("portal_timepoint_enterprise_adoption_simjudged_thorough", SimulationConfig.portal_timepoint_enterprise_adoption_simjudged_thorough(), {"M17", "M13", "M7", "M15", "M11", "M8"}),
+        ("portal_timepoint_founder_transition_simjudged_thorough", SimulationConfig.portal_timepoint_founder_transition_simjudged_thorough(), {"M17", "M13", "M8", "M7", "M15"}),
+    ]
+
     # ANDOS test scripts (always run)
     andos_scripts = [
         ("test_m5_query_evolution.py", "M5 Query Evolution", {"M5"}),
@@ -400,6 +437,60 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False):
         print("   - 4 AI marketplace dynamics templates (pricing war, capability leapfrog, business model evolution, regulatory divergence)")
         print("   Estimated cost: $15-30, Runtime: 30-60 minutes")
         print()
+    elif mode == 'portal_timepoint':
+        templates_to_run = portal_timepoint_templates
+        print("🌀 PORTAL TIMEPOINT MODE: Real Founder Stories (Standard)")
+        print("   Running 5 PORTAL templates with real Timepoint founder profiles (Sean + Ken):")
+        print("   - portal_timepoint_unicorn: $1.2B Series C (March 2030 → October 2024)")
+        print("   - portal_timepoint_series_a_success: $50M Series A (December 2026 → February 2025)")
+        print("   - portal_timepoint_product_market_fit: $5M ARR + PMF (June 2026 → October 2024)")
+        print("   - portal_timepoint_enterprise_adoption: 25 F500 customers (March 2027 → November 2024)")
+        print("   - portal_timepoint_founder_transition: Founder departure (September 2027 → October 2024)")
+        print("   Estimated cost: $6-12, Runtime: 12-18 minutes")
+        print("   Each template traces backward from success/failure to founding decisions")
+        print()
+    elif mode == 'portal_timepoint_simjudged_quick':
+        templates_to_run = portal_timepoint_templates_simjudged_quick
+        print("🎬 PORTAL TIMEPOINT MODE: Simulation-Judged QUICK (Real Founders)")
+        print("   Running 5 PORTAL templates with real Timepoint founders + lightweight simulation judging:")
+        print("   - 1 forward step per candidate antecedent")
+        print("   - No dialog generation (faster)")
+        print("   - Judge LLM: Llama 3.1 70B")
+        print("   Estimated cost: $12-24 (~2x standard), Runtime: 24-36 minutes")
+        print("   Quality: Good - captures basic emergent behaviors with real founder dynamics")
+        print()
+    elif mode == 'portal_timepoint_simjudged':
+        templates_to_run = portal_timepoint_templates_simjudged
+        print("🎬 PORTAL TIMEPOINT MODE: Simulation-Judged STANDARD (Real Founders)")
+        print("   Running 5 PORTAL templates with real Timepoint founders + standard simulation judging:")
+        print("   - 2 forward steps per candidate antecedent")
+        print("   - Dialog generation enabled")
+        print("   - Judge LLM: Llama 3.1 405B")
+        print("   Estimated cost: $18-36 (~3x standard), Runtime: 36-54 minutes")
+        print("   Quality: High - captures dialog realism and founder partnership dynamics")
+        print()
+    elif mode == 'portal_timepoint_simjudged_thorough':
+        templates_to_run = portal_timepoint_templates_simjudged_thorough
+        print("🎬 PORTAL TIMEPOINT MODE: Simulation-Judged THOROUGH (Real Founders)")
+        print("   Running 5 PORTAL templates with real Timepoint founders + thorough simulation judging:")
+        print("   - 3 forward steps per candidate antecedent")
+        print("   - Dialog generation + extra analysis")
+        print("   - Judge LLM: Llama 3.1 405B (low temperature)")
+        print("   - More candidates per step for better exploration")
+        print("   Estimated cost: $30-60 (~4-5x standard), Runtime: 54-75 minutes")
+        print("   Quality: Maximum - research-grade founder journey analysis")
+        print()
+    elif mode == 'portal_timepoint_all':
+        templates_to_run = portal_timepoint_templates + portal_timepoint_templates_simjudged_quick + portal_timepoint_templates_simjudged + portal_timepoint_templates_simjudged_thorough
+        print("🎬🌀 PORTAL TIMEPOINT MODE: ALL VARIANTS (Real Founders - Comprehensive)")
+        print("   Running ALL 20 PORTAL Timepoint templates with real founder profiles:")
+        print("   - 5 standard PORTAL Timepoint templates")
+        print("   - 5 simulation-judged QUICK variants")
+        print("   - 5 simulation-judged STANDARD variants")
+        print("   - 5 simulation-judged THOROUGH variants")
+        print("   Estimated cost: $66-132, Runtime: 126-183 minutes")
+        print("   Use this for comprehensive quality comparison across all approaches with real founder data")
+        print()
 
     results = {}
     total_cost = 0.0
@@ -409,7 +500,10 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False):
         'full': (20, 50, 45),
         'portal_simjudged': (15, 30, 38),
         'portal_simjudged_thorough': (25, 50, 53),
-        'portal_all': (55, 110, 128)
+        'portal_all': (55, 110, 128),
+        'portal_timepoint_simjudged': (18, 36, 45),
+        'portal_timepoint_simjudged_thorough': (30, 60, 65),
+        'portal_timepoint_all': (66, 132, 155)
     }
 
     if mode in expensive_modes:
@@ -667,6 +761,31 @@ if __name__ == "__main__":
         help="Run ALL PORTAL tests (standard + all 3 simulation-judged variants = 16 templates total)"
     )
     parser.add_argument(
+        "--portal-timepoint-only",
+        action="store_true",
+        help="Run ONLY PORTAL Timepoint templates with real founder profiles (5 templates)"
+    )
+    parser.add_argument(
+        "--portal-timepoint-simjudged-quick-only",
+        action="store_true",
+        help="Run ONLY PORTAL Timepoint simulation-judged QUICK variants (1 step, ~2x cost, 5 templates)"
+    )
+    parser.add_argument(
+        "--portal-timepoint-simjudged-only",
+        action="store_true",
+        help="Run ONLY PORTAL Timepoint simulation-judged STANDARD variants (2 steps + dialog, ~3x cost, 5 templates)"
+    )
+    parser.add_argument(
+        "--portal-timepoint-simjudged-thorough-only",
+        action="store_true",
+        help="Run ONLY PORTAL Timepoint simulation-judged THOROUGH variants (3 steps + analysis, ~4-5x cost, 5 templates)"
+    )
+    parser.add_argument(
+        "--portal-timepoint-all",
+        action="store_true",
+        help="Run ALL PORTAL Timepoint tests (standard + all 3 simulation-judged variants = 20 templates total)"
+    )
+    parser.add_argument(
         "--skip-summaries",
         action="store_true",
         help="Skip LLM-powered run summaries (reduces cost slightly)"
@@ -693,6 +812,16 @@ if __name__ == "__main__":
         mode = 'portal_simjudged_thorough'
     elif args.portal_all:
         mode = 'portal_all'
+    elif args.portal_timepoint_only:
+        mode = 'portal_timepoint'
+    elif args.portal_timepoint_simjudged_quick_only:
+        mode = 'portal_timepoint_simjudged_quick'
+    elif args.portal_timepoint_simjudged_only:
+        mode = 'portal_timepoint_simjudged'
+    elif args.portal_timepoint_simjudged_thorough_only:
+        mode = 'portal_timepoint_simjudged_thorough'
+    elif args.portal_timepoint_all:
+        mode = 'portal_timepoint_all'
     elif args.timepoint_corporate_analysis_only:
         mode = 'timepoint_corporate'
     elif args.full:

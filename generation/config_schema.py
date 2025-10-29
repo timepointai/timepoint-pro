@@ -4326,6 +4326,948 @@ class SimulationConfig(BaseModel):
             }
         )
 
+    # ============================================================================
+    # Timepoint Corporate Portal Templates (M17 - Backward Temporal Reasoning)
+    # Using Real Founders: Sean McDonald + Ken Cavanagh
+    # ============================================================================
+
+    @classmethod
+    def portal_timepoint_unicorn(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Timepoint achieves $1.2B unicorn valuation - work backward to founding.
+
+        Portal: March 2030 - Timepoint valued at $1.2B Series C
+        Origin: October 2024 - Sean + Ken found company with vision but no funding
+        Goal: Find plausible growth paths to unicorn status leveraging their complementary skills
+
+        Features real founders: Sean McDonald (philosophical/technical) + Ken Cavanagh (psychology/operations)
+        """
+        return cls(
+            scenario_description=(
+                "**March 2030: Timepoint Unicorn Status** - Timepoint closes $150M Series C at $1.2B post-money valuation. "
+                "$120M ARR, 450 employees, 95+ Fortune 500 customers. Wall Street analysts call it 'the Bloomberg Terminal "
+                "of temporal simulation.' But how did two philosophers get here? "
+                "\n\n"
+                "**The Founders**: Sean McDonald (Philosophical Technical Polymath) brings exceptional conceptual innovation, "
+                "philosophical depth, and AI/IoT technical chops. Three-time founder (Jute Networks, Bitwater Farms, Sundial). "
+                "Published author on consciousness and AI. Strength: First-principles thinking, unconventional products. "
+                "Weakness: Limited operational scaling experience, needs strong business partner. "
+                "\n\n"
+                "Ken Cavanagh (Psychology-Tech Bridge Builder) brings industrial-organizational psychology + AI systems expertise. "
+                "Former SpaceX People Analytics, Agency42 founder. Rare combination: understands neural networks AND team dynamics. "
+                "Strength: Human-centered AI, people analytics, practical execution. Weakness: Needs complementary visionary for "
+                "product positioning. "
+                "\n\n"
+                "**This is a complementary founding team**: Sean's conceptual innovation + Ken's operational/psychological depth. "
+                "Work backward from $1.2B to October 2024 founding moment. System explores multiple paths: "
+                "\n\n"
+                "(A) **Enterprise-First Strategy**: Land Fortune 500 early (pharma, finance), slow but steady $500K-$2M ACVs, "
+                "focus on mission-critical use cases (regulatory compliance, scenario planning). Requires strong enterprise "
+                "sales team + customer success. Ken's I-O psych background helps positioning for workforce planning use cases. "
+                "\n\n"
+                "(B) **Developer-Led Growth**: Open-source core temporal engine, build community, freemium → paid enterprise. "
+                "Sean's open-source advocacy (Sundial, Jute) aligns here. Start with academic/research users, expand to commercial. "
+                "Lower burn but slower revenue ramp. "
+                "\n\n"
+                "(C) **Vertical Domination**: Own one vertical completely (healthcare simulation, financial stress testing), "
+                "then expand. Ken's healthcare/org behavior expertise + Sean's AI/simulation depth = credible healthcare play. "
+                "\n\n"
+                "**Validation checks**: Given Sean's philosophical focus and Ken's practical execution, do growth strategies "
+                "play to their strengths? Does Sean stay engaged through operational scaling (historical risk)? Does Ken get "
+                "enough strategic input (his need for visionary complement)? Forward coherence ensures founding team dynamics "
+                "→ PMF discovery → scaling execution makes sense. "
+                "\n\n"
+                "**Pivot points**: Initial positioning (academic vs enterprise, Oct 2024), PMF moment (Q2 2025), Series A "
+                "strategy (Q4 2025), scaling/hiring pattern (2026-2028), partnership model evolution (do roles stay clear?)."
+            ),
+            world_id="portal_timepoint_unicorn",
+            entities=EntityConfig(
+                count=6,  # Sean + Ken + lead investor + key hire + customer champion + advisor
+                types=["human"],
+                initial_resolution=ResolutionLevel.DIALOG
+            ),
+            timepoints=CompanyConfig(
+                count=1,  # PORTAL generates backward states
+                resolution="quarter"
+            ),
+            temporal=TemporalConfig(
+                mode=TemporalMode.PORTAL,
+                portal_description="$1.2B Series C valuation, $120M ARR, 450 employees, 95+ Fortune 500 customers",
+                portal_year=2030,
+                origin_year=2024,
+                backward_steps=22,  # 5.5 years × 4 quarters
+                path_count=3,
+                candidate_antecedents_per_step=7,
+                exploration_mode="adaptive",
+                coherence_threshold=0.65,
+                llm_scoring_weight=0.30,
+                historical_precedent_weight=0.25,
+                causal_necessity_weight=0.25,
+                entity_capability_weight=0.15
+            ),
+            outputs=OutputConfig(
+                formats=["json", "jsonl", "markdown"],
+                include_dialogs=True,
+                include_relationships=True,
+                export_ml_dataset=True
+            ),
+            metadata={
+                "portal_type": "timepoint_unicorn",
+                "founder_profiles": ["sean_mcdonald", "ken_cavanagh"],
+                "profile_source": "generation/profiles/founder_archetypes/*.json",
+                "mechanisms_featured": [
+                    "M17_modal_causality_portal",
+                    "M13_multi_entity_synthesis",
+                    "M7_causal_milestone_chains",
+                    "M15_strategic_planning",
+                    "M8_founder_stress",
+                    "M11_fundraising_negotiations"
+                ],
+                "expected_paths": 3,
+                "growth_strategies": ["enterprise_first", "developer_led", "vertical_healthcare"],
+                "key_questions": [
+                    "How do Sean's philosophical depth + Ken's operational pragmatism enable unicorn trajectory?",
+                    "What GTM strategy leverages their unique skill combination?",
+                    "Does Sean stay engaged through operational scaling?",
+                    "How do founder roles evolve as company grows?"
+                ]
+            }
+        )
+
+    @classmethod
+    def portal_timepoint_series_a_success(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Timepoint closes strong $50M Series A - work backward to seed stage.
+
+        Portal: December 2026 - $50M Series A at $200M valuation
+        Origin: February 2025 - $2M seed round
+        Goal: Trace path from seed to Series A success with strong metrics
+        """
+        return cls(
+            scenario_description=(
+                "**December 2026: Timepoint Series A Success** - Timepoint closes $50M Series A led by Andreessen Horowitz "
+                "at $200M post-money valuation. Metrics: $8M ARR, 150% YoY growth, 15 enterprise customers, $500K average ACV, "
+                "net revenue retention 135%. VCs cite 'unique founder combination of philosophical depth + operational rigor.' "
+                "\n\n"
+                "**Work backward from Series A to seed stage**: How did Sean and Ken get here in 22 months? Starting context: "
+                "February 2025 seed round $2M at $10M post (Lux Capital, unusual bet on 'philosophers building AI'). At seed, "
+                "they had: working prototype, 2 pilot customers, strong vision doc, but no proven GTM. "
+                "\n\n"
+                "**Key milestones to explore backward**: "
+                "- Series A pitch (Dec 2026): What metrics/story convinced a16z? "
+                "- Customer #10 signed (Q3 2026): What pattern emerged that proved GTM? "
+                "- PMF moment (Q1 2026): When did customer retention/expansion inflect? "
+                "- First $1M ARR (Q4 2025): What pricing/packaging worked? "
+                "- Customer #1-5 signed (Q2-Q3 2025): How did initial sales motion develop? "
+                "- Post-seed execution (Q1 2025): What did they build first? Who did they hire? "
+                "\n\n"
+                "**Founder dynamics to trace**: Did Sean's philosophical positioning help or hurt enterprise sales? "
+                "Did Ken's I-O psych background unlock workforce use cases? How did they divide CEO/President/CTO roles? "
+                "What tensions emerged as company professionalized? "
+                "\n\n"
+                "**Three candidate paths backward**: "
+                "(A) Workforce Planning Path: Ken's I-O psych expertise → HR tech positioning → sell to CHROs. "
+                "(B) Scenario Planning Path: Sean's philosophical depth → strategic planning positioning → sell to strategy teams. "
+                "(C) Compliance/Risk Path: Both founders' rigor → regulatory/risk use cases → sell to compliance officers. "
+                "\n\n"
+                "Each path has different customer profiles, sales cycles, ACV patterns, and founder engagement levels."
+            ),
+            world_id="portal_timepoint_series_a",
+            entities=EntityConfig(
+                count=6,  # Sean + Ken + seed investor + Series A investor + early customer + first hire
+                types=["human"],
+                initial_resolution=ResolutionLevel.DIALOG
+            ),
+            timepoints=CompanyConfig(
+                count=1,
+                resolution="quarter"
+            ),
+            temporal=TemporalConfig(
+                mode=TemporalMode.PORTAL,
+                portal_description="$50M Series A at $200M valuation, $8M ARR, 15 enterprise customers",
+                portal_year=2026,
+                origin_year=2025,
+                backward_steps=8,  # 22 months ~ 8 quarters
+                path_count=3,
+                candidate_antecedents_per_step=7,
+                exploration_mode="adaptive",
+                coherence_threshold=0.70,
+                llm_scoring_weight=0.30,
+                historical_precedent_weight=0.25,
+                causal_necessity_weight=0.25,
+                entity_capability_weight=0.15
+            ),
+            outputs=OutputConfig(
+                formats=["json", "jsonl", "markdown"],
+                include_dialogs=True,
+                include_relationships=True,
+                export_ml_dataset=True
+            ),
+            metadata={
+                "portal_type": "timepoint_series_a",
+                "founder_profiles": ["sean_mcdonald", "ken_cavanagh"],
+                "profile_source": "generation/profiles/founder_archetypes/*.json",
+                "mechanisms_featured": [
+                    "M17_modal_causality_portal",
+                    "M13_founder_relationship_evolution",
+                    "M7_causal_revenue_milestones",
+                    "M15_strategic_positioning",
+                    "M11_investor_negotiations"
+                ],
+                "expected_paths": 3,
+                "use_case_paths": ["workforce_planning", "scenario_planning", "compliance_risk"],
+                "key_questions": [
+                    "What use case positioning enabled rapid enterprise adoption?",
+                    "How did founder skill sets map to initial GTM?",
+                    "What hiring pattern supported growth?",
+                    "How did founder roles evolve seed → Series A?"
+                ]
+            }
+        )
+
+    @classmethod
+    def portal_timepoint_product_market_fit(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Timepoint achieves strong PMF - work backward to MVP launch.
+
+        Portal: June 2026 - Strong PMF: $5M ARR, 40+ customers, NRR 140%
+        Origin: October 2024 - MVP launch, 0 customers
+        Goal: Identify product decisions and positioning that led to PMF
+        """
+        return cls(
+            scenario_description=(
+                "**June 2026: Timepoint Product-Market Fit Moment** - Timepoint crosses clear PMF threshold: $5M ARR, "
+                "42 paying customers (32 enterprise, 10 mid-market), net revenue retention 140%, organic inbound 60% of pipeline, "
+                "customer quotes: 'finally, someone who gets temporal reasoning' and 'philosophers building AI is exactly what we needed.' "
+                "\n\n"
+                "**Work backward to MVP launch**: October 2024, Sean and Ken shipped MVP after 6 months of development. Features: "
+                "basic temporal simulation engine, manual scenario setup, limited automation. No clear positioning yet—customers "
+                "confused about 'what is this for?' First 6 months: 3 pilot customers, inconsistent feedback, unclear ICP. "
+                "\n\n"
+                "**Critical questions to explore backward**: "
+                "- What positioning shift unlocked PMF? (when did 'temporal simulation' become 'scenario planning for executives'?) "
+                "- What product iteration mattered most? (when did automation → self-service happen?) "
+                "- What customer discovery process worked? (how did they find the ICP?) "
+                "- What pricing/packaging resonated? (per-seat? per-scenario? enterprise license?) "
+                "- What founder behaviors enabled learning? (Sean's philosophical depth → customer convos? Ken's psych training → user research?) "
+                "\n\n"
+                "**Three candidate PMF paths**: "
+                "(A) Executive Scenario Planning: Positioned as 'what-if analysis for C-suite,' sold to strategy/CEO office, "
+                "premium pricing ($50K-$200K/year), requires high-touch onboarding. Sean's philosophical framing helps here. "
+                "\n"
+                "(B) Workforce Planning & Org Design: Positioned as 'simulate org changes before executing,' sold to HR/CHRO, "
+                "mid-market pricing ($20K-$80K/year), Ken's I-O psych credibility unlocks category. "
+                "\n"
+                "(C) Compliance & Risk Simulation: Positioned as 'test regulatory scenarios,' sold to compliance/risk officers, "
+                "high-value pricing ($100K-$500K/year), both founders' rigor + transparency ethos builds trust. "
+                "\n\n"
+                "**Founder skill utilization**: Does Sean's 'questions fundamental assumptions' trait → deeper customer discovery? "
+                "Does Ken's 'bridges technical and human perspectives' trait → clearer product positioning? How do they divide product "
+                "vs GTM responsibilities?"
+            ),
+            world_id="portal_timepoint_pmf",
+            entities=EntityConfig(
+                count=6,  # Sean + Ken + early customer + design partner + product advisor + first PM hire
+                types=["human"],
+                initial_resolution=ResolutionLevel.DIALOG
+            ),
+            timepoints=CompanyConfig(
+                count=1,
+                resolution="month"
+            ),
+            temporal=TemporalConfig(
+                mode=TemporalMode.PORTAL,
+                portal_description="$5M ARR, 42 customers, 140% NRR, clear product-market fit",
+                portal_year=2026,
+                origin_year=2024,
+                backward_steps=20,  # 20 months from Oct 2024 to June 2026
+                path_count=3,
+                candidate_antecedents_per_step=7,
+                exploration_mode="adaptive",
+                coherence_threshold=0.70,
+                llm_scoring_weight=0.30,
+                historical_precedent_weight=0.25,
+                causal_necessity_weight=0.25,
+                entity_capability_weight=0.15
+            ),
+            outputs=OutputConfig(
+                formats=["json", "jsonl", "markdown"],
+                include_dialogs=True,
+                include_relationships=True,
+                export_ml_dataset=True
+            ),
+            metadata={
+                "portal_type": "timepoint_pmf",
+                "founder_profiles": ["sean_mcdonald", "ken_cavanagh"],
+                "profile_source": "generation/profiles/founder_archetypes/*.json",
+                "mechanisms_featured": [
+                    "M17_modal_causality_portal",
+                    "M13_cofounder_product_collaboration",
+                    "M7_causal_product_iteration",
+                    "M15_customer_discovery_strategy",
+                    "M3_customer_feedback_integration"
+                ],
+                "expected_paths": 3,
+                "pmf_paths": ["executive_scenario_planning", "workforce_org_design", "compliance_risk"],
+                "key_questions": [
+                    "What positioning shift unlocked PMF?",
+                    "Which product iterations mattered most?",
+                    "How did founders' unique skills enable customer discovery?",
+                    "What pricing/packaging resonated with ICP?"
+                ]
+            }
+        )
+
+    @classmethod
+    def portal_timepoint_enterprise_adoption(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Timepoint achieves enterprise adoption at scale - work backward to first pilot.
+
+        Portal: March 2027 - 25 Fortune 500 customers, $18M ARR
+        Origin: November 2024 - First pilot customer signed
+        Goal: Trace evolution of enterprise sales motion and customer success patterns
+        """
+        return cls(
+            scenario_description=(
+                "**March 2027: Timepoint Enterprise Dominance** - Timepoint now serves 25 Fortune 500 customers including "
+                "Goldman Sachs, Pfizer, Microsoft, JPMorgan. $18M ARR, average ACV $720K, net revenue retention 145%, "
+                "reference selling drives 70% of new pipeline. Customer testimonials cite 'philosophical rigor meets practical execution' "
+                "as key differentiator. Sean presents at Davos on 'AI and Human Flourishing.' Ken publishes HBR article on "
+                "'Psychology-Informed AI Implementation.' But how did they get here from one pilot customer? "
+                "\n\n"
+                "**Work backward to first pilot**: November 2024, first enterprise pilot signed with pharmaceutical company "
+                "(clinical trial scenario planning). $50K pilot, 3-month commitment, 5 users. Customer champion: Head of Clinical Operations "
+                "who resonated with Sean's philosophical depth + Ken's healthcare/org expertise. Pilot scope: test 10 trial design scenarios, "
+                "compare outcomes, validate assumptions. Risk: If pilot fails, enterprise motion dies. "
+                "\n\n"
+                "**Critical milestones to trace backward**: "
+                "- Customer #25 signed (Mar 2027): What reference network enabled this? "
+                "- Reference selling inflection (Q3 2026): When did customers start selling for them? "
+                "- Customer success pattern emerged (Q1 2026): What CS playbook worked? "
+                "- First customer renewal + expansion (Q2 2025): What drove expansion from $50K → $500K? "
+                "- Customer #1 pilot success (Feb 2025): What made pilot succeed? "
+                "- Pilot negotiation (Nov 2024): How did they land first enterprise customer? "
+                "\n\n"
+                "**Three enterprise paths to explore**: "
+                "(A) Vertical Beachhead: Win pharma → leverage references in healthcare → expand to other regulated industries. "
+                "Ken's healthcare expertise + Sean's philosophical rigor = credibility in risk-averse sectors. "
+                "\n"
+                "(B) Horizontal Champions: Win individual champions across industries → build champion network → scale via word-of-mouth. "
+                "Sean's thought leadership (Davos, writings) + Ken's HBR credibility = executive-level relationships. "
+                "\n"
+                "(C) Strategic Partnership: Partner with big consulting firm (McKinsey, BCG) → co-sell into their enterprise accounts. "
+                "Both founders' intellectual depth = consulting credibility. "
+                "\n\n"
+                "**Founder role evolution**: As company grows 1 → 25 customers, how do Sean and Ken's roles change? Does Sean stay "
+                "engaged in customer conversations (his historical pattern)? Does Ken build the CS/account management function (his I-O "
+                "psych + people expertise)? What operational tensions emerge?"
+            ),
+            world_id="portal_timepoint_enterprise",
+            entities=EntityConfig(
+                count=6,  # Sean + Ken + first customer champion + VP Sales hire + CS leader + consulting partner
+                types=["human"],
+                initial_resolution=ResolutionLevel.DIALOG
+            ),
+            timepoints=CompanyConfig(
+                count=1,
+                resolution="quarter"
+            ),
+            temporal=TemporalConfig(
+                mode=TemporalMode.PORTAL,
+                portal_description="25 Fortune 500 customers, $18M ARR, dominant enterprise position",
+                portal_year=2027,
+                origin_year=2024,
+                backward_steps=10,  # 28 months ~ 10 quarters
+                path_count=3,
+                candidate_antecedents_per_step=7,
+                exploration_mode="adaptive",
+                coherence_threshold=0.70,
+                llm_scoring_weight=0.30,
+                historical_precedent_weight=0.25,
+                causal_necessity_weight=0.25,
+                entity_capability_weight=0.15
+            ),
+            outputs=OutputConfig(
+                formats=["json", "jsonl", "markdown"],
+                include_dialogs=True,
+                include_relationships=True,
+                export_ml_dataset=True
+            ),
+            metadata={
+                "portal_type": "timepoint_enterprise_adoption",
+                "founder_profiles": ["sean_mcdonald", "ken_cavanagh"],
+                "profile_source": "generation/profiles/founder_archetypes/*.json",
+                "mechanisms_featured": [
+                    "M17_modal_causality_portal",
+                    "M13_enterprise_relationship_building",
+                    "M7_causal_sales_milestones",
+                    "M15_reference_selling_strategy",
+                    "M8_founder_scaling_stress",
+                    "M11_enterprise_negotiations"
+                ],
+                "expected_paths": 3,
+                "enterprise_paths": ["vertical_beachhead", "horizontal_champions", "strategic_partnership"],
+                "key_questions": [
+                    "What customer success pattern enabled 145% NRR?",
+                    "How did reference network develop?",
+                    "What founder behaviors drove enterprise credibility?",
+                    "How did roles evolve as company scaled?"
+                ]
+            }
+        )
+
+    @classmethod
+    def portal_timepoint_founder_transition(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: One founder departs after Series B - work backward to partnership formation.
+
+        Portal: September 2027 - Ken Cavanagh departs as President after Series B
+        Origin: October 2024 - Partnership formation & equity agreements
+        Goal: Identify early partnership dynamics that predicted transition
+        """
+        return cls(
+            scenario_description=(
+                "**September 2027: Ken Cavanagh Departs Timepoint** - After successful $100M Series B ($500M valuation), "
+                "Ken Cavanagh (President/COO) announces departure to 'pursue new opportunities.' Sean McDonald (CEO) remains. "
+                "Public statement: 'amicable transition,' 'different visions for next phase,' 'grateful for partnership.' Private reality: "
+                "18 months of growing tension over strategic direction, role clarity, and decision authority. Ken owns 28% (post-dilution), "
+                "Sean owns 42%. Board thanks Ken for 'operational excellence' but sides with Sean's vision. "
+                "\n\n"
+                "**Work backward to founding moment**: October 2024, Sean and Ken negotiate partnership. Initial split: Sean 55% (CEO, "
+                "product vision, fundraising), Ken 35% (President, operations, GTM), ESOP/advisors 10%. Vesting: 4 years, 1-year cliff. "
+                "Role boundaries: Sean owns product roadmap + investor relations, Ken owns revenue execution + team building. Sounds clear. "
+                "But was it really? "
+                "\n\n"
+                "**Critical tensions to trace backward**: "
+                "- Departure negotiation (Sep 2027): What final conflict triggered exit? "
+                "- Series B board dynamics (June 2027): Did board favor one founder over other? "
+                "- Product vs sales tension (Q1 2027): Sean wants deeper product → Ken needs more features for sales. Who wins? "
+                "- First major disagreement (Q3 2026): When did cracks appear? "
+                "- Series A role evolution (Q4 2025): Did equity dilution (Sean 42% → Ken 28%) create resentment? "
+                "- Early hiring conflicts (Q2 2025): Did they agree on key hires? "
+                "- Formation negotiation (Oct 2024): Were role boundaries truly clear? Red flags missed? "
+                "\n\n"
+                "**Three breakup paths to explore**: "
+                "(A) Product Vision Conflict: Sean's philosophical/long-term vision conflicts with Ken's practical/near-term execution needs. "
+                "Sean wants to build 'AI consciousness framework,' Ken wants to ship features customers are buying. Irreconcilable. "
+                "\n"
+                "(B) Authority Ambiguity: Despite clear initial roles, gray areas emerge (who decides pricing? hiring? product priorities?). "
+                "Sean's philosophical nature → questions everything. Ken's operational nature → wants clear authority. Friction builds. "
+                "\n"
+                "(C) Board Alignment Shift: Post-Series B, board wants aggressive growth → prefers operational CEO. Pressures Sean to "
+                "delegate more → Sean resists → board sides with Sean (founder primacy) → Ken feels undermined → exits. "
+                "\n\n"
+                "**Founder dynamics analysis**: Given Sean's 'needs strong operational partner' weakness + Ken's 'needs complementary "
+                "visionary' weakness, was this partnership structurally sound? Did initial equity split (55/35) create implicit hierarchy "
+                "that undermined partnership? Did their complementary strengths become conflicting priorities under growth pressure?"
+            ),
+            world_id="portal_timepoint_founder_transition",
+            entities=EntityConfig(
+                count=6,  # Sean + Ken + lead board member + VP Engineering + VP Sales + mediator/advisor
+                types=["human"],
+                initial_resolution=ResolutionLevel.DIALOG
+            ),
+            timepoints=CompanyConfig(
+                count=1,
+                resolution="quarter"
+            ),
+            temporal=TemporalConfig(
+                mode=TemporalMode.PORTAL,
+                portal_description="Ken Cavanagh departs as President after Series B, partnership dissolves",
+                portal_year=2027,
+                origin_year=2024,
+                backward_steps=12,  # 3 years × 4 quarters
+                path_count=3,
+                candidate_antecedents_per_step=7,
+                exploration_mode="adaptive",
+                coherence_threshold=0.70,
+                llm_scoring_weight=0.30,
+                historical_precedent_weight=0.20,
+                causal_necessity_weight=0.30,  # Higher weight: partnership dynamics are causally critical
+                entity_capability_weight=0.20
+            ),
+            outputs=OutputConfig(
+                formats=["json", "jsonl", "markdown"],
+                include_dialogs=True,
+                include_relationships=True,
+                export_ml_dataset=True
+            ),
+            metadata={
+                "portal_type": "timepoint_founder_transition",
+                "founder_profiles": ["sean_mcdonald", "ken_cavanagh"],
+                "profile_source": "generation/profiles/founder_archetypes/*.json",
+                "mechanisms_featured": [
+                    "M17_modal_causality_portal",
+                    "M13_founder_relationship_deterioration",
+                    "M7_causal_conflict_escalation",
+                    "M15_strategic_vision_misalignment",
+                    "M8_partnership_stress",
+                    "M11_board_founder_dynamics"
+                ],
+                "expected_paths": 3,
+                "breakup_paths": ["product_vision_conflict", "authority_ambiguity", "board_alignment_shift"],
+                "key_questions": [
+                    "What early partnership decisions predicted later conflict?",
+                    "Were initial role boundaries truly clear?",
+                    "How did equity split create implicit hierarchy?",
+                    "What board dynamics influenced founder relationship?",
+                    "Could partnership have been structured differently?"
+                ]
+            }
+        )
+
+    # ============================================================================
+    # Timepoint Corporate Portal Templates - QUICK Simulation-Judged Variants
+    # ============================================================================
+
+    @classmethod
+    def portal_timepoint_unicorn_simjudged_quick(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Timepoint unicorn journey with QUICK simulation-based judging.
+
+        Same scenario as portal_timepoint_unicorn but uses lightweight
+        simulation judging for candidate evaluation (1 forward step, no dialog).
+
+        Cost: ~2x standard | Speed: Fast | Quality: Good
+        """
+        base = cls.portal_timepoint_unicorn()
+        base.temporal.use_simulation_judging = True
+        base.temporal.simulation_forward_steps = 1
+        base.temporal.simulation_max_entities = 3
+        base.temporal.simulation_include_dialog = False
+        base.temporal.judge_model = "meta-llama/llama-3.1-70b-instruct"
+        base.temporal.judge_temperature = 0.3
+        base.temporal.simulation_cache_results = True
+        base.world_id = "portal_timepoint_unicorn_simjudged_quick"
+        base.metadata["simulation_judging"] = {
+            "enabled": True,
+            "quality_level": "quick",
+            "forward_steps": 1,
+            "dialog_enabled": False,
+            "cost_multiplier": "~2x",
+            "use_case": "Fast exploration of unicorn trajectories"
+        }
+        return base
+
+    @classmethod
+    def portal_timepoint_series_a_success_simjudged_quick(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Series A success journey with QUICK simulation-based judging.
+
+        Same scenario as portal_timepoint_series_a_success but uses lightweight
+        simulation judging for candidate evaluation (1 forward step, no dialog).
+
+        Cost: ~2x standard | Speed: Fast | Quality: Good
+        """
+        base = cls.portal_timepoint_series_a_success()
+        base.temporal.use_simulation_judging = True
+        base.temporal.simulation_forward_steps = 1
+        base.temporal.simulation_max_entities = 3
+        base.temporal.simulation_include_dialog = False
+        base.temporal.judge_model = "meta-llama/llama-3.1-70b-instruct"
+        base.temporal.judge_temperature = 0.3
+        base.temporal.simulation_cache_results = True
+        base.world_id = "portal_timepoint_series_a_success_simjudged_quick"
+        base.metadata["simulation_judging"] = {
+            "enabled": True,
+            "quality_level": "quick",
+            "forward_steps": 1,
+            "dialog_enabled": False,
+            "cost_multiplier": "~2x",
+            "use_case": "Fast exploration of Series A pathways"
+        }
+        return base
+
+    @classmethod
+    def portal_timepoint_product_market_fit_simjudged_quick(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Product-market fit journey with QUICK simulation-based judging.
+
+        Same scenario as portal_timepoint_product_market_fit but uses lightweight
+        simulation judging for candidate evaluation (1 forward step, no dialog).
+
+        Cost: ~2x standard | Speed: Fast | Quality: Good
+        """
+        base = cls.portal_timepoint_product_market_fit()
+        base.temporal.use_simulation_judging = True
+        base.temporal.simulation_forward_steps = 1
+        base.temporal.simulation_max_entities = 3
+        base.temporal.simulation_include_dialog = False
+        base.temporal.judge_model = "meta-llama/llama-3.1-70b-instruct"
+        base.temporal.judge_temperature = 0.3
+        base.temporal.simulation_cache_results = True
+        base.world_id = "portal_timepoint_product_market_fit_simjudged_quick"
+        base.metadata["simulation_judging"] = {
+            "enabled": True,
+            "quality_level": "quick",
+            "forward_steps": 1,
+            "dialog_enabled": False,
+            "cost_multiplier": "~2x",
+            "use_case": "Fast exploration of PMF discovery paths"
+        }
+        return base
+
+    @classmethod
+    def portal_timepoint_enterprise_adoption_simjudged_quick(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Enterprise adoption journey with QUICK simulation-based judging.
+
+        Same scenario as portal_timepoint_enterprise_adoption but uses lightweight
+        simulation judging for candidate evaluation (1 forward step, no dialog).
+
+        Cost: ~2x standard | Speed: Fast | Quality: Good
+        """
+        base = cls.portal_timepoint_enterprise_adoption()
+        base.temporal.use_simulation_judging = True
+        base.temporal.simulation_forward_steps = 1
+        base.temporal.simulation_max_entities = 3
+        base.temporal.simulation_include_dialog = False
+        base.temporal.judge_model = "meta-llama/llama-3.1-70b-instruct"
+        base.temporal.judge_temperature = 0.3
+        base.temporal.simulation_cache_results = True
+        base.world_id = "portal_timepoint_enterprise_adoption_simjudged_quick"
+        base.metadata["simulation_judging"] = {
+            "enabled": True,
+            "quality_level": "quick",
+            "forward_steps": 1,
+            "dialog_enabled": False,
+            "cost_multiplier": "~2x",
+            "use_case": "Fast exploration of enterprise GTM strategies"
+        }
+        return base
+
+    @classmethod
+    def portal_timepoint_founder_transition_simjudged_quick(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Founder transition journey with QUICK simulation-based judging.
+
+        Same scenario as portal_timepoint_founder_transition but uses lightweight
+        simulation judging for candidate evaluation (1 forward step, no dialog).
+
+        Cost: ~2x standard | Speed: Fast | Quality: Good
+        """
+        base = cls.portal_timepoint_founder_transition()
+        base.temporal.use_simulation_judging = True
+        base.temporal.simulation_forward_steps = 1
+        base.temporal.simulation_max_entities = 3
+        base.temporal.simulation_include_dialog = False
+        base.temporal.judge_model = "meta-llama/llama-3.1-70b-instruct"
+        base.temporal.judge_temperature = 0.3
+        base.temporal.simulation_cache_results = True
+        base.world_id = "portal_timepoint_founder_transition_simjudged_quick"
+        base.metadata["simulation_judging"] = {
+            "enabled": True,
+            "quality_level": "quick",
+            "forward_steps": 1,
+            "dialog_enabled": False,
+            "cost_multiplier": "~2x",
+            "use_case": "Fast exploration of partnership failure modes"
+        }
+        return base
+
+    # ============================================================================
+    # Timepoint Corporate Portal Templates - STANDARD Simulation-Judged Variants
+    # ============================================================================
+
+    @classmethod
+    def portal_timepoint_unicorn_simjudged(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Timepoint unicorn journey with STANDARD simulation-based judging.
+
+        Same scenario as portal_timepoint_unicorn but uses standard
+        simulation judging for candidate evaluation (2 forward steps, dialog enabled).
+
+        Cost: ~3x standard | Speed: Medium | Quality: High
+        """
+        base = cls.portal_timepoint_unicorn()
+        base.temporal.use_simulation_judging = True
+        base.temporal.simulation_forward_steps = 2
+        base.temporal.simulation_max_entities = 5
+        base.temporal.simulation_include_dialog = True
+        base.temporal.judge_model = "meta-llama/llama-3.1-405b-instruct"
+        base.temporal.judge_temperature = 0.3
+        base.temporal.simulation_cache_results = True
+        base.world_id = "portal_timepoint_unicorn_simjudged"
+        base.metadata["simulation_judging"] = {
+            "enabled": True,
+            "quality_level": "standard",
+            "forward_steps": 2,
+            "dialog_enabled": True,
+            "cost_multiplier": "~3x",
+            "use_case": "Production runs, high-quality unicorn trajectory analysis"
+        }
+        return base
+
+    @classmethod
+    def portal_timepoint_series_a_success_simjudged(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Series A success journey with STANDARD simulation-based judging.
+
+        Same scenario as portal_timepoint_series_a_success but uses standard
+        simulation judging for candidate evaluation (2 forward steps, dialog enabled).
+
+        Cost: ~3x standard | Speed: Medium | Quality: High
+        """
+        base = cls.portal_timepoint_series_a_success()
+        base.temporal.use_simulation_judging = True
+        base.temporal.simulation_forward_steps = 2
+        base.temporal.simulation_max_entities = 5
+        base.temporal.simulation_include_dialog = True
+        base.temporal.judge_model = "meta-llama/llama-3.1-405b-instruct"
+        base.temporal.judge_temperature = 0.3
+        base.temporal.simulation_cache_results = True
+        base.world_id = "portal_timepoint_series_a_success_simjudged"
+        base.metadata["simulation_judging"] = {
+            "enabled": True,
+            "quality_level": "standard",
+            "forward_steps": 2,
+            "dialog_enabled": True,
+            "cost_multiplier": "~3x",
+            "use_case": "Production runs, high-quality Series A pathway analysis"
+        }
+        return base
+
+    @classmethod
+    def portal_timepoint_product_market_fit_simjudged(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Product-market fit journey with STANDARD simulation-based judging.
+
+        Same scenario as portal_timepoint_product_market_fit but uses standard
+        simulation judging for candidate evaluation (2 forward steps, dialog enabled).
+
+        Cost: ~3x standard | Speed: Medium | Quality: High
+        """
+        base = cls.portal_timepoint_product_market_fit()
+        base.temporal.use_simulation_judging = True
+        base.temporal.simulation_forward_steps = 2
+        base.temporal.simulation_max_entities = 5
+        base.temporal.simulation_include_dialog = True
+        base.temporal.judge_model = "meta-llama/llama-3.1-405b-instruct"
+        base.temporal.judge_temperature = 0.3
+        base.temporal.simulation_cache_results = True
+        base.world_id = "portal_timepoint_product_market_fit_simjudged"
+        base.metadata["simulation_judging"] = {
+            "enabled": True,
+            "quality_level": "standard",
+            "forward_steps": 2,
+            "dialog_enabled": True,
+            "cost_multiplier": "~3x",
+            "use_case": "Production runs, high-quality PMF discovery analysis"
+        }
+        return base
+
+    @classmethod
+    def portal_timepoint_enterprise_adoption_simjudged(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Enterprise adoption journey with STANDARD simulation-based judging.
+
+        Same scenario as portal_timepoint_enterprise_adoption but uses standard
+        simulation judging for candidate evaluation (2 forward steps, dialog enabled).
+
+        Cost: ~3x standard | Speed: Medium | Quality: High
+        """
+        base = cls.portal_timepoint_enterprise_adoption()
+        base.temporal.use_simulation_judging = True
+        base.temporal.simulation_forward_steps = 2
+        base.temporal.simulation_max_entities = 5
+        base.temporal.simulation_include_dialog = True
+        base.temporal.judge_model = "meta-llama/llama-3.1-405b-instruct"
+        base.temporal.judge_temperature = 0.3
+        base.temporal.simulation_cache_results = True
+        base.world_id = "portal_timepoint_enterprise_adoption_simjudged"
+        base.metadata["simulation_judging"] = {
+            "enabled": True,
+            "quality_level": "standard",
+            "forward_steps": 2,
+            "dialog_enabled": True,
+            "cost_multiplier": "~3x",
+            "use_case": "Production runs, high-quality enterprise GTM analysis"
+        }
+        return base
+
+    @classmethod
+    def portal_timepoint_founder_transition_simjudged(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Founder transition journey with STANDARD simulation-based judging.
+
+        Same scenario as portal_timepoint_founder_transition but uses standard
+        simulation judging for candidate evaluation (2 forward steps, dialog enabled).
+
+        Cost: ~3x standard | Speed: Medium | Quality: High
+        """
+        base = cls.portal_timepoint_founder_transition()
+        base.temporal.use_simulation_judging = True
+        base.temporal.simulation_forward_steps = 2
+        base.temporal.simulation_max_entities = 5
+        base.temporal.simulation_include_dialog = True
+        base.temporal.judge_model = "meta-llama/llama-3.1-405b-instruct"
+        base.temporal.judge_temperature = 0.3
+        base.temporal.simulation_cache_results = True
+        base.world_id = "portal_timepoint_founder_transition_simjudged"
+        base.metadata["simulation_judging"] = {
+            "enabled": True,
+            "quality_level": "standard",
+            "forward_steps": 2,
+            "dialog_enabled": True,
+            "cost_multiplier": "~3x",
+            "use_case": "Production runs, high-quality partnership analysis"
+        }
+        return base
+
+    # ============================================================================
+    # Timepoint Corporate Portal Templates - THOROUGH Simulation-Judged Variants
+    # ============================================================================
+
+    @classmethod
+    def portal_timepoint_unicorn_simjudged_thorough(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Timepoint unicorn journey with THOROUGH simulation-based judging.
+
+        Same scenario as portal_timepoint_unicorn but uses thorough
+        simulation judging for candidate evaluation (3 forward steps, dialog + extra analysis).
+
+        Cost: ~4-5x standard | Speed: Slow | Quality: Highest
+        """
+        base = cls.portal_timepoint_unicorn()
+        base.temporal.use_simulation_judging = True
+        base.temporal.simulation_forward_steps = 3
+        base.temporal.simulation_max_entities = 7
+        base.temporal.simulation_include_dialog = True
+        base.temporal.candidate_antecedents_per_step = 7
+        base.temporal.judge_model = "meta-llama/llama-3.1-405b-instruct"
+        base.temporal.judge_temperature = 0.2
+        base.temporal.simulation_cache_results = True
+        base.world_id = "portal_timepoint_unicorn_simjudged_thorough"
+        base.metadata["simulation_judging"] = {
+            "enabled": True,
+            "quality_level": "thorough",
+            "forward_steps": 3,
+            "dialog_enabled": True,
+            "cost_multiplier": "~4-5x",
+            "use_case": "Research-grade unicorn trajectory analysis with maximum detail"
+        }
+        return base
+
+    @classmethod
+    def portal_timepoint_series_a_success_simjudged_thorough(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Series A success journey with THOROUGH simulation-based judging.
+
+        Same scenario as portal_timepoint_series_a_success but uses thorough
+        simulation judging for candidate evaluation (3 forward steps, dialog + extra analysis).
+
+        Cost: ~4-5x standard | Speed: Slow | Quality: Highest
+        """
+        base = cls.portal_timepoint_series_a_success()
+        base.temporal.use_simulation_judging = True
+        base.temporal.simulation_forward_steps = 3
+        base.temporal.simulation_max_entities = 7
+        base.temporal.simulation_include_dialog = True
+        base.temporal.candidate_antecedents_per_step = 7
+        base.temporal.judge_model = "meta-llama/llama-3.1-405b-instruct"
+        base.temporal.judge_temperature = 0.2
+        base.temporal.simulation_cache_results = True
+        base.world_id = "portal_timepoint_series_a_success_simjudged_thorough"
+        base.metadata["simulation_judging"] = {
+            "enabled": True,
+            "quality_level": "thorough",
+            "forward_steps": 3,
+            "dialog_enabled": True,
+            "cost_multiplier": "~4-5x",
+            "use_case": "Research-grade Series A pathway analysis with maximum detail"
+        }
+        return base
+
+    @classmethod
+    def portal_timepoint_product_market_fit_simjudged_thorough(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Product-market fit journey with THOROUGH simulation-based judging.
+
+        Same scenario as portal_timepoint_product_market_fit but uses thorough
+        simulation judging for candidate evaluation (3 forward steps, dialog + extra analysis).
+
+        Cost: ~4-5x standard | Speed: Slow | Quality: Highest
+        """
+        base = cls.portal_timepoint_product_market_fit()
+        base.temporal.use_simulation_judging = True
+        base.temporal.simulation_forward_steps = 3
+        base.temporal.simulation_max_entities = 7
+        base.temporal.simulation_include_dialog = True
+        base.temporal.candidate_antecedents_per_step = 7
+        base.temporal.judge_model = "meta-llama/llama-3.1-405b-instruct"
+        base.temporal.judge_temperature = 0.2
+        base.temporal.simulation_cache_results = True
+        base.world_id = "portal_timepoint_product_market_fit_simjudged_thorough"
+        base.metadata["simulation_judging"] = {
+            "enabled": True,
+            "quality_level": "thorough",
+            "forward_steps": 3,
+            "dialog_enabled": True,
+            "cost_multiplier": "~4-5x",
+            "use_case": "Research-grade PMF discovery analysis with maximum detail"
+        }
+        return base
+
+    @classmethod
+    def portal_timepoint_enterprise_adoption_simjudged_thorough(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Enterprise adoption journey with THOROUGH simulation-based judging.
+
+        Same scenario as portal_timepoint_enterprise_adoption but uses thorough
+        simulation judging for candidate evaluation (3 forward steps, dialog + extra analysis).
+
+        Cost: ~4-5x standard | Speed: Slow | Quality: Highest
+        """
+        base = cls.portal_timepoint_enterprise_adoption()
+        base.temporal.use_simulation_judging = True
+        base.temporal.simulation_forward_steps = 3
+        base.temporal.simulation_max_entities = 7
+        base.temporal.simulation_include_dialog = True
+        base.temporal.candidate_antecedents_per_step = 7
+        base.temporal.judge_model = "meta-llama/llama-3.1-405b-instruct"
+        base.temporal.judge_temperature = 0.2
+        base.temporal.simulation_cache_results = True
+        base.world_id = "portal_timepoint_enterprise_adoption_simjudged_thorough"
+        base.metadata["simulation_judging"] = {
+            "enabled": True,
+            "quality_level": "thorough",
+            "forward_steps": 3,
+            "dialog_enabled": True,
+            "cost_multiplier": "~4-5x",
+            "use_case": "Research-grade enterprise GTM analysis with maximum detail"
+        }
+        return base
+
+    @classmethod
+    def portal_timepoint_founder_transition_simjudged_thorough(cls) -> "SimulationConfig":
+        """
+        PORTAL mode: Founder transition journey with THOROUGH simulation-based judging.
+
+        Same scenario as portal_timepoint_founder_transition but uses thorough
+        simulation judging for candidate evaluation (3 forward steps, dialog + extra analysis).
+
+        Cost: ~4-5x standard | Speed: Slow | Quality: Highest
+        """
+        base = cls.portal_timepoint_founder_transition()
+        base.temporal.use_simulation_judging = True
+        base.temporal.simulation_forward_steps = 3
+        base.temporal.simulation_max_entities = 7
+        base.temporal.simulation_include_dialog = True
+        base.temporal.candidate_antecedents_per_step = 7
+        base.temporal.judge_model = "meta-llama/llama-3.1-405b-instruct"
+        base.temporal.judge_temperature = 0.2
+        base.temporal.simulation_cache_results = True
+        base.world_id = "portal_timepoint_founder_transition_simjudged_thorough"
+        base.metadata["simulation_judging"] = {
+            "enabled": True,
+            "quality_level": "thorough",
+            "forward_steps": 3,
+            "dialog_enabled": True,
+            "cost_multiplier": "~4-5x",
+            "use_case": "Research-grade partnership analysis with maximum detail"
+        }
+        return base
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization"""
         return self.model_dump()
