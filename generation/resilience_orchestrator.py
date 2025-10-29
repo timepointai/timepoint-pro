@@ -399,7 +399,8 @@ class ResilientE2EWorkflowRunner:
         metadata_manager: MetadataManager,
         checkpoint_dir: str = "checkpoints",
         enable_circuit_breaker: bool = True,
-        enable_health_monitoring: bool = True
+        enable_health_monitoring: bool = True,
+        generate_summary: bool = True
     ):
         """
         Args:
@@ -407,11 +408,13 @@ class ResilientE2EWorkflowRunner:
             checkpoint_dir: Directory for checkpoints
             enable_circuit_breaker: Enable circuit breaker protection
             enable_health_monitoring: Enable pre-flight and continuous health checks
+            generate_summary: Whether to generate LLM-powered run summaries (default: True)
         """
         self.metadata_manager = metadata_manager
+        self.generate_summary = generate_summary
 
         # Wrap the real E2E runner
-        self.inner_runner = FullE2EWorkflowRunner(metadata_manager)
+        self.inner_runner = FullE2EWorkflowRunner(metadata_manager, generate_summary=generate_summary)
 
         # Fault tolerance components
         self.checkpoint_manager = CheckpointManager(

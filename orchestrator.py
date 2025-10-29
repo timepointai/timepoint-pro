@@ -21,6 +21,7 @@ from datetime import datetime, timedelta
 from pydantic import BaseModel
 import json
 import time
+import warnings
 import networkx as nx
 
 from schemas import (
@@ -963,7 +964,10 @@ class ResolutionAssigner:
         centrality = {}
         if graph.number_of_edges() > 0:
             try:
-                centrality = nx.eigenvector_centrality(graph, max_iter=1000)
+                # Suppress RuntimeWarning for small graphs (k >= N - 1 for N * N square matrix)
+                with warnings.catch_warnings():
+                    warnings.filterwarnings('ignore', category=RuntimeWarning)
+                    centrality = nx.eigenvector_centrality(graph, max_iter=1000)
             except:
                 # Fallback to degree centrality if eigenvector fails
                 centrality = nx.degree_centrality(graph)

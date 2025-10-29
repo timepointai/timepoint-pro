@@ -5,6 +5,7 @@ import hydra
 from omegaconf import DictConfig
 from pathlib import Path
 from datetime import datetime
+import warnings
 
 # Import all required modules
 import networkx as nx
@@ -369,7 +370,10 @@ def run_training(cfg: DictConfig, store: GraphStore, llm_client: LLMClient):
     import networkx as nx
     from tensors import compute_ttm_metrics
 
-    centralities = nx.eigenvector_centrality(graph)
+    # Suppress RuntimeWarning for small graphs
+    with warnings.catch_warnings():
+        warnings.filterwarnings('ignore', category=RuntimeWarning)
+        centralities = nx.eigenvector_centrality(graph)
     top_entities = sorted(centralities.items(), key=lambda x: x[1], reverse=True)[:5]
 
     print(f"\nTop 5 Most Central Entities:")

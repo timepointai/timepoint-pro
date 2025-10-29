@@ -2,6 +2,7 @@
 # ============================================================================
 # graph.py - NetworkX graph operations and fixtures
 # ============================================================================
+import warnings
 import networkx as nx
 from datetime import datetime, timedelta
 from typing import Dict
@@ -54,12 +55,15 @@ def create_timeline_graph(start_date: datetime, end_date: datetime, resolution: 
 
 def compute_centralities(G: nx.Graph) -> Dict[str, Dict[str, float]]:
     """Compute all centrality metrics"""
-    return {
-        "eigenvector": nx.eigenvector_centrality(G),
-        "betweenness": nx.betweenness_centrality(G),
-        "pagerank": nx.pagerank(G),
-        "degree": dict(G.degree())
-    }
+    # Suppress RuntimeWarning for small graphs
+    with warnings.catch_warnings():
+        warnings.filterwarnings('ignore', category=RuntimeWarning)
+        return {
+            "eigenvector": nx.eigenvector_centrality(G),
+            "betweenness": nx.betweenness_centrality(G),
+            "pagerank": nx.pagerank(G),
+            "degree": dict(G.degree())
+        }
 
 def export_graph_data(graph: nx.Graph, filename: str):
     """Export graph in multiple formats for visualization"""

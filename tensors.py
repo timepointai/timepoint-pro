@@ -5,6 +5,7 @@ import numpy as np
 from scipy.linalg import svd
 from sklearn.decomposition import PCA, NMF
 from typing import Callable, Dict, List, Optional
+import warnings
 import networkx as nx
 
 from schemas import Entity
@@ -151,11 +152,14 @@ def compute_ttm_metrics(entity: Entity, graph: nx.Graph) -> Dict[str, float]:
     if entity.entity_id not in graph:
         return {}
 
-    metrics = {
-        "eigenvector_centrality": nx.eigenvector_centrality(graph).get(entity.entity_id, 0.0),
-        "betweenness": nx.betweenness_centrality(graph).get(entity.entity_id, 0.0),
-        "pagerank": nx.pagerank(graph).get(entity.entity_id, 0.0),
-    }
+    # Suppress RuntimeWarning for small graphs
+    with warnings.catch_warnings():
+        warnings.filterwarnings('ignore', category=RuntimeWarning)
+        metrics = {
+            "eigenvector_centrality": nx.eigenvector_centrality(graph).get(entity.entity_id, 0.0),
+            "betweenness": nx.betweenness_centrality(graph).get(entity.entity_id, 0.0),
+            "pagerank": nx.pagerank(graph).get(entity.entity_id, 0.0),
+        }
     return metrics
 
 

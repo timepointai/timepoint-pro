@@ -30,6 +30,7 @@ from oxen_integration.data_formatters import EntityEvolutionFormatter
 from metadata.run_tracker import MetadataManager, RunMetadata
 from metadata.tracking import set_current_run_id, clear_current_run_id, set_metadata_manager
 from metadata import logfire_setup
+from metadata.run_summarizer import generate_run_summary
 from andos.layer_computer import compute_andos_layers, validate_andos_layers
 
 
@@ -67,14 +68,16 @@ class FullE2EWorkflowRunner:
     This is the production workflow orchestrator.
     """
 
-    def __init__(self, metadata_manager: MetadataManager):
+    def __init__(self, metadata_manager: MetadataManager, generate_summary: bool = True):
         """
         Initialize E2E runner.
 
         Args:
             metadata_manager: Metadata tracking manager
+            generate_summary: Whether to generate LLM-powered run summaries (default: True)
         """
         self.metadata_manager = metadata_manager
+        self.generate_summary = generate_summary
         set_metadata_manager(metadata_manager)
         self.logfire = logfire_setup.get_logfire()
 
@@ -158,6 +161,16 @@ class FullE2EWorkflowRunner:
                     oxen_dataset_url
                 )
 
+                # Step 8: Generate LLM summary (optional)
+                if self.generate_summary:
+                    summary = self._generate_summary(metadata, training_data, scene_result)
+                    if summary:
+                        print(f"\n{'='*80}")
+                        print(f"📝 RUN SUMMARY")
+                        print(f"{'='*80}")
+                        print(f"{summary}")
+                        print(f"{'='*80}\n")
+
                 print(f"\n{'='*80}")
                 print(f"✅ E2E WORKFLOW COMPLETE: {run_id}")
                 print(f"{'='*80}\n")
@@ -202,6 +215,47 @@ class FullE2EWorkflowRunner:
 
             self.logfire.info("Run tracking initialized", run_id=run_id)
             return metadata
+
+    def _generate_summary(
+        self,
+        metadata: RunMetadata,
+        training_data: List[Dict],
+        scene_result: Dict
+    ) -> Optional[str]:
+        """Step 8: Generate LLM-powered run summary"""
+        with self.logfire.span("step:generate_summary"):
+            print("\nStep 8: Generating run summary...")
+
+            try:
+                llm = scene_result.get("llm_client")
+                if not llm:
+                    print("  ⚠️  No LLM client - skipping summary")
+                    return None
+
+                # Generate summary using metadata and training data
+                summary = generate_run_summary(
+                    run_metadata=metadata,
+                    training_data=training_data[:5] if training_data else None,  # Sample first 5 examples
+                    llm_client=llm
+                )
+
+                # Save summary to database
+                self.metadata_manager.update_summary(metadata.run_id, summary)
+
+                print(f"✓ Summary generated ({len(summary)} chars)")
+
+                self.logfire.info(
+                    "Run summary generated",
+                    run_id=metadata.run_id,
+                    summary_length=len(summary)
+                )
+
+                return summary
+
+            except Exception as e:
+                print(f"  ⚠️  Summary generation failed: {e}")
+                self.logfire.warn("Summary generation failed", error=str(e))
+                return None
 
     def _generate_initial_scene(
         self, config: SimulationConfig, run_id: str

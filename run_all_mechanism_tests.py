@@ -88,6 +88,16 @@ def run_template(runner, config, name: str, expected_mechanisms: Set[str]) -> Di
         result = runner.run(config)
         mechanisms = set(result.mechanisms_used) if result.mechanisms_used else set()
 
+        # Track Oxen URLs and PDF locations
+        oxen_repo_url = result.oxen_repo_url if hasattr(result, 'oxen_repo_url') else None
+        oxen_dataset_url = result.oxen_dataset_url if hasattr(result, 'oxen_dataset_url') else None
+
+        # Find PDF files in datasets/{template_id}/
+        pdf_paths = []
+        template_dataset_dir = Path("datasets") / config.template_id
+        if template_dataset_dir.exists():
+            pdf_paths = [str(p) for p in template_dataset_dir.glob("*.pdf")]
+
         success = {
             'success': True,
             'run_id': result.run_id,
@@ -95,7 +105,11 @@ def run_template(runner, config, name: str, expected_mechanisms: Set[str]) -> Di
             'timepoints': result.timepoints_created,
             'mechanisms': mechanisms,
             'expected': expected_mechanisms,
-            'cost': result.cost_usd or 0.0
+            'cost': result.cost_usd or 0.0,
+            'summary': result.summary if hasattr(result, 'summary') else None,
+            'oxen_repo_url': oxen_repo_url,
+            'oxen_dataset_url': oxen_dataset_url,
+            'pdf_paths': pdf_paths
         }
 
         print(f"\n✅ Success: {name}")
@@ -103,6 +117,10 @@ def run_template(runner, config, name: str, expected_mechanisms: Set[str]) -> Di
         print(f"   Entities: {result.entities_created}, Timepoints: {result.timepoints_created}")
         print(f"   Mechanisms: {', '.join(sorted(mechanisms))}")
         print(f"   Cost: ${result.cost_usd:.2f}")
+        if oxen_repo_url:
+            print(f"   Oxen Repo: {oxen_repo_url}")
+        if pdf_paths:
+            print(f"   PDFs: {len(pdf_paths)} generated")
 
         return success
 
@@ -114,7 +132,8 @@ def run_template(runner, config, name: str, expected_mechanisms: Set[str]) -> Di
             'error': str(e),
             'mechanisms': set(),
             'expected': expected_mechanisms,
-            'cost': 0.0
+            'cost': 0.0,
+            'summary': None
         }
 
 
@@ -193,7 +212,7 @@ def run_andos_script(script: str, name: str, expected_mechanisms: Set[str]) -> D
         }
 
 
-def run_all_templates(mode: str = 'quick'):
+def run_all_templates(mode: str = 'quick', skip_summaries: bool = False):
     """Run all mechanism test templates"""
     from generation.config_schema import SimulationConfig
     from generation.resilience_orchestrator import ResilientE2EWorkflowRunner
@@ -210,10 +229,15 @@ def run_all_templates(mode: str = 'quick'):
     print("   - ANDOS scripts: 0s cooldown")
     print("   - Phase transition: 0s")
     print()
+    if skip_summaries:
+        print("📝 Summaries: DISABLED (--skip-summaries)")
+    else:
+        print("📝 Summaries: ENABLED (use --skip-summaries to disable)")
+    print()
 
     # Initialize
     metadata_manager = MetadataManager(db_path="metadata/runs.db")
-    runner = ResilientE2EWorkflowRunner(metadata_manager)
+    runner = ResilientE2EWorkflowRunner(metadata_manager, generate_summary=not skip_summaries)
 
     # Define templates
     # Quick mode: safe, fast templates
@@ -519,6 +543,80 @@ def run_all_templates(mode: str = 'quick'):
         print("  ⚠️  OXEN_API_TOKEN not set - Oxen uploads skipped")
         print("  Set OXEN_API_TOKEN to test Oxen publishing")
 
+    # Summary recap
+    if not skip_summaries:
+        print("\n" + "=" * 80)
+        print("📝 RUN SUMMARIES RECAP")
+        print("=" * 80)
+
+        summaries_shown = 0
+        for name, result in results.items():
+            if result['success'] and result.get('summary'):
+                print(f"\n{name}:")
+                print(f"  {result['summary']}")
+                summaries_shown += 1
+
+        if summaries_shown == 0:
+            print("\n  No summaries available (templates may not have completed successfully)")
+        else:
+            print(f"\n  Total summaries: {summaries_shown}")
+
+    # Artifacts Summary (Oxen URLs and PDFs)
+    print("\n" + "=" * 80)
+    print("📦 ARTIFACTS SUMMARY")
+    print("=" * 80)
+
+    oxen_repos = []
+    oxen_datasets = []
+    all_pdfs = []
+
+    for name, result in results.items():
+        if result['success']:
+            if result.get('oxen_repo_url'):
+                oxen_repos.append((name, result['oxen_repo_url']))
+            if result.get('oxen_dataset_url'):
+                oxen_datasets.append((name, result['oxen_dataset_url']))
+            if result.get('pdf_paths'):
+                for pdf_path in result['pdf_paths']:
+                    # Get file size
+                    try:
+                        size_bytes = Path(pdf_path).stat().st_size
+                        size_kb = size_bytes / 1024
+                        all_pdfs.append((name, pdf_path, size_kb))
+                    except:
+                        all_pdfs.append((name, pdf_path, 0.0))
+
+    # Oxen Repositories
+    if oxen_repos:
+        print(f"\n🐂 Oxen Repositories ({len(oxen_repos)} templates):")
+        for name, url in oxen_repos:
+            print(f"  {name:30s} → {url}")
+    else:
+        print(f"\n🐂 Oxen Repositories: None (OXEN_API_TOKEN may not be set)")
+
+    # Oxen Datasets
+    if oxen_datasets:
+        print(f"\n📊 Oxen Datasets ({len(oxen_datasets)} templates):")
+        for name, url in oxen_datasets:
+            print(f"  {name:30s} → {url}")
+
+    # PDF Screenplays
+    if all_pdfs:
+        print(f"\n📄 PDF Screenplays ({len(all_pdfs)} files):")
+        for name, pdf_path, size_kb in all_pdfs:
+            print(f"  {name:30s} → {pdf_path} ({size_kb:.1f} KB)")
+    else:
+        print(f"\n📄 PDF Screenplays: None generated")
+
+    # Summary stats
+    print(f"\n📈 Artifact Statistics:")
+    print(f"  Oxen Repositories: {len(oxen_repos)}")
+    print(f"  Oxen Datasets: {len(oxen_datasets)}")
+    print(f"  PDF Screenplays: {len(all_pdfs)}")
+    total_pdf_size = sum(size for _, _, size in all_pdfs)
+    if total_pdf_size > 0:
+        print(f"  Total PDF Size: {total_pdf_size:.1f} KB")
+
     # Final summary
     print("\n" + "=" * 80)
     print("TEST RUN COMPLETE")
@@ -568,6 +666,11 @@ if __name__ == "__main__":
         action="store_true",
         help="Run ALL PORTAL tests (standard + all 3 simulation-judged variants = 16 templates total)"
     )
+    parser.add_argument(
+        "--skip-summaries",
+        action="store_true",
+        help="Skip LLM-powered run summaries (reduces cost slightly)"
+    )
     args = parser.parse_args()
 
     # Verify API key
@@ -597,5 +700,5 @@ if __name__ == "__main__":
     else:
         mode = 'quick'
 
-    success = run_all_templates(mode)
+    success = run_all_templates(mode, skip_summaries=args.skip_summaries)
     sys.exit(0 if success else 1)

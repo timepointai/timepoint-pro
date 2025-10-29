@@ -559,7 +559,11 @@ def _population_loop_graph(
     # Get graph metrics
     try:
         import networkx as nx
-        centrality = nx.eigenvector_centrality(graph).get(entity.entity_id, 0.0)
+        import warnings
+        # Suppress RuntimeWarning for small graphs
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', category=RuntimeWarning)
+            centrality = nx.eigenvector_centrality(graph).get(entity.entity_id, 0.0)
         neighbors = list(graph.neighbors(entity.entity_id))
         degree = graph.degree(entity.entity_id)
     except:

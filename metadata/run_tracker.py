@@ -92,6 +92,10 @@ class RunMetadata(BaseModel):
     status: str = "running"  # running, completed, failed
     error_message: Optional[str] = None
 
+    # LLM-generated summary
+    summary: Optional[str] = None
+    summary_generated_at: Optional[datetime] = None
+
     class Config:
         use_enum_values = True
 
@@ -133,7 +137,9 @@ class MetadataManager:
                 oxen_repo_url TEXT,
                 oxen_dataset_url TEXT,
                 status TEXT DEFAULT 'running',
-                error_message TEXT
+                error_message TEXT,
+                summary TEXT,
+                summary_generated_at TEXT
             )
         """)
 
@@ -178,7 +184,37 @@ class MetadataManager:
         """)
 
         conn.commit()
+
+        # Migrate database schema if needed
+        self._migrate_database(conn)
+
         conn.close()
+
+    def _migrate_database(self, conn: sqlite3.Connection):
+        """
+        Migrate database schema to add new columns if they don't exist.
+
+        This ensures backward compatibility with existing databases.
+        """
+        cursor = conn.cursor()
+
+        # Check if summary columns exist in runs table
+        cursor.execute("PRAGMA table_info(runs)")
+        columns = {row[1] for row in cursor.fetchall()}  # row[1] is column name
+
+        # Add summary column if missing
+        if 'summary' not in columns:
+            print("📝 Migrating database: Adding 'summary' column to runs table...")
+            cursor.execute("ALTER TABLE runs ADD COLUMN summary TEXT")
+            conn.commit()
+            print("   ✓ Summary column added")
+
+        # Add summary_generated_at column if missing
+        if 'summary_generated_at' not in columns:
+            print("📝 Migrating database: Adding 'summary_generated_at' column to runs table...")
+            cursor.execute("ALTER TABLE runs ADD COLUMN summary_generated_at TEXT")
+            conn.commit()
+            print("   ✓ Summary timestamp column added")
 
     def start_run(
         self,
@@ -389,6 +425,35 @@ class MetadataManager:
 
         return self.get_run(run_id)
 
+    def update_summary(
+        self,
+        run_id: str,
+        summary: str
+    ):
+        """
+        Update run with LLM-generated summary.
+
+        Args:
+            run_id: Run to update
+            summary: Generated summary text
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            UPDATE runs SET
+                summary = ?,
+                summary_generated_at = ?
+            WHERE run_id = ?
+        """, (
+            summary,
+            datetime.now().isoformat(),
+            run_id
+        ))
+
+        conn.commit()
+        conn.close()
+
     def get_run(self, run_id: str) -> RunMetadata:
         """Retrieve complete run metadata"""
         conn = sqlite3.connect(self.db_path)
@@ -428,6 +493,8 @@ class MetadataManager:
             oxen_dataset_url=row[15],
             status=row[16],
             error_message=row[17],
+            summary=row[18],
+            summary_generated_at=datetime.fromisoformat(row[19]) if row[19] else None,
             mechanisms_used=mechanisms_used
         )
 
