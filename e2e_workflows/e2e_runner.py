@@ -31,6 +31,7 @@ from metadata.run_tracker import MetadataManager, RunMetadata
 from metadata.tracking import set_current_run_id, clear_current_run_id, set_metadata_manager
 from metadata import logfire_setup
 from metadata.run_summarizer import generate_run_summary
+from metadata.narrative_exporter import NarrativeExporter
 from andos.layer_computer import compute_andos_layers, validate_andos_layers
 
 
@@ -161,15 +162,49 @@ class FullE2EWorkflowRunner:
                     oxen_dataset_url
                 )
 
-                # Step 8: Generate LLM summary (optional)
+                # Step 8: Generate narrative summary (optional)
                 if self.generate_summary:
-                    summary = self._generate_summary(metadata, training_data, scene_result)
+                    summary = self._generate_summary(
+                        metadata,
+                        training_data,
+                        scene_result,
+                        all_timepoints,      # Pass full temporal arc
+                        trained_entities     # Pass character development
+                    )
                     if summary:
+                        # Update metadata object with summary
+                        metadata.summary = summary
+                        metadata.summary_generated_at = datetime.now()
                         print(f"\n{'='*80}")
-                        print(f"📝 RUN SUMMARY")
+                        print(f"📝 NARRATIVE SUMMARY")
                         print(f"{'='*80}")
                         print(f"{summary}")
                         print(f"{'='*80}\n")
+
+                # Step 9: Generate narrative exports (CRITICAL DELIVERABLE)
+                try:
+                    narrative_files = self._generate_narrative_exports(
+                        metadata=metadata,
+                        all_timepoints=all_timepoints,
+                        trained_entities=trained_entities,
+                        scene_result=scene_result,
+                        training_data=training_data,
+                        config=config
+                    )
+
+                    # Update metadata with export paths
+                    if narrative_files:
+                        metadata.narrative_exports = narrative_files
+                        metadata.narrative_export_generated_at = datetime.now()
+                        # Save to database
+                        self.metadata_manager.save_metadata(metadata)
+
+                except Exception as e:
+                    # Narrative export failure = run failure (per user requirement)
+                    metadata.status = "failed"
+                    metadata.error_message = f"Narrative export failed: {str(e)}"
+                    self.metadata_manager.save_metadata(metadata)
+                    raise
 
                 print(f"\n{'='*80}")
                 print(f"✅ E2E WORKFLOW COMPLETE: {run_id}")
@@ -220,11 +255,13 @@ class FullE2EWorkflowRunner:
         self,
         metadata: RunMetadata,
         training_data: List[Dict],
-        scene_result: Dict
+        scene_result: Dict,
+        all_timepoints: List[Timepoint],
+        trained_entities: List[Entity]
     ) -> Optional[str]:
-        """Step 8: Generate LLM-powered run summary"""
+        """Step 8: Generate LLM-powered narrative summary"""
         with self.logfire.span("step:generate_summary"):
-            print("\nStep 8: Generating run summary...")
+            print("\nStep 8: Generating narrative summary...")
 
             try:
                 llm = scene_result.get("llm_client")
@@ -232,11 +269,16 @@ class FullE2EWorkflowRunner:
                     print("  ⚠️  No LLM client - skipping summary")
                     return None
 
-                # Generate summary using metadata and training data
+                store = scene_result.get("store")
+
+                # Generate NARRATIVE summary using full simulation data
                 summary = generate_run_summary(
                     run_metadata=metadata,
-                    training_data=training_data[:5] if training_data else None,  # Sample first 5 examples
-                    llm_client=llm
+                    training_data=training_data[:5] if training_data else None,  # Sample for context
+                    llm_client=llm,
+                    all_timepoints=all_timepoints,  # Full narrative arc
+                    entities=trained_entities,       # Character development
+                    store=store                      # For dialogs
                 )
 
                 # Save summary to database
@@ -256,6 +298,96 @@ class FullE2EWorkflowRunner:
                 print(f"  ⚠️  Summary generation failed: {e}")
                 self.logfire.warn("Summary generation failed", error=str(e))
                 return None
+
+    def _generate_narrative_exports(
+        self,
+        metadata: RunMetadata,
+        all_timepoints: List[Timepoint],
+        trained_entities: List[Entity],
+        scene_result: Dict,
+        training_data: List[Dict],
+        config: SimulationConfig
+    ) -> Dict[str, str]:
+        """
+        Step 9: Generate narrative exports in configured formats.
+
+        Returns:
+            Dictionary mapping format name to file path
+
+        Raises:
+            Exception: If any export fails (per user requirement)
+        """
+        if not config.outputs.generate_narrative_exports:
+            return {}
+
+        with self.logfire.span("step:narrative_exports"):
+            print(f"\n🎬 Generating narrative exports...")
+
+            # Initialize exporter
+            exporter = NarrativeExporter()
+
+            # Collect all run data
+            narrative_data = exporter.collect_run_data(
+                run_metadata=metadata,
+                timepoints=all_timepoints,
+                entities=trained_entities,
+                store=scene_result.get("store"),
+                training_data=training_data,
+                config=config
+            )
+
+            # Optionally enhance with LLM
+            if config.outputs.enhance_narrative_with_llm:
+                try:
+                    llm = scene_result.get("llm_client")
+                    if llm:
+                        narrative_data = exporter.enhance_with_llm(narrative_data, llm)
+                        print(f"  ✓ Executive summary enhanced with LLM")
+                except Exception as e:
+                    print(f"  ⚠️  LLM enhancement failed: {e}, using template only")
+
+            # Generate exports
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            base_path = Path("datasets") / config.world_id
+            base_path.mkdir(parents=True, exist_ok=True)
+
+            exported_files = {}
+            depth = config.outputs.narrative_detail_level
+
+            for format_name in config.outputs.narrative_export_formats:
+                try:
+                    output_file = base_path / f"narrative_{timestamp}.{format_name}"
+
+                    if format_name == "markdown":
+                        path = exporter.export_markdown(narrative_data, output_file, depth)
+                        print(f"    ✓ Markdown: {path.name} ({path.stat().st_size} bytes)")
+                    elif format_name == "json":
+                        path = exporter.export_json(narrative_data, output_file)
+                        print(f"    ✓ JSON: {path.name} ({path.stat().st_size} bytes)")
+                    elif format_name == "pdf":
+                        try:
+                            path = exporter.export_pdf(narrative_data, output_file, depth)
+                            print(f"    ✓ PDF: {path.name} ({path.stat().st_size} bytes)")
+                        except ImportError:
+                            print(f"    ⚠️  PDF skipped: reportlab not installed")
+                            continue
+
+                    exported_files[format_name] = str(path)
+
+                except Exception as e:
+                    # Per user requirement: export failure means run fails
+                    raise Exception(f"Narrative export failed for {format_name}: {e}")
+
+            if not exported_files:
+                raise Exception("No narrative exports were generated successfully")
+
+            self.logfire.info(
+                "Narrative exports generated",
+                formats=list(exported_files.keys()),
+                detail_level=depth
+            )
+
+            return exported_files
 
     def _generate_initial_scene(
         self, config: SimulationConfig, run_id: str
@@ -816,16 +948,24 @@ class FullE2EWorkflowRunner:
             fountain_exporter.export(script_data, str(fountain_file))
             print(f"    ✓ Fountain script: {fountain_file.name} ({fountain_file.stat().st_size} bytes)")
 
-            # Export PDF script
-            pdf_file = output_dir / f"screenplay_{timestamp}.pdf"
-            pdf_exporter = PDFExporter()
-            pdf_exporter.export(script_data, str(pdf_file))
-            print(f"    ✓ PDF script: {pdf_file.name} ({pdf_file.stat().st_size} bytes)")
+            result_files = {'fountain': fountain_file}
 
-            return {
-                'fountain': fountain_file,
-                'pdf': pdf_file
-            }
+            # Export PDF script (with graceful degradation if reportlab not installed)
+            try:
+                # Import check for reportlab
+                from reportlab.lib.pagesizes import letter
+
+                pdf_file = output_dir / f"screenplay_{timestamp}.pdf"
+                pdf_exporter = PDFExporter()
+                pdf_exporter.export(script_data, str(pdf_file))
+                print(f"    ✓ PDF script: {pdf_file.name} ({pdf_file.stat().st_size} bytes)")
+                result_files['pdf'] = pdf_file
+            except ImportError:
+                print(f"    ⚠️  PDF export skipped: reportlab not installed (pip install reportlab)")
+            except Exception as pdf_err:
+                print(f"    ⚠️  PDF export failed: {pdf_err}")
+
+            return result_files
 
         except Exception as e:
             print(f"    ⚠️  Script export failed: {e}")

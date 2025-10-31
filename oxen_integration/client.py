@@ -68,13 +68,35 @@ class OxenClient:
 
     def _init_remote_repo(self):
         """Initialize RemoteRepo instance."""
-        try:
-            from oxen.remote_repo import RemoteRepo
+        RemoteRepo = None
+        import_error = None
 
-            self.remote_repo = RemoteRepo(f"{self.namespace}/{self.repo_name}")
-        except ImportError:
+        # Try multiple import paths for oxenai package
+        try:
+            from oxen import RemoteRepo
+        except ImportError as e1:
+            import_error = e1
+            try:
+                from oxen.remote_repo import RemoteRepo
+            except ImportError as e2:
+                import_error = e2
+                try:
+                    from oxenai import RemoteRepo
+                except ImportError as e3:
+                    import_error = e3
+
+        if RemoteRepo is None:
             raise ConfigurationError(
-                "oxenai package not installed. Install with: pip install oxenai"
+                f"oxenai package import failed: {import_error}. "
+                "Install with: pip install oxenai"
+            )
+
+        try:
+            self.remote_repo = RemoteRepo(f"{self.namespace}/{self.repo_name}")
+        except AttributeError as e:
+            raise ConfigurationError(
+                f"oxenai package API mismatch: {e}. "
+                "Try: pip install --upgrade oxenai"
             )
         except Exception as e:
             # Remote repo initialization failure is not critical
@@ -110,9 +132,29 @@ class OxenClient:
         Raises:
             RepositoryError: If repository creation fails
         """
+        # Try multiple import paths for oxenai package
+        RemoteRepo = None
+        import_error = None
         try:
-            from oxen.remote_repo import RemoteRepo
+            from oxen import RemoteRepo
+        except ImportError as e1:
+            import_error = e1
+            try:
+                from oxen.remote_repo import RemoteRepo
+            except ImportError as e2:
+                import_error = e2
+                try:
+                    from oxenai import RemoteRepo
+                except ImportError as e3:
+                    import_error = e3
 
+        if RemoteRepo is None:
+            raise ConfigurationError(
+                f"oxenai package import failed: {import_error}. "
+                "Install with: pip install oxenai"
+            )
+
+        try:
             repo_name = name or self.repo_name
             if not repo_name:
                 raise RepositoryError("Repository name required")
@@ -145,9 +187,12 @@ class OxenClient:
                 description=description,
             )
 
-        except ImportError:
+        except (ConfigurationError, RepositoryError):
+            raise
+        except AttributeError as e:
             raise ConfigurationError(
-                "oxenai package not installed. Install with: pip install oxenai"
+                f"oxenai package API mismatch: {e}. "
+                "Try: pip install --upgrade oxenai"
             )
         except Exception as e:
             raise RepositoryError(f"Failed to create repository: {e}")
@@ -174,9 +219,29 @@ class OxenClient:
         Raises:
             UploadError: If upload fails
         """
+        # Try multiple import paths for oxenai package
+        RemoteRepo = None
+        import_error = None
         try:
-            from oxen.remote_repo import RemoteRepo
+            from oxen import RemoteRepo
+        except ImportError as e1:
+            import_error = e1
+            try:
+                from oxen.remote_repo import RemoteRepo
+            except ImportError as e2:
+                import_error = e2
+                try:
+                    from oxenai import RemoteRepo
+                except ImportError as e3:
+                    import_error = e3
 
+        if RemoteRepo is None:
+            raise ConfigurationError(
+                f"oxenai package import failed: {import_error}. "
+                "Install with: pip install oxenai"
+            )
+
+        try:
             # Validate file exists
             file_path_obj = Path(file_path)
             if not file_path_obj.exists():
@@ -234,9 +299,12 @@ class OxenClient:
                 commit_id=commit_id,
             )
 
-        except ImportError:
+        except (ConfigurationError, UploadError, RepositoryError):
+            raise
+        except AttributeError as e:
             raise ConfigurationError(
-                "oxenai package not installed. Install with: pip install oxenai"
+                f"oxenai package API mismatch: {e}. "
+                "Try: pip install --upgrade oxenai"
             )
         except (UploadError, RepositoryError):
             raise

@@ -34,6 +34,9 @@ Timepoint-Daedalus enables you to:
 git clone https://github.com/yourusername/timepoint-daedalus.git
 cd timepoint-daedalus
 pip install -r requirements.txt
+
+# Optional: Install PDF export support
+pip install reportlab
 ```
 
 ### Configuration
@@ -264,7 +267,73 @@ exporter.export_batch(
 **Supported Formats**: JSON, JSONL, Markdown, CSV, SQLite
 **Compression**: gzip, bz2 (50-70% size reduction)
 
-### 6. Fault Tolerance & Resilience
+### 6. Automated Narrative Exports
+
+Every simulation run automatically generates comprehensive narrative summaries:
+
+```python
+from generation.config_schema import SimulationConfig
+
+# Narrative exports enabled by default
+config = SimulationConfig.board_meeting()
+
+# Customize export behavior
+config.outputs.generate_narrative_exports = True  # Default: on
+config.outputs.narrative_export_formats = ["markdown", "json", "pdf"]
+config.outputs.narrative_detail_level = "summary"  # minimal | summary | comprehensive
+config.outputs.enhance_narrative_with_llm = True  # Optional LLM enhancement (~$0.003/run)
+```
+
+**Features**:
+- **Automatic Generation**: MD/JSON/PDF created at end of every run
+- **Executive Summary**: High-level overview with LLM enhancement option
+- **Character Profiles**: Entity states, knowledge, and emotional dynamics
+- **Timeline**: Chronological sequence of events
+- **Dialog Excerpts**: Sample conversations from the simulation
+- **Training Insights**: Entity counts, training stats, mechanism usage
+- **Cost Tracking**: Token usage and API costs
+
+**Export Formats**:
+- **Markdown**: Human-readable narrative with full formatting
+- **JSON**: Structured data for programmatic access
+- **PDF**: Publication-ready document (requires `reportlab`)
+
+**Detail Levels**:
+- **Minimal**: Metadata only (run stats, costs, mechanisms)
+- **Summary**: Key highlights (characters, timeline, dialogs)
+- **Comprehensive**: Everything (full analysis with all details)
+
+**File Locations**:
+```
+datasets/{template_id}/narrative_{timestamp}.md
+datasets/{template_id}/narrative_{timestamp}.json
+datasets/{template_id}/narrative_{timestamp}.pdf
+```
+
+**Backfill Historical Runs**:
+```bash
+# Generate narratives for all existing completed runs
+python scripts/backfill_narrative_exports.py --all
+
+# Specific runs only
+python scripts/backfill_narrative_exports.py --run-ids run_001 run_002
+
+# Preview without writing files
+python scripts/backfill_narrative_exports.py --all --dry-run
+
+# Customize formats and detail level
+python scripts/backfill_narrative_exports.py --all --formats markdown json --detail-level comprehensive
+```
+
+**Configuration Options**:
+- Disable for specific runs: `config.outputs.generate_narrative_exports = False`
+- Choose formats: `config.outputs.narrative_export_formats = ["markdown"]`
+- Adjust detail: `config.outputs.narrative_detail_level = "comprehensive"`
+- Disable LLM enhancement: `config.outputs.enhance_narrative_with_llm = False`
+
+**Note**: Export failures will cause the run to fail (narrative exports are treated as critical deliverables).
+
+### 7. Fault Tolerance & Resilience
 
 Global resilience system protects long-running simulations:
 
@@ -458,6 +527,13 @@ python run_vertical_finetune.py
 - `resilience_orchestrator.py` - Global fault tolerance (circuit breaker, health monitoring, transaction log)
 - `fault_handler.py` - Error recovery with adaptive retry
 - `checkpoint_manager.py` - Atomic checkpointing with file locking
+
+**Metadata & Exports** (`metadata/`):
+- `run_tracker.py` - Run metadata tracking and database management
+- `narrative_exporter.py` - Automated narrative summary generation (MD/JSON/PDF)
+
+**Scripts** (`scripts/`):
+- `backfill_narrative_exports.py` - Generate narratives for historical runs
 
 ---
 

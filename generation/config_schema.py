@@ -364,12 +364,46 @@ class OutputConfig(BaseModel):
         description="Export in ML training format (JSONL)"
     )
 
+    # Narrative export configuration
+    generate_narrative_exports: bool = Field(
+        default=True,
+        description="Generate comprehensive narrative summaries (MD/JSON/PDF)"
+    )
+    narrative_export_formats: List[str] = Field(
+        default=["markdown", "json", "pdf"],
+        description="Formats to generate: markdown, json, pdf"
+    )
+    narrative_detail_level: str = Field(
+        default="summary",
+        description="Detail level: minimal, summary, comprehensive"
+    )
+    enhance_narrative_with_llm: bool = Field(
+        default=True,
+        description="Use LLM to enhance executive summary (adds ~$0.003/run)"
+    )
+
     @field_validator('formats')
     @classmethod
     def validate_formats(cls, v):
         valid_formats = {"json", "jsonl", "csv", "markdown", "sqlite", "html"}
         if not all(f in valid_formats for f in v):
             raise ValueError(f"Invalid format. Must be one of: {valid_formats}")
+        return v
+
+    @field_validator('narrative_export_formats')
+    @classmethod
+    def validate_narrative_formats(cls, v):
+        valid = {"markdown", "json", "pdf"}
+        if not all(f in valid for f in v):
+            raise ValueError(f"Invalid narrative format. Must be one of: {valid}")
+        return v
+
+    @field_validator('narrative_detail_level')
+    @classmethod
+    def validate_detail_level(cls, v):
+        valid = {"minimal", "summary", "comprehensive"}
+        if v not in valid:
+            raise ValueError(f"Invalid detail level. Must be one of: {valid}")
         return v
 
 

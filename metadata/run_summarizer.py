@@ -31,39 +31,70 @@ class RunSummarizer:
     def generate_summary(
         self,
         run_metadata: RunMetadata,
-        training_data: Optional[List[Dict]] = None
+        training_data: Optional[List[Dict]] = None,
+        all_timepoints: Optional[List] = None,
+        entities: Optional[List] = None,
+        store = None
     ) -> str:
         """
-        Generate concise 3-5 sentence summary using LLM.
+        Generate narrative summary using LLM (like a plot synopsis).
 
         Args:
             run_metadata: Complete run metadata from database
             training_data: Optional training examples generated during run
+            all_timepoints: Full list of timepoints (narrative arc)
+            entities: Full list of trained entities (character development)
+            store: GraphStore for accessing dialogs
 
         Returns:
-            Short narrative summary (150-300 tokens, 3-5 sentences)
+            Narrative summary (300-500 words, 3-4 paragraphs, plot-focused)
         """
         # Collect all run artifacts
         artifacts = self._collect_run_artifacts(run_metadata, training_data)
 
-        # Format prompt for LLM
-        prompt = self._format_summary_prompt(artifacts)
+        # Format prompt for LLM (narrative-focused if we have full data)
+        if all_timepoints and entities:
+            prompt = self._format_narrative_prompt(artifacts, all_timepoints, entities, store)
+        else:
+            # Fallback to metadata summary if narrative data unavailable
+            prompt = self._format_summary_prompt(artifacts)
 
-        # Call LLM (use Haiku for cost efficiency: ~$0.001 per summary)
-        try:
-            response = self.llm.generate(
-                prompt=prompt,
-                model="anthropic/claude-3-5-haiku-20241022",
-                max_tokens=300,
-                temperature=0.3  # Low temp for consistent, focused summaries
-            )
-            summary = response.strip()
-        except Exception as e:
-            # Fallback to structured summary if LLM fails
-            summary = self._generate_fallback_summary(artifacts)
-            summary += f" (LLM summary unavailable: {str(e)})"
+        # Call LLM with retry logic (use Haiku for cost efficiency: ~$0.003 per narrative summary)
+        import time
+        max_retries = 3
+        retry_delay = 2  # seconds
 
-        return summary
+        for attempt in range(max_retries):
+            try:
+                response = self.llm.service.call(
+                    system="You are an expert at writing compelling narrative summaries of historical simulations.",
+                    user=prompt,
+                    model="anthropic/claude-3-5-haiku-20241022",
+                    max_tokens=800,  # Increased for narrative summaries
+                    temperature=0.7,  # Higher temp for creative narrative
+                    call_type="generate_summary"
+                )
+                summary = response.content.strip() if response.success else None
+                if not summary:
+                    raise ValueError("LLM returned empty response")
+                return summary  # Success, return immediately
+
+            except Exception as e:
+                error_str = str(e).lower()
+                # Check if this is a rate limit error (429)
+                is_rate_limit = "429" in error_str or "rate limit" in error_str or "too many requests" in error_str
+
+                if is_rate_limit and attempt < max_retries - 1:
+                    # Exponential backoff for rate limits
+                    wait_time = retry_delay * (2 ** attempt)
+                    print(f"Rate limit hit, retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})...")
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    # Non-rate-limit error or final attempt - fall back
+                    summary = self._generate_fallback_summary(artifacts)
+                    summary += f" (LLM summary unavailable: {str(e)})"
+                    return summary
 
     def _collect_run_artifacts(
         self,
@@ -194,6 +225,103 @@ Failed: {artifacts['validations_failed']}
 
         return prompt
 
+    def _format_narrative_prompt(self, artifacts: Dict[str, Any], all_timepoints: List, entities: List, store) -> str:
+        """
+        Build NARRATIVE summary prompt (like a movie plot synopsis).
+
+        Focus on story, character decisions, drama, and outcomes rather than metadata.
+
+        Returns:
+            Narrative-focused prompt string
+        """
+        # Extract narrative arc from timepoints
+        timeline = "\n".join([
+            f"{i+1}. {tp.timestamp if hasattr(tp, 'timestamp') else 'Time unknown'} - {tp.event_description if hasattr(tp, 'event_description') else str(tp)}"
+            for i, tp in enumerate(all_timepoints[:10])  # Limit to first 10 to avoid huge prompts
+        ])
+
+        if len(all_timepoints) > 10:
+            timeline += f"\n... ({len(all_timepoints) - 10} more timepoints)"
+
+        # Character summaries
+        characters = []
+        for e in entities[:15]:  # Limit to 15 main characters
+            if hasattr(e, 'entity_id') and hasattr(e, 'entity_type'):
+                knowledge_count = len(e.knowledge_state) if hasattr(e, 'knowledge_state') and e.knowledge_state else 0
+                characters.append(f"- **{e.entity_id}**: {e.entity_type}, {knowledge_count} knowledge items")
+
+        characters_text = "\n".join(characters) if characters else "(No character data available)"
+
+        if len(entities) > 15:
+            characters_text += f"\n... ({len(entities) - 15} more characters)"
+
+        # Sample dialogs from store (if available)
+        dialog_excerpt = ""
+        if store:
+            try:
+                dialogs = store.load_all_dialogs()
+                if dialogs and len(dialogs) > 0:
+                    first_dialog = dialogs[0]
+                    if hasattr(first_dialog, 'turns') and len(first_dialog.turns) > 0:
+                        excerpt_turns = []
+                        for turn in first_dialog.turns[:3]:  # First 3 turns
+                            speaker = turn.speaker if hasattr(turn, 'speaker') else 'Unknown'
+                            content = turn.content if hasattr(turn, 'content') else str(turn)
+                            excerpt_turns.append(f"{speaker}: {content[:100]}...")
+                        dialog_excerpt = "\n".join(excerpt_turns)
+            except Exception as e:
+                dialog_excerpt = f"(Dialog loading failed: {e})"
+
+        if not dialog_excerpt:
+            dialog_excerpt = "(No dialogs available)"
+
+        prompt = f"""You are writing a compelling narrative summary of a historical simulation.
+
+This is like writing a **plot synopsis** for a screenplay or novel. Focus on:
+1. The STORY that unfolded (what happened?)
+2. Character decisions, conflicts, and development (who did what?)
+3. Dramatic moments and turning points (key scenes)
+4. Final outcome and its significance (how did it end?)
+
+Write 3-4 paragraphs that capture the narrative arc like you're describing a film to a friend.
+
+## Scenario
+
+**Title**: {artifacts['template_id']}
+**Mode**: {artifacts['causal_mode']} causality
+**Setting**: {all_timepoints[0].event_description if hasattr(all_timepoints[0], 'event_description') else 'Historical simulation'}
+
+## Timeline of Events
+
+{timeline}
+
+## Characters
+
+{characters_text}
+
+## Sample Dialog
+
+{dialog_excerpt}
+
+## Your Task
+
+Write a narrative summary (3-4 paragraphs, 300-500 words) that tells the STORY:
+
+**Paragraph 1**: Setup and initial situation
+**Paragraph 2**: Rising action, key decisions, and conflicts
+**Paragraph 3**: Climax and resolution
+**Paragraph 4** (optional): Reflection on significance and outcome
+
+Make it read like a compelling plot synopsis, NOT a technical report.
+Use past tense, third person narrative voice.
+Focus on human drama and meaningful choices, not statistics.
+
+**Example style**: "In 1787 Philadelphia, delegates gathered at the Constitutional Convention facing an impossible task: create a lasting government for a fractious new nation. Madison's Virginia Plan proposed a strong central government, immediately sparking fierce debate..."
+
+Summary:"""
+
+        return prompt
+
     def _generate_fallback_summary(self, artifacts: Dict[str, Any]) -> str:
         """
         Generate structured summary if LLM is unavailable.
@@ -217,18 +345,24 @@ Failed: {artifacts['validations_failed']}
 def generate_run_summary(
     run_metadata: RunMetadata,
     training_data: Optional[List[Dict]] = None,
-    llm_client: Optional[LLMClient] = None
+    llm_client: Optional[LLMClient] = None,
+    all_timepoints: Optional[List] = None,
+    entities: Optional[List] = None,
+    store = None
 ) -> str:
     """
-    Convenience function to generate summary for a run.
+    Convenience function to generate narrative summary for a run.
 
     Args:
         run_metadata: Complete run metadata
         training_data: Optional training examples
         llm_client: Optional LLM client (creates new one if None)
+        all_timepoints: Full list of timepoints (for narrative arc)
+        entities: Full list of trained entities (for character development)
+        store: GraphStore for accessing dialogs
 
     Returns:
-        Generated summary string
+        Generated narrative summary string (plot synopsis style)
     """
     summarizer = RunSummarizer(llm_client)
-    return summarizer.generate_summary(run_metadata, training_data)
+    return summarizer.generate_summary(run_metadata, training_data, all_timepoints, entities, store)

@@ -96,6 +96,13 @@ class RunMetadata(BaseModel):
     summary: Optional[str] = None
     summary_generated_at: Optional[datetime] = None
 
+    # Narrative exports
+    narrative_exports: Optional[Dict[str, str]] = Field(
+        default=None,
+        description="Paths to generated narrative files: {format: path}"
+    )
+    narrative_export_generated_at: Optional[datetime] = None
+
     class Config:
         use_enum_values = True
 
@@ -215,6 +222,20 @@ class MetadataManager:
             cursor.execute("ALTER TABLE runs ADD COLUMN summary_generated_at TEXT")
             conn.commit()
             print("   ✓ Summary timestamp column added")
+
+        # Add narrative_exports column if missing
+        if 'narrative_exports' not in columns:
+            print("📝 Migrating database: Adding 'narrative_exports' column to runs table...")
+            cursor.execute("ALTER TABLE runs ADD COLUMN narrative_exports TEXT")
+            conn.commit()
+            print("   ✓ Narrative exports column added")
+
+        # Add narrative_export_generated_at column if missing
+        if 'narrative_export_generated_at' not in columns:
+            print("📝 Migrating database: Adding 'narrative_export_generated_at' column to runs table...")
+            cursor.execute("ALTER TABLE runs ADD COLUMN narrative_export_generated_at TEXT")
+            conn.commit()
+            print("   ✓ Narrative export timestamp column added")
 
     def start_run(
         self,
@@ -454,6 +475,137 @@ class MetadataManager:
         conn.commit()
         conn.close()
 
+    def update_narrative_exports(
+        self,
+        run_id: str,
+        narrative_exports: Dict[str, str]
+    ):
+        """
+        Update run with narrative export file paths.
+
+        Args:
+            run_id: Run to update
+            narrative_exports: Dictionary mapping format to file path
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            UPDATE runs SET
+                narrative_exports = ?,
+                narrative_export_generated_at = ?
+            WHERE run_id = ?
+        """, (
+            json.dumps(narrative_exports),
+            datetime.now().isoformat(),
+            run_id
+        ))
+
+        conn.commit()
+        conn.close()
+
+    def save_metadata(self, metadata: RunMetadata):
+        """
+        Save or update complete metadata object.
+
+        Args:
+            metadata: RunMetadata object to save
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        # Check if run exists
+        cursor.execute("SELECT run_id FROM runs WHERE run_id = ?", (metadata.run_id,))
+        exists = cursor.fetchone() is not None
+
+        if exists:
+            # Update existing run
+            cursor.execute("""
+                UPDATE runs SET
+                    template_id = ?,
+                    started_at = ?,
+                    completed_at = ?,
+                    causal_mode = ?,
+                    max_entities = ?,
+                    max_timepoints = ?,
+                    entities_created = ?,
+                    timepoints_created = ?,
+                    training_examples = ?,
+                    cost_usd = ?,
+                    llm_calls = ?,
+                    tokens_used = ?,
+                    duration_seconds = ?,
+                    oxen_repo_url = ?,
+                    oxen_dataset_url = ?,
+                    status = ?,
+                    error_message = ?,
+                    summary = ?,
+                    summary_generated_at = ?,
+                    narrative_exports = ?,
+                    narrative_export_generated_at = ?
+                WHERE run_id = ?
+            """, (
+                metadata.template_id,
+                metadata.started_at.isoformat(),
+                metadata.completed_at.isoformat() if metadata.completed_at else None,
+                metadata.causal_mode.value if hasattr(metadata.causal_mode, 'value') else str(metadata.causal_mode),
+                metadata.max_entities,
+                metadata.max_timepoints,
+                metadata.entities_created,
+                metadata.timepoints_created,
+                metadata.training_examples,
+                metadata.cost_usd,
+                metadata.llm_calls,
+                metadata.tokens_used,
+                metadata.duration_seconds,
+                metadata.oxen_repo_url,
+                metadata.oxen_dataset_url,
+                metadata.status,
+                metadata.error_message,
+                metadata.summary,
+                metadata.summary_generated_at.isoformat() if metadata.summary_generated_at else None,
+                json.dumps(metadata.narrative_exports) if metadata.narrative_exports else None,
+                metadata.narrative_export_generated_at.isoformat() if metadata.narrative_export_generated_at else None,
+                metadata.run_id
+            ))
+        else:
+            # Insert new run
+            cursor.execute("""
+                INSERT INTO runs (
+                    run_id, template_id, started_at, completed_at, causal_mode,
+                    max_entities, max_timepoints, entities_created, timepoints_created,
+                    training_examples, cost_usd, llm_calls, tokens_used, duration_seconds,
+                    oxen_repo_url, oxen_dataset_url, status, error_message,
+                    summary, summary_generated_at, narrative_exports, narrative_export_generated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                metadata.run_id,
+                metadata.template_id,
+                metadata.started_at.isoformat(),
+                metadata.completed_at.isoformat() if metadata.completed_at else None,
+                metadata.causal_mode.value if hasattr(metadata.causal_mode, 'value') else str(metadata.causal_mode),
+                metadata.max_entities,
+                metadata.max_timepoints,
+                metadata.entities_created,
+                metadata.timepoints_created,
+                metadata.training_examples,
+                metadata.cost_usd,
+                metadata.llm_calls,
+                metadata.tokens_used,
+                metadata.duration_seconds,
+                metadata.oxen_repo_url,
+                metadata.oxen_dataset_url,
+                metadata.status,
+                metadata.error_message,
+                metadata.summary,
+                metadata.summary_generated_at.isoformat() if metadata.summary_generated_at else None,
+                json.dumps(metadata.narrative_exports) if metadata.narrative_exports else None,
+                metadata.narrative_export_generated_at.isoformat() if metadata.narrative_export_generated_at else None
+            ))
+
+        conn.commit()
+        conn.close()
+
     def get_run(self, run_id: str) -> RunMetadata:
         """Retrieve complete run metadata"""
         conn = sqlite3.connect(self.db_path)
@@ -472,6 +624,14 @@ class MetadataManager:
         mechanisms_used = {row[0] for row in cursor.fetchall()}
 
         conn.close()
+
+        # Parse narrative exports if present
+        narrative_exports = None
+        if len(row) > 20 and row[20]:
+            try:
+                narrative_exports = json.loads(row[20])
+            except:
+                narrative_exports = None
 
         # Build metadata
         metadata = RunMetadata(
@@ -493,8 +653,10 @@ class MetadataManager:
             oxen_dataset_url=row[15],
             status=row[16],
             error_message=row[17],
-            summary=row[18],
-            summary_generated_at=datetime.fromisoformat(row[19]) if row[19] else None,
+            summary=row[18] if len(row) > 18 else None,
+            summary_generated_at=datetime.fromisoformat(row[19]) if len(row) > 19 and row[19] else None,
+            narrative_exports=narrative_exports,
+            narrative_export_generated_at=datetime.fromisoformat(row[21]) if len(row) > 21 and row[21] else None,
             mechanisms_used=mechanisms_used
         )
 
