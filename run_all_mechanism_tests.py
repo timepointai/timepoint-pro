@@ -92,9 +92,9 @@ def run_template(runner, config, name: str, expected_mechanisms: Set[str]) -> Di
         oxen_repo_url = result.oxen_repo_url if hasattr(result, 'oxen_repo_url') else None
         oxen_dataset_url = result.oxen_dataset_url if hasattr(result, 'oxen_dataset_url') else None
 
-        # Find PDF files in datasets/{template_id}/
+        # Find PDF files in datasets/{world_id}/
         pdf_paths = []
-        template_dataset_dir = Path("datasets") / config.template_id
+        template_dataset_dir = Path("datasets") / config.world_id
         if template_dataset_dir.exists():
             pdf_paths = [str(p) for p in template_dataset_dir.glob("*.pdf")]
 

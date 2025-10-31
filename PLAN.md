@@ -2,7 +2,7 @@
 
 **Project**: Temporal Knowledge Graph System with LLM-Driven Entity Simulation
 **Status**: **PRODUCTION READY** ✅
-**Last Updated**: October 27, 2025 (Updated with Phase 11: Global Resilience System)
+**Last Updated**: October 31, 2025 (Updated with Phase 12: Automated Narrative Exports)
 
 ---
 
@@ -64,6 +64,137 @@ Tracked: M1, M2, M3, M4, M5, M6, M7, M8, M9, M10, M11, M12, M13, M14, M15, M16, 
 ---
 
 ## Completed Phases
+
+### Phase 12: Automated Narrative Exports ✅
+
+**Goal**: Generate comprehensive narrative summaries (MD/JSON/PDF) for every simulation run automatically
+
+**Problem**: Users needed plot-like narrative summaries instead of just metadata statistics. Manual summary generation was time-consuming and inconsistent.
+
+**Solution**: Automated narrative export system that generates comprehensive summaries at the end of every run, with configurable formats and detail levels.
+
+**Deliverables**:
+1. ✅ Created `metadata/narrative_exporter.py` (NEW - 828 lines)
+   - NarrativeData Pydantic model (run metadata, characters, timeline, dialogs, insights)
+   - NarrativeExporter class (data collection, export generation)
+   - Template-based summary generation
+   - Optional LLM enhancement (~$0.003/run using Claude Haiku)
+   - Three export formats: Markdown, JSON, PDF
+
+2. ✅ Enhanced `generation/config_schema.py` (UPDATED)
+   - Added 4 narrative export configuration fields:
+     - `generate_narrative_exports` (default: True)
+     - `narrative_export_formats` (default: ["markdown", "json", "pdf"])
+     - `narrative_detail_level` (default: "summary")
+     - `enhance_narrative_with_llm` (default: True)
+   - Full validation for all fields
+
+3. ✅ Enhanced `metadata/run_tracker.py` (UPDATED)
+   - Added `narrative_exports` field (Dict[str, str] mapping format to file path)
+   - Added `narrative_export_generated_at` timestamp field
+   - Automatic database migration on startup
+   - New methods: `update_narrative_exports()`, `save_metadata()`
+
+4. ✅ Integrated into `e2e_workflows/e2e_runner.py` (UPDATED)
+   - Added Step 9: `_generate_narrative_exports()` method
+   - Automatic export generation at end of every run
+   - Export failures cause run to fail (critical deliverable)
+   - Automatic database updates with export file paths
+
+5. ✅ Created `scripts/backfill_narrative_exports.py` (NEW - 267 lines)
+   - Command-line tool for historical runs
+   - Options: --all, --run-ids, --template, --formats, --detail-level
+   - --dry-run mode for preview
+   - Progress reporting and error handling
+
+**Key Features**:
+
+**NarrativeExporter**:
+- Collects all simulation artifacts (entities, timepoints, dialogs, training data)
+- Generates executive summary with optional LLM enhancement
+- Extracts character profiles with knowledge states and emotional dynamics
+- Creates timeline from timepoint sequence
+- Samples dialog excerpts from GraphStore
+- Analyzes training insights (entity counts, stats, costs)
+- Computes strengths/weaknesses assessment
+
+**Export Formats**:
+- **Markdown**: Human-readable narrative with full formatting
+- **JSON**: Structured data for programmatic access (complete NarrativeData dump)
+- **PDF**: Publication-ready document (requires reportlab, graceful degradation)
+
+**Detail Levels**:
+- **Minimal**: Metadata only (run stats, costs, mechanisms)
+- **Summary**: Key highlights (characters, timeline, dialogs) - DEFAULT
+- **Comprehensive**: Everything (full analysis with all details)
+
+**LLM Enhancement**:
+- Optional enhancement of executive summary using Claude Haiku
+- Cost: ~$0.003 per run
+- Improves narrative quality and coherence
+- Graceful degradation if LLM fails (uses template only)
+
+**Database Integration**:
+- Automatic schema migration adds new columns
+- Exports tracked in `metadata/runs.db`
+- File paths stored in `narrative_exports` field
+- Timestamp tracked in `narrative_export_generated_at`
+
+**Backfill Support**:
+```bash
+# Generate narratives for all existing completed runs
+python scripts/backfill_narrative_exports.py --all
+
+# Specific runs only
+python scripts/backfill_narrative_exports.py --run-ids run_001 run_002
+
+# Preview without writing
+python scripts/backfill_narrative_exports.py --all --dry-run
+
+# Custom configuration
+python scripts/backfill_narrative_exports.py --all --formats markdown json --detail-level comprehensive
+```
+
+**Configuration**:
+```python
+from generation.config_schema import SimulationConfig
+
+config = SimulationConfig.board_meeting()
+
+# Customize exports
+config.outputs.generate_narrative_exports = True  # Default: on
+config.outputs.narrative_export_formats = ["markdown", "json", "pdf"]
+config.outputs.narrative_detail_level = "summary"  # minimal | summary | comprehensive
+config.outputs.enhance_narrative_with_llm = True  # Optional LLM enhancement
+```
+
+**File Locations**:
+```
+datasets/{template_id}/narrative_{timestamp}.md
+datasets/{template_id}/narrative_{timestamp}.json
+datasets/{template_id}/narrative_{timestamp}.pdf
+```
+
+**Files Created**:
+- metadata/narrative_exporter.py (NEW - 828 lines)
+- scripts/backfill_narrative_exports.py (NEW - 267 lines)
+
+**Files Enhanced**:
+- generation/config_schema.py (added narrative export fields)
+- metadata/run_tracker.py (added narrative export tracking)
+- e2e_workflows/e2e_runner.py (integrated narrative exports)
+
+**Guarantees**:
+- **Default behavior**: All runs generate narratives automatically
+- **Critical deliverable**: Export failures cause run to fail
+- **Database persistence**: All export paths tracked in metadata
+- **Opt-out capability**: Can disable via configuration
+- **Format flexibility**: Choose any combination of MD/JSON/PDF
+- **Historical support**: Backfill script for existing runs
+
+**Phase 12 Status**: ✅ COMPLETE - Automated narrative export system operational
+
+---
 
 ### Phase 11: Global Resilience System ✅
 
@@ -734,10 +865,11 @@ For questions or issues, see project documentation or open a GitHub issue.
 
 ---
 
-**Last Updated**: October 27, 2025 (Phase 11 Complete)
+**Last Updated**: October 31, 2025 (Phase 12 Complete)
 **Current Status**: **PRODUCTION READY** ✅
 **Mechanism Coverage**: **17/17 (100%)** - ALL MECHANISMS TRACKED
 **Test Reliability**: **11/11 (100%)** - ALL TESTS PASSING
 **Architecture**: ANDOS layer-by-layer training (solves circular dependencies)
 **Fault Tolerance**: Global resilience system with checkpointing, circuit breaker, health monitoring
+**Narrative Exports**: Automated MD/JSON/PDF generation for all runs
 **System Ready For**: Production deployment, research applications, fine-tuning workflows, large-scale runs

@@ -242,6 +242,12 @@ class DialogTurn(BaseModel):
     confidence: float = 1.0  # confidence in generation
     physical_state_influence: Optional[str] = None  # how physical state affected utterance
 
+    @field_validator('knowledge_references', mode='before')
+    @classmethod
+    def convert_none_to_empty_list(cls, v):
+        """Convert None to [] for LLM compatibility"""
+        return v if v is not None else []
+
 
 class DialogData(BaseModel):
     """Structured data for dialog generation"""
