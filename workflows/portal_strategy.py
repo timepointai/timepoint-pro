@@ -322,7 +322,7 @@ For EACH antecedent, provide:
 - world_context: Dict of contextual factors (economy, politics, technology, culture)
 - causal_link: 1-2 sentence explanation of how this leads to the consequent
 
-Return as JSON array of {count} antecedent objects."""
+Return as JSON with an "antecedents" array containing {count} antecedent objects."""
 
         try:
             # Define schema for structured output
@@ -335,18 +335,21 @@ Return as JSON array of {count} antecedent objects."""
                 world_context: Dict[str, Any]
                 causal_link: str
 
+            class AntecedentList(BaseModel):
+                """Wrapper for list of antecedents"""
+                antecedents: List[AntecedentSchema]
+
             # Call LLM with structured generation
-            antecedent_data = self.llm.generate_structured(
+            result = self.llm.generate_structured(
                 prompt=user_prompt,
-                response_model=List[AntecedentSchema],
+                response_model=AntecedentList,
                 system_prompt=system_prompt,
                 temperature=0.8,  # Higher temp for diversity
                 max_tokens=2000
             )
 
-            # Handle case where LLM returns single object instead of list
-            if not isinstance(antecedent_data, list):
-                antecedent_data = [antecedent_data]
+            # Extract list from wrapper
+            antecedent_data = result.antecedents if hasattr(result, 'antecedents') else []
 
             # Convert to PortalState objects
             antecedents = []

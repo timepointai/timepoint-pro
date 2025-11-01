@@ -598,6 +598,42 @@ class FullE2EWorkflowRunner:
                 llm_client=llm
             )
 
+            # MODE DETECTION: Check if portal simulation
+            if config.temporal.mode == TemporalMode.PORTAL:
+                print(f"\n{'='*80}")
+                print(f"PORTAL MODE DETECTED")
+                print(f"Running backward simulation: {config.temporal.backward_steps} steps")
+                print(f"Target: {config.temporal.portal_description}")
+                print(f"Timeframe: {config.temporal.origin_year} → {config.temporal.portal_year}")
+                print(f"{'='*80}\n")
+
+                # Run portal simulation
+                portal_paths = temporal_agent.run_portal_simulation(config.temporal)
+
+                # Convert portal paths to timepoints
+                all_timepoints = self._convert_portal_paths_to_timepoints(
+                    portal_paths, initial_timepoint, store
+                )
+
+                # Store portal metadata for downstream processing
+                scene_result["portal_paths"] = portal_paths
+                scene_result["is_portal_mode"] = True
+
+                print(f"✓ Portal simulation complete:")
+                print(f"  - Paths generated: {len(portal_paths)}")
+                print(f"  - Timepoints created: {len(all_timepoints)}")
+                print(f"  - Best coherence: {portal_paths[0].coherence_score:.3f}" if portal_paths else "  - No paths")
+
+                self.logfire.info(
+                    "Portal temporal generation complete",
+                    timepoints=len(all_timepoints),
+                    paths=len(portal_paths),
+                    is_portal_mode=True
+                )
+
+                return all_timepoints
+
+            # FORWARD MODE: Original forward generation logic
             all_timepoints = [initial_timepoint]
             current_timepoint = initial_timepoint
 
@@ -631,6 +667,86 @@ class FullE2EWorkflowRunner:
             )
 
             return all_timepoints
+
+    def _convert_portal_paths_to_timepoints(
+        self,
+        portal_paths: List,
+        initial_timepoint: Timepoint,
+        store
+    ) -> List[Timepoint]:
+        """
+        Convert PortalPath objects to Timepoint objects for E2E pipeline.
+
+        Strategy:
+        - Take best path (highest coherence_score)
+        - Convert each PortalState → Timepoint
+        - Preserve portal metadata in timepoint.metadata
+        - Link timepoints causally (parent→child)
+
+        Args:
+            portal_paths: List of PortalPath from PortalStrategy
+            initial_timepoint: Origin timepoint (founding moment)
+            store: GraphStore for saving timepoints
+
+        Returns:
+            List of Timepoint objects ordered origin→portal
+        """
+        if not portal_paths:
+            print("  ⚠️  No portal paths returned, using initial timepoint only")
+            return [initial_timepoint]
+
+        # Take best path (first in list, already sorted by coherence)
+        best_path = portal_paths[0]
+
+        print(f"\n  Converting best path to timepoints:")
+        print(f"    Path ID: {best_path.path_id}")
+        print(f"    Coherence: {best_path.coherence_score:.3f}")
+        print(f"    States: {len(best_path.states)}")
+        print(f"    Pivot Points: {best_path.pivot_points}")
+
+        timepoints = []
+        previous_timepoint_id = None
+
+        for idx, state in enumerate(best_path.states):
+            # Generate timepoint ID
+            tp_id = f"tp_{idx:03d}_{state.year}"
+
+            # Create Timepoint from PortalState
+            timepoint = Timepoint(
+                timepoint_id=tp_id,
+                timestamp=datetime(state.year, 1, 1),  # Use year for timestamp
+                event_description=state.description,
+                entities_present=[e.entity_id for e in state.entities] if state.entities else [],
+                causal_parent=previous_timepoint_id,
+                metadata={
+                    "portal_mode": True,
+                    "path_id": best_path.path_id,
+                    "path_position": idx,
+                    "plausibility_score": state.plausibility_score,
+                    "coherence_score": best_path.coherence_score,
+                    "is_pivot_point": idx in best_path.pivot_points,
+                    "world_state": state.world_state,
+                    "year": state.year
+                }
+            )
+
+            # Save to database
+            store.save_timepoint(timepoint)
+
+            timepoints.append(timepoint)
+            previous_timepoint_id = tp_id
+
+            if idx in best_path.pivot_points:
+                print(f"    ✓ Timepoint {idx}: Year {state.year} [PIVOT POINT]")
+            else:
+                print(f"    ✓ Timepoint {idx}: Year {state.year}")
+
+        print(f"\n  Portal path metadata:")
+        print(f"    All paths available: {len(portal_paths)}")
+        for i, path in enumerate(portal_paths[:3], 1):  # Show top 3
+            print(f"      Path {i}: Coherence {path.coherence_score:.3f}")
+
+        return timepoints
 
     def _train_entities(
         self, scene_result: Dict, timepoints: List[Timepoint], andos_layers: List[List[Entity]], run_id: str
