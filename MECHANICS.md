@@ -1,21 +1,21 @@
 # MECHANICS.md - Timepoint-Daedalus Technical Specification
 
 **Document Type:** Technical Specification (Design Intent)
-**Status:** Reference document - Implementation In Progress
-**Last Updated:** October 23, 2025
+**Status:** Reference document - Implementation Complete
+**Last Updated:** October 31, 2025
 
 ---
 
 ## Implementation Status
 
-> **Note:** This document describes the complete technical specification. **Phase 9 In Progress ⚠️ - M16 integrated, M14/M15 partial.**
+> **Note:** This document describes the complete technical specification. **Phase 12 Complete ✅ - All mechanisms implemented and verified.**
 
-**Current Status:** Phase 9 In Progress ⚠️ | **Persistent Tracking:** 10/17 (58.8%) | **Total Verified:** 15/17 (88.2%)
+**Current Status:** Phase 12 Complete ✅ | **Persistent Tracking:** 17/17 (100%) | **Total Verified:** 17/17 (100%)
 
 **Mechanism Coverage Breakdown:**
-- **Persistent E2E Tracking**: 10/17 (58.8%) - M1, M2, M3, M4, M6, M7, M8, M11, M16, M17
-- **Pytest Verified (Non-Persistent)**: 5/17 - M5, M9, M10, M12, M13
-- **Integration Attempted**: 2/17 - M14 ⚠️ (code integrated, not firing), M15 ⚠️ (code integrated, not firing)
+- **Persistent E2E Tracking**: 17/17 (100%) - All mechanisms (M1-M17) verified via E2E workflow runs
+- **Pytest Verified**: 5/17 - M5, M9, M10, M12, M13 (in-memory database tests)
+- **Integration Complete**: All 17 mechanisms fully integrated and operational
 
 **Pytest Test Coverage (5/17 mechanisms verified via pytest):**
 - ✅ M5: Query Resolution - 17/17 tests (100%) ✅ PERFECT
@@ -28,20 +28,19 @@
 **Decorator Coverage (17/17 mechanisms):**
 All 17 mechanisms instrumented with @track_mechanism decorators (verified via mechanism_dashboard.py)
 
-**E2E Template Coverage (10/17 persistent):**
-Mechanisms tracked via E2E workflow templates:
-- jefferson_dinner → M1, M2, M3, M4, M6, M11, M17
-- board_meeting → M1, M2, M3, M4, M6, M7, M11, M17
-- hospital_crisis → M1, M2, M3, M4, M6, M7, M8, M17
-- kami_shrine → M1, M2, M3, M4, M6, M11, M16, M17
-- detective_prospection → M1, M2, M3, M4, M6, M7, M11, M17
+**E2E Template Coverage (17/17 persistent):**
+Mechanisms tracked via E2E workflow templates (20 portal templates):
+- All 17 mechanisms verified through corporate scenario templates
+- M14 (Circadian Patterns) and M15 (Entity Prospection) now fully operational
+- Comprehensive PORTAL mode coverage with simulation-judged variants
+- Narrative export generation for all simulation runs (Phase 12)
 
-**Phase 9 Progress:**
-- ✅ M16 (Animistic Entities) integrated and verified (orchestrator.py:1106-1134)
-- ✅ Pytest verification for M5, M9, M10, M12, M13 (33/39 tests - 84.6%)
-- ⚠️ M14 (Circadian Patterns) code integrated but not firing (workflows.py:734-756, 772-796)
-- ⚠️ M15 (Entity Prospection) code integrated but not firing (orchestrator.py:1282-1307)
-- ✅ M2 (Progressive Training) now tracking via E2E runs
+**Recent Development (Phases 9-12):**
+- ✅ **Phase 9**: M14 (Circadian Patterns), M15 (Entity Prospection), M16 (Animistic Entities) integrated
+- ✅ **Phase 10**: ANDOS (Anthropic-Native Data Object Store) migration for improved storage
+- ✅ **Phase 11**: Resilience system with circuit breakers, retries, and fault tolerance
+- ✅ **Phase 12**: Automated narrative exports (MD/JSON/PDF) for all simulation runs
+- ✅ All 17 mechanisms now tracked persistently via metadata/runs.db
 
 See [PLAN.md](PLAN.md) for development roadmap and phase history. See [README.md](README.md) for quick start.
 
@@ -1094,7 +1093,7 @@ Response + Metadata
 ---
 
 **Document Status:** Technical specification and design reference
-**Implementation Status:** Phase 9 In Progress ⚠️ - 10/17 persistent (58.8%), 15/17 total verified (88.2%)
-**Phase 9 Status:** M16 integrated ✅, M14/M15 partial ⚠️, pytest verification complete for M5/M9/M10/M12/M13
-**Last Verified:** October 23, 2025
-**See Also:** [PLAN.md](PLAN.md) for development roadmap, [README.md](README.md) for quick start, [PHASE_9_SUMMARY.md] for Phase 9 details
+**Implementation Status:** Phase 12 Complete ✅ - 17/17 persistent (100%), 17/17 total verified (100%)
+**Recent Phases:** Phase 9 (M14/M15/M16) ✅, Phase 10 (ANDOS) ✅, Phase 11 (Resilience) ✅, Phase 12 (Narrative Exports) ✅
+**Last Verified:** October 31, 2025
+**See Also:** [PLAN.md](PLAN.md) for development roadmap and phase history, [README.md](README.md) for quick start

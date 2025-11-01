@@ -4,6 +4,9 @@ omegaconf>=2.3.0
 pydantic>=2.10.0
 fastapi
 logfire
+reportlab 
+oxenai
+
 
 # LLM and AI
 instructor>=1.7.0

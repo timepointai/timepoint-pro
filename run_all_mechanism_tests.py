@@ -77,6 +77,68 @@ def confirm_expensive_run(mode: str, min_cost: float, max_cost: float, runtime_m
         return False
 
 
+def list_modes():
+    """Display all available simulation modes with template counts and cost estimates"""
+    print("\n" + "="*80)
+    print("AVAILABLE SIMULATION MODES")
+    print("="*80)
+
+    print("\n📚 QUICK MODE (DEFAULT)")
+    print("  Templates: 7 | Cost: $2-5 | Runtime: 8-15 min")
+    print("  Safe, fast templates for basic mechanism coverage")
+
+    print("\n🔬 FULL MODE (--full)")
+    print("  Templates: 13 | Cost: $20-50 | Runtime: 30-60 min")
+    print("  All quick templates + expensive comprehensive templates")
+
+    print("\n🏢 TIMEPOINT CORPORATE MODES")
+    print("  --timepoint-forward:")
+    print("    Templates: 15 | Cost: $15-30 | Runtime: 30-60 min")
+    print("    Forward-mode Timepoint corporate templates (formation + growth + AI marketplace)")
+    print("  --timepoint-all:")
+    print("    Templates: 35 | Cost: $81-162 | Runtime: 156-243 min")
+    print("    ALL Timepoint corporate (15 forward-mode + 20 portal-mode)")
+
+    print("\n🌀 PORTAL MODES (Backward Temporal Reasoning)")
+    print("  --portal-test-only:")
+    print("    Templates: 4 | Cost: $5-10 | Runtime: 10-15 min")
+    print("    Standard portal templates (presidential, startup, academic, failure)")
+    print("  --portal-simjudged-quick-only:")
+    print("    Templates: 4 | Cost: $10-20 | Runtime: 20-30 min")
+    print("    Portal + lightweight simulation judging (1 step)")
+    print("  --portal-simjudged-only:")
+    print("    Templates: 4 | Cost: $15-30 | Runtime: 30-45 min")
+    print("    Portal + standard simulation judging (2 steps + dialog)")
+    print("  --portal-simjudged-thorough-only:")
+    print("    Templates: 4 | Cost: $25-50 | Runtime: 45-60 min")
+    print("    Portal + thorough simulation judging (3 steps + analysis)")
+    print("  --portal-all:")
+    print("    Templates: 16 | Cost: $55-110 | Runtime: 105-150 min")
+    print("    ALL portal variants (standard + quick + standard + thorough)")
+
+    print("\n🎯 PORTAL TIMEPOINT MODES (Real Founder Profiles)")
+    print("  --portal-timepoint-only:")
+    print("    Templates: 5 | Cost: $6-12 | Runtime: 12-18 min")
+    print("    Standard portal with real Timepoint founders (Sean + Ken)")
+    print("  --portal-timepoint-simjudged-quick-only:")
+    print("    Templates: 5 | Cost: $12-24 | Runtime: 24-36 min")
+    print("    Portal Timepoint + lightweight simulation judging")
+    print("  --portal-timepoint-simjudged-only:")
+    print("    Templates: 5 | Cost: $18-36 | Runtime: 36-54 min")
+    print("    Portal Timepoint + standard simulation judging")
+    print("  --portal-timepoint-simjudged-thorough-only:")
+    print("    Templates: 5 | Cost: $30-60 | Runtime: 54-75 min")
+    print("    Portal Timepoint + thorough simulation judging")
+    print("  --portal-timepoint-all:")
+    print("    Templates: 20 | Cost: $66-132 | Runtime: 126-183 min")
+    print("    ALL portal Timepoint variants (standard + quick + standard + thorough)")
+
+    print("\n" + "="*80)
+    print("💡 TIP: Use --skip-summaries to reduce cost slightly")
+    print("="*80)
+    print()
+
+
 def run_template(runner, config, name: str, expected_mechanisms: Set[str]) -> Dict:
     """Run a single template and return results"""
     print(f"\n{'='*80}")
@@ -491,6 +553,18 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False):
         print("   Estimated cost: $66-132, Runtime: 126-183 minutes")
         print("   Use this for comprehensive quality comparison across all approaches with real founder data")
         print()
+    elif mode == 'timepoint_all':
+        templates_to_run = timepoint_corporate_templates + portal_timepoint_templates + portal_timepoint_templates_simjudged_quick + portal_timepoint_templates_simjudged + portal_timepoint_templates_simjudged_thorough
+        print("🏢🌀 TIMEPOINT CORPORATE: ALL MODES (Complete Timepoint Suite)")
+        print("   Running ALL 35 Timepoint corporate templates:")
+        print("   - 15 forward-mode templates (formation, growth, personalities, AI marketplace)")
+        print("   - 5 standard PORTAL Timepoint templates")
+        print("   - 5 simulation-judged QUICK variants")
+        print("   - 5 simulation-judged STANDARD variants")
+        print("   - 5 simulation-judged THOROUGH variants")
+        print("   Estimated cost: $81-162, Runtime: 156-243 minutes")
+        print("   Complete Timepoint corporate analysis: forward causality + backward portal reasoning")
+        print()
 
     results = {}
     total_cost = 0.0
@@ -503,7 +577,9 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False):
         'portal_all': (55, 110, 128),
         'portal_timepoint_simjudged': (18, 36, 45),
         'portal_timepoint_simjudged_thorough': (30, 60, 65),
-        'portal_timepoint_all': (66, 132, 155)
+        'portal_timepoint_all': (66, 132, 155),
+        'timepoint_all': (81, 162, 243),
+        'timepoint_corporate': (15, 30, 60)
     }
 
     if mode in expensive_modes:
@@ -738,7 +814,22 @@ if __name__ == "__main__":
     parser.add_argument(
         "--timepoint-corporate-analysis-only",
         action="store_true",
-        help="Run ONLY Timepoint corporate formation scenarios (VC pitches + formation analysis)"
+        help="[DEPRECATED] Use --timepoint-forward instead. Run ONLY Timepoint corporate formation scenarios (VC pitches + formation analysis)"
+    )
+    parser.add_argument(
+        "--timepoint-forward",
+        action="store_true",
+        help="Run ONLY forward-mode Timepoint corporate templates (15 templates: formation analysis + growth + personalities + AI marketplace)"
+    )
+    parser.add_argument(
+        "--timepoint-all",
+        action="store_true",
+        help="Run ALL Timepoint corporate templates (35 total: 15 forward-mode + 20 portal-mode)"
+    )
+    parser.add_argument(
+        "--list-modes",
+        action="store_true",
+        help="Display all available simulation modes with template counts and exit"
     )
     parser.add_argument(
         "--portal-simjudged-quick-only",
@@ -792,6 +883,11 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
+    # Handle --list-modes first (doesn't require API key)
+    if args.list_modes:
+        list_modes()
+        sys.exit(0)
+
     # Verify API key
     if not os.getenv("OPENROUTER_API_KEY"):
         print("❌ ERROR: OPENROUTER_API_KEY not set")
@@ -800,6 +896,13 @@ if __name__ == "__main__":
 
     print(f"✓ API keys loaded from .env")
     print()
+
+    # Show deprecation warning if old flag is used
+    if args.timepoint_corporate_analysis_only:
+        print("\n⚠️  DEPRECATION WARNING")
+        print("   --timepoint-corporate-analysis-only is deprecated.")
+        print("   Please use --timepoint-forward instead.")
+        print("   (Continuing with timepoint_corporate mode...)\n")
 
     # Determine mode
     if args.portal_test_only:
@@ -822,8 +925,10 @@ if __name__ == "__main__":
         mode = 'portal_timepoint_simjudged_thorough'
     elif args.portal_timepoint_all:
         mode = 'portal_timepoint_all'
-    elif args.timepoint_corporate_analysis_only:
+    elif args.timepoint_forward or args.timepoint_corporate_analysis_only:
         mode = 'timepoint_corporate'
+    elif args.timepoint_all:
+        mode = 'timepoint_all'
     elif args.full:
         mode = 'full'
     else:
