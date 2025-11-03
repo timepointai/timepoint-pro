@@ -112,6 +112,88 @@ exporter.export_report(
 
 ---
 
+## Running Simulations with run.sh
+
+The `run.sh` script provides a unified interface for running all simulation modes with optional real-time monitoring.
+
+### Basic Usage
+
+```bash
+# Quick tests (9 templates, ~$9-18, 18-27 min)
+./run.sh quick
+
+# Portal tests with monitoring
+./run.sh --monitor portal-test
+
+# Ultra mode with chat-enabled monitoring
+./run.sh --monitor --chat ultra
+
+# List all available modes
+./run.sh --list
+```
+
+### Available Modes
+
+#### Basic Modes
+- **quick**: Quick tests (9 templates, ~$9-18, 18-27 min)
+- **full**: All quick + expensive tests (13 templates)
+
+#### Timepoint Corporate
+- **timepoint-forward**: Forward-mode corporate (15 templates, $15-30, 30-60 min)
+- **timepoint-all**: ALL corporate templates (35 templates, $81-162, 156-243 min)
+
+#### Portal (Backward Reasoning)
+- **portal-test**: Standard portal (4 templates, $5-10, 10-15 min)
+- **portal-simjudged-quick**: Quick simulation judging (4 templates, $10-20, 20-30 min)
+- **portal-simjudged**: Standard simulation judging (4 templates, $15-30, 30-45 min)
+- **portal-simjudged-thorough**: Thorough judging (4 templates, $25-50, 45-60 min)
+- **portal-all**: ALL portal variants (16 templates, $55-110, 105-150 min)
+
+#### Portal Timepoint (Real Founders)
+- **portal-timepoint**: Standard with founders (5 templates, $6-12, 12-18 min)
+- **portal-timepoint-simjudged-quick**: Quick judging (5 templates, $12-24, 24-36 min)
+- **portal-timepoint-simjudged**: Standard judging (5 templates, $18-36, 36-54 min)
+- **portal-timepoint-simjudged-thorough**: Thorough judging (5 templates, $30-60, 54-75 min)
+- **portal-timepoint-all**: ALL portal timepoint (20 templates, $66-132, 126-183 min)
+
+#### Ultra Mode
+- **ultra**: Run EVERYTHING (64 templates, $176-352, 301-468 min)
+
+### Monitoring Options
+
+```bash
+# Enable real-time LLM monitoring
+./run.sh --monitor quick
+
+# Enable interactive chat during monitoring
+./run.sh --monitor --chat portal-timepoint
+
+# Custom monitoring interval (seconds)
+./run.sh --monitor --interval 120 quick
+
+# Use premium LLM model for monitoring
+./run.sh --monitor --llm-model meta-llama/llama-3.1-405b-instruct portal-test
+```
+
+### Environment Setup
+
+Create `.env` file with API keys:
+
+```bash
+OPENROUTER_API_KEY=sk-or-v1-...
+OXEN_API_KEY=SFMyNTY...
+```
+
+### Output Locations
+
+All modes generate:
+- **Database**: `metadata/runs.db` (with M1+M17 metrics)
+- **Narrative Exports**: `datasets/<template>/narrative_*.{json,md,pdf}`
+- **Training Data**: `datasets/<template>/training_*.jsonl`
+- **Oxen Uploads**: If `OXEN_API_KEY` is set
+
+---
+
 ## Complete Pipeline
 
 The system provides an end-to-end workflow:
@@ -300,8 +382,6 @@ config.temporal.fidelity_template = "portal_pivots"
 
 **See Also**:
 - Documentation: [MECHANICS.md](MECHANICS.md) - M1+M17 Integration section
-- Migration Guide: [MIGRATION.md](MIGRATION.md) - Database v2 migration
-- Implementation Plan: [HANDOFF.md](HANDOFF.md) - Complete technical specification
 
 ### 4. Adaptive Fidelity (Legacy)
 
@@ -451,27 +531,48 @@ result = runner.run(config)
 
 ## Testing
 
-### Run Tests
+### Run E2E Tests with run.sh (Recommended)
+
+```bash
+# Quick development tests (9 templates, ~18-27 min)
+./run.sh quick
+
+# Full test suite (13 templates)
+./run.sh full
+
+# PORTAL Mode tests
+./run.sh portal-test                    # Standard PORTAL (4 templates, ~10-15 min)
+./run.sh portal-simjudged               # With simulation judging (~30-45 min)
+./run.sh portal-all                     # All PORTAL variants (16 templates)
+
+# Portal Timepoint tests (real founders)
+./run.sh portal-timepoint               # Standard (5 templates, ~12-18 min)
+./run.sh portal-timepoint-simjudged     # With judging (~36-54 min)
+./run.sh portal-timepoint-all           # All variants (20 templates)
+
+# Timepoint Corporate tests
+./run.sh timepoint-forward              # Forward-mode (15 templates, ~30-60 min)
+./run.sh timepoint-all                  # All corporate (35 templates)
+
+# Ultra mode (everything)
+./run.sh ultra                          # 64 templates (5-8 hours)
+
+# With monitoring enabled
+./run.sh --monitor quick
+./run.sh --monitor --chat portal-timepoint
+```
+
+### Run Unit/Mechanism Tests with pytest
 
 ```bash
 # Run all mechanism tests
 pytest -v
 
 # Specific mechanism tests
-pytest test_m5_query_resolution.py -v              # M5: Query Resolution (16/17 passing)
-pytest test_m9_on_demand_generation.py -v          # M9: On-Demand Generation (17/23 passing)
+pytest test_m5_query_resolution.py -v              # M5: Query Resolution
+pytest test_m9_on_demand_generation.py -v          # M9: On-Demand Generation
 pytest test_branching_integration.py -v            # M12: Counterfactual Branching
 pytest test_phase3_dialog_multi_entity.py -v       # M13: Multi-Entity Synthesis
-
-# Run mechanism test runner
-python run_all_mechanism_tests.py
-
-# PORTAL Mode Tests (M17 - Backward Temporal Reasoning)
-python run_all_mechanism_tests.py --portal-test-only                    # Standard PORTAL (4 templates, ~$5-10)
-python run_all_mechanism_tests.py --portal-simjudged-quick-only        # Quick simulation judging (~$10-20)
-python run_all_mechanism_tests.py --portal-simjudged-only              # Standard simulation judging (~$15-30)
-python run_all_mechanism_tests.py --portal-simjudged-thorough-only     # Thorough simulation judging (~$25-50)
-python run_all_mechanism_tests.py --portal-all                         # All PORTAL variants (16 templates, ~$55-110)
 
 # Run with real LLM (requires OPENROUTER_API_KEY)
 export OPENROUTER_API_KEY=your_key
@@ -483,8 +584,6 @@ pytest -v
 - 4 quality levels each: standard (static), sim-judged quick, sim-judged standard, sim-judged thorough
 - Total: 16 PORTAL templates testing backward temporal reasoning
 - Simulation judging captures emergent behaviors and dialog realism invisible to static scoring
-
-```
 
 ### Test Coverage
 

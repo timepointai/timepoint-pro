@@ -190,3 +190,6 @@ cython_debug/
 /datasets
 /checkpoints
 /generation
+
+.claude/settings.local.json
+.claude/*.log
