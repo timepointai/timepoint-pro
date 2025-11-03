@@ -3,7 +3,7 @@
 # workflows.py - LangGraph workflow definitions
 # ============================================================================
 from langgraph.graph import StateGraph, END
-from typing import TypedDict, List, Dict, Optional
+from typing import TypedDict, List, Dict, Optional, Tuple
 import networkx as nx
 import json
 import numpy as np
@@ -2363,7 +2363,7 @@ def generate_animistic_entities_for_scene(
 class TemporalAgent:
     """Time as entity with goals in non-Pearl modes"""
 
-    def __init__(self, mode: Optional[TemporalMode] = None, config: Optional[Dict] = None, store=None, llm_client=None):
+    def __init__(self, mode: Optional[TemporalMode] = None, config: Optional[Dict] = None, store=None, llm_client=None, temporal_config=None):
         # Support both signatures
         if store is not None or llm_client is not None:
             # New signature with store and llm_client
@@ -2379,6 +2379,366 @@ class TemporalAgent:
             self.llm_client = None
 
         self.personality = np.random.randn(5)  # Time's "style" vector
+
+        # M1+M17: Store fidelity-temporal configuration
+        self.temporal_config = temporal_config
+        self.fidelity_strategy = None  # Will be set during temporal generation
+
+    @track_mechanism("M1+M17", "adaptive_fidelity_temporal_strategy")
+    def determine_fidelity_temporal_strategy(
+        self,
+        config,  # TemporalConfig
+        context: Dict
+    ) -> "FidelityTemporalStrategy":
+        """
+        Determine optimal fidelity + temporal strategy based on:
+        - Modal requirements (PORTAL pivots, DIRECTORIAL climax, CYCLICAL prophecy timing)
+        - Token budget constraints
+        - Causal necessity (minimum time for state evolution)
+        - Entity development needs
+
+        Args:
+            config: TemporalConfig with mode and budget settings
+            context: Dict with:
+                - portal_state: PortalState (for PORTAL mode)
+                - origin_year: int
+                - entities: List[Entity]
+                - token_budget: float (optional override)
+
+        Returns:
+            FidelityTemporalStrategy: Complete allocation strategy
+        """
+        from schemas import FidelityTemporalStrategy, ResolutionLevel
+
+        # Route to mode-specific strategy
+        if self.mode == TemporalMode.PORTAL:
+            return self._strategy_for_portal_mode(config, context)
+        elif self.mode == TemporalMode.DIRECTORIAL:
+            return self._strategy_for_directorial_mode(config, context)
+        elif self.mode == TemporalMode.CYCLICAL:
+            return self._strategy_for_cyclical_mode(config, context)
+        elif self.mode == TemporalMode.BRANCHING:
+            return self._strategy_for_branching_mode(config, context)
+        else:
+            # Default PEARL mode or others
+            return self._strategy_for_default_mode(config, context)
+
+    def _strategy_for_portal_mode(self, config, context) -> "FidelityTemporalStrategy":
+        """
+        PORTAL mode strategy: Blended fidelity allocation.
+
+        Fidelity allocation:
+        - Portal endpoint: TRAINED (maximum detail for known outcome)
+        - Origin: TRAINED (maximum detail for known starting point)
+        - Pivot points: DIALOG (detected via branching factor or judge recommendation)
+        - Bridge states: SCENE (connecting states)
+        - Checkpoints: TENSOR_ONLY (minimal state snapshots)
+
+        Temporal allocation:
+        - Adaptive based on causal necessity
+        - Denser steps around pivots, sparser for stable periods
+        """
+        from schemas import FidelityTemporalStrategy, FidelityPlanningMode, TokenBudgetMode, ResolutionLevel
+
+        # Extract context
+        portal_year = config.portal_year
+        origin_year = config.origin_year
+        backward_steps = config.backward_steps  # Suggestion, not command
+
+        # Get fidelity planning mode from config (default to HYBRID for portal)
+        planning_mode = getattr(config, 'fidelity_planning_mode', FidelityPlanningMode.HYBRID)
+        budget_mode = getattr(config, 'token_budget_mode', TokenBudgetMode.SOFT_GUIDANCE)
+        token_budget = getattr(config, 'token_budget', 15000)
+
+        # Calculate temporal strategy
+        total_months = (portal_year - origin_year) * 12
+
+        if planning_mode == FidelityPlanningMode.PROGRAMMATIC:
+            # Pre-planned schedule using fidelity template
+            fidelity_template = getattr(config, 'fidelity_template', 'balanced')
+            strategy = self._apply_fidelity_template(fidelity_template, backward_steps, total_months)
+
+            return FidelityTemporalStrategy(
+                mode=self.mode,
+                planning_mode=planning_mode,
+                budget_mode=budget_mode,
+                token_budget=token_budget,
+                timepoint_count=len(strategy['fidelity_schedule']),
+                fidelity_schedule=strategy['fidelity_schedule'],
+                temporal_steps=strategy['temporal_steps'],
+                adaptive_threshold=0.7,
+                min_resolution=ResolutionLevel.TENSOR_ONLY,
+                max_resolution=ResolutionLevel.TRAINED,
+                allocation_rationale=f"PORTAL mode programmatic: {fidelity_template} template",
+                estimated_tokens=strategy['estimated_tokens'],
+                estimated_cost_usd=strategy['estimated_tokens'] * 0.000002  # Rough estimate
+            )
+
+        elif planning_mode == FidelityPlanningMode.ADAPTIVE:
+            # Fully adaptive - engine decides per-step during simulation
+            # For now, provide initial estimate
+            return FidelityTemporalStrategy(
+                mode=self.mode,
+                planning_mode=planning_mode,
+                budget_mode=budget_mode,
+                token_budget=token_budget,
+                timepoint_count=backward_steps,  # Initial estimate
+                fidelity_schedule=[],  # Will be determined per-step
+                temporal_steps=[],  # Will be determined per-step
+                adaptive_threshold=0.7,
+                min_resolution=ResolutionLevel.TENSOR_ONLY,
+                max_resolution=ResolutionLevel.TRAINED,
+                allocation_rationale="PORTAL mode adaptive: fidelity determined per-step based on simulation state",
+                estimated_tokens=token_budget,  # Use budget as estimate
+                estimated_cost_usd=token_budget * 0.000002
+            )
+
+        else:  # HYBRID
+            # Start with programmatic plan, allow upgrades
+            fidelity_template = getattr(config, 'fidelity_template', 'portal_pivots')
+            strategy = self._apply_fidelity_template(fidelity_template, backward_steps, total_months)
+
+            return FidelityTemporalStrategy(
+                mode=self.mode,
+                planning_mode=planning_mode,
+                budget_mode=budget_mode,
+                token_budget=token_budget,
+                timepoint_count=len(strategy['fidelity_schedule']),
+                fidelity_schedule=strategy['fidelity_schedule'],
+                temporal_steps=strategy['temporal_steps'],
+                adaptive_threshold=0.75,  # Higher threshold for upgrades in hybrid
+                min_resolution=ResolutionLevel.TENSOR_ONLY,
+                max_resolution=ResolutionLevel.TRAINED,
+                allocation_rationale=f"PORTAL mode hybrid: {fidelity_template} template with adaptive upgrades",
+                estimated_tokens=strategy['estimated_tokens'],
+                estimated_cost_usd=strategy['estimated_tokens'] * 0.000002
+            )
+
+    def _apply_fidelity_template(self, template_name: str, suggested_steps: int, total_months: int) -> Dict:
+        """
+        Apply a fidelity template to generate programmatic allocation.
+
+        Templates define "musical scores" - patterns of fidelity + temporal allocation.
+        """
+        from schemas import ResolutionLevel
+
+        # Import template library (will be defined in Phase 3.2)
+        # For now, provide basic templates
+
+        if template_name == "minimalist":
+            # 10 TENSOR checkpoints, 3 SCENE bridges, 1 DIALOG endpoint
+            fidelity_schedule = [ResolutionLevel.TENSOR_ONLY] * 10 + \
+                               [ResolutionLevel.SCENE] * 3 + \
+                               [ResolutionLevel.DIALOG]
+            # Even temporal distribution
+            month_step = total_months // len(fidelity_schedule)
+            temporal_steps = [month_step] * len(fidelity_schedule)
+            estimated_tokens = 10 * 200 + 3 * 1000 + 1 * 10000  # Rough estimate
+
+        elif template_name == "balanced":
+            # 5 TENSOR, 5 SCENE, 3 GRAPH, 2 DIALOG
+            fidelity_schedule = [ResolutionLevel.TENSOR_ONLY] * 5 + \
+                               [ResolutionLevel.SCENE] * 5 + \
+                               [ResolutionLevel.GRAPH] * 3 + \
+                               [ResolutionLevel.DIALOG] * 2
+            month_step = total_months // len(fidelity_schedule)
+            temporal_steps = [month_step] * len(fidelity_schedule)
+            estimated_tokens = 5 * 200 + 5 * 1000 + 3 * 5000 + 2 * 10000
+
+        elif template_name == "portal_pivots":
+            # Blended: Endpoint + Origin = TRAINED, middle = adaptive
+            # For now, use balanced as starting point
+            fidelity_schedule = [ResolutionLevel.TRAINED] + \
+                               [ResolutionLevel.TENSOR_ONLY] * 8 + \
+                               [ResolutionLevel.SCENE] * 4 + \
+                               [ResolutionLevel.DIALOG] * 2 + \
+                               [ResolutionLevel.TRAINED]
+            month_step = total_months // len(fidelity_schedule)
+            temporal_steps = [month_step] * len(fidelity_schedule)
+            estimated_tokens = 2 * 50000 + 8 * 200 + 4 * 1000 + 2 * 10000
+
+        elif template_name == "max_quality":
+            # 10 DIALOG, 5 TRAINED
+            fidelity_schedule = [ResolutionLevel.DIALOG] * 10 + \
+                               [ResolutionLevel.TRAINED] * 5
+            month_step = total_months // len(fidelity_schedule)
+            temporal_steps = [month_step] * len(fidelity_schedule)
+            estimated_tokens = 10 * 10000 + 5 * 50000
+
+        else:
+            # Default to balanced
+            fidelity_schedule = [ResolutionLevel.SCENE] * suggested_steps
+            month_step = total_months // suggested_steps
+            temporal_steps = [month_step] * suggested_steps
+            estimated_tokens = suggested_steps * 1000
+
+        return {
+            'fidelity_schedule': fidelity_schedule,
+            'temporal_steps': temporal_steps,
+            'estimated_tokens': estimated_tokens
+        }
+
+    def _strategy_for_directorial_mode(self, config, context) -> "FidelityTemporalStrategy":
+        """DIRECTORIAL mode: Allocate fidelity based on narrative arc"""
+        from schemas import FidelityTemporalStrategy, FidelityPlanningMode, TokenBudgetMode, ResolutionLevel
+
+        # TODO: Implement directorial-specific strategy
+        # For now, return basic strategy
+        return FidelityTemporalStrategy(
+            mode=self.mode,
+            planning_mode=FidelityPlanningMode.PROGRAMMATIC,
+            budget_mode=TokenBudgetMode.SOFT_GUIDANCE,
+            token_budget=15000,
+            timepoint_count=15,
+            fidelity_schedule=[ResolutionLevel.SCENE] * 15,
+            temporal_steps=[24] * 15,  # 2 years between each
+            adaptive_threshold=0.7,
+            min_resolution=ResolutionLevel.TENSOR_ONLY,
+            max_resolution=ResolutionLevel.TRAINED,
+            allocation_rationale="DIRECTORIAL mode: TODO - implement narrative arc allocation",
+            estimated_tokens=15000,
+            estimated_cost_usd=0.03
+        )
+
+    def _strategy_for_cyclical_mode(self, config, context) -> "FidelityTemporalStrategy":
+        """CYCLICAL mode: Allocate based on cycle periods and prophecy fulfillment"""
+        from schemas import FidelityTemporalStrategy, FidelityPlanningMode, TokenBudgetMode, ResolutionLevel
+
+        # TODO: Implement cyclical-specific strategy
+        return FidelityTemporalStrategy(
+            mode=self.mode,
+            planning_mode=FidelityPlanningMode.PROGRAMMATIC,
+            budget_mode=TokenBudgetMode.SOFT_GUIDANCE,
+            token_budget=10000,
+            timepoint_count=10,
+            fidelity_schedule=[ResolutionLevel.SCENE] * 10,
+            temporal_steps=[84] * 10,  # 7 days each (weekly cycle)
+            adaptive_threshold=0.7,
+            min_resolution=ResolutionLevel.TENSOR_ONLY,
+            max_resolution=ResolutionLevel.TRAINED,
+            allocation_rationale="CYCLICAL mode: TODO - implement cycle-based allocation",
+            estimated_tokens=10000,
+            estimated_cost_usd=0.02
+        )
+
+    def _strategy_for_branching_mode(self, config, context) -> "FidelityTemporalStrategy":
+        """BRANCHING mode: Allocate based on branch points"""
+        from schemas import FidelityTemporalStrategy, FidelityPlanningMode, TokenBudgetMode, ResolutionLevel
+
+        # TODO: Implement branching-specific strategy
+        return FidelityTemporalStrategy(
+            mode=self.mode,
+            planning_mode=FidelityPlanningMode.PROGRAMMATIC,
+            budget_mode=TokenBudgetMode.SOFT_GUIDANCE,
+            token_budget=20000,
+            timepoint_count=15,
+            fidelity_schedule=[ResolutionLevel.SCENE] * 15,
+            temporal_steps=[12] * 15,
+            adaptive_threshold=0.7,
+            min_resolution=ResolutionLevel.TENSOR_ONLY,
+            max_resolution=ResolutionLevel.TRAINED,
+            allocation_rationale="BRANCHING mode: TODO - implement branch-based allocation",
+            estimated_tokens=20000,
+            estimated_cost_usd=0.04
+        )
+
+    def _strategy_for_default_mode(self, config, context) -> "FidelityTemporalStrategy":
+        """Default strategy for PEARL and other modes"""
+        from schemas import FidelityTemporalStrategy, FidelityPlanningMode, TokenBudgetMode, ResolutionLevel
+
+        return FidelityTemporalStrategy(
+            mode=self.mode,
+            planning_mode=FidelityPlanningMode.PROGRAMMATIC,
+            budget_mode=TokenBudgetMode.SOFT_GUIDANCE,
+            token_budget=10000,
+            timepoint_count=10,
+            fidelity_schedule=[ResolutionLevel.SCENE] * 10,
+            temporal_steps=[12] * 10,  # 1 year between each
+            adaptive_threshold=0.7,
+            min_resolution=ResolutionLevel.TENSOR_ONLY,
+            max_resolution=ResolutionLevel.TRAINED,
+            allocation_rationale="Default mode: balanced fidelity allocation",
+            estimated_tokens=10000,
+            estimated_cost_usd=0.02
+        )
+
+    def determine_next_step_fidelity_and_time(
+        self,
+        current_state,  # PortalState
+        strategy: "FidelityTemporalStrategy",
+        step_num: int,
+        context: Dict
+    ) -> Tuple[int, "ResolutionLevel"]:
+        """
+        For ADAPTIVE or HYBRID modes: decide next step's time gap and fidelity level.
+
+        Args:
+            current_state: Current PortalState in backward simulation
+            strategy: Overall FidelityTemporalStrategy
+            step_num: Current step number (0-indexed)
+            context: Dict with:
+                - entities: List[Entity]
+                - pivot_detected: bool (for HYBRID mode)
+                - simulation_state: Dict (for adaptive decisions)
+
+        Returns:
+            Tuple of (months_to_next_state, resolution_level)
+        """
+        from schemas import ResolutionLevel, FidelityPlanningMode
+
+        if strategy.planning_mode == FidelityPlanningMode.PROGRAMMATIC:
+            # Use pre-planned schedule
+            if step_num < len(strategy.temporal_steps):
+                return (strategy.temporal_steps[step_num], strategy.fidelity_schedule[step_num])
+            else:
+                # Fallback
+                return (12, ResolutionLevel.SCENE)
+
+        elif strategy.planning_mode == FidelityPlanningMode.ADAPTIVE:
+            # Fully adaptive decision
+            # Determine fidelity based on current simulation state
+
+            # Check if this is a pivot point (high importance)
+            importance_score = context.get('importance_score', 0.5)
+
+            if importance_score > strategy.adaptive_threshold:
+                resolution = ResolutionLevel.DIALOG
+            elif importance_score > 0.5:
+                resolution = ResolutionLevel.SCENE
+            else:
+                resolution = ResolutionLevel.TENSOR_ONLY
+
+            # Determine temporal step based on state complexity
+            # More complex states = shorter time gaps for granularity
+            complexity = context.get('state_complexity', 0.5)
+            if complexity > 0.7:
+                month_step = 1  # Monthly granularity for complex periods
+            elif complexity > 0.4:
+                month_step = 3  # Quarterly granularity
+            else:
+                month_step = 12  # Annual granularity for simple periods
+
+            return (month_step, resolution)
+
+        else:  # HYBRID
+            # Start with programmatic plan
+            if step_num < len(strategy.temporal_steps):
+                planned_month_step = strategy.temporal_steps[step_num]
+                planned_resolution = strategy.fidelity_schedule[step_num]
+            else:
+                planned_month_step = 12
+                planned_resolution = ResolutionLevel.SCENE
+
+            # Check if we should upgrade due to pivot detection
+            pivot_detected = context.get('pivot_detected', False)
+
+            if pivot_detected and planned_resolution < ResolutionLevel.DIALOG:
+                # Upgrade to DIALOG for pivot points
+                print(f"  🎯 Pivot detected at step {step_num}: upgrading {planned_resolution} → DIALOG")
+                return (planned_month_step, ResolutionLevel.DIALOG)
+
+            # Otherwise, use planned allocation
+            return (planned_month_step, planned_resolution)
 
     def influence_event_probability(self, event: str, context: Dict) -> float:
         """Adjust event probability based on temporal mode"""

@@ -23,6 +23,56 @@ class TemporalMode(str, Enum):
     CYCLICAL = "cyclical"  # Time loops and prophecy
     PORTAL = "portal"  # Backward inference from fixed endpoint to origin
 
+class FidelityPlanningMode(str, Enum):
+    """How should fidelity be allocated across timepoints?"""
+    PROGRAMMATIC = "programmatic"  # Plan all fidelity levels upfront (deterministic)
+    ADAPTIVE = "adaptive"  # Decide per-step based on simulation state (dynamic)
+    HYBRID = "hybrid"  # Programmatic plan + adaptive upgrades for critical moments
+
+
+class TokenBudgetMode(str, Enum):
+    """How should token budget be enforced?"""
+    HARD_CONSTRAINT = "hard"  # Simulation fails if budget exceeded
+    SOFT_GUIDANCE = "soft"  # Target budget, allow 110% overage with warning
+    MAX_QUALITY = "max"  # No budget limit, maximize fidelity
+    ADAPTIVE_FALLBACK = "adaptive"  # Hit budget, exceed if validity requires it
+    ORCHESTRATOR_DIRECTED = "orchestrator"  # Orchestrator decides dynamically
+    USER_CONFIGURED = "user"  # User provides exact allocation
+
+
+class FidelityTemporalStrategy(BaseModel):
+    """
+    Co-determined fidelity + temporal allocation strategy.
+
+    This is the "musical score" that the TemporalAgent generates,
+    specifying both WHEN timepoints occur and HOW MUCH DETAIL each has.
+    """
+    # Modal context
+    mode: TemporalMode
+    planning_mode: FidelityPlanningMode
+    budget_mode: TokenBudgetMode
+    token_budget: Optional[float] = None  # Total tokens (if budget_mode requires it)
+
+    # Programmatic plan (if planning_mode=PROGRAMMATIC or HYBRID)
+    timepoint_count: int  # Total number of timepoints
+    fidelity_schedule: List[ResolutionLevel]  # Per-timepoint fidelity [TENSOR, SCENE, DIALOG, ...]
+    temporal_steps: List[int]  # Month gaps between timepoints [3, 6, 1, 12, ...]
+
+    # Adaptive parameters (if planning_mode=ADAPTIVE or HYBRID)
+    adaptive_threshold: float = 0.7  # When to upgrade fidelity (e.g., pivot point score > 0.7)
+    min_resolution: ResolutionLevel = ResolutionLevel.TENSOR_ONLY
+    max_resolution: ResolutionLevel = ResolutionLevel.TRAINED
+
+    # Metadata
+    allocation_rationale: str  # Why this strategy? (for debugging/explainability)
+    estimated_tokens: float  # Projected token usage
+    estimated_cost_usd: float  # Projected cost
+
+    # Post-execution tracking
+    actual_tokens_used: Optional[float] = None
+    actual_cost_usd: Optional[float] = None
+    budget_compliance_ratio: Optional[float] = None  # actual/budget
+
 class TTMTensor(SQLModel):
     """Timepoint Tensor Model - context, biology, behavior"""
     context_vector: bytes  # Serialized numpy array (knowledge, information)

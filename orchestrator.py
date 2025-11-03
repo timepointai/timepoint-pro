@@ -397,13 +397,76 @@ Schema:
         context: Dict,
         count: int
     ) -> List[EntityRosterItem]:
-        """Pass 1: Generate entity roster with minimal details"""
+        """Pass 1: Generate entity roster with minimal details
+
+        If entity_config.profiles is specified, load predefined profiles from JSON files.
+        Otherwise, generate entities via LLM as before.
+        """
+        from pathlib import Path
+
+        # Add absolute timeout to prevent infinite loops
+        start_time = time.time()
+        absolute_timeout = 300  # 5 minutes max for entity roster generation
+
+        # Check if profiles are specified in context
+        entity_config = context.get("entity_config", {})
+        profile_paths = entity_config.get("profiles", [])
+
+        loaded_entities = []
+
+        # Load predefined profiles if specified
+        if profile_paths:
+            print(f"   📋 Loading {len(profile_paths)} predefined entity profiles...")
+            for profile_path in profile_paths:
+                profile_file = Path(profile_path)
+                if not profile_file.exists():
+                    print(f"   ⚠️  Profile not found: {profile_path}, skipping...")
+                    continue
+
+                try:
+                    with open(profile_file) as f:
+                        profile_data = json.load(f)
+
+                    # Extract name from filename (e.g., "sean.json" → "sean")
+                    name = profile_file.stem
+
+                    # Get full name from profile if available, otherwise use filename
+                    full_name = profile_data.get("name", name.replace("_", " ").title())
+                    entity_id = name.lower().replace(" ", "_")
+
+                    # Create EntityRosterItem from profile
+                    entity = EntityRosterItem(
+                        entity_id=entity_id,
+                        entity_type="human",
+                        role="primary",  # Profiles are for primary characters
+                        description=profile_data.get("description", f"{full_name} - Founder"),
+                        initial_knowledge=profile_data.get("initial_knowledge", [
+                            f"Expert in {profile_data.get('archetype_id', 'business')}",
+                            *[f"Strength: {s}" for s in profile_data.get("strengths", [])[:2]],
+                            *[f"Weakness: {w}" for w in profile_data.get("weaknesses", [])[:2]]
+                        ]),
+                        relationships={}  # Will be filled later
+                    )
+                    loaded_entities.append(entity)
+                    print(f"   ✓ Loaded profile: {full_name} ({entity_id})")
+                except Exception as e:
+                    print(f"   ⚠️  Failed to load profile {profile_path}: {e}")
+                    continue
+
+        # Calculate how many entities still need to be generated
+        remaining_count = count - len(loaded_entities)
+
+        if remaining_count <= 0:
+            print(f"   ✓ All {count} entities loaded from profiles")
+            return loaded_entities
+
+        print(f"   🤖 Generating {remaining_count} additional entities via LLM...")
 
         prompt = f"""You are generating an entity roster for a historical simulation.
 
 Event: {event_description}
 
-Generate EXACTLY {count} entities (people, places, objects, concepts) involved in this event.
+Generate EXACTLY {remaining_count} entities (people, places, objects, concepts) involved in this event.
 
 For each entity, provide ONLY:
 - entity_id: unique lowercase identifier (e.g., "thomas_jefferson")
@@ -427,7 +490,7 @@ Return a JSON object with this structure:
   ]
 }}
 
-Return EXACTLY {count} entities. This is critical."""
+Return EXACTLY {remaining_count} entities. This is critical."""
 
         # Use larger token limit for roster generation (Llama 4 Scout supports 327K)
         max_tokens = min((count * 100) + 1000, 42000)
@@ -438,6 +501,14 @@ Return EXACTLY {count} entities. This is critical."""
         max_retries = 2
 
         while retry_count <= max_retries:
+            # Check absolute timeout
+            elapsed = time.time() - start_time
+            if elapsed > absolute_timeout:
+                if loaded_entities:
+                    print(f"   ⚠️  Absolute timeout ({absolute_timeout}s) exceeded, returning {len(loaded_entities)} loaded profiles")
+                    return loaded_entities
+                raise TimeoutError(f"Entity roster generation exceeded {absolute_timeout}s timeout")
+
             try:
                 result = self.llm.generate_structured(
                     prompt=prompt,
@@ -451,29 +522,39 @@ Return EXACTLY {count} entities. This is critical."""
                 )
 
                 # Validate we got the right count
-                if len(result.entities) < count * 0.8:  # Allow 20% tolerance
-                    print(f"   ⚠️  Only got {len(result.entities)}/{count} entities, retrying...")
+                if len(result.entities) < remaining_count * 0.8:  # Allow 20% tolerance
+                    print(f"   ⚠️  Only got {len(result.entities)}/{remaining_count} entities, retrying...")
                     retry_count += 1
                     if retry_count <= max_retries:
                         # Escalate to 405B on retry
                         model = "meta-llama/llama-3.1-405b-instruct"
-                        max_tokens = min((count * 120) + 2000, 100000)
+                        max_tokens = min((remaining_count * 120) + 2000, 100000)
                         continue
 
-                return result.entities
+                # Merge loaded profiles with LLM-generated entities
+                all_entities = loaded_entities + result.entities
+                print(f"   ✓ Total entities: {len(all_entities)} ({len(loaded_entities)} from profiles + {len(result.entities)} generated)")
+                return all_entities
 
             except Exception as e:
                 retry_count += 1
                 if retry_count > max_retries:
+                    # If we have loaded profiles, return them even if LLM generation failed
+                    if loaded_entities:
+                        print(f"   ⚠️  LLM generation failed after {max_retries + 1} attempts, but returning {len(loaded_entities)} loaded profiles")
+                        return loaded_entities
                     raise RuntimeError(f"Failed to generate entity roster after {max_retries + 1} attempts: {e}") from e
 
                 print(f"   ⚠️  Attempt {retry_count} failed: {e}")
                 print(f"   🚀 Escalating to Llama 405B...")
                 model = "meta-llama/llama-3.1-405b-instruct"
-                max_tokens = min((count * 120) + 2000, 100000)
+                max_tokens = min((remaining_count * 120) + 2000, 100000)
                 time.sleep(2 ** retry_count)  # Exponential backoff
 
-        # Should never reach here, but just in case
+        # Should never reach here, but just in case - return loaded profiles if we have them
+        if loaded_entities:
+            print(f"   ⚠️  Unexpected: Returning {len(loaded_entities)} loaded profiles")
+            return loaded_entities
         raise RuntimeError("Failed to generate entity roster")
 
     def _generate_timepoint_skeleton(

@@ -14,6 +14,7 @@ from datetime import datetime
 from enum import Enum
 import json
 from pathlib import Path
+from schemas import FidelityPlanningMode, TokenBudgetMode
 
 
 # ============================================================================
@@ -161,6 +162,75 @@ class TemporalMode(str, Enum):
     BRANCHING = "branching"
     CYCLICAL = "cyclical"
     PORTAL = "portal"  # Backward inference from fixed endpoint to origin
+
+
+# ============================================================================
+# M1+M17: Fidelity Template Library
+# ============================================================================
+
+FIDELITY_TEMPLATES = {
+    "minimalist": {
+        "description": "Minimal token usage for fast exploration",
+        "pattern": [ResolutionLevel.TENSOR_ONLY] * 10 +
+                   [ResolutionLevel.SCENE] * 3 +
+                   [ResolutionLevel.DIALOG],
+        "token_estimate": 5000,
+        "cost_estimate_usd": 0.01,
+        "use_case": "Fast exploration, budget-constrained runs, testing",
+        "quality_level": "Basic",
+        "recommended_for": ["quick", "testing", "budget_constrained"]
+    },
+    "balanced": {
+        "description": "Good quality/cost ratio for production runs",
+        "pattern": [ResolutionLevel.TENSOR_ONLY] * 5 +
+                   [ResolutionLevel.SCENE] * 5 +
+                   [ResolutionLevel.GRAPH] * 3 +
+                   [ResolutionLevel.DIALOG] * 2,
+        "token_estimate": 15000,
+        "cost_estimate_usd": 0.03,
+        "use_case": "Production runs, general purpose, good quality",
+        "quality_level": "Good",
+        "recommended_for": ["production", "general", "default"]
+    },
+    "dramatic": {
+        "description": "DIRECTORIAL mode focused on narrative climax",
+        "pattern": [ResolutionLevel.TENSOR_ONLY] * 8 +
+                   [ResolutionLevel.SCENE] * 4 +
+                   [ResolutionLevel.DIALOG] * 2 +
+                   [ResolutionLevel.TRAINED],
+        "token_estimate": 25000,
+        "cost_estimate_usd": 0.05,
+        "use_case": "DIRECTORIAL mode, narrative-focused simulations",
+        "quality_level": "High",
+        "recommended_for": ["directorial", "narrative", "story_focused"]
+    },
+    "max_quality": {
+        "description": "Maximum fidelity, no budget constraints",
+        "pattern": [ResolutionLevel.DIALOG] * 10 +
+                   [ResolutionLevel.TRAINED] * 5,
+        "token_estimate": 350000,
+        "cost_estimate_usd": 0.70,
+        "use_case": "Research, publication-quality runs, maximum realism",
+        "quality_level": "Maximum",
+        "recommended_for": ["research", "publication", "max_quality"]
+    },
+    "portal_pivots": {
+        "description": "PORTAL mode with adaptive pivot detection",
+        "pattern": "adaptive",  # Special: engine determines pivots dynamically
+        "token_estimate": 20000,
+        "cost_estimate_usd": 0.04,
+        "use_case": "PORTAL mode, pivot point focus, blended fidelity",
+        "quality_level": "High",
+        "recommended_for": ["portal", "backward_simulation", "pivot_focused"],
+        "allocation_strategy": {
+            "endpoint": ResolutionLevel.TRAINED,
+            "origin": ResolutionLevel.TRAINED,
+            "pivots": ResolutionLevel.DIALOG,
+            "bridges": ResolutionLevel.SCENE,
+            "checkpoints": ResolutionLevel.TENSOR_ONLY
+        }
+    }
+}
 
 
 class EntityConfig(BaseModel):
@@ -338,6 +408,32 @@ class TemporalConfig(BaseModel):
     simulation_cache_results: bool = Field(
         default=True,
         description="Cache simulation results to avoid redundant computation"
+    )
+
+    # M1+M17: Adaptive Fidelity-Temporal Strategy Configuration
+    fidelity_planning_mode: FidelityPlanningMode = Field(
+        default=FidelityPlanningMode.HYBRID,
+        description="How should fidelity be allocated? programmatic | adaptive | hybrid"
+    )
+    token_budget_mode: TokenBudgetMode = Field(
+        default=TokenBudgetMode.SOFT_GUIDANCE,
+        description="How should token budget be enforced? hard | soft | max | adaptive | orchestrator | user"
+    )
+    token_budget: Optional[float] = Field(
+        default=15000,
+        description="Total token budget for simulation (if budget_mode requires it)"
+    )
+    fidelity_template: str = Field(
+        default="balanced",
+        description="Fidelity template: minimalist | balanced | dramatic | max_quality | portal_pivots"
+    )
+    custom_fidelity_schedule: Optional[List[ResolutionLevel]] = Field(
+        default=None,
+        description="Custom fidelity schedule (overrides template)"
+    )
+    custom_temporal_steps: Optional[List[int]] = Field(
+        default=None,
+        description="Custom temporal steps in months (overrides template)"
     )
 
 

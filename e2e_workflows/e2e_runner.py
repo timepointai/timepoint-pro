@@ -416,7 +416,12 @@ class FullE2EWorkflowRunner:
                     "max_entities": config.entities.count,
                     "max_timepoints": 1,  # Just initial scene
                     "temporal_mode": config.temporal.mode.value,
-                    "entity_metadata": config.metadata  # Pass rich metadata for specialized mechanisms
+                    "entity_metadata": config.metadata,  # Pass rich metadata for specialized mechanisms
+                    "entity_config": {
+                        "count": config.entities.count,
+                        "types": config.entities.types,
+                        "profiles": getattr(config.entities, 'profiles', [])
+                    }
                 },
                 save_to_db=True
             )
@@ -591,12 +596,35 @@ class FullE2EWorkflowRunner:
             store = scene_result["store"]
             initial_timepoint = scene_result["timepoints"][0]
 
-            # Create temporal agent
+            # Create temporal agent with fidelity configuration (M1+M17)
             temporal_agent = TemporalAgent(
                 mode=config.temporal.mode,
                 store=store,
-                llm_client=llm
+                llm_client=llm,
+                temporal_config=config.temporal  # Pass full TemporalConfig for fidelity awareness
             )
+
+            # Store temporal_agent for fidelity metrics tracking (M1+M17)
+            scene_result["temporal_agent"] = temporal_agent
+
+            # M1+M17: Determine fidelity strategy at start of temporal generation
+            if config.temporal.fidelity_planning_mode and config.temporal.token_budget:
+                try:
+                    strategy_context = {
+                        "entities": scene_result["entities"],
+                        "origin_year": datetime.now().year,
+                        "token_budget": config.temporal.token_budget
+                    }
+                    temporal_agent.fidelity_strategy = temporal_agent.determine_fidelity_temporal_strategy(
+                        config.temporal,
+                        strategy_context
+                    )
+                    print(f"  📊 Fidelity strategy determined:")
+                    print(f"     Planning mode: {config.temporal.fidelity_planning_mode.value}")
+                    print(f"     Token budget: {config.temporal.token_budget:,}")
+                    print(f"     Template: {config.temporal.fidelity_template}")
+                except Exception as e:
+                    print(f"  ⚠️  Fidelity strategy determination failed: {e}, using defaults")
 
             # MODE DETECTION: Check if portal simulation
             if config.temporal.mode == TemporalMode.PORTAL:
@@ -1243,6 +1271,49 @@ class FullE2EWorkflowRunner:
 
                 print(f"  ⚠️  No LLM client found, using estimates")
 
+            # M1+M17: Calculate fidelity metrics (Database v2)
+            config = scene_result.get("config")
+            fidelity_strategy_json = None
+            fidelity_distribution = None
+            token_budget_compliance = None
+            fidelity_efficiency_score = None
+
+            # Calculate fidelity distribution (count ResolutionLevel across entities)
+            from collections import Counter
+            from schemas import ResolutionLevel
+            resolution_counts = Counter()
+            for entity in scene_result["entities"]:
+                res_level = getattr(entity, 'resolution_level', ResolutionLevel.SCENE)
+                resolution_counts[res_level.value] += 1
+
+            fidelity_distribution = json.dumps(dict(resolution_counts))
+            print(f"  📊 Fidelity distribution: {dict(resolution_counts)}")
+
+            # Calculate token budget compliance
+            if config and hasattr(config.temporal, 'token_budget') and config.temporal.token_budget:
+                token_budget = config.temporal.token_budget
+                token_budget_compliance = actual_tokens / token_budget if token_budget > 0 else None
+                print(f"  📊 Token budget compliance: {token_budget_compliance:.2f} ({actual_tokens:,} / {token_budget:,})")
+
+            # Calculate fidelity efficiency score (quality per token)
+            # Quality proxy: entities + timepoints (output richness)
+            quality_score = entities_count + timepoints_count
+            if actual_tokens > 0:
+                fidelity_efficiency_score = quality_score / actual_tokens
+                print(f"  📊 Fidelity efficiency: {fidelity_efficiency_score:.6f} (quality: {quality_score}, tokens: {actual_tokens:,})")
+
+            # Capture fidelity strategy from TemporalAgent (if available)
+            temporal_agent = scene_result.get("temporal_agent")
+            if temporal_agent and hasattr(temporal_agent, 'fidelity_strategy'):
+                import json as json_module
+                try:
+                    strategy = temporal_agent.fidelity_strategy
+                    if strategy:
+                        fidelity_strategy_json = json_module.dumps(strategy.model_dump() if hasattr(strategy, 'model_dump') else str(strategy))
+                        print(f"  📊 Fidelity strategy captured from TemporalAgent")
+                except Exception as e:
+                    print(f"  ⚠️  Failed to serialize fidelity strategy: {e}")
+
             metadata = self.metadata_manager.complete_run(
                 run_id=run_id,
                 entities_created=entities_count,
@@ -1252,7 +1323,13 @@ class FullE2EWorkflowRunner:
                 llm_calls=actual_calls,  # REAL call count
                 tokens_used=actual_tokens,  # REAL token count
                 oxen_repo_url=oxen_repo_url,
-                oxen_dataset_url=oxen_dataset_url
+                oxen_dataset_url=oxen_dataset_url,
+                # M1+M17: Database v2 - Fidelity metrics
+                fidelity_strategy_json=fidelity_strategy_json,
+                fidelity_distribution=fidelity_distribution,
+                actual_tokens_used=float(actual_tokens) if actual_tokens else None,
+                token_budget_compliance=token_budget_compliance,
+                fidelity_efficiency_score=fidelity_efficiency_score
             )
 
             print(f"✓ Metadata complete")

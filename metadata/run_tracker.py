@@ -103,6 +103,29 @@ class RunMetadata(BaseModel):
     )
     narrative_export_generated_at: Optional[datetime] = None
 
+    # M1+M17: Database v2 - Fidelity-Temporal Strategy Tracking
+    schema_version: str = "2.0"  # Database version marker
+    fidelity_strategy_json: Optional[str] = Field(
+        default=None,
+        description="JSON-serialized FidelityTemporalStrategy from TemporalAgent"
+    )
+    fidelity_distribution: Optional[str] = Field(
+        default=None,
+        description="JSON dict of {ResolutionLevel: count} for this run"
+    )
+    actual_tokens_used: Optional[float] = Field(
+        default=None,
+        description="Actual token usage (may differ from budget)"
+    )
+    token_budget_compliance: Optional[float] = Field(
+        default=None,
+        description="actual_tokens / token_budget ratio"
+    )
+    fidelity_efficiency_score: Optional[float] = Field(
+        default=None,
+        description="Quality metric: output_quality / tokens_used"
+    )
+
     class Config:
         use_enum_values = True
 
@@ -146,7 +169,13 @@ class MetadataManager:
                 status TEXT DEFAULT 'running',
                 error_message TEXT,
                 summary TEXT,
-                summary_generated_at TEXT
+                summary_generated_at TEXT,
+                schema_version TEXT DEFAULT '2.0',
+                fidelity_strategy_json TEXT,
+                fidelity_distribution TEXT,
+                actual_tokens_used REAL,
+                token_budget_compliance REAL,
+                fidelity_efficiency_score REAL
             )
         """)
 
@@ -236,6 +265,23 @@ class MetadataManager:
             cursor.execute("ALTER TABLE runs ADD COLUMN narrative_export_generated_at TEXT")
             conn.commit()
             print("   ✓ Narrative export timestamp column added")
+
+        # M1+M17: Database v2 - Add fidelity-temporal strategy tracking columns
+        v2_columns = {
+            'schema_version': "TEXT DEFAULT '2.0'",
+            'fidelity_strategy_json': "TEXT",
+            'fidelity_distribution': "TEXT",
+            'actual_tokens_used': "REAL",
+            'token_budget_compliance': "REAL",
+            'fidelity_efficiency_score': "REAL"
+        }
+
+        for col_name, col_type in v2_columns.items():
+            if col_name not in columns:
+                print(f"📝 Migrating database v1→v2: Adding '{col_name}' column...")
+                cursor.execute(f"ALTER TABLE runs ADD COLUMN {col_name} {col_type}")
+                conn.commit()
+                print(f"   ✓ {col_name} column added")
 
     def start_run(
         self,
@@ -391,7 +437,13 @@ class MetadataManager:
         tokens_used: int,
         oxen_repo_url: Optional[str] = None,
         oxen_dataset_url: Optional[str] = None,
-        error_message: Optional[str] = None
+        error_message: Optional[str] = None,
+        # M1+M17: Database v2 - Fidelity metrics
+        fidelity_strategy_json: Optional[str] = None,
+        fidelity_distribution: Optional[str] = None,
+        actual_tokens_used: Optional[float] = None,
+        token_budget_compliance: Optional[float] = None,
+        fidelity_efficiency_score: Optional[float] = None
     ) -> RunMetadata:
         """Complete a run and finalize metadata"""
         conn = sqlite3.connect(self.db_path)
@@ -423,7 +475,12 @@ class MetadataManager:
                 oxen_repo_url = ?,
                 oxen_dataset_url = ?,
                 status = ?,
-                error_message = ?
+                error_message = ?,
+                fidelity_strategy_json = ?,
+                fidelity_distribution = ?,
+                actual_tokens_used = ?,
+                token_budget_compliance = ?,
+                fidelity_efficiency_score = ?
             WHERE run_id = ?
         """, (
             completed_at.isoformat(),
@@ -438,6 +495,11 @@ class MetadataManager:
             oxen_dataset_url,
             status,
             error_message,
+            fidelity_strategy_json,
+            fidelity_distribution,
+            actual_tokens_used,
+            token_budget_compliance,
+            fidelity_efficiency_score,
             run_id
         ))
 
@@ -542,7 +604,12 @@ class MetadataManager:
                     summary = ?,
                     summary_generated_at = ?,
                     narrative_exports = ?,
-                    narrative_export_generated_at = ?
+                    narrative_export_generated_at = ?,
+                    fidelity_strategy_json = ?,
+                    fidelity_distribution = ?,
+                    actual_tokens_used = ?,
+                    token_budget_compliance = ?,
+                    fidelity_efficiency_score = ?
                 WHERE run_id = ?
             """, (
                 metadata.template_id,
@@ -566,6 +633,11 @@ class MetadataManager:
                 metadata.summary_generated_at.isoformat() if metadata.summary_generated_at else None,
                 json.dumps(metadata.narrative_exports) if metadata.narrative_exports else None,
                 metadata.narrative_export_generated_at.isoformat() if metadata.narrative_export_generated_at else None,
+                metadata.fidelity_strategy_json,
+                metadata.fidelity_distribution,
+                metadata.actual_tokens_used,
+                metadata.token_budget_compliance,
+                metadata.fidelity_efficiency_score,
                 metadata.run_id
             ))
         else:
@@ -576,8 +648,10 @@ class MetadataManager:
                     max_entities, max_timepoints, entities_created, timepoints_created,
                     training_examples, cost_usd, llm_calls, tokens_used, duration_seconds,
                     oxen_repo_url, oxen_dataset_url, status, error_message,
-                    summary, summary_generated_at, narrative_exports, narrative_export_generated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    summary, summary_generated_at, narrative_exports, narrative_export_generated_at,
+                    fidelity_strategy_json, fidelity_distribution, actual_tokens_used,
+                    token_budget_compliance, fidelity_efficiency_score
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 metadata.run_id,
                 metadata.template_id,
@@ -600,7 +674,12 @@ class MetadataManager:
                 metadata.summary,
                 metadata.summary_generated_at.isoformat() if metadata.summary_generated_at else None,
                 json.dumps(metadata.narrative_exports) if metadata.narrative_exports else None,
-                metadata.narrative_export_generated_at.isoformat() if metadata.narrative_export_generated_at else None
+                metadata.narrative_export_generated_at.isoformat() if metadata.narrative_export_generated_at else None,
+                metadata.fidelity_strategy_json,
+                metadata.fidelity_distribution,
+                metadata.actual_tokens_used,
+                metadata.token_budget_compliance,
+                metadata.fidelity_efficiency_score
             ))
 
         conn.commit()
@@ -657,6 +736,13 @@ class MetadataManager:
             summary_generated_at=datetime.fromisoformat(row[19]) if len(row) > 19 and row[19] else None,
             narrative_exports=narrative_exports,
             narrative_export_generated_at=datetime.fromisoformat(row[21]) if len(row) > 21 and row[21] else None,
+            # M1+M17: Database v2 - Fidelity metrics
+            schema_version=row[22] if len(row) > 22 else "1.0",
+            fidelity_strategy_json=row[23] if len(row) > 23 else None,
+            fidelity_distribution=row[24] if len(row) > 24 else None,
+            actual_tokens_used=row[25] if len(row) > 25 else None,
+            token_budget_compliance=row[26] if len(row) > 26 else None,
+            fidelity_efficiency_score=row[27] if len(row) > 27 else None,
             mechanisms_used=mechanisms_used
         )
 

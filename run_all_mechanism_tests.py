@@ -23,6 +23,7 @@ import sys
 import subprocess
 import argparse
 import time
+import json
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Set
@@ -46,6 +47,60 @@ if os.getenv("OXEN_API_KEY") and not os.getenv("OXEN_API_TOKEN"):
     os.environ["OXEN_API_TOKEN"] = os.environ["OXEN_API_KEY"]
 
 
+def _print_narrative_excerpt(run_id: str, world_id: str):
+    """Print narrative excerpt from JSON file for monitoring visibility"""
+    try:
+        # Look for narrative JSON file
+        datasets_dir = Path("datasets") / world_id
+        narrative_files = list(datasets_dir.glob(f"narrative_{run_id}.json"))
+
+        if not narrative_files:
+            return  # No narrative file yet
+
+        narrative_file = narrative_files[0]
+        with open(narrative_file) as f:
+            narrative_data = json.load(f)
+
+        # Extract sample content
+        timepoints = narrative_data.get("timepoints", [])
+        if not timepoints:
+            return
+
+        # Print first and last timepoint summaries
+        print(f"\n   📖 Narrative Excerpt:")
+
+        # First timepoint
+        first_tp = timepoints[0]
+        print(f"   ├─ T0: {first_tp.get('timestamp', 'N/A')} - {first_tp.get('title', 'Untitled')}")
+        if first_tp.get('scene'):
+            scene_text = first_tp['scene'][:150].replace('\n', ' ')
+            print(f"   │  Scene: {scene_text}...")
+
+        # Last timepoint (if different)
+        if len(timepoints) > 1:
+            last_tp = timepoints[-1]
+            print(f"   └─ T{len(timepoints)-1}: {last_tp.get('timestamp', 'N/A')} - {last_tp.get('title', 'Untitled')}")
+            if last_tp.get('scene'):
+                scene_text = last_tp['scene'][:150].replace('\n', ' ')
+                print(f"      Scene: {scene_text}...")
+
+        # Sample dialog if available
+        for tp in timepoints[:2]:  # Check first 2 timepoints
+            dialogs = tp.get('dialogs', [])
+            if dialogs:
+                first_dialog = dialogs[0]
+                speaker = first_dialog.get('speaker', 'Unknown')
+                text = first_dialog.get('text', '')[:100].replace('\n', ' ')
+                print(f"   💬 Sample Dialog ({speaker}): \"{text}...\"")
+                break
+
+        print()  # Empty line for readability
+
+    except Exception as e:
+        # Silently fail - narrative excerpt is nice-to-have, not critical
+        pass
+
+
 def confirm_expensive_run(mode: str, min_cost: float, max_cost: float, runtime_min: int) -> bool:
     """
     Ask user to confirm expensive test runs.
@@ -66,6 +121,13 @@ def confirm_expensive_run(mode: str, min_cost: float, max_cost: float, runtime_m
     print(f"Estimated Cost: ${min_cost:.0f}-${max_cost:.0f}")
     print(f"Estimated Runtime: {runtime_min} minutes")
     print()
+
+    # Check if auto-confirm is enabled via environment variable
+    # This allows monitoring systems to bypass the interactive prompt
+    if os.getenv("TIMEPOINT_AUTO_CONFIRM", "").lower() in ["1", "true", "yes"]:
+        print("✓ AUTO-CONFIRMED (TIMEPOINT_AUTO_CONFIRM environment variable set)")
+        print("✓ Starting test run...")
+        return True
 
     response = input("Do you want to proceed? [y/N]: ").strip().lower()
 
@@ -134,6 +196,13 @@ def list_modes():
     print("    ALL portal Timepoint variants (standard + quick + standard + thorough)")
 
     print("\n" + "="*80)
+    print("🚀 ULTRA MODE (--ultra-all)")
+    print("  Templates: 64 | Cost: $176-352 | Runtime: 301-468 min")
+    print("  Run EVERYTHING: quick + full + timepoint corporate + all portal modes")
+    print("  Complete system validation across all 17 mechanisms")
+    print("="*80)
+
+    print("\n" + "="*80)
     print("💡 TIP: Use --skip-summaries to reduce cost slightly")
     print("="*80)
     print()
@@ -183,6 +252,9 @@ def run_template(runner, config, name: str, expected_mechanisms: Set[str]) -> Di
             print(f"   Oxen Repo: {oxen_repo_url}")
         if pdf_paths:
             print(f"   PDFs: {len(pdf_paths)} generated")
+
+        # Print narrative excerpt for monitoring visibility
+        _print_narrative_excerpt(result.run_id, config.world_id)
 
         return success
 
@@ -565,6 +637,23 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False):
         print("   Estimated cost: $81-162, Runtime: 156-243 minutes")
         print("   Complete Timepoint corporate analysis: forward causality + backward portal reasoning")
         print()
+    elif mode == 'ultra_all':
+        templates_to_run = (quick_templates + full_templates +
+                           timepoint_corporate_templates +
+                           portal_templates + portal_templates_simjudged_quick + portal_templates_simjudged + portal_templates_simjudged_thorough +
+                           portal_timepoint_templates + portal_timepoint_templates_simjudged_quick + portal_timepoint_templates_simjudged + portal_timepoint_templates_simjudged_thorough)
+        print("🚀 ULTRA MODE: COMPLETE SYSTEM VALIDATION")
+        print("   Running ALL 64 templates across ALL categories:")
+        print("   - 7 quick templates (basic coverage)")
+        print("   - 6 full templates (comprehensive)")
+        print("   - 15 timepoint corporate templates (forward-mode)")
+        print("   - 4 portal templates (backward reasoning)")
+        print("   - 12 portal simjudged variants (all quality levels)")
+        print("   - 5 portal timepoint templates (real founders)")
+        print("   - 15 portal timepoint simjudged variants (all quality levels)")
+        print("   Estimated cost: $176-352, Runtime: 301-468 minutes")
+        print("   Complete validation of all 17 mechanisms + ANDOS scripts")
+        print()
 
     results = {}
     total_cost = 0.0
@@ -579,7 +668,8 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False):
         'portal_timepoint_simjudged_thorough': (30, 60, 65),
         'portal_timepoint_all': (66, 132, 155),
         'timepoint_all': (81, 162, 243),
-        'timepoint_corporate': (15, 30, 60)
+        'timepoint_corporate': (15, 30, 60),
+        'ultra_all': (176, 352, 468)
     }
 
     if mode in expensive_modes:
@@ -877,6 +967,11 @@ if __name__ == "__main__":
         help="Run ALL PORTAL Timepoint tests (standard + all 3 simulation-judged variants = 20 templates total)"
     )
     parser.add_argument(
+        "--ultra-all",
+        action="store_true",
+        help="Run EVERYTHING: all 64 templates across ALL categories (quick + full + timepoint + portal + portal-timepoint = complete system validation)"
+    )
+    parser.add_argument(
         "--skip-summaries",
         action="store_true",
         help="Skip LLM-powered run summaries (reduces cost slightly)"
@@ -905,7 +1000,9 @@ if __name__ == "__main__":
         print("   (Continuing with timepoint_corporate mode...)\n")
 
     # Determine mode
-    if args.portal_test_only:
+    if args.ultra_all:
+        mode = 'ultra_all'
+    elif args.portal_test_only:
         mode = 'portal'
     elif args.portal_simjudged_quick_only:
         mode = 'portal_simjudged_quick'

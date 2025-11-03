@@ -20,6 +20,7 @@ Timepoint-Daedalus enables you to:
 - **Architecture**: ANDOS layer-by-layer training (solves circular dependencies)
 - **Cost Optimization**: 95% reduction via adaptive fidelity + tensor compression
 - **Fault Tolerance**: Global resilience system with checkpointing, circuit breaker, health monitoring
+- **Profile Loading**: Real founder profiles (Sean McDonald, Ken Cavanagh) in Portal Timepoint templates ✅ NEW
 - Real LLM integration with OpenRouter (requires `OPENROUTER_API_KEY`)
 - Complete pipeline: Natural Language → Simulation → Query → Report → Export
 - **Documentation**: [MECHANICS.md](MECHANICS.md) for architecture | [PLAN.md](PLAN.md) for roadmap
@@ -219,7 +220,90 @@ config_simjudged = SimulationConfig.portal_presidential_election_simjudged()
 - Documentation: [MECHANICS.md](MECHANICS.md) - M17 PORTAL Mode section
 - Templates: 16 PORTAL templates (4 scenarios × 4 variants each)
 
-### 3. Adaptive Fidelity
+#### Real Founder Profiles: Portal Timepoint Templates
+
+**NEW**: 5 Portal templates that simulate Timepoint's path to success using real founder profiles (Sean McDonald, Ken Cavanagh) loaded from JSON:
+
+```python
+# Profile-based templates (real founders)
+config = SimulationConfig.portal_timepoint_unicorn()              # $1.2B valuation
+config = SimulationConfig.portal_timepoint_series_a_success()     # $15M Series A
+config = SimulationConfig.portal_timepoint_product_market_fit()   # 10K users
+config = SimulationConfig.portal_timepoint_enterprise_adoption()  # Fortune 500
+config = SimulationConfig.portal_timepoint_founder_transition()   # Leadership evolution
+
+# Each automatically loads:
+# - Sean McDonald (philosophical_technical_polymath archetype)
+# - Ken Cavanagh (psychology_tech_bridge archetype)
+# - 4 additional entities generated via LLM
+```
+
+**Profile Loading Architecture:**
+- Profiles stored in `generation/profiles/founder_archetypes/*.json`
+- Automatically loaded before LLM entity generation
+- Ensures consistent founder characterization across runs
+- Reduces cost by ~33% for entity generation (2 profiles + 4 LLM = 6 total)
+
+**How It Works:**
+```python
+# 1. Config specifies profiles
+entities=EntityConfig(
+    count=6,
+    types=["human"],
+    profiles=[
+        "generation/profiles/founder_archetypes/sean.json",
+        "generation/profiles/founder_archetypes/ken.json"
+    ]
+)
+
+# 2. System loads profiles + generates remaining entities
+# Sean + Ken from JSON → 4 supporting cast from LLM → 6 total entities
+
+# 3. All entities ready for PORTAL simulation
+```
+
+**Validation:** Run `python test_profile_context_passing.py` to verify profile loading works correctly.
+
+**See Also:**
+- Phase 13 Documentation: [PLAN.md](PLAN.md) - Profile Loading System section
+- Profile Schema: `generation/profiles/founder_archetypes/sean.json`, `ken.json`
+
+### 3. Adaptive Fidelity-Temporal Strategy (M1+M17 Integration)
+
+**NEW**: The TemporalAgent co-determines BOTH fidelity allocation (how much detail per timepoint) AND temporal progression (when/how much time passes), optimizing simulation validity vs token efficiency.
+
+**Key Features**:
+- **Planning Modes**: PROGRAMMATIC (pre-planned), ADAPTIVE (runtime decisions), HYBRID (planned + adaptive)
+- **Token Budget Modes**: HARD_CONSTRAINT, SOFT_GUIDANCE, MAX_QUALITY, ADAPTIVE_FALLBACK, ORCHESTRATOR_DIRECTED, USER_CONFIGURED
+- **Fidelity Templates**: minimalist (5k tokens), balanced (15k), dramatic (25k), max_quality (350k), portal_pivots (20k adaptive)
+
+**Musical Score Metaphor**:
+- **Template**: Default fidelity+temporal strategy
+- **TemporalAgent**: "Conductor" that interprets score based on simulation needs
+- **User**: Full customization control
+
+**Example Usage**:
+```python
+from schemas import FidelityPlanningMode, TokenBudgetMode
+from generation.config_schema import SimulationConfig
+
+config = SimulationConfig.portal_timepoint_unicorn()
+
+# Customize fidelity strategy
+config.temporal.fidelity_planning_mode = FidelityPlanningMode.HYBRID
+config.temporal.token_budget = 15000
+config.temporal.token_budget_mode = TokenBudgetMode.SOFT_GUIDANCE
+config.temporal.fidelity_template = "portal_pivots"
+```
+
+**Database v2**: All runs tracked with fidelity metrics (distribution, budget compliance, efficiency score)
+
+**See Also**:
+- Documentation: [MECHANICS.md](MECHANICS.md) - M1+M17 Integration section
+- Migration Guide: [MIGRATION.md](MIGRATION.md) - Database v2 migration
+- Implementation Plan: [HANDOFF.md](HANDOFF.md) - Complete technical specification
+
+### 4. Adaptive Fidelity (Legacy)
 
 Five resolution levels optimize cost vs. detail:
 

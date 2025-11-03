@@ -54,11 +54,39 @@ class PortalState:
     plausibility_score: float = 0.0
     parent_state: Optional['PortalState'] = None  # The state this came from (T+1)
     children_states: List['PortalState'] = field(default_factory=list)  # Possible T-1 states
+    month: int = 1  # Month (1-12), defaults to January for backward compatibility
+    resolution_level: 'ResolutionLevel' = None  # NEW: Fidelity level for this state
 
     def __post_init__(self):
-        """Ensure children_states is a list"""
+        """Ensure children_states is a list, month is valid, resolution defaults to SCENE"""
         if self.children_states is None:
             self.children_states = []
+        # Validate month
+        if not (1 <= self.month <= 12):
+            self.month = 1
+        # Default resolution to SCENE if not specified
+        if self.resolution_level is None:
+            self.resolution_level = ResolutionLevel.SCENE
+
+    def to_year_month_str(self) -> str:
+        """Return human-readable year-month string"""
+        month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        return f"{month_names[self.month-1]} {self.year}"
+
+    def to_total_months(self) -> int:
+        """Convert year + month to total months since year 0"""
+        return self.year * 12 + self.month
+
+    @classmethod
+    def from_total_months(cls, total_months: int, **kwargs) -> 'PortalState':
+        """Create PortalState from total months count"""
+        year = total_months // 12
+        month = total_months % 12
+        if month == 0:  # Handle month 0 → December of previous year
+            year -= 1
+            month = 12
+        return cls(year=year, month=month, **kwargs)
 
 
 @dataclass
@@ -211,21 +239,94 @@ class PortalStrategy:
             raise ValueError(f"Unknown exploration mode: {strategy}")
 
     def _explore_reverse_chronological(self, portal: PortalState) -> List[PortalPath]:
-        """Standard backward stepping: T_n → T_n-1 → ... → T_0"""
+        """Standard backward stepping: T_n → T_n-1 → ... → T_0
+
+        Uses month-based calculation to support sub-year granularity.
+        Ensures smooth temporal progression even when backward_steps > year_range.
+        """
+        from workflows import TemporalAgent
+        from schemas import FidelityPlanningMode
+
         paths = []
         current_states = [portal]
 
-        year_step = (self.config.portal_year - self.config.origin_year) // self.config.backward_steps
+        # NEW CODE - Query TemporalAgent for strategy:
+        # Create temporal agent for this simulation
+        temporal_agent = TemporalAgent(mode=self.config.mode, store=self.store, llm_client=self.llm)
 
-        for step in range(self.config.backward_steps):
+        # Get comprehensive fidelity-temporal strategy
+        strategy = temporal_agent.determine_fidelity_temporal_strategy(
+            config=self.config,
+            context={
+                'portal_state': portal,
+                'origin_year': self.config.origin_year,
+                'entities': portal.entities
+            }
+        )
+
+        print(f"  Fidelity-Temporal Strategy:")
+        print(f"    Planning mode: {strategy.planning_mode}")
+        print(f"    Budget mode: {strategy.budget_mode}")
+        print(f"    Token budget: {strategy.token_budget}")
+        print(f"    Timepoints: {strategy.timepoint_count}")
+        print(f"    Estimated tokens: {strategy.estimated_tokens}")
+        print(f"    Rationale: {strategy.allocation_rationale}")
+
+        # Initialize tracking for month calculation
+        portal_month_total = portal.to_total_months()
+
+        for step in range(strategy.timepoint_count):
             next_states = []
-            step_year = self.config.portal_year - (step + 1) * year_step
 
-            print(f"  Backward step {step+1}/{self.config.backward_steps}: Year {step_year}")
+            # Determine fidelity and temporal step for this iteration
+            if strategy.planning_mode in [FidelityPlanningMode.PROGRAMMATIC]:
+                # Use pre-planned schedule
+                if step < len(strategy.temporal_steps):
+                    month_step = strategy.temporal_steps[step]
+                    target_resolution = strategy.fidelity_schedule[step]
+                else:
+                    # Fallback
+                    month_step = 3
+                    target_resolution = ResolutionLevel.SCENE
+            else:
+                # Query agent for adaptive decision
+                month_step, target_resolution = temporal_agent.determine_next_step_fidelity_and_time(
+                    current_state=current_states[0] if current_states else portal,
+                    strategy=strategy,
+                    step_num=step,
+                    context={
+                        'entities': current_states[0].entities if current_states else portal.entities,
+                        'importance_score': 0.5,  # TODO: compute from state
+                        'state_complexity': 0.5,  # TODO: compute from state
+                        'pivot_detected': False  # TODO: detect pivot points
+                    }
+                )
+
+            # Calculate target month count
+            if step == 0:
+                portal_month_total = portal.to_total_months()
+            step_month_total = portal_month_total - month_step
+            portal_month_total = step_month_total  # Update for next iteration
+
+            # Convert to year and month
+            step_year = step_month_total // 12
+            step_month = step_month_total % 12
+            if step_month == 0:  # Handle month 0 → December of previous year
+                step_year -= 1
+                step_month = 12
+
+            # Create temporary state for logging
+            temp_state = PortalState(year=step_year, month=step_month, description="", entities=[], world_state={})
+            print(f"  Backward step {step+1}/{strategy.timepoint_count}: {temp_state.to_year_month_str()} @ {target_resolution}")
 
             for state in current_states:
                 # Generate N candidate antecedents for this state
-                antecedents = self._generate_antecedents(state, target_year=step_year)
+                antecedents = self._generate_antecedents(
+                    state,
+                    target_year=step_year,
+                    target_month=step_month,
+                    target_resolution=target_resolution  # NEW PARAMETER
+                )
 
                 # Score and filter
                 scored = self._score_antecedents(antecedents, state)
@@ -265,6 +366,8 @@ class PortalStrategy:
         self,
         current_state: PortalState,
         target_year: int = None,
+        target_month: int = None,
+        target_resolution: ResolutionLevel = None,  # NEW
         count: int = None
     ) -> List[PortalState]:
         """
@@ -276,6 +379,8 @@ class PortalStrategy:
         Args:
             current_state: The consequent state to work backward from
             target_year: Target year for antecedent states
+            target_month: Target month (1-12) for antecedent states
+            target_resolution: Target fidelity level for antecedent states
             count: Number of candidates to generate
 
         Returns:
@@ -283,11 +388,12 @@ class PortalStrategy:
         """
         count = count or self.config.candidate_antecedents_per_step
         target_year = target_year or (current_state.year - 1)
+        target_month = target_month or 1  # Default to January
 
         # If no LLM client, fall back to placeholder
         if not self.llm:
             print("    ⚠️  No LLM client available, using placeholder antecedents")
-            return self._generate_placeholder_antecedents(current_state, target_year, count)
+            return self._generate_placeholder_antecedents(current_state, target_year, target_month, target_resolution, count)
 
         # Build LLM prompt for antecedent generation
         system_prompt = "You are an expert at backward temporal reasoning and counterfactual analysis."
@@ -298,26 +404,31 @@ class PortalStrategy:
         if entity_names:
             entity_summary += f" (including {', '.join(entity_names[:5])})"
 
+        # Create human-readable target time string
+        month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        target_time_str = f"{month_names[target_month-1]} {target_year}"
+
         user_prompt = f"""Generate {count} DIVERSE and DISTINCT plausible antecedent states that could naturally lead to this consequent state.
 
-CONSEQUENT STATE (Year {current_state.year}):
+CONSEQUENT STATE ({current_state.to_year_month_str()}):
 {current_state.description}
 
 Entities: {entity_summary}
 World Context: {current_state.world_state}
 
-TARGET YEAR FOR ANTECEDENTS: {target_year}
+TARGET TIME FOR ANTECEDENTS: {target_time_str}
 
 INSTRUCTIONS:
-1. Generate {count} DIFFERENT possible states for year {target_year}
+1. Generate {count} DIFFERENT possible states for {target_time_str}
 2. Each should represent a distinct path/strategy/decision that could lead to the consequent
 3. Vary the approaches: some gradual, some pivotal moments, some lucky breaks
 4. Ensure each is historically/causally plausible
 5. Consider: entity capabilities, resource constraints, time requirements, external events
 
 For EACH antecedent, provide:
-- description: Detailed narrative of what's happening in {target_year} (2-3 sentences)
-- key_events: Array of 2-4 specific events that occurred this year
+- description: Detailed narrative of what's happening in {target_time_str} (2-3 sentences)
+- key_events: Array of 2-4 specific events that occurred at this time
 - entity_changes: Dict mapping entity names to how they changed (skills, relationships, resources)
 - world_context: Dict of contextual factors (economy, politics, technology, culture)
 - causal_link: 1-2 sentence explanation of how this leads to the consequent
@@ -331,7 +442,7 @@ Return as JSON with an "antecedents" array containing {count} antecedent objects
             class AntecedentSchema(BaseModel):
                 description: str
                 key_events: List[str]
-                entity_changes: Dict[str, str]
+                entity_changes: Dict[str, Any]  # Changed from Dict[str, str] to accept nested dicts
                 world_context: Dict[str, Any]
                 causal_link: str
 
@@ -357,6 +468,8 @@ Return as JSON with an "antecedents" array containing {count} antecedent objects
                 # Create antecedent state
                 state = PortalState(
                     year=target_year,
+                    month=target_month,
+                    resolution_level=target_resolution or ResolutionLevel.SCENE,  # NEW
                     description=data.description,
                     entities=current_state.entities.copy(),  # Start with same entities
                     world_state=data.world_context,
@@ -375,7 +488,7 @@ Return as JSON with an "antecedents" array containing {count} antecedent objects
             if len(antecedents) < count:
                 print(f"    ⚠️  LLM returned {len(antecedents)}/{count} antecedents, padding with placeholders")
                 placeholders = self._generate_placeholder_antecedents(
-                    current_state, target_year, count - len(antecedents)
+                    current_state, target_year, target_month, target_resolution, count - len(antecedents)
                 )
                 antecedents.extend(placeholders)
 
@@ -384,19 +497,23 @@ Return as JSON with an "antecedents" array containing {count} antecedent objects
         except Exception as e:
             print(f"    ⚠️  LLM generation failed: {e}")
             print(f"    Falling back to placeholder antecedents")
-            return self._generate_placeholder_antecedents(current_state, target_year, count)
+            return self._generate_placeholder_antecedents(current_state, target_year, target_month, target_resolution, count)
 
     def _generate_placeholder_antecedents(
         self,
         current_state: PortalState,
         target_year: int,
-        count: int
+        target_month: int,
+        target_resolution: ResolutionLevel = None,  # NEW
+        count: int = 1
     ) -> List[PortalState]:
         """Generate placeholder antecedents when LLM is unavailable"""
         antecedents = []
         for i in range(count):
             antecedent = PortalState(
                 year=target_year,
+                month=target_month,
+                resolution_level=target_resolution or ResolutionLevel.SCENE,  # NEW
                 description=f"Antecedent {i+1} for {current_state.description}",
                 entities=current_state.entities.copy(),
                 world_state=current_state.world_state.copy(),
@@ -446,24 +563,44 @@ Return as JSON with an "antecedents" array containing {count} antecedent objects
         max_entities = self.config.simulation_max_entities
         active_entities = candidate_state.entities[:max_entities] if candidate_state.entities else []
 
+        # Calculate month step size based on backward_steps configuration
+        # This ensures forward simulation stepping matches backward simulation stepping
+        portal_month_total = self.config.portal_year * 12 + 1
+        origin_month_total = self.config.origin_year * 12 + 1
+        total_months = portal_month_total - origin_month_total
+        month_step = max(1, total_months // self.config.backward_steps)
+
         # Simulate forward steps
         for step in range(steps):
             current = simulated_states[-1]
-            next_year = current.year + 1
+
+            # Calculate next time point using month-based stepping
+            current_month_total = current.to_total_months()
+            next_month_total = current_month_total + month_step
+            next_year = next_month_total // 12
+            next_month = next_month_total % 12
+            if next_month == 0:  # Handle month 0 → December of previous year
+                next_year -= 1
+                next_month = 12
 
             # Generate next state description using LLM
             if self.llm:
                 try:
-                    next_state_description = self._generate_forward_state(current, next_year)
+                    next_state_description = self._generate_forward_state(current, next_year, next_month)
                 except Exception as e:
                     print(f"      ⚠️  Forward state generation failed: {e}")
-                    next_state_description = f"Year {next_year}: Continuation of {current.description[:50]}..."
+                    month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+                    next_time_str = f"{month_names[next_month-1]} {next_year}"
+                    next_state_description = f"{next_time_str}: Continuation of {current.description[:50]}..."
             else:
-                next_state_description = f"Year {next_year}: Continuation of {current.description[:50]}..."
+                month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+                next_time_str = f"{month_names[next_month-1]} {next_year}"
+                next_state_description = f"{next_time_str}: Continuation of {current.description[:50]}..."
 
             # Create next state
             next_state = PortalState(
                 year=next_year,
+                month=next_month,
                 description=next_state_description,
                 entities=active_entities.copy(),
                 world_state=current.world_state.copy(),
@@ -499,18 +636,24 @@ Return as JSON with an "antecedents" array containing {count} antecedent objects
             "simulation_end_year": simulated_states[-1].year if simulated_states else candidate_state.year
         }
 
-    def _generate_forward_state(self, current_state: PortalState, next_year: int) -> str:
+    def _generate_forward_state(self, current_state: PortalState, next_year: int, next_month: int) -> str:
         """Generate description of next state in forward simulation"""
         system_prompt = "You are an expert at forward temporal simulation and causal reasoning."
 
-        user_prompt = f"""Given this state, generate a plausible description of what happens in the next year.
+        # Create human-readable time strings
+        month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        current_time_str = current_state.to_year_month_str()
+        next_time_str = f"{month_names[next_month-1]} {next_year}"
 
-CURRENT STATE (Year {current_state.year}):
+        user_prompt = f"""Given this state, generate a plausible description of what happens at the next time point.
+
+CURRENT STATE ({current_time_str}):
 {current_state.description}
 
 World Context: {current_state.world_state}
 
-Generate a concise (2-3 sentences) description of what happens in year {next_year}.
+Generate a concise (2-3 sentences) description of what happens in {next_time_str}.
 Consider:
 - Natural progression of events from current state
 - Realistic timeframes for change
@@ -529,7 +672,7 @@ Return only the description text, no extra formatting."""
             )
             return response.content.strip()
         except:
-            return f"Year {next_year}: Natural continuation of events from {current_state.year}"
+            return f"{next_time_str}: Natural continuation of events from {current_time_str}"
 
     def _generate_simulation_dialog(
         self,
@@ -546,9 +689,9 @@ Return only the description text, no extra formatting."""
 
         prompt = f"""Generate a brief 2-3 turn dialog between entities during this transition.
 
-FROM (Year {current_state.year}): {current_state.description[:200]}
+FROM ({current_state.to_year_month_str()}): {current_state.description[:200]}
 
-TO (Year {next_state.year}): {next_state.description[:200]}
+TO ({next_state.to_year_month_str()}): {next_state.description[:200]}
 
 Participants: {', '.join(entity_names[:3])}
 
@@ -689,7 +832,7 @@ Rate each candidate 0.0-1.0 where:
             candidate_block = f"""
 CANDIDATE {i+1}:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Antecedent Year: {candidate_year}
+Antecedent Time: {candidate.to_year_month_str()}
 Antecedent State: {candidate_desc[:300]}
 
 Forward Simulation:
@@ -711,7 +854,7 @@ Causal Link: {candidate.world_state.get('causal_link', 'Not specified')}
         user_prompt = f"""Evaluate the realism of these {len(candidate_antecedents)} backward temporal paths.
 
 TARGET STATE (What we need to reach):
-Year: {consequent_state.year}
+Time: {consequent_state.to_year_month_str()}
 Description: {consequent_state.description}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
