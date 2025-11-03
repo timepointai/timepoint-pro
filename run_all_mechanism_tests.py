@@ -50,6 +50,8 @@ if os.getenv("OXEN_API_KEY") and not os.getenv("OXEN_API_TOKEN"):
 def _print_narrative_excerpt(run_id: str, world_id: str):
     """Print narrative excerpt from JSON file for monitoring visibility"""
     try:
+        import json  # Import inside function to avoid any import order issues
+
         # Look for narrative JSON file
         datasets_dir = Path("datasets") / world_id
         narrative_files = list(datasets_dir.glob(f"narrative_{run_id}.json"))
