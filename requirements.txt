@@ -4,8 +4,9 @@ omegaconf>=2.3.0
 pydantic>=2.10.0
 fastapi
 logfire
-reportlab 
+reportlab
 oxenai
+python-dotenv>=1.0.0
 
 
 # LLM and AI
@@ -21,7 +22,7 @@ networkx>=3.4.2
 sqlmodel>=0.0.22
 
 # Scientific computing and ML
-numpy>=2.2.1
+numpy>=1.26,<2.0  # Keep <2.0 for matplotlib/numba compatibility
 scipy>=1.15.0
 scikit-learn>=1.6.1
 
