@@ -1,296 +1,400 @@
 #!/usr/bin/env python3
 """
-demo_orchestrator.py - Demonstration of OrchestratorAgent Usage
+demo_orchestrator.py - Generate Real Simulations from Natural Language
 
-This script demonstrates how to use the OrchestratorAgent to automatically
-generate complete scene specifications from natural language descriptions.
+This script generates complete simulations with REAL LLM calls from natural language.
 
 Usage:
-    # Dry run mode (for testing, no API calls):
-    python demo_orchestrator.py --dry-run
+    # Simple - use your own prompt:
+    python demo_orchestrator.py --event "simulate a board meeting about a merger"
 
-    # Real LLM mode (requires OPENROUTER_API_KEY in .env):
-    python demo_orchestrator.py
+    # With custom settings:
+    python demo_orchestrator.py --event "emergency crisis meeting" --entities 5 --timepoints 3
 
-    # Custom event:
-    python demo_orchestrator.py --event "simulate the signing of the magna carta"
+    # Test mode (no API costs):
+    python demo_orchestrator.py --event "your prompt" --dry-run
+
+Requirements:
+    - OPENROUTER_API_KEY in .env file (get from https://openrouter.ai/keys)
+    - Estimated cost per run: $0.05-0.20 depending on complexity
 """
 
 import os
+import sys
+import json
 import argparse
+from pathlib import Path
+from datetime import datetime
 from dotenv import load_dotenv
 
-from orchestrator import OrchestratorAgent, simulate_event
-from llm import LLMClient
+from orchestrator import simulate_event
+from llm_v2 import LLMClient
 from storage import GraphStore
 
 # Load environment variables
 load_dotenv()
 
 
-def demo_basic_usage(dry_run=True):
-    """Demonstrate basic orchestrator usage"""
-    print("\n" + "="*70)
-    print("DEMO 1: Basic Orchestrator Usage")
-    print("="*70)
+def run_simulation(event_description: str, max_entities: int = 4, max_timepoints: int = 3,
+                   temporal_mode: str = "pearl", dry_run: bool = False, save_results: bool = True):
+    """
+    Run a complete simulation from natural language description.
+
+    Args:
+        event_description: Natural language description of what to simulate
+        max_entities: Maximum number of entities/characters (1-20)
+        max_timepoints: Maximum number of timepoints (1-10)
+        temporal_mode: Temporal causality mode (pearl, directorial, cyclical, branching)
+        dry_run: If True, use mock data (no API costs)
+        save_results: If True, save results to output directory
+
+    Returns:
+        dict: Simulation results
+    """
+
+    # Header
+    print("\n" + "="*80)
+    print("  TIMEPOINT-DAEDALUS: Natural Language Simulation")
+    print("="*80)
+
+    # Check API key
+    if not dry_run:
+        api_key = os.getenv("OPENROUTER_API_KEY")
+        if not api_key:
+            print("\n❌ ERROR: OPENROUTER_API_KEY not set")
+            print("\nTo use real LLM calls:")
+            print("  1. Get API key from: https://openrouter.ai/keys")
+            print("  2. Add to .env file: OPENROUTER_API_KEY=your_key_here")
+            print("  3. Run again")
+            print("\nOr use --dry-run for testing without API calls")
+            sys.exit(1)
 
     # Setup
-    api_key = os.getenv("OPENROUTER_API_KEY", "test_key")
-    llm_client = LLMClient(api_key=api_key, dry_run=dry_run)
-    store = GraphStore("sqlite:///demo_orchestrator.db")
+    print(f"\n📝 Event Description:")
+    print(f"   {event_description}")
+    print(f"\n⚙️  Configuration:")
+    print(f"   Max Entities: {max_entities}")
+    print(f"   Max Timepoints: {max_timepoints}")
+    print(f"   Temporal Mode: {temporal_mode}")
+    print(f"   Mode: {'🧪 DRY RUN (mock data)' if dry_run else '🔴 REAL LLM (API costs)'}")
 
-    # Create orchestrator
-    orchestrator = OrchestratorAgent(llm_client, store)
+    if not dry_run:
+        print(f"\n💰 Estimated cost: $0.05-0.20 depending on complexity")
+        response = input("\nContinue? [y/N]: ").strip().lower()
+        if response not in ['y', 'yes']:
+            print("❌ Cancelled")
+            sys.exit(0)
 
-    # Orchestrate a scene
-    event_description = "simulate the constitutional convention in the united states"
+    # Initialize
+    print("\n" + "-"*80)
+    print("Initializing components...")
+    print("-"*80)
 
-    print(f"\n📝 Event: {event_description}")
-    print(f"🔧 Mode: {'DRY RUN (mock data)' if dry_run else 'REAL LLM'}\n")
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
 
-    result = orchestrator.orchestrate(
-        event_description,
-        context={
-            "temporal_mode": "pearl",
-            "max_entities": 8,
-            "max_timepoints": 5
-        },
-        save_to_db=True
-    )
+    # LLM client
+    if dry_run:
+        api_key = "test_key"
+    else:
+        api_key = os.getenv("OPENROUTER_API_KEY")
+
+    llm_client = LLMClient(api_key=api_key)
+
+    # Verify mode
+    if llm_client.dry_run and not dry_run:
+        print("⚠️  WARNING: LLM client in dry_run mode despite --real flag")
+        print("   Set LLM_SERVICE_ENABLED=true in .env for real calls")
+
+    print(f"✓ LLM Client: {llm_client.default_model}")
+
+    # Storage
+    db_path = f"output/simulations/sim_{timestamp}.db"
+    Path("output/simulations").mkdir(parents=True, exist_ok=True)
+    store = GraphStore(f"sqlite:///{db_path}")
+    print(f"✓ Storage: {db_path}")
+
+    # Run simulation
+    print("\n" + "-"*80)
+    print("Generating simulation...")
+    print("-"*80)
+    print("\n⏳ This will take 1-3 minutes for REAL mode, ~5 seconds for DRY RUN...")
+
+    start_time = datetime.utcnow()
+
+    try:
+        result = simulate_event(
+            event_description,
+            llm_client,
+            store,
+            context={
+                "max_entities": max_entities,
+                "max_timepoints": max_timepoints,
+                "temporal_mode": temporal_mode
+            },
+            save_to_db=True
+        )
+    except Exception as e:
+        print(f"\n❌ ERROR during simulation: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+    end_time = datetime.utcnow()
+    elapsed = (end_time - start_time).total_seconds()
+
+    # Extract results
+    spec = result['specification']
+    entities = result['entities']
+    timepoints = result['timepoints']
+    graph = result['graph']
+    exposure_events = result['exposure_events']
 
     # Display results
-    spec = result["specification"]
-    print("\n" + "-"*70)
-    print("RESULTS:")
-    print("-"*70)
-    print(f"Scene Title: {spec.scene_title}")
-    print(f"Description: {spec.scene_description}")
-    print(f"Location: {spec.temporal_scope['location']}")
-    print(f"Time Period: {spec.temporal_scope['start_date']} → {spec.temporal_scope['end_date']}")
-    print(f"Temporal Mode: {spec.temporal_mode}")
+    print("\n" + "="*80)
+    print("  RESULTS")
+    print("="*80)
 
-    print(f"\nEntities ({len(result['entities'])}):")
-    for entity in result['entities'][:5]:  # Show first 5
-        print(f"  - {entity.entity_id} ({entity.entity_type}, {entity.entity_metadata.get('role')})")
-        print(f"    Resolution: {entity.resolution_level.value}")
-        cognitive = entity.entity_metadata.get("cognitive_tensor", {})
-        knowledge = cognitive.get("knowledge_state", [])
-        print(f"    Initial knowledge: {len(knowledge)} items")
+    print(f"\n📋 Scene: {spec.scene_title}")
+    print(f"   {spec.scene_description[:150]}...")
+    print(f"\n   Location: {spec.temporal_scope.get('location', 'Not specified')}")
+    print(f"   Period: {spec.temporal_scope.get('start_date', 'N/A')} → {spec.temporal_scope.get('end_date', 'N/A')}")
+    print(f"   Mode: {spec.temporal_mode}")
 
-    print(f"\nTimepoints ({len(result['timepoints'])}):")
-    for tp in result['timepoints']:
-        print(f"  - {tp.timepoint_id}: {tp.event_description}")
-        print(f"    Timestamp: {tp.timestamp}")
-        print(f"    Entities present: {len(tp.entities_present)}")
-        print(f"    Causal parent: {tp.causal_parent or 'None (root)'}")
+    print(f"\n👥 Entities: {len(entities)}")
+    for i, entity in enumerate(entities, 1):
+        print(f"\n   {i}. {entity.entity_id}")
+        role = entity.entity_metadata.get('role', 'Unknown')
+        print(f"      Role: {role}")
+        print(f"      Type: {entity.entity_type}")
+        print(f"      Resolution: {entity.resolution_level.value}")
 
-    print(f"\nRelationship Graph:")
-    print(f"  Nodes: {result['graph'].number_of_nodes()}")
-    print(f"  Edges: {result['graph'].number_of_edges()}")
+        # Show knowledge
+        cognitive = entity.entity_metadata.get('cognitive_tensor', {})
+        knowledge = cognitive.get('knowledge_state', [])
+        if knowledge:
+            print(f"      Knowledge: {len(knowledge)} items")
+            print(f"         Sample: {knowledge[0][:60]}...")
 
-    print(f"\nExposure Events:")
-    total_events = sum(len(events) for events in result['exposure_events'].values())
-    print(f"  Total knowledge items seeded: {total_events}")
+        # Show personality
+        personality = cognitive.get('personality_traits', [])
+        if personality:
+            print(f"      Personality: {', '.join(personality[:3])}")
 
-    print(f"\nTemporal Agent:")
-    print(f"  Mode: {result['temporal_agent'].mode.value}")
+    print(f"\n⏱️  Timepoints: {len(timepoints)}")
+    for i, tp in enumerate(timepoints, 1):
+        print(f"\n   {i}. {tp.timepoint_id}")
+        print(f"      Event: {tp.event_description}")
+        print(f"      Time: {tp.timestamp}")
+        print(f"      Entities: {len(tp.entities_present)}")
+        if tp.causal_parent:
+            print(f"      Caused by: {tp.causal_parent}")
+
+    print(f"\n🔗 Relationships: {graph.number_of_edges()}")
+    if graph.number_of_edges() > 0:
+        for source, target, data in list(graph.edges(data=True))[:3]:
+            rel = data.get('relationship', 'connected')
+            print(f"   {source} --[{rel}]--> {target}")
+        if graph.number_of_edges() > 3:
+            print(f"   ... and {graph.number_of_edges() - 3} more")
+
+    total_knowledge = sum(len(events) for events in exposure_events.values())
+    print(f"\n📊 Knowledge Items Seeded: {total_knowledge}")
+
+    # Cost tracking
+    if hasattr(llm_client, 'service'):
+        stats = llm_client.service.get_statistics()
+        total_cost = stats.get('total_cost', 0.0)
+        total_tokens = stats.get('total_tokens', 0)
+        total_calls = stats.get('total_calls', 0)
+    else:
+        total_cost = getattr(llm_client, 'cost', 0.0)
+        total_tokens = getattr(llm_client, 'token_count', 0)
+        total_calls = 0
+
+    print(f"\n💰 Cost: ${total_cost:.4f}")
+    print(f"   API Calls: {total_calls}")
+    print(f"   Tokens: {total_tokens:,}")
+    print(f"   Time: {elapsed:.1f}s")
+
+    # Save results
+    if save_results:
+        output_dir = Path("output/simulations")
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Summary JSON
+        summary_file = output_dir / f"summary_{timestamp}.json"
+        summary = {
+            "metadata": {
+                "timestamp": timestamp,
+                "event_description": event_description,
+                "elapsed_seconds": elapsed,
+                "cost_usd": total_cost,
+                "tokens": total_tokens,
+                "api_calls": total_calls,
+                "dry_run": dry_run
+            },
+            "configuration": {
+                "max_entities": max_entities,
+                "max_timepoints": max_timepoints,
+                "temporal_mode": temporal_mode
+            },
+            "scene": {
+                "title": spec.scene_title,
+                "description": spec.scene_description,
+                "location": spec.temporal_scope.get('location'),
+                "temporal_mode": spec.temporal_mode
+            },
+            "entities": [
+                {
+                    "entity_id": e.entity_id,
+                    "type": e.entity_type,
+                    "role": e.entity_metadata.get('role'),
+                    "resolution": e.resolution_level.value,
+                    "knowledge_count": len(e.entity_metadata.get('cognitive_tensor', {}).get('knowledge_state', []))
+                }
+                for e in entities
+            ],
+            "timepoints": [
+                {
+                    "timepoint_id": tp.timepoint_id,
+                    "event": tp.event_description,
+                    "timestamp": tp.timestamp.isoformat(),
+                    "entities_present": tp.entities_present,
+                    "causal_parent": tp.causal_parent
+                }
+                for tp in timepoints
+            ],
+            "graph": {
+                "nodes": graph.number_of_nodes(),
+                "edges": graph.number_of_edges()
+            }
+        }
+
+        with open(summary_file, 'w') as f:
+            json.dump(summary, f, indent=2, default=str)
+
+        # Entity details
+        entity_file = output_dir / f"entities_{timestamp}.jsonl"
+        with open(entity_file, 'w') as f:
+            for entity in entities:
+                f.write(json.dumps({
+                    "entity_id": entity.entity_id,
+                    "entity_type": entity.entity_type,
+                    "timepoint": entity.timepoint,
+                    "resolution_level": entity.resolution_level.value,
+                    "metadata": entity.entity_metadata
+                }, default=str) + '\n')
+
+        print(f"\n📁 Results saved:")
+        print(f"   Database: {db_path}")
+        print(f"   Summary: {summary_file}")
+        print(f"   Entities: {entity_file}")
+
+    print("\n" + "="*80)
+    print("  ✅ SIMULATION COMPLETE")
+    print("="*80)
+
+    if not dry_run:
+        print(f"\n💡 You generated:")
+        print(f"   • {len(entities)} entities with knowledge and personalities")
+        print(f"   • {len(timepoints)} timepoints with causal relationships")
+        print(f"   • {total_knowledge} knowledge items across the simulation")
+        print(f"\n   Total cost: ${total_cost:.4f}")
 
     return result
 
 
-def demo_convenience_function(dry_run=True):
-    """Demonstrate convenience function usage"""
-    print("\n" + "="*70)
-    print("DEMO 2: Convenience Function Usage")
-    print("="*70)
-
-    api_key = os.getenv("OPENROUTER_API_KEY", "test_key")
-    llm_client = LLMClient(api_key=api_key, dry_run=dry_run)
-    store = GraphStore("sqlite:///demo_orchestrator.db")
-
-    print("\n📝 Using simulate_event() convenience function")
-    print(f"🔧 Mode: {'DRY RUN (mock data)' if dry_run else 'REAL LLM'}\n")
-
-    result = simulate_event(
-        "simulate a brief historical meeting",
-        llm_client,
-        store,
-        context={"max_entities": 4, "max_timepoints": 2},
-        save_to_db=False
-    )
-
-    print(f"\n✓ Scene generated: {result['specification'].scene_title}")
-    print(f"  - {len(result['entities'])} entities")
-    print(f"  - {len(result['timepoints'])} timepoints")
-
-
-def demo_component_by_component(dry_run=True):
-    """Demonstrate step-by-step component usage"""
-    print("\n" + "="*70)
-    print("DEMO 3: Component-by-Component Usage")
-    print("="*70)
-
-    from orchestrator import (
-        SceneParser,
-        KnowledgeSeeder,
-        RelationshipExtractor,
-        ResolutionAssigner
-    )
-
-    api_key = os.getenv("OPENROUTER_API_KEY", "test_key")
-    llm_client = LLMClient(api_key=api_key, dry_run=dry_run)
-    store = GraphStore("sqlite:///demo_orchestrator.db")
-
-    print("\n📝 Parsing scene step-by-step")
-    print(f"🔧 Mode: {'DRY RUN (mock data)' if dry_run else 'REAL LLM'}\n")
-
-    # Step 1: Parse scene
-    print("Step 1: Scene Parsing...")
-    parser = SceneParser(llm_client)
-    spec = parser.parse("simulate a royal coronation ceremony")
-    print(f"  ✓ Parsed: {spec.scene_title}")
-
-    # Step 2: Seed knowledge
-    print("\nStep 2: Knowledge Seeding...")
-    seeder = KnowledgeSeeder(store)
-    exposure_events = seeder.seed_knowledge(spec, create_exposure_events=False)
-    print(f"  ✓ Seeded {sum(len(e) for e in exposure_events.values())} knowledge items")
-
-    # Step 3: Build relationship graph
-    print("\nStep 3: Relationship Extraction...")
-    extractor = RelationshipExtractor()
-    graph = extractor.build_graph(spec)
-    print(f"  ✓ Built graph: {graph.number_of_nodes()} nodes, {graph.number_of_edges()} edges")
-
-    # Step 4: Assign resolutions
-    print("\nStep 4: Resolution Assignment...")
-    assigner = ResolutionAssigner()
-    resolutions = assigner.assign_resolutions(spec, graph)
-    print(f"  ✓ Assigned resolutions for {len(resolutions)} entities")
-
-    # Show resolution distribution
-    from collections import Counter
-    dist = Counter(resolutions.values())
-    for level, count in dist.most_common():
-        print(f"    - {level.value}: {count}")
-
-
-def demo_different_temporal_modes(dry_run=True):
-    """Demonstrate different temporal modes"""
-    print("\n" + "="*70)
-    print("DEMO 4: Different Temporal Modes")
-    print("="*70)
-
-    api_key = os.getenv("OPENROUTER_API_KEY", "test_key")
-    llm_client = LLMClient(api_key=api_key, dry_run=dry_run)
-    store = GraphStore("sqlite:///demo_orchestrator.db")
-
-    modes = ["pearl", "directorial", "cyclical"]
-
-    for mode in modes:
-        print(f"\n{'─'*70}")
-        print(f"Testing Temporal Mode: {mode.upper()}")
-        print(f"{'─'*70}")
-
-        result = simulate_event(
-            "simulate a brief historical event",
-            llm_client,
-            store,
-            context={
-                "temporal_mode": mode,
-                "max_entities": 3,
-                "max_timepoints": 2
-            },
-            save_to_db=False
-        )
-
-        print(f"  ✓ Scene: {result['specification'].scene_title}")
-        print(f"  ✓ Temporal Mode: {result['temporal_agent'].mode.value}")
-
-        if mode == "directorial":
-            print("    → Optimized for narrative structure and dramatic tension")
-        elif mode == "cyclical":
-            print("    → Allows prophecy and temporal loops")
-        elif mode == "pearl":
-            print("    → Standard causality (no anachronisms)")
-
-
 def main():
-    """Main demonstration runner"""
-    parser = argparse.ArgumentParser(description="Demonstrate OrchestratorAgent")
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Use dry run mode (no API calls, mock data)"
+    """Main entry point"""
+    parser = argparse.ArgumentParser(
+        description="Generate simulations from natural language",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python demo_orchestrator.py --event "emergency board meeting about bankruptcy"
+  python demo_orchestrator.py --event "apollo 13 crisis" --entities 5 --timepoints 4
+  python demo_orchestrator.py --event "constitutional convention" --mode directorial
+  python demo_orchestrator.py --event "test scenario" --dry-run
+
+Temporal Modes:
+  pearl         Standard causality (default)
+  directorial   Narrative-focused with dramatic tension
+  cyclical      Allows prophecy and time loops
+  branching     Counterfactual what-if scenarios
+        """
     )
+
     parser.add_argument(
         "--event",
         type=str,
-        help="Custom event description to simulate"
+        required=True,
+        help="Natural language description of what to simulate"
     )
+
     parser.add_argument(
-        "--demo",
+        "--entities",
         type=int,
-        choices=[1, 2, 3, 4],
-        help="Run specific demo (1=basic, 2=convenience, 3=components, 4=modes)"
+        default=4,
+        help="Maximum number of entities (1-20, default: 4)"
+    )
+
+    parser.add_argument(
+        "--timepoints",
+        type=int,
+        default=3,
+        help="Maximum number of timepoints (1-10, default: 3)"
+    )
+
+    parser.add_argument(
+        "--mode",
+        type=str,
+        default="pearl",
+        choices=["pearl", "directorial", "cyclical", "branching"],
+        help="Temporal causality mode (default: pearl)"
+    )
+
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Use mock data (no API costs)"
+    )
+
+    parser.add_argument(
+        "--no-save",
+        action="store_true",
+        help="Don't save results to files"
     )
 
     args = parser.parse_args()
 
-    print("\n" + "="*70)
-    print("ORCHESTRATOR AGENT DEMONSTRATION")
-    print("="*70)
-    print("\nThe OrchestratorAgent bridges natural language descriptions")
-    print("to fully-specified simulations with entities, timepoints, and graphs.")
-    print("="*70)
+    # Validate parameters
+    if args.entities < 1 or args.entities > 20:
+        print("❌ ERROR: --entities must be between 1 and 20")
+        sys.exit(1)
 
-    if args.event:
-        # Custom event
-        api_key = os.getenv("OPENROUTER_API_KEY", "test_key")
-        llm_client = LLMClient(api_key=api_key, dry_run=args.dry_run)
-        store = GraphStore("sqlite:///demo_orchestrator.db")
+    if args.timepoints < 1 or args.timepoints > 10:
+        print("❌ ERROR: --timepoints must be between 1 and 10")
+        sys.exit(1)
 
-        print(f"\n📝 Custom Event: {args.event}")
-        print(f"🔧 Mode: {'DRY RUN' if args.dry_run else 'REAL LLM'}\n")
-
-        result = simulate_event(
-            args.event,
-            llm_client,
-            store,
-            save_to_db=True
+    # Run simulation
+    try:
+        result = run_simulation(
+            event_description=args.event,
+            max_entities=args.entities,
+            max_timepoints=args.timepoints,
+            temporal_mode=args.mode,
+            dry_run=args.dry_run,
+            save_results=not args.no_save
         )
-
-        print(f"\n✓ Generated: {result['specification'].scene_title}")
-        print(f"  - {len(result['entities'])} entities")
-        print(f"  - {len(result['timepoints'])} timepoints")
-        print(f"  - {result['graph'].number_of_edges()} relationships")
-
-    elif args.demo:
-        # Run specific demo
-        demos = {
-            1: demo_basic_usage,
-            2: demo_convenience_function,
-            3: demo_component_by_component,
-            4: demo_different_temporal_modes
-        }
-        demos[args.demo](dry_run=args.dry_run)
-
-    else:
-        # Run all demos
-        demo_basic_usage(dry_run=args.dry_run)
-        demo_convenience_function(dry_run=args.dry_run)
-        demo_component_by_component(dry_run=args.dry_run)
-        demo_different_temporal_modes(dry_run=args.dry_run)
-
-    print("\n" + "="*70)
-    print("DEMONSTRATION COMPLETE")
-    print("="*70)
-    print("\nNext steps:")
-    print("  1. Set OPENROUTER_API_KEY in .env for real LLM calls")
-    print("  2. Run: python demo_orchestrator.py")
-    print("  3. Try custom events: python demo_orchestrator.py --event 'your event here'")
-    print("  4. Integrate with existing workflows for entity population")
-    print("="*70 + "\n")
+        sys.exit(0)
+    except KeyboardInterrupt:
+        print("\n\n❌ Interrupted by user")
+        sys.exit(1)
+    except Exception as e:
+        print(f"\n❌ ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
 
 
 if __name__ == "__main__":
