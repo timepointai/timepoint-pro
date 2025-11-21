@@ -6,9 +6,11 @@ Tests that the new LLM service works correctly throughout the application.
 """
 
 import sys
-sys.path.insert(0, '/code')
-
 import os
+# Get the project root directory
+project_root = os.path.dirname(os.path.abspath(__file__))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 os.environ['OPENROUTER_API_KEY'] = os.environ.get('OPENROUTER_API_KEY', 'test')
 
 import hydra

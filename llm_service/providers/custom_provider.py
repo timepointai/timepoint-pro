@@ -14,7 +14,11 @@ from llm_service.response_parser import ResponseParser
 
 # Import existing client from llm.py
 import sys
-sys.path.insert(0, '/code')
+import os
+# Get the project root directory
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 from llm import OpenRouterClient, ModelManager
 
 
