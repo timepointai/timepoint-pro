@@ -34,11 +34,21 @@ Timepoint-Daedalus enables you to:
 ```bash
 git clone https://github.com/yourusername/timepoint-daedalus.git
 cd timepoint-daedalus
+
+# Install dependencies using uv (recommended)
+uv pip install -r requirements.txt
+
+# Or use pip if uv is not available
 pip install -r requirements.txt
 
+# Install additional required packages
+uv pip install msgspec
+
 # Optional: Install PDF export support
-pip install reportlab
+uv pip install reportlab
 ```
+
+**Note**: This project uses `uv` for faster package management. Install it with: `pip install uv`
 
 ### Configuration
 
