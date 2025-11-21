@@ -193,3 +193,23 @@ cython_debug/
 
 .claude/settings.local.json
 .claude/*.log
+
+# Large installer packages
+*.pkg
+*.dmg
+*.exe
+*.msi
+
+# Database files
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Site/build output
+dashboards/_site/
+_site/
+
+# Backup files
+*.backup
+*.bak
