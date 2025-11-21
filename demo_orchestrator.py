@@ -101,9 +101,8 @@ def run_simulation(event_description: str, max_entities: int = 4, max_timepoints
     llm_client = LLMClient(api_key=api_key)
 
     # Verify mode
-    if llm_client.dry_run and not dry_run:
-        print("⚠️  WARNING: LLM client in dry_run mode despite --real flag")
-        print("   Set LLM_SERVICE_ENABLED=true in .env for real calls")
+    if dry_run:
+        print("⚠️  DRY RUN MODE: Using mock LLM responses")
 
     print(f"✓ LLM Client: {llm_client.default_model}")
 
@@ -321,6 +320,7 @@ Temporal Modes:
   directorial   Narrative-focused with dramatic tension
   cyclical      Allows prophecy and time loops
   branching     Counterfactual what-if scenarios
+  portal        Backward causal inference from known future state
         """
     )
 
@@ -349,7 +349,7 @@ Temporal Modes:
         "--mode",
         type=str,
         default="pearl",
-        choices=["pearl", "directorial", "cyclical", "branching"],
+        choices=["pearl", "directorial", "cyclical", "branching", "portal"],
         help="Temporal causality mode (default: pearl)"
     )
 
