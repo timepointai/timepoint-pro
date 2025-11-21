@@ -5,7 +5,11 @@ This demonstrates the key features of the new LLM service architecture.
 """
 
 import sys
-sys.path.insert(0, '/code')
+import os
+# Get the project root directory
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 from llm_service import LLMService, LLMServiceConfig
 from llm_service.config import ServiceMode, DefaultParametersConfig, APIKeyConfig
