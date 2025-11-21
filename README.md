@@ -43,10 +43,19 @@ pip install reportlab
 ### Configuration
 
 ```bash
-# Set up your API key
+# 1. Copy the example environment file
+cp .env.example .env
+
+# 2. Edit .env and add your OpenRouter API key
+# Get your API key from: https://openrouter.ai/keys
+# Then update OPENROUTER_API_KEY in the .env file
+
+# Alternatively, set environment variables directly:
 export OPENROUTER_API_KEY=your_key_here
 export LLM_SERVICE_ENABLED=true
 ```
+
+**Important**: The `.env` file is required for `demo_orchestrator.py` to work. Make sure to set your `OPENROUTER_API_KEY` in the `.env` file.
 
 ### Basic Usage
 
