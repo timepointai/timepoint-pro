@@ -8,12 +8,19 @@
 
 ## Current State
 
-**System Status**: ✅ **FULLY OPERATIONAL**
+**System Status**: ✅ **OPERATIONAL** (with setup requirements)
 
 - **All 17 mechanisms tracked** (100% coverage)
 - **Circuit breaker healthy** (CLOSED state)
 - **No blocking errors**
 - **Ready for production use**
+
+**Prerequisites for Running**:
+- ✅ Environment variables must be explicitly exported: `export $(cat .env | xargs)`
+- ✅ Missing dependencies must be installed: `uv pip install msgspec`
+- ✅ API key must be on single line with no embedded newlines
+- ✅ Interactive prompts require auto-confirmation: `echo "y" | python ...`
+- ✅ Hardcoded Docker paths (`/code`) have been migrated to dynamic project root detection
 
 ---
 
@@ -81,23 +88,46 @@ The **SIMPLE** (Simulation Integration Monitor with Parallel LLM Execution) plat
 
 ## Quick Start
 
+### Setup (One-Time)
+
+```bash
+# 1. Install dependencies using uv (recommended)
+uv pip install -r requirements.txt
+uv pip install msgspec  # Required dependency
+
+# Or use pip if uv not available
+pip install -r requirements.txt
+pip install msgspec
+
+# 2. Create .env file with your API key (MUST be single line, no breaks)
+echo 'OPENROUTER_API_KEY=your_key_here' > .env
+```
+
 ### Running Simulations
 
 ```bash
-# Set up environment
-source .env  # Contains OPENROUTER_API_KEY and OXEN_API_KEY
+# 1. Load environment variables (REQUIRED before each session)
+export $(cat .env | xargs)
 
+# Or source directly
+source .env
+
+# 2. Run simulations with auto-confirmation
 # Quick test (9 templates, ~18-27 min, $9-18)
-./run.sh quick
+echo "y" | ./run.sh quick
 
 # With monitoring and chat
-./run.sh --monitor --chat quick
+echo "y" | ./run.sh --monitor --chat quick
 
 # Portal with real founders (5 templates, ~12-18 min, $6-12)
-./run.sh --monitor portal-timepoint
+echo "y" | ./run.sh --monitor portal-timepoint
 
 # Full suite (64 templates, 5-8 hours, $176-352)
-./run.sh ultra
+echo "y" | ./run.sh ultra
+
+# Or use environment variable to auto-confirm
+export TIMEPOINT_AUTO_CONFIRM=1
+./run.sh quick
 ```
 
 ### Available Modes
@@ -111,15 +141,19 @@ source .env  # Contains OPENROUTER_API_KEY and OXEN_API_KEY
 ### Testing Individual Mechanisms
 
 ```bash
-# ANDOS test scripts
-python3.10 test_m5_query_evolution.py
-python3.10 test_m9_missing_witness.py
-python3.10 test_m10_scene_analysis.py
-python3.10 test_m12_alternate_history.py
-python3.10 test_m13_synthesis.py
+# ANDOS test scripts (with auto-confirmation)
+echo "y" | python3.10 test_m5_query_evolution.py
+echo "y" | python3.10 test_m9_missing_witness.py
+echo "y" | python3.10 test_m10_scene_analysis.py
+echo "y" | python3.10 test_m12_alternate_history.py
+echo "y" | python3.10 test_m13_synthesis.py
 
 # Direct mechanism test runner
-python3.10 run_all_mechanism_tests.py --quick
+echo "y" | python3.10 run_all_mechanism_tests.py --quick
+
+# Or set environment variable to skip prompts
+export TIMEPOINT_AUTO_CONFIRM=1
+python3.10 test_m5_query_evolution.py
 ```
 
 ---
@@ -323,16 +357,75 @@ sqlite3 metadata/runs.db "SELECT run_id, fidelity_distribution, token_budget_com
 **Fix**:
 1. Ensure using `python3.10` (not `python` or `python3`)
 2. Check environment: `python3.10 --version`
-3. Reinstall if needed: `pip install -r requirements.txt`
+3. Reinstall if needed: `uv pip install -r requirements.txt`
+4. Install missing dependencies: `uv pip install msgspec`
+
+### Environment Variable Issues
+
+**"OPENROUTER_API_KEY not set"**
+→ Load environment: `export $(cat .env | xargs)` before running
+
+**"Illegal header value" with embedded newlines**
+→ API key has line breaks. Ensure single line in `.env`:
+```bash
+# Correct (single line)
+OPENROUTER_API_KEY=sk-or-v1-your_key_here
+
+# Wrong (has line break)
+OPENROUTER_API_KEY=sk-or-v1-your_key\
+_here
+```
+
+**"EOFError: EOF when reading a line"**
+→ Interactive prompt blocking. Use: `echo "y" | python ...` or set `TIMEPOINT_AUTO_CONFIRM=1`
 
 ### LLM Errors
-**Symptom**: `OpenRouter API error` or `Rate limit exceeded`
 
-**Fix**:
-1. Check API key: `echo $OPENROUTER_API_KEY`
-2. Verify key validity at https://openrouter.ai/keys
-3. Check rate limits in OpenRouter dashboard
-4. Circuit breaker will protect from cascading failures
+**"OpenRouter API error: 401 - User not found"**
+→ Check:
+1. API key loaded: `echo $OPENROUTER_API_KEY`
+2. Key validity at https://openrouter.ai/keys
+3. Environment loaded: `export $(cat .env | xargs)`
+
+**"Rate limit exceeded"**
+→ Check OpenRouter dashboard, circuit breaker will protect from cascading failures
+
+---
+
+## Migration Notes
+
+### Docker to Local Path Migration (Nov 21, 2025)
+
+**Issue**: Hardcoded Docker paths (`/code`) caused import failures when running locally
+
+**Files Fixed**:
+1. `llm_service/providers/custom_provider.py` (line 17)
+2. `test_llm_service_integration.py` (line 9)
+3. `test_orchestrator_simple.py` (line 5)
+4. `test_llm_enhancements_integration.py` (line 13)
+5. `examples/llm_service_demo.py` (line 8)
+
+**Fix Pattern**:
+```python
+# Before (hardcoded Docker path):
+import sys
+sys.path.insert(0, '/code')
+
+# After (dynamic project root):
+import sys
+import os
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+```
+
+**Impact**: System now runs correctly both in Docker containers and local development environments
+
+**Related Issues Fixed**:
+- OpenRouter API 401 "User not found" errors (caused by failed imports)
+- Missing `msgspec` dependency (installed via `uv pip install msgspec`)
+- Environment variable loading (requires explicit `export $(cat .env | xargs)`)
+- Interactive prompt blocking (fixed via `echo "y" |` or `TIMEPOINT_AUTO_CONFIRM=1`)
 
 ---
 

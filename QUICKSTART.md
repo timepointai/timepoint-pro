@@ -17,37 +17,53 @@ That's it! Just describe what you want to simulate in plain English.
 OPENROUTER_API_KEY=your_key_here
 ```
 
-3. **Done!** You're ready to generate simulations.
+3. **Load environment variables** (do this before running):
+```bash
+# Export all variables from .env
+export $(cat .env | xargs)
+
+# Or source the file directly
+source .env
+
+# Or set directly (must be ONE line, no breaks)
+export OPENROUTER_API_KEY="your_key_here"
+```
+
+4. **Done!** You're ready to generate simulations.
+
+**Important**: The API key must be on a **single line** with no line breaks. If you see "Illegal header value" errors, check that your key doesn't have embedded newlines.
 
 ## Examples
 
+**Note**: All commands require environment variables to be loaded first (see Setup above). The `echo "y" |` prefix automatically confirms the cost estimate prompt.
+
 ### Basic Usage
 ```bash
-# Emergency board meeting
-python demo_orchestrator.py --event "emergency board meeting where 4 executives debate whether to accept acquisition offer"
+# Emergency board meeting (auto-confirm with echo "y")
+echo "y" | python demo_orchestrator.py --event "emergency board meeting where 4 executives debate whether to accept acquisition offer"
 
 # Historical event
-python demo_orchestrator.py --event "apollo 13 crisis - the moment they discover the oxygen tank explosion"
+echo "y" | python demo_orchestrator.py --event "apollo 13 crisis - the moment they discover the oxygen tank explosion"
 
 # Fiction scenario
-python demo_orchestrator.py --event "detective interrogates 3 witnesses about a murder"
+echo "y" | python demo_orchestrator.py --event "detective interrogates 3 witnesses about a murder"
 ```
 
 ### With Custom Settings
 ```bash
 # More entities and timepoints
-python demo_orchestrator.py --event "constitutional convention" --entities 8 --timepoints 5
+echo "y" | python demo_orchestrator.py --event "constitutional convention" --entities 8 --timepoints 5
 
 # Different temporal mode (narrative-focused)
-python demo_orchestrator.py --event "shakespearean tragedy" --mode directorial
+echo "y" | python demo_orchestrator.py --event "shakespearean tragedy" --mode directorial
 
 # Branching timeline (what-if scenarios)
-python demo_orchestrator.py --event "cuban missile crisis decision point" --mode branching
+echo "y" | python demo_orchestrator.py --event "cuban missile crisis decision point" --mode branching
 ```
 
 ### Test Without Cost
 ```bash
-# Dry run mode - no API calls, uses mock data
+# Dry run mode - no API calls, uses mock data (no confirmation needed)
 python demo_orchestrator.py --event "test scenario" --dry-run
 ```
 
@@ -106,8 +122,8 @@ The script will show estimated cost and ask for confirmation before running.
 ## Advanced Options
 
 ```bash
-# All options
-python demo_orchestrator.py \
+# All options (use echo "y" | to auto-confirm, or --dry-run to skip)
+echo "y" | python demo_orchestrator.py \
   --event "your description" \
   --entities 5 \              # Max entities (1-20, default: 4)
   --timepoints 4 \            # Max timepoints (1-10, default: 3)
@@ -158,10 +174,23 @@ After generating a simulation:
 ## Troubleshooting
 
 **"OPENROUTER_API_KEY not set"**
-→ Add your API key to `.env` file
+→ Add your API key to `.env` file and load it: `export $(cat .env | xargs)`
+
+**"Illegal header value" with embedded newlines**
+→ Your API key has line breaks. Ensure it's on a single line in `.env` with no line breaks
+→ When exporting manually, use one line: `export OPENROUTER_API_KEY="your_key_here"`
+
+**"EOFError: EOF when reading a line"**
+→ Script is waiting for confirmation prompt. Use `echo "y" | python demo_orchestrator.py ...`
+
+**"ModuleNotFoundError: No module named 'msgspec'"**
+→ Install missing dependency: `uv pip install msgspec`
 
 **"LLM client in dry_run mode"**
-→ Set `LLM_SERVICE_ENABLED=true` in `.env`
+→ Environment variables not loaded. Run: `export $(cat .env | xargs)` before running scripts
+
+**"OpenRouter API error: 401 - User not found"**
+→ API key invalid or not loaded. Verify key in `.env` and export environment variables
 
 **Simulation takes too long**
 → Reduce `--entities` and `--timepoints`

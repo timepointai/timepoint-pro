@@ -60,16 +60,27 @@ cp .env.example .env
 # Get your API key from: https://openrouter.ai/keys
 # Then update OPENROUTER_API_KEY in the .env file
 
+# 3. Load the environment variables (REQUIRED)
+export $(cat .env | xargs)
+
+# Or source the file directly
+source .env
+
 # Alternatively, set environment variables directly:
 export OPENROUTER_API_KEY=your_key_here
 export LLM_SERVICE_ENABLED=true
 ```
 
-**Important**: The `.env` file is required for `demo_orchestrator.py` to work. Make sure to set your `OPENROUTER_API_KEY` in the `.env` file.
+**Important**:
+- The `.env` file must be **explicitly loaded** before running scripts
+- Simply having the file present is not enough - you must export the variables
+- Run `export $(cat .env | xargs)` or `source .env` before each session
+- When setting `OPENROUTER_API_KEY`, ensure it's on a **single line** with no line breaks
 
 ### Basic Usage
 
 ```python
+import os
 from nl_interface import NLConfigGenerator
 from orchestrator import simulate_event
 from llm_v2 import LLMClient
@@ -82,8 +93,12 @@ config, confidence = generator.generate_config(
     "Focus on dialog and decision making."
 )
 
-# 2. Execute simulation
-llm = LLMClient()
+# 2. Execute simulation (requires API key from environment)
+api_key = os.getenv("OPENROUTER_API_KEY")
+if not api_key:
+    raise ValueError("OPENROUTER_API_KEY must be set in environment")
+
+llm = LLMClient(api_key=api_key)
 store = GraphStore("sqlite:///simulations.db")
 
 result = simulate_event(
