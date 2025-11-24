@@ -27,7 +27,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Import test tracker for file monitoring
-pytest_plugins = ['pytest_test_tracker']
+pytest_plugins = ['tests.pytest_test_tracker']
 
 
 # ============================================================================

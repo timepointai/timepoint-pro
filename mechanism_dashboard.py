@@ -42,11 +42,11 @@ MECHANISMS = {
 
 # Test file mapping
 TEST_FILES = {
-    "M5": "test_m5_query_resolution.py",
-    "M9": "test_m9_on_demand_generation.py",
-    "M10": "test_scene_queries.py",
-    "M12": "test_branching_integration.py",
-    "M13": "test_phase3_dialog_multi_entity.py",
+    "M5": "tests/mechanisms/test_m5_query_resolution.py",
+    "M9": "tests/mechanisms/test_m9_on_demand_generation.py",
+    "M10": "tests/mechanisms/test_scene_queries.py",
+    "M12": "tests/mechanisms/test_branching_integration.py",
+    "M13": "tests/integration/test_phase3_dialog_multi_entity.py",
 }
 
 
@@ -96,12 +96,22 @@ def get_test_results() -> Dict[str, Dict]:
                     with open(log_file, 'r') as f:
                         data = json.load(f)
                         if 'files' in data:
-                            for file_data in data.get('files', []):
-                                if test_file in file_data.get('filename', ''):
-                                    log_time = datetime.fromisoformat(file_data.get('modified', ''))
-                                    if latest_time is None or log_time > latest_time:
-                                        latest_time = log_time
-                                        latest_result = file_data
+                            files_data = data.get('files', {})
+                            # Handle both dict (new) and list (legacy) formats
+                            if isinstance(files_data, dict):
+                                for file_path, file_info in files_data.items():
+                                    if test_file in file_path:
+                                        log_time = datetime.fromisoformat(file_info.get('modified', ''))
+                                        if latest_time is None or log_time > latest_time:
+                                            latest_time = log_time
+                                            latest_result = file_info
+                            elif isinstance(files_data, list):
+                                for file_data in files_data:
+                                    if test_file in file_data.get('filename', ''):
+                                        log_time = datetime.fromisoformat(file_data.get('modified', ''))
+                                        if latest_time is None or log_time > latest_time:
+                                            latest_time = log_time
+                                            latest_result = file_data
                 except Exception:
                     continue
 
