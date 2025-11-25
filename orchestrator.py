@@ -28,7 +28,8 @@ from schemas import (
     Entity, Timepoint, ResolutionLevel, TemporalMode,
     ExposureEvent, CognitiveTensor
 )
-from llm import LLMClient, EntityPopulation
+from llm import LLMClient
+from schemas import EntityPopulation  # Canonical location (breaks circular dep)
 from storage import GraphStore
 from workflows import TemporalAgent, create_entity_training_workflow
 from metadata.tracking import track_mechanism

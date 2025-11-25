@@ -400,21 +400,13 @@ def retry_with_backoff(func: Callable[..., T], max_retries: int = 3, base_delay:
     # This should never be reached, but just in case
     raise last_exception
 
-class EntityPopulation(BaseModel):
-    """Structured output schema for entity population"""
-    entity_id: str = ""
-    knowledge_state: List[str] = []
-    energy_budget: float = 50.0
-    personality_traits: List[float] = [0.0, 0.0, 0.0, 0.0, 0.0]
-    temporal_awareness: str = "present"
-    confidence: float = 0.5
-
-class ValidationResult(BaseModel):
-    """Structured validation result"""
-    is_valid: bool
-    violations: List[str]
-    confidence: float
-    reasoning: str
+# ============================================================================
+# Backward Compatibility Re-exports (classes now live in schemas.py)
+# ============================================================================
+# These imports maintain backward compatibility for code that does:
+#   from llm import EntityPopulation, ValidationResult
+# The canonical location is now schemas.py to break circular dependencies.
+from schemas import EntityPopulation, ValidationResult
 
 class LLMClient:
     """Unified LLM client with cost tracking and model selection (REAL LLM only)"""

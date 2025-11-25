@@ -552,6 +552,28 @@ class AIEntity(BaseModel):
 
 
 # ============================================================================
+# LLM Response Schemas (moved from llm.py to break circular dependency)
+# ============================================================================
+
+class EntityPopulation(BaseModel):
+    """Structured output schema for entity population from LLM"""
+    entity_id: str = ""
+    knowledge_state: List[str] = []
+    energy_budget: float = 50.0
+    personality_traits: List[float] = [0.0, 0.0, 0.0, 0.0, 0.0]
+    temporal_awareness: str = "present"
+    confidence: float = 0.5
+
+
+class ValidationResult(BaseModel):
+    """Structured validation result from LLM"""
+    is_valid: bool
+    violations: List[str]
+    confidence: float
+    reasoning: str
+
+
+# ============================================================================
 # Entity Type Converters
 # ============================================================================
 
@@ -571,8 +593,7 @@ def entity_population_to_entity(population, entity_id: str, entity_type: str = "
     Returns:
         Entity object ready for database storage
     """
-    # Import here to avoid circular dependency
-    from llm import EntityPopulation
+    # EntityPopulation is now defined in this file - no circular import needed
 
     # Handle both EntityPopulation objects and dicts
     if isinstance(population, EntityPopulation):

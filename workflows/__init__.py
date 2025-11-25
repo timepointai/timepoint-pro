@@ -14,7 +14,7 @@ from schemas import Entity, ResolutionLevel, TTMTensor, EnvironmentEntity, Atmos
 from schemas import Dialog, DialogTurn, DialogData, RelationshipTrajectory, RelationshipState, RelationshipMetrics, Contradiction, ComparativeAnalysis
 from schemas import AnimalEntity, BuildingEntity, AbstractEntity, AnyEntity, KamiEntity, AIEntity, TemporalMode
 from llm_v2 import LLMClient  # Use new centralized service
-from llm import EntityPopulation  # Keep schema import
+from schemas import EntityPopulation  # Canonical location (breaks circular dep)
 from resolution_engine import ResolutionEngine
 from storage import GraphStore
 from graph import create_test_graph

@@ -27,8 +27,8 @@ import os
 from llm_service import LLMService, LLMServiceConfig
 from llm_service.config import ServiceMode, DefaultParametersConfig, APIKeyConfig
 
-# Import existing schemas for compatibility
-from llm import EntityPopulation, ValidationResult
+# Import schemas (canonical location - breaks circular dependency)
+from schemas import EntityPopulation, ValidationResult
 
 
 class LLMClient:
