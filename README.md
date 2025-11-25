@@ -248,7 +248,7 @@ Natural Language Description
     Exported Files
 ```
 
-See `test_e2e_complete_pipeline.py` for a working example.
+See `tests/e2e/test_e2e_complete_pipeline.py` for a working example.
 
 ---
 
@@ -378,7 +378,7 @@ entities=EntityConfig(
 # 3. All entities ready for PORTAL simulation
 ```
 
-**Validation:** Run `python test_profile_context_passing.py` to verify profile loading works correctly.
+**Validation:** Run `pytest tests/unit/test_profile_context_passing.py` to verify profile loading works correctly.
 
 **See Also:**
 - Phase 13 Documentation: [PLAN.md](PLAN.md) - Profile Loading System section
@@ -603,10 +603,10 @@ result = runner.run(config)
 pytest -v
 
 # Specific mechanism tests
-pytest test_m5_query_resolution.py -v              # M5: Query Resolution
-pytest test_m9_on_demand_generation.py -v          # M9: On-Demand Generation
-pytest test_branching_integration.py -v            # M12: Counterfactual Branching
-pytest test_phase3_dialog_multi_entity.py -v       # M13: Multi-Entity Synthesis
+pytest tests/mechanisms/test_m5_query_resolution.py -v              # M5: Query Resolution
+pytest tests/mechanisms/test_m9_on_demand_generation.py -v          # M9: On-Demand Generation
+pytest tests/mechanisms/test_branching_integration.py -v            # M12: Counterfactual Branching
+pytest tests/integration/test_phase3_dialog_multi_entity.py -v      # M13: Multi-Entity Synthesis
 
 # Run with real LLM (requires OPENROUTER_API_KEY)
 export OPENROUTER_API_KEY=your_key

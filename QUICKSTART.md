@@ -3,7 +3,7 @@
 ## TL;DR - One Command
 
 ```bash
-python demo_orchestrator.py --event "emergency board meeting about a merger"
+python examples/demo_orchestrator.py --event "emergency board meeting about a merger"
 ```
 
 That's it! Just describe what you want to simulate in plain English.
@@ -40,31 +40,31 @@ export OPENROUTER_API_KEY="your_key_here"
 ### Basic Usage
 ```bash
 # Emergency board meeting (auto-confirm with echo "y")
-echo "y" | python demo_orchestrator.py --event "emergency board meeting where 4 executives debate whether to accept acquisition offer"
+echo "y" | python examples/demo_orchestrator.py --event "emergency board meeting where 4 executives debate whether to accept acquisition offer"
 
 # Historical event
-echo "y" | python demo_orchestrator.py --event "apollo 13 crisis - the moment they discover the oxygen tank explosion"
+echo "y" | python examples/demo_orchestrator.py --event "apollo 13 crisis - the moment they discover the oxygen tank explosion"
 
 # Fiction scenario
-echo "y" | python demo_orchestrator.py --event "detective interrogates 3 witnesses about a murder"
+echo "y" | python examples/demo_orchestrator.py --event "detective interrogates 3 witnesses about a murder"
 ```
 
 ### With Custom Settings
 ```bash
 # More entities and timepoints
-echo "y" | python demo_orchestrator.py --event "constitutional convention" --entities 8 --timepoints 5
+echo "y" | python examples/demo_orchestrator.py --event "constitutional convention" --entities 8 --timepoints 5
 
 # Different temporal mode (narrative-focused)
-echo "y" | python demo_orchestrator.py --event "shakespearean tragedy" --mode directorial
+echo "y" | python examples/demo_orchestrator.py --event "shakespearean tragedy" --mode directorial
 
 # Branching timeline (what-if scenarios)
-echo "y" | python demo_orchestrator.py --event "cuban missile crisis decision point" --mode branching
+echo "y" | python examples/demo_orchestrator.py --event "cuban missile crisis decision point" --mode branching
 ```
 
 ### Test Without Cost
 ```bash
 # Dry run mode - no API calls, uses mock data (no confirmation needed)
-python demo_orchestrator.py --event "test scenario" --dry-run
+python examples/demo_orchestrator.py --event "test scenario" --dry-run
 ```
 
 ## What You Get
@@ -123,7 +123,7 @@ The script will show estimated cost and ask for confirmation before running.
 
 ```bash
 # All options (use echo "y" | to auto-confirm, or --dry-run to skip)
-echo "y" | python demo_orchestrator.py \
+echo "y" | python examples/demo_orchestrator.py \
   --event "your description" \
   --entities 5 \              # Max entities (1-20, default: 4)
   --timepoints 4 \            # Max timepoints (1-10, default: 3)
@@ -131,7 +131,7 @@ echo "y" | python demo_orchestrator.py \
   --dry-run                   # Test without API costs
 
 # Help
-python demo_orchestrator.py --help
+python examples/demo_orchestrator.py --help
 ```
 
 ## Tips for Writing Good Prompts
@@ -163,12 +163,12 @@ After generating a simulation:
 
 2. **Generate training data**:
    ```bash
-   python run_character_engine.py
+   python scripts/legacy_runners/run_character_engine.py
    ```
 
 3. **Run full E2E pipeline**:
    ```bash
-   python run_complete_e2e_workflow.py
+   ./run.sh quick
    ```
 
 ## Troubleshooting
@@ -241,5 +241,5 @@ After generating a simulation:
 **Ready to try?**
 
 ```bash
-python demo_orchestrator.py --event "your natural language prompt here"
+python examples/demo_orchestrator.py --event "your natural language prompt here"
 ```
