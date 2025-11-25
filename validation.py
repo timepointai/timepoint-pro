@@ -56,7 +56,7 @@ class Validator(ABC):
 def validate_information_conservation(entity: Entity, context: Dict, store=None) -> Dict:
     """Validate knowledge ⊆ exposure history"""
     # Handle both Entity and EntityPopulation types
-    from llm import EntityPopulation
+    from schemas import EntityPopulation  # Canonical location (breaks circular dep)
 
     # If store is provided, query actual exposure events from database
     if store:
@@ -89,7 +89,7 @@ def validate_information_conservation(entity: Entity, context: Dict, store=None)
 def validate_energy_budget(entity: Entity, context: Dict) -> Dict:
     """Validate interaction costs ≤ capacity with circadian adjustments"""
     # Handle both Entity and EntityPopulation types
-    from llm import EntityPopulation
+    from schemas import EntityPopulation  # Canonical location (breaks circular dep)
 
     if isinstance(entity, EntityPopulation):
         budget = entity.energy_budget
@@ -151,7 +151,7 @@ def validate_behavioral_inertia(entity: Entity, context: Dict) -> Dict:
 def validate_biological_constraints(entity: Entity, context: Dict) -> Dict:
     """Validate age-dependent capabilities"""
     # Handle both Entity and EntityPopulation types
-    from llm import EntityPopulation
+    from schemas import EntityPopulation  # Canonical location (breaks circular dep)
 
     if isinstance(entity, EntityPopulation):
         # EntityPopulation doesn't have age, skip validation
