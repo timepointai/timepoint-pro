@@ -47,7 +47,11 @@ if os.getenv("OXEN_API_KEY") and not os.getenv("OXEN_API_TOKEN"):
     os.environ["OXEN_API_TOKEN"] = os.environ["OXEN_API_KEY"]
 
 
-def run_convergence_analysis(run_count: int = 3) -> bool:
+def run_convergence_analysis(
+    run_count: int = 3,
+    template_filter: Optional[str] = None,
+    verbose: bool = False
+) -> bool:
     """
     Run convergence analysis on recent runs from the database.
 
@@ -56,6 +60,8 @@ def run_convergence_analysis(run_count: int = 3) -> bool:
 
     Args:
         run_count: Number of recent runs to compare
+        template_filter: Optional template ID to filter runs
+        verbose: Show detailed divergence point information
 
     Returns:
         True if analysis succeeded, False otherwise
@@ -68,13 +74,24 @@ def run_convergence_analysis(run_count: int = 3) -> bool:
     print("\n" + "=" * 80)
     print("CONVERGENCE ANALYSIS")
     print("=" * 80)
-    print(f"Comparing causal graphs across {run_count} recent runs...")
+    if template_filter:
+        print(f"Template filter: {template_filter}")
+    print(f"Comparing causal graphs across {run_count} runs...")
     print()
 
     try:
         # Get recent runs
         metadata_manager = MetadataManager(db_path="metadata/runs.db")
-        recent_runs = metadata_manager.get_all_runs()[-run_count:]
+        all_runs = metadata_manager.get_all_runs()
+
+        # Filter by template if specified
+        if template_filter:
+            all_runs = [r for r in all_runs if hasattr(r, 'template_id') and r.template_id == template_filter]
+            if not all_runs:
+                print(f"  No runs found for template: {template_filter}")
+                return False
+
+        recent_runs = all_runs[-run_count:]
 
         if len(recent_runs) < 2:
             print(f"  Need at least 2 runs for convergence analysis, found {len(recent_runs)}")
@@ -144,9 +161,15 @@ def run_convergence_analysis(run_count: int = 3) -> bool:
 
         # Show divergence points if any
         if result.divergence_points:
-            print(f"\n  🔀 Top Divergence Points:")
-            for dp in result.divergence_points[:3]:
+            print(f"\n  🔀 Divergence Points ({len(result.divergence_points)} total):")
+            show_count = len(result.divergence_points) if verbose else min(3, len(result.divergence_points))
+            for dp in result.divergence_points[:show_count]:
                 print(f"     - {dp.edge}: {dp.agreement_ratio:.0%} agreement")
+                if verbose:
+                    print(f"       Present in: {', '.join(dp.present_in_runs)}")
+                    print(f"       Absent in: {', '.join(dp.absent_in_runs)}")
+            if not verbose and len(result.divergence_points) > 3:
+                print(f"     ... and {len(result.divergence_points) - 3} more (use --convergence-verbose for details)")
 
         # Store result in database
         store = GraphStore("sqlite:///metadata/runs.db")
@@ -344,6 +367,16 @@ def list_modes():
     print("  Run any simulation from plain English description")
     print("  Example: --nl \"Emergency board meeting where CFO reveals bankruptcy\"")
     print("  Options: --nl-entities N, --nl-timepoints N to override defaults")
+    print("="*80)
+
+    print("\n" + "="*80)
+    print("📊 CONVERGENCE ANALYSIS")
+    print("  --convergence:           Run convergence after simulations")
+    print("  --convergence-only:      Run ONLY convergence (no simulations)")
+    print("  --convergence-runs N:    Number of runs to compare (default: 3)")
+    print("  --convergence-template:  Filter to specific template")
+    print("  --convergence-verbose:   Show detailed divergence points")
+    print("  Example: --convergence-only --convergence-template hospital_crisis --convergence-runs 5")
     print("="*80)
 
     print("\n" + "="*80)
@@ -1266,10 +1299,26 @@ if __name__ == "__main__":
         help="Run convergence analysis on recent runs (compares causal graphs across runs)"
     )
     parser.add_argument(
+        "--convergence-only",
+        action="store_true",
+        help="Run ONLY convergence analysis (no simulation runs)"
+    )
+    parser.add_argument(
         "--convergence-runs",
         type=int,
         default=3,
         help="Number of runs to compare for convergence (default: 3)"
+    )
+    parser.add_argument(
+        "--convergence-template",
+        type=str,
+        metavar="TEMPLATE",
+        help="Filter convergence analysis to specific template (e.g. hospital_crisis)"
+    )
+    parser.add_argument(
+        "--convergence-verbose",
+        action="store_true",
+        help="Show detailed divergence points in convergence analysis"
     )
     args = parser.parse_args()
 
@@ -1342,11 +1391,24 @@ if __name__ == "__main__":
     else:
         mode = 'quick'
 
+    # Handle --convergence-only mode (no simulation runs)
+    if args.convergence_only:
+        convergence_success = run_convergence_analysis(
+            run_count=args.convergence_runs,
+            template_filter=args.convergence_template,
+            verbose=args.convergence_verbose
+        )
+        sys.exit(0 if convergence_success else 1)
+
     success = run_all_templates(mode, skip_summaries=args.skip_summaries)
 
     # Run convergence analysis if requested
     if args.convergence:
-        convergence_success = run_convergence_analysis(run_count=args.convergence_runs)
+        convergence_success = run_convergence_analysis(
+            run_count=args.convergence_runs,
+            template_filter=args.convergence_template,
+            verbose=args.convergence_verbose
+        )
         if not convergence_success:
             print("\n⚠️  Convergence analysis failed but template runs may have succeeded")
 
