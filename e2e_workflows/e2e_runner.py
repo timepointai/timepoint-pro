@@ -213,6 +213,14 @@ class FullE2EWorkflowRunner:
                     self.metadata_manager.save_metadata(metadata)
                     raise
 
+                # Step 10: Optional Convergence Analysis (post-run)
+                if config.convergence and config.convergence.enabled:
+                    self._run_convergence_analysis(
+                        run_id=run_id,
+                        template_id=config.world_id,
+                        config=config
+                    )
+
                 print(f"\n{'='*80}")
                 print(f"✅ E2E WORKFLOW COMPLETE: {run_id}")
                 print(f"{'='*80}\n")
@@ -1419,3 +1427,118 @@ class FullE2EWorkflowRunner:
             )
 
             return metadata
+
+    def _run_convergence_analysis(
+        self,
+        run_id: str,
+        template_id: str,
+        config: SimulationConfig
+    ) -> None:
+        """
+        Step 10: Optional Convergence Analysis (post-run).
+
+        Compares the current run's causal graph against recent runs of the same template.
+        Requires config.convergence.enabled = True.
+
+        Args:
+            run_id: Current run ID
+            template_id: Template identifier
+            config: Simulation configuration with convergence settings
+        """
+        with self.logfire.span("step:convergence_analysis"):
+            print("\nStep 10: Running convergence analysis...")
+
+            try:
+                from evaluation.convergence import (
+                    CausalGraph,
+                    compute_convergence_from_graphs,
+                )
+                from schemas import ConvergenceSet
+                from storage import GraphStore
+                import uuid
+
+                conv_config = config.convergence
+                run_count = conv_config.run_count if conv_config else 3
+
+                # Get recent runs for this template
+                all_runs = self.metadata_manager.get_all_runs()
+                template_runs = [
+                    r for r in all_runs
+                    if hasattr(r, 'template_id') and r.template_id == template_id
+                ]
+
+                # Take most recent N runs (including current)
+                recent_runs = template_runs[-run_count:]
+
+                if len(recent_runs) < 2:
+                    print(f"  Need at least 2 runs for convergence, found {len(recent_runs)}")
+                    return
+
+                print(f"  Analyzing {len(recent_runs)} runs of template: {template_id}")
+
+                # Build causal graphs from run metadata
+                graphs = []
+                for run in recent_runs:
+                    graph = CausalGraph(
+                        run_id=run.run_id,
+                        template_id=template_id,
+                    )
+
+                    # Use mechanisms as proxy for causal structure
+                    if run.mechanisms_used:
+                        mechanisms = list(run.mechanisms_used)
+                        for i, m1 in enumerate(mechanisms):
+                            for m2 in mechanisms[i+1:]:
+                                graph.temporal_edges.add((m1, m2))
+
+                    if run.entities_created and run.entities_created > 0:
+                        graph.metadata['entity_count'] = run.entities_created
+
+                    graphs.append(graph)
+
+                if len(graphs) < 2:
+                    print(f"  Could not build enough graphs")
+                    return
+
+                # Compute convergence
+                result = compute_convergence_from_graphs(graphs)
+
+                # Display results
+                print(f"\n  📊 Convergence Results:")
+                print(f"  ├─ Score: {result.convergence_score:.2%}")
+                print(f"  ├─ Grade: {result.robustness_grade}")
+                print(f"  ├─ Consensus Edges: {len(result.consensus_edges)}")
+                print(f"  └─ Contested Edges: {len(result.contested_edges)}")
+
+                # Store result
+                store = GraphStore("sqlite:///metadata/runs.db")
+                convergence_set = ConvergenceSet(
+                    set_id=f"conv_e2e_{uuid.uuid4().hex[:8]}",
+                    template_id=template_id,
+                    run_ids=json.dumps(result.run_ids),
+                    run_count=result.run_count,
+                    convergence_score=result.convergence_score,
+                    min_similarity=result.min_similarity,
+                    max_similarity=result.max_similarity,
+                    robustness_grade=result.robustness_grade,
+                    consensus_edge_count=len(result.consensus_edges),
+                    contested_edge_count=len(result.contested_edges),
+                    divergence_points=json.dumps([
+                        {"edge": dp.edge, "ratio": dp.agreement_ratio}
+                        for dp in result.divergence_points[:10]
+                    ])
+                )
+                store.save_convergence_set(convergence_set)
+
+                print(f"  ✅ Convergence analysis saved: {convergence_set.set_id}")
+
+                self.logfire.info(
+                    "Convergence analysis complete",
+                    score=result.convergence_score,
+                    grade=result.robustness_grade,
+                    set_id=convergence_set.set_id
+                )
+
+            except Exception as e:
+                print(f"  ⚠️  Convergence analysis failed: {e}")
+                self.logfire.warn("Convergence analysis failed", error=str(e))
