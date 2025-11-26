@@ -1,541 +1,211 @@
-# MECHANICS.md - Timepoint-Daedalus Technical Specification
+# MECHANICS.md — Timepoint-Daedalus Technical Architecture
 
-**Document Type:** Technical Specification (Design Intent)
-**Status:** Reference document - Implementation Complete
-**Last Updated:** November 25, 2025
+**A temporal simulation framework where fidelity follows attention, knowledge has provenance, and time has modes.**
 
----
 
-## Implementation Status
+## tl;dr
+MECHANICS
+Five pillars:
 
-> **Note:** This document describes the complete technical specification. **Phase 12 Complete ✅ - All mechanisms implemented and verified.**
+Fidelity Management: Resolution is heterogeneous and query-driven. Entities range from TENSOR_ONLY (~200 tokens) to TRAINED (~50k tokens). Queries trigger lazy elevation; disuse allows compression. Cost scales with attention, not simulation size.
+Temporal Reasoning: Time has modes. PEARL (standard causality), PORTAL (backward inference from endpoints), BRANCHING (counterfactuals), CYCLICAL (prophecy), etc. Each mode changes what "consistency" means and how validation works.
+Knowledge Provenance: Entities can't magically know things. Knowledge has tracked exposure events (who learned what, from whom, when). This enables causal audit, prevents anachronisms structurally, and supports counterfactual reasoning.
+Entity Simulation: On-demand entity generation, scene-level collective behavior, dialog synthesis with full context, relationship evolution tracking, prospection (entities modeling their futures), and animistic agency (objects/institutions that "want" things).
+Infrastructure: Intelligent model selection (M18) matches actions to optimal LLMs—math-heavy tasks use reasoning models, dialog uses conversational models, with automatic fallbacks and license compliance for commercial synthetic data.
 
-**Current Status:** Phase 12 Complete ✅ | **Persistent Tracking:** 17/17 (100%) | **Total Verified:** 17/17 (100%)
-
-**Mechanism Coverage Breakdown:**
-- **Persistent E2E Tracking**: 17/17 (100%) - All mechanisms (M1-M17) verified via E2E workflow runs
-- **Pytest Verified**: 5/17 - M5, M9, M10, M12, M13 (in-memory database tests)
-- **Integration Complete**: All 17 mechanisms fully integrated and operational
-
-**Pytest Test Coverage (5/17 mechanisms verified via pytest):**
-- ✅ M5: Query Resolution - 17/17 tests (100%) ✅ PERFECT
-- ✅ M9: On-Demand Generation - 21/23 tests (91.3%) ✅ Excellent
-- ✅ M10: Scene-Level Queries - 2/3 tests (66.7%) ✅ Good
-- ✅ M12: Counterfactual Branching - 2/2 tests (100%) ✅ PERFECT
-- ✅ M13: Multi-Entity Synthesis - 8/11 tests (72.7%) ✅ Good
-**Note:** Pytest tests use in-memory database, so these don't persist to metadata/runs.db
-
-**Decorator Coverage (17/17 mechanisms):**
-All 17 mechanisms instrumented with @track_mechanism decorators (verified via mechanism_dashboard.py)
-
-**E2E Template Coverage (17/17 persistent):**
-Mechanisms tracked via E2E workflow templates (20 portal templates):
-- All 17 mechanisms verified through corporate scenario templates
-- M14 (Circadian Patterns) and M15 (Entity Prospection) now fully operational
-- Comprehensive PORTAL mode coverage with simulation-judged variants
-- Narrative export generation for all simulation runs (Phase 12)
-
-**Recent Development (Phases 9-12):**
-- ✅ **Phase 9**: M14 (Circadian Patterns), M15 (Entity Prospection), M16 (Animistic Entities) integrated
-- ✅ **Phase 10**: ANDOS (Anthropic-Native Data Object Store) migration for improved storage
-- ✅ **Phase 11**: Resilience system with circuit breakers, retries, and fault tolerance
-- ✅ **Phase 12**: Automated narrative exports (MD/JSON/PDF) for all simulation runs
-- ✅ All 17 mechanisms now tracked persistently via metadata/runs.db
-
-See [PLAN.md](PLAN.md) for development roadmap and phase history. See [README.md](README.md) for quick start.
+The 18 mechanisms are implementations of these ideas. The ideas are the value; the mechanisms are derivable.
 
 ---
 
-## Problem Statement
+## The Core Problem
 
-Large language model-based historical simulations face two fundamental constraints:
+LLM-based simulations face a fundamental tension: full-fidelity simulation is prohibitively expensive (O(entities × timepoints × tokens)) and causes context collapse, but naive compression destroys causal structure. You can't reason about "what did Jefferson know when he wrote this letter" if you've summarized away the exposure events that gave him that knowledge.
 
-1. **Token Economics**: Full-context prompting scales as O(entities × timepoints × token_cost), reaching $500/query for 100 entities across 10 timepoints at 50k tokens per entity.
-2. **Temporal Consistency**: Compression-based approaches lose causal structure required to prevent anachronisms and maintain coherent temporal evolution.
+Traditional approaches assume uniform fidelity—every entity at every moment rendered at the same resolution. This is wasteful (most detail is never queried) and inflexible (no way to dynamically allocate detail where it matters).
 
-Traditional solutions treat this as either a caching problem (cache invalidation complexity) or lossy compression problem (breaks temporal reasoning). Both assume uniform fidelity across all entities and timepoints.
+## The Architectural Insight
 
-## Architectural Solution
+Timepoint-Daedalus treats **fidelity as a query-driven 2D surface** over (entity, timepoint) space. Resolution is heterogeneous and mutable: a minor attendee exists as a 200-token tensor embedding until someone asks about them, at which point the system elevates their resolution while preserving causal consistency with everything already established.
 
-Timepoint-Daedalus implements query-driven progressive refinement in a causally-linked temporal graph with heterogeneous fidelity. Resolution adapts to observed query patterns rather than static importance heuristics. This reduces token costs by 95% (from $500 to $5-20 per query) while maintaining temporal consistency through explicit causal validation.
+This enables 95% cost reduction without temporal incoherence—but only because the system maintains explicit causal structure (exposure events, temporal chains, validation constraints) that compression-based approaches discard.
 
 ---
 
-## Mechanism 1: Heterogeneous Fidelity Temporal Graphs ✅
+## Conceptual Architecture
 
-**Status:** Implemented (199 code references)
+The 18 mechanisms group into five pillars:
 
-### Implementation
+| Pillar | Problem | Mechanisms |
+|--------|---------|------------|
+| **Fidelity Management** | Allocate detail where queries land | M1, M2, M5, M6 |
+| **Temporal Reasoning** | Multiple notions of time and causality | M7, M8, M12, M14, M17 |
+| **Knowledge Provenance** | Track who knows what, from whom, when | M3, M4 |
+| **Entity Simulation** | Generate and synthesize entity behavior | M9, M10, M11, M13, M15, M16 |
+| **Infrastructure** | Model selection, cost optimization | M18 |
 
-Temporal graph where each node (entity, timepoint) pair has independent resolution level. Resolution levels form an ordered set: `TENSOR_ONLY < SCENE < GRAPH < DIALOG < TRAINED`.
+---
 
-```
-Graph Structure:
-Timepoint(id=T0, event="Inauguration")
-├── Entity(id="washington", resolution=TRAINED, tokens=50k)
-├── Entity(id="adams", resolution=DIALOG, tokens=10k)
-├── Entity(id="attendee_47", resolution=TENSOR_ONLY, tokens=200)
-└── causal_link → Timepoint(id=T1)
-```
+# Pillar 1: Fidelity Management
 
-### Properties
+The insight: not all entities and moments deserve equal detail. Fidelity should concentrate around high-centrality entities at critical timepoints—like a map that renders at higher resolution only where you zoom.
 
-- **Per-entity resolution**: Each entity maintains independent resolution at each timepoint
-- **Per-timepoint resolution**: Timepoint itself has resolution affecting all entities present
-- **Mutable**: Resolution can increase (elevation) or decrease (compression) based on usage
-- **2D fidelity surface**: Detail concentrates around high-centrality entities at critical timepoints
+## M1: Heterogeneous Fidelity Graphs
 
-### Storage Requirements
-
-Token budget allocation example for 100 entities × 10 timepoints:
-- Uniform high fidelity: 50k × 100 × 10 = 50M tokens
-- Heterogeneous fidelity: ~2.5M tokens (95% reduction)
-
-Distribution with power-law usage pattern:
-- 5 central entities at TRAINED: 5 × 50k = 250k
-- 20 secondary entities at DIALOG: 20 × 10k = 200k
-- 75 peripheral entities at TENSOR_ONLY: 75 × 200 = 15k
-
-### M1 Extension: Profile Loading System ✅
-
-**Status:** Implemented (orchestrator.py:407-450, e2e_runner.py:420-424, generation/config_schema.py:178-181)
-
-#### Problem
-
-Portal Timepoint simulations needed consistent characterization of real founders (Sean McDonald, Ken Cavanagh) across runs. Previously, entities were always LLM-generated from scenario descriptions, leading to:
-- Inconsistent founder characterization
-- Wasted LLM calls generating already-defined entities
-- Inability to use validated founder archetypes from JSON profiles
-
-#### Solution
-
-Profile loading system that loads pre-defined entities from JSON files before LLM generation.
-
-#### Architecture
-
-**3-Stage Context Passing Chain:**
+Each (entity, timepoint) pair maintains independent resolution:
 
 ```
-SimulationConfig (profiles field)
-        ↓
-E2E Runner (extracts entity_config)
-        ↓
-Orchestrator (loads JSON profiles)
-        ↓
-Profile Loading (merge with LLM-generated entities)
+Resolution Levels (ordered):
+TENSOR_ONLY < SCENE < GRAPH < DIALOG < TRAINED
+
+Example Graph:
+Timepoint(T0, "Constitutional Convention")
+├── Entity("washington", resolution=TRAINED, ~50k tokens)
+├── Entity("madison", resolution=DIALOG, ~10k tokens)  
+├── Entity("attendee_47", resolution=TENSOR_ONLY, ~200 tokens)
+└── causal_link → Timepoint(T1)
 ```
 
-#### Implementation
+Resolution is **mutable**: queries elevate resolution (lazy loading), disuse can compress it back down. The system maintains both compressed and full representations, switching based on query patterns.
 
-**1. EntityConfig Schema** (generation/config_schema.py:178-181):
-```python
-profiles: Optional[List[str]] = Field(
-    default=None,
-    description="Paths to JSON profile files for predefined entities"
-)
-```
+**Token economics**: 100 entities × 10 timepoints at uniform high fidelity costs ~50M tokens. With heterogeneous fidelity (power-law distribution), this drops to ~2.5M tokens—95% reduction.
 
-**2. Context Passing** (e2e_runner.py:420-424):
-```python
-context={
-    "max_entities": config.entities.count,
-    "max_timepoints": 1,
-    "temporal_mode": config.temporal.mode.value,
-    "entity_metadata": config.metadata,
-    "entity_config": {
-        "count": config.entities.count,
-        "types": config.entities.types,
-        "profiles": config.entities.profiles if config.entities.profiles else []
-    }
-}
-```
+### Profile Loading Extension
 
-**3. Profile Loading** (orchestrator.py:407-450):
-```python
-# Extract profiles from context
-entity_config = context.get("entity_config", {})
-profile_paths = entity_config.get("profiles", [])
-
-loaded_entities = []
-
-# Load JSON profiles
-if profile_paths:
-    for profile_path in profile_paths:
-        profile_file = Path(profile_path)
-        with open(profile_file) as f:
-            profile_data = json.load(f)
-
-        # Create EntityRosterItem from profile
-        entity = EntityRosterItem(
-            entity_id=name.lower().replace(" ", "_"),
-            entity_type="human",
-            role="primary",
-            description=profile_data.get("description"),
-            initial_knowledge=profile_data.get("initial_knowledge", [])
-        )
-        loaded_entities.append(entity)
-
-# Calculate remaining entities needed
-remaining = max_entities - len(loaded_entities)
-
-# Generate remaining entities via LLM
-llm_generated = generate_via_llm(count=remaining)
-
-# Merge profiles + LLM-generated
-all_entities = loaded_entities + llm_generated
-return all_entities
-```
-
-#### Profile JSON Format
+For simulations with known entities (real founders, historical figures), pre-defined JSON profiles can be loaded instead of LLM-generated:
 
 ```json
 {
   "name": "Sean McDonald",
   "archetype_id": "philosophical_technical_polymath",
-  "description": "Co-founder and technical visionary",
-  "traits": {
-    "technical_depth": 0.85,
-    "philosophical_thinking": 0.95,
-    "product_vision": 0.90
-  },
-  "strengths": [
-    "exceptional_conceptual_innovation",
-    "technical_implementation_across_multiple_domains"
-  ],
-  "weaknesses": [
-    "limited_operational_scaling_experience"
-  ],
-  "initial_knowledge": [
-    "Expert in causal AI architectures",
-    "Deep knowledge of temporal reasoning systems"
-  ]
+  "traits": { "technical_depth": 0.85, "philosophical_thinking": 0.95 },
+  "initial_knowledge": ["Expert in causal AI architectures", "Deep knowledge of temporal reasoning"]
 }
 ```
 
-#### Templates Using Profiles
+This ensures consistency across runs and reduces LLM calls for well-characterized entities.
 
-5 Portal Timepoint templates now load Sean and Ken's profiles:
-- `portal_timepoint_unicorn` - $1.2B valuation scenario
-- `portal_timepoint_series_a_success` - $15M Series A
-- `portal_timepoint_product_market_fit` - 10K users milestone
-- `portal_timepoint_enterprise_adoption` - Fortune 500 contracts
-- `portal_timepoint_founder_transition` - Leadership evolution
+## M2: Progressive Training
 
-#### Guarantees
-
-- **Graceful degradation**: Returns loaded profiles even if LLM generation fails
-- **Timeout protection**: 5-minute absolute timeout prevents infinite loops
-- **Cost optimization**: Only generates (N - profiles_count) entities via LLM
-- **Consistency**: Same profiles used across all runs
-- **Validation**: test_profile_context_passing.py verifies context chain
-
-#### Performance Impact
-
-For 6-entity simulation with 2 pre-loaded profiles:
-- **Before**: 6 LLM entity generations (~$0.06, ~30s)
-- **After**: 2 profile loads + 4 LLM generations (~$0.04, ~20s)
-- **Savings**: ~33% cost reduction, ~33% time reduction for entity generation
-
----
-
-## Mechanism 2: Progressive Training Without Cache Invalidation ✅
-
-**Status:** Implemented (resolution_engine.py, workflows.py, query_interface.py)
-
-### Metadata-Driven Quality Spectrum
-
-Entity quality exists on continuous spectrum determined by accumulated metadata rather than binary cached/uncached state.
+Entity quality exists on a continuous spectrum determined by accumulated interaction, not binary cached/uncached state.
 
 ```python
 EntityMetadata:
-    query_count: int           # Number of times entity queried
-    training_iterations: int   # LLM elaboration passes completed
-    eigenvector_centrality: float  # Graph centrality score (0-1)
+    query_count: int              # Times queried
+    training_iterations: int      # LLM elaboration passes
+    eigenvector_centrality: float # Graph importance (0-1)
     resolution_level: ResolutionLevel
     last_accessed: datetime
 ```
 
-### Resolution Elevation Algorithm
+Each query increments metadata. When thresholds are crossed, the system triggers elevation—generating richer state representations and storing both compressed and full versions. Quality accumulates; nothing is thrown away.
+
+## M5: Query-Driven Lazy Resolution
+
+Resolution decisions happen at query time, not simulation time:
 
 ```python
-def should_elevate_resolution(entity: Entity, threshold_config: Config) -> bool:
-    if entity.query_count > threshold_config.frequent_access:
-        return entity.resolution < DIALOG
-    if entity.eigenvector_centrality > threshold_config.central_node:
-        return entity.resolution < GRAPH
-    return False
-```
-
-### Training Accumulation
-
-Each query increments entity metadata:
-1. `query_count += 1`
-2. If elevation triggered: `training_iterations += 1`, `resolution = next_level(resolution)`
-3. Store both compressed representation (PCA/SVD) and full state
-4. Next query retrieves higher-fidelity state
-
----
-
-## Mechanism 3: Exposure Event Tracking ✅
-
-**Status:** Implemented (98 code references)
-
-### Schema
-
-```python
-ExposureEvent:
-    id: UUID
-    entity_id: str
-    event_type: EventType  # witnessed, learned, told, experienced
-    information: str  # knowledge item acquired
-    source: Optional[str]  # entity_id or external source
-    timestamp: datetime
-    confidence: float  # 0.0-1.0
-    timepoint_id: str
-```
-
-### Validation Constraint
-
-Knowledge consistency check: `entity.knowledge_state ⊆ {e.information for e in entity.exposure_events where e.timestamp ≤ query_timestamp}`
-
-### Causal Audit Trail
-
-Exposure events form directed acyclic graph:
-- Nodes: Information items
-- Edges: Causal relationships (entity A learned X from entity B at time T)
-- Validation: Walk graph to verify information accessibility
-
-### Counterfactual Reasoning Support
-
-Removing exposure events and recomputing forward enables what-if scenarios:
-```
-timeline_branch = remove_exposure_events(entity="jefferson", filter=lambda e: e.source=="paris")
-propagate_causality(timeline_branch, start=intervention_point)
-```
-
----
-
-## Mechanism 4: Physics-Inspired Validation ✅
-
-**Status:** Implemented (validation.py:54-203 - 5 validators)
-
-**Implementation Evidence:**
-- `validate_information_conservation()` - validation.py:54-86
-- `validate_energy_budget()` - validation.py:88-124 (with circadian adjustments)
-- `validate_behavioral_inertia()` - validation.py:126-146
-- `validate_biological_constraints()` - validation.py:148-169
-- `validate_network_flow()` - validation.py:171-203
-
-### Conservation Law Validators
-
-**Information Conservation** (Shannon entropy):
-```python
-@Validator.register("information_conservation", severity="ERROR")
-def validate_information(entity: Entity, context: Dict) -> ValidationResult:
-    knowledge = set(entity.knowledge_state)
-    exposure = set(e.information for e in context["exposure_history"])
-    violations = knowledge - exposure
-    return ValidationResult(
-        valid=len(violations) == 0,
-        violations=list(violations)
-    )
-```
-
-**Energy Budget** (thermodynamic):
-```python
-@Validator.register("energy_budget", severity="WARNING")
-def validate_energy(entity: Entity, context: Dict) -> ValidationResult:
-    budget = entity.cognitive_tensor.energy_budget
-    expenditure = sum(interaction.cost for interaction in context["interactions"])
-    return ValidationResult(
-        valid=expenditure <= budget * 1.2,
-        message=f"Expenditure {expenditure} exceeds budget {budget}"
-    )
-```
-
----
-
-## Mechanism 5: Query-Driven Lazy Resolution ✅
-
-**Status:** Implemented (query_interface.py, schemas.py, storage.py)
-
-**Implementation Evidence:**
-- QueryHistory table - schemas.py:194-203
-- Query history tracking - query_interface.py:298-332 (saved before cache check)
-- Storage methods - storage.py:311-340 (save_query_history, get_query_history_for_entity, get_entity_query_count, get_entity_elevation_count)
-- Resolution elevation logic - resolution_engine.py:check_retraining_needed(), elevate_resolution()
-- Test coverage - test_m5_query_resolution.py (17 comprehensive tests)
-
-### Resolution Decision Function
-
-```python
-def decide_resolution(
-    entity: Entity, 
-    timepoint: Timepoint,
-    query_history: QueryHistory,
-    thresholds: ThresholdConfig
-) -> ResolutionLevel:
-    
+def decide_resolution(entity, timepoint, query_history, thresholds):
     if entity.query_count > thresholds.frequent_access:
         return max(entity.resolution, DIALOG)
-    
     if entity.eigenvector_centrality > thresholds.central_node:
         return max(entity.resolution, GRAPH)
-    
     if timepoint.importance_score > thresholds.critical_event:
         return max(entity.resolution, SCENE)
-    
     return TENSOR_ONLY
 ```
 
----
+This is the key to cost reduction: we never pay for detail nobody asked about.
 
-## Mechanism 6: TTM Tensor Model ✅
+## M6: Timepoint Tensor Model (TTM) Tensor Compression
 
-**Status:** Implemented (41 code references)
-
-### Schema
+At TENSOR_ONLY resolution, entities are represented as structured tensors:
 
 ```python
 TTMTensor:
-    context_vector: np.ndarray    # Shape: (n_knowledge,)
-    biology_vector: np.ndarray    # Shape: (n_physical,)
-    behavior_vector: np.ndarray   # Shape: (n_personality,)
+    context_vector: np.ndarray   # Knowledge state
+    biology_vector: np.ndarray   # Physical attributes
+    behavior_vector: np.ndarray  # Personality/decision patterns
 
-PhysicalTensor:
-    age: float
-    health_events: List[HealthEvent]
-    location: (float, float) | str
-    mobility_level: float
-    biological_constraints: Dict[str, bool]
-
-CognitiveTensor:
-    knowledge_state: Set[str]
-    belief_vector: np.ndarray
-    emotional_state: (float, float)
-    energy_budget: float
-    personality_vector: np.ndarray
-
-BehaviorTensor:
-    personality_traits: np.ndarray
-    decision_patterns: np.ndarray
-    social_preferences: np.ndarray
+# Compression ratios:
+# Full entity: ~50k tokens
+# TTM representation: ~1,600 tokens (97% compression)
 ```
 
-### Compression Ratios
-
-Typical entity state (50k tokens) decomposes to:
-- Biology: 100 tokens
-- Behavior: 500 tokens
-- Context: 1000 tokens
-- **Total: 1600 tokens vs 50k (97% compression)**
+Tensors preserve enough structure for causal validation and can be re-expanded when queries require higher fidelity.
 
 ---
 
-## Mechanism 7: Causal Temporal Chains ✅
+# Pillar 2: Temporal Reasoning
 
-**Status:** Implemented (55 code references)
+Time isn't one thing. The framework supports multiple temporal ontologies, each with different causal semantics and validation rules.
 
-### Schema
+## M17: Modal Temporal Causality
+
+Six temporal modes, each defining what "consistency" means:
+
+```python
+class TemporalMode(Enum):
+    PEARL = "pearl"           # Standard causal DAG—causes precede effects
+    DIRECTORIAL = "directorial"  # Narrative time with flashbacks, ellipsis
+    NONLINEAR = "nonlinear"      # Presentation order ≠ causal order
+    BRANCHING = "branching"      # Counterfactual timelines diverge from decision points
+    CYCLICAL = "cyclical"        # Prophetic/mythic time—future constrains past
+    PORTAL = "portal"            # Backward inference from known endpoints
+```
+
+### PORTAL Mode: Backward Temporal Reasoning
+
+The most complex mode. Given a known endpoint ("startup reaches $1B valuation in 2030") and origin ("founders meet in 2024"), PORTAL discovers plausible paths connecting them.
+
+**Architecture**: Generate candidate antecedent states, score them via hybrid evaluation (LLM plausibility + historical precedent + causal necessity + entity capability), validate forward coherence, detect pivot points where paths diverge.
+
+```python
+config = TemporalConfig(
+    mode=TemporalMode.PORTAL,
+    portal_description="John Doe elected President in 2040",
+    portal_year=2040,
+    origin_year=2025,
+    backward_steps=15,
+    path_count=3
+)
+```
+
+**Exploration strategies**:
+- **Reverse chronological**: 2040 → 2039 → ... → 2025 (simple, predictable)
+- **Oscillating**: 2040 → 2025 → 2039 → 2026 → ... (better for complex scenarios)
+- **Adaptive**: System chooses based on complexity
+
+**Forward coherence validation**: Backward-generated paths must make sense when simulated forward. Paths below coherence threshold are pruned, backtracked, or marked with warnings.
+
+**Simulation-based judging** (optional enhancement): Instead of static scoring formulas, run mini forward simulations from each candidate antecedent and use a judge LLM to evaluate which simulation is most realistic. Captures emergent behaviors invisible to static scoring—2-5x cost increase for significantly better path plausibility.
+
+## M7: Causal Temporal Chains
+
+Timepoints form explicit causal chains:
 
 ```python
 Timepoint:
     timepoint_id: str
     timestamp: datetime
-    causal_parent: Optional[str]
+    causal_parent: Optional[str]  # Explicit link to causing timepoint
     event_description: str
     entities_present: List[str]
-    resolution_level: ResolutionLevel
     importance_score: float
 ```
 
-### Causality Validation
+**Validation constraint**: Entity at timepoint T can only reference information from timepoints T' where a causal path exists from T' to T. This prevents anachronisms structurally, not heuristically.
 
-Information flow constraint: Entity at timepoint T can only reference information from timepoints T' where path exists from T' to T in causal chain.
+## M8: Vertical Timepoint Expansion
 
----
+Timepoints can be expanded vertically—adding detail within a moment rather than progressing to the next moment. A "board meeting" timepoint might expand into arrival, opening remarks, key debate, decision, aftermath—all causally linked but temporally simultaneous.
 
-## Mechanism 8: Embodied Entity States ✅
+## M12: Counterfactual Branching
 
-**Status:** Implemented (schemas.py, validation.py)
-
-**Implementation Evidence:**
-- PhysicalTensor - schemas.py:49-59 (age, health_status, pain_level, fever, mobility, stamina, sensory_acuity, location)
-- CognitiveTensor - schemas.py:62-72 (knowledge_state, emotional_valence, emotional_arousal, energy_budget, decision_confidence, patience_threshold, risk_tolerance, social_engagement)
-- Entity integration - schemas.py:88-107 (physical_tensor and cognitive_tensor properties)
-- Body-mind coupling - validation.py:210-242
-  - `couple_pain_to_cognition()` - validation.py:210-227
-  - `couple_illness_to_cognition()` - validation.py:229-242
-- Dialog validation integration - validation.py:248-327 (physical/emotional constraints on dialog)
-
----
-
-## Mechanism 9: On-Demand Entity Generation ✅
-
-**Status:** Implemented (query_interface.py)
-
-**Implementation Evidence:**
-- `extract_entity_names()` - query_interface.py:799-840 (regex-based entity name extraction)
-- `detect_entity_gap()` - query_interface.py:842-846 (identifies missing entities)
-- `generate_entity_on_demand()` - query_interface.py:848-944 (LLM-based plausible entity generation)
-- Integration in synthesize_response - query_interface.py:342-366
-- Pattern matching for numbered entities (attendee_47, person_12, etc.)
-- Fallback to minimal entity creation on LLM failure
-- Test coverage - test_m9_on_demand_generation.py (23 comprehensive tests)
-
----
-
-## Mechanism 10: Scene-Level Entity Sets ✅
-
-**Status:** Implemented (schemas.py, workflows.py)
-
-**Implementation Evidence:**
-- EnvironmentEntity - schemas.py:114-124 (location, capacity, ambient_temperature, lighting_level, weather, architectural_style, acoustic_properties)
-- AtmosphereEntity - schemas.py:127-136 (tension_level, formality_level, emotional_valence, emotional_arousal, social_cohesion, energy_level)
-- CrowdEntity - schemas.py:139-148 (size, density, mood_distribution, movement_pattern, demographic_composition, noise_level)
-- `compute_scene_atmosphere()` - workflows.py:266+ (aggregates entity states into scene atmosphere)
-- `compute_crowd_dynamics()` - workflows.py (crowd behavior computation)
-- Integration with dialog and multi-entity synthesis workflows
-
----
-
-## Mechanism 11: Dialog/Interaction Synthesis ✅
-
-**Status:** Implemented (schemas.py, workflows.py, validation.py, llm_v2.py)
-
-**Implementation Evidence:**
-- DialogTurn - schemas.py:220-229 (speaker, content, timestamp, emotional_tone, knowledge_references, confidence, physical_state_influence)
-- DialogData - schemas.py:232-239 (turns, total_duration, information_exchanged, relationship_impacts, atmosphere_evolution)
-- Dialog (SQLModel) - schemas.py:242-262 (persistent dialog storage)
-- `synthesize_dialog()` - workflows.py:645-813 (full physical/emotional/temporal context)
-- `generate_dialog()` - llm_v2.py:717-760 (LLM integration with structured output)
-- Dialog validators - validation.py:248-457
-  - `validate_dialog_realism()` - validation.py:248-327
-  - `validate_dialog_knowledge_consistency()` - validation.py:330-390
-  - `validate_dialog_relationship_consistency()` - validation.py:393-457
-- Storage methods - storage.py:162-194 (save_dialog, get_dialog, get_dialogs_at_timepoint, get_dialogs_for_entities)
-
----
-
-## Mechanism 12: Counterfactual Branching ✅
-
-**Status:** Implemented (172 code references)
-
-### Branch Creation Algorithm
+Create alternate timelines from intervention points:
 
 ```python
-def create_counterfactual_branch(
-    parent_timeline: Timeline,
-    intervention_point: str,
-    intervention: Intervention
-) -> Timeline:
-    """Create alternate timeline with intervention applied"""
-    
-    branch = Timeline(
-        timeline_id=generate_uuid(),
-        parent_timeline_id=parent_timeline.timeline_id,
-        branch_point=intervention_point
-    )
+def create_counterfactual_branch(parent_timeline, intervention_point, intervention):
+    branch = Timeline(parent_id=parent_timeline.id, branch_point=intervention_point)
     
     # Copy timepoints before intervention
     for tp in parent_timeline.get_timepoints_before(intervention_point):
@@ -546,1268 +216,534 @@ def create_counterfactual_branch(
     apply_intervention(branch_tp, intervention)
     branch.add_timepoint(branch_tp)
     
-    # Propagate causality forward
+    # Propagate causal effects forward
     propagate_causal_effects(branch, intervention_point)
     
     return branch
 ```
 
----
+Enables "what if Madison hadn't shared his notes?" queries with proper causal propagation.
 
-## Mechanism 13: Multi-Entity Synthesis ✅
+## M14: Circadian Activity Patterns
 
-**Status:** Implemented (schemas.py, workflows.py, storage.py)
-
-**Implementation Evidence:**
-- RelationshipMetrics - schemas.py:268-276 (shared_knowledge, belief_alignment, interaction_count, trust_level, emotional_bond, power_dynamic)
-- RelationshipState - schemas.py:278-286 (relationship state at specific timepoint)
-- RelationshipTrajectory (SQLModel) - schemas.py:288-299 (evolution over time)
-- Contradiction - schemas.py:301-311 (identified contradictions between entities)
-- ComparativeAnalysis - schemas.py:313-323 (multi-entity comparison results)
-- `analyze_relationship_evolution()` - workflows.py:819+ (relationship trajectory tracking)
-- `detect_contradictions()` - workflows.py (contradiction detection)
-- `synthesize_multi_entity_response()` - workflows.py (comparative analysis across entities)
-- Storage methods - storage.py:200-230 (save_relationship_trajectory, get_relationship_trajectory_between, get_entity_relationships)
-
----
-
-## Mechanism 14: Circadian Activity Patterns ✅
-
-**Status:** Implemented (70 code references)
-
-### Circadian Context Schema
-
-```python
-CircadianContext:
-    hour: int  # 0-23
-    typical_activities: Dict[str, float]
-    ambient_conditions: AmbientConditions
-    social_constraints: List[str]
-```
-
-### Activity Probability Functions
+Entities have activity probabilities that vary with time of day:
 
 ```python
 def get_activity_probability(hour: int, activity: str) -> float:
     probability_map = {
         "sleep": lambda h: 0.95 if 0 <= h < 6 else 0.05,
-        "meals": lambda h: 0.8 if h in [7, 12, 19] else 0.1,
         "work": lambda h: 0.7 if 9 <= h < 17 else 0.1,
         "social": lambda h: 0.6 if 18 <= h < 23 else 0.2,
     }
     return probability_map.get(activity, lambda h: 0.0)(hour)
 ```
 
+This constrains entity behavior plausibly without requiring explicit scheduling logic.
+
 ---
 
-## Mechanism 15: Entity Prospection ✅
+# Pillar 3: Knowledge Provenance
 
-**Status:** Implemented (47 code references)
+The insight: entities shouldn't magically know things. Every piece of knowledge should have a traceable origin—who learned what, from whom, when, with what confidence.
 
-### Prospective State Schema
+## M3: Exposure Event Tracking
+
+Knowledge acquisition is logged as exposure events:
+
+```python
+ExposureEvent:
+    entity_id: str
+    event_type: EventType  # witnessed, learned, told, experienced
+    information: str       # The knowledge item
+    source: Optional[str]  # Another entity or external source
+    timestamp: datetime
+    confidence: float      # 0.0-1.0
+    timepoint_id: str
+```
+
+**Validation constraint**: `entity.knowledge_state ⊆ {e.information for e in entity.exposure_events where e.timestamp ≤ query_timestamp}`
+
+An entity cannot know something without a recorded exposure event explaining how they learned it.
+
+**Causal audit trail**: Exposure events form a DAG. Nodes are information items; edges are causal relationships. Walking the graph validates information accessibility and enables counterfactual reasoning ("if Jefferson hadn't received that letter...").
+
+## M4: Physics-Inspired Validation
+
+Five validators enforce consistency using conservation-law metaphors:
+
+**Information Conservation** (Shannon entropy): Knowledge state cannot exceed exposure history.
+
+```python
+def validate_information(entity, context):
+    knowledge = set(entity.knowledge_state)
+    exposure = set(e.information for e in context["exposure_history"])
+    violations = knowledge - exposure
+    return ValidationResult(valid=len(violations) == 0, violations=list(violations))
+```
+
+**Energy Budget** (thermodynamic): Entities have bounded cognitive/physical energy per timepoint.
+
+**Behavioral Inertia**: Personality traits persist; sudden changes require justification.
+
+**Biological Constraints**: Physical limitations (illness, fatigue, location) constrain behavior.
+
+**Network Flow**: Information propagation respects relationship topology.
+
+---
+
+# Pillar 4: Entity Simulation
+
+Generating and synthesizing entity behavior at the appropriate fidelity level.
+
+## M9: On-Demand Entity Generation
+
+Queries may reference entities that don't exist yet. The system detects this and generates plausible entities on demand:
+
+```python
+def detect_entity_gap(query, existing_entities):
+    referenced = extract_entity_names(query)
+    missing = referenced - set(existing_entities)
+    return missing
+
+def generate_entity_on_demand(name, context):
+    # LLM generates plausible entity given scenario context
+    # Falls back to minimal entity creation on failure
+```
+
+Pattern matching handles numbered entities ("attendee_47", "person_12") that emerge from queries about crowds or background characters.
+
+## M10: Scene-Level Entity Sets
+
+Scenes have their own entity types that influence individual behavior:
+
+```python
+EnvironmentEntity:  # Physical space
+    location, capacity, lighting, weather, acoustics
+
+AtmosphereEntity:   # Emergent mood
+    tension_level, formality, emotional_valence, energy_level
+
+CrowdEntity:        # Collective behavior
+    size, density, mood_distribution, movement_pattern
+```
+
+Individual entity behavior is synthesized in context of scene-level state—a heated argument affects the atmosphere, which affects how other entities behave.
+
+## M11: Dialog Synthesis
+
+Dialog generation incorporates full context:
+
+```python
+DialogTurn:
+    speaker: str
+    content: str
+    timestamp: datetime
+    emotional_tone: str
+    knowledge_references: List[str]  # What knowledge is being used
+    physical_state_influence: str    # How body state affects speech
+```
+
+**Validation**: Dialog is checked for knowledge consistency (can speaker know this?), relationship consistency (would they say this to this person?), and realism (physical/emotional constraints on speech).
+
+## M13: Multi-Entity Synthesis
+
+Relationships evolve and can be analyzed across entities:
+
+```python
+RelationshipMetrics:
+    shared_knowledge: Set[str]
+    belief_alignment: float
+    interaction_count: int
+    trust_level: float
+    power_dynamic: float
+
+def analyze_relationship_evolution(entity_a, entity_b, timespan):
+    # Track how relationship metrics change over timepoints
+    
+def detect_contradictions(entities, timepoint):
+    # Find belief conflicts between entities
+```
+
+## M15: Entity Prospection
+
+Entities model their own futures, and those models influence present behavior:
 
 ```python
 ProspectiveState:
     entity_id: str
-    timepoint_id: str
     forecast_horizon: timedelta
     expectations: List[Expectation]
     contingency_plans: Dict[str, List[Action]]
     anxiety_level: float
 ```
 
----
+A founder considering a pivot doesn't just react to current state—they simulate consequences (imperfectly, with bias) and act on those simulations. This captures planning, anxiety, and anticipatory behavior.
 
-## Mechanism 16: Animistic Entity Extension ✅
+## M16: Animistic Entity Extension
 
-**Status:** Implemented (102 code references)
-
-### Non-Human Entity Types
+Objects, institutions, and places can have agency:
 
 ```python
-class AnimisticEntityTypes:
-    ANIMAL = "animal"
-    PLANT = "plant"
-    OBJECT = "object"
-    BUILDING = "building"
-    ABSTRACT = "abstract_concept"
+class AnimismLevel:
+    0: Only humans
+    1: Humans + animals/buildings
+    2: All objects/organisms  
+    3: Abstract concepts
+    4: Adaptive (AnyEntity)
+    5: Spiritual (KamiEntity)
+    6: AI agents
 ```
 
-### Animism Level Control
-
-```python
-class AnimismConfig:
-    level: int  # 0-6
-    # Level 0: Only human entities
-    # Level 1: Humans + animals/buildings
-    # Level 2: All objects/organisms
-    # Level 3: Abstract concepts
-    # Level 4: AnyEntity (adaptive)
-    # Level 5: KamiEntity (spiritual)
-    # Level 6: AIEntity (external agents)
-```
+The conference room "wants" productive meetings; the startup's codebase "resists" certain changes. This captures how non-human entities shape behavior without requiring explicit rules—the animistic frame lets the LLM reason about object/institution agency naturally.
 
 ---
 
-## Mechanism 17: Modal Temporal Causality ✅
+# Pillar 5: Infrastructure
 
-**Status:** Implemented (73+ code references)
+System-level optimizations that make everything else work better.
 
-### Causal Mode Enumeration
+## M18: Intelligent Model Selection
+
+Different actions have different requirements. Dialog synthesis needs conversational fluency; mathematical reasoning needs strong logical capabilities; JSON generation needs structured output reliability. M18 provides capability-based model selection.
+
+### Core Concepts
+
+**Action Types**: 16 distinct action categories, each with different model requirements:
 
 ```python
-class TemporalMode(Enum):
-    PEARL = "pearl"              # Standard DAG causality
-    DIRECTORIAL = "directorial"  # Narrative structure
-    NONLINEAR = "nonlinear"      # Presentation ≠ causality
-    BRANCHING = "branching"      # Many-worlds
-    CYCLICAL = "cyclical"        # Time loops
-    PORTAL = "portal"            # Backward inference from endpoint to origin
+class ActionType(Enum):
+    ENTITY_POPULATION = auto()       # Generating entity profiles
+    DIALOG_SYNTHESIS = auto()        # Creating realistic conversations
+    TEMPORAL_REASONING = auto()      # Causal chain analysis
+    COUNTERFACTUAL_PREDICTION = auto()  # "What if" scenarios
+    KNOWLEDGE_VALIDATION = auto()    # Checking information consistency
+    SCENE_GENERATION = auto()        # Environment/atmosphere creation
+    RELATIONSHIP_ANALYSIS = auto()   # Inter-entity dynamics
+    PROSPECTION = auto()             # Entity future modeling
+    ANIMISTIC_BEHAVIOR = auto()      # Object/institution agency
+    PORTAL_BACKWARD_REASONING = auto()  # Backward temporal inference
+    PORTAL_PATH_SCORING = auto()     # Evaluating path plausibility
+    CONFIG_GENERATION = auto()       # NL to simulation config
+    TENSOR_COMPRESSION = auto()      # Entity state compression
+    VALIDATION = auto()              # General consistency checks
+    SUMMARIZATION = auto()           # Condensing information
+    GENERAL = auto()                 # Catch-all
 ```
 
-### Mode-Specific Configuration
+**Model Capabilities**: 15 capability dimensions for scoring models:
 
-Each mode has unique configuration:
-- **Pearl**: Strict ordering, no retrocausality
-- **Directorial**: Narrative arc, dramatic tension
-- **Nonlinear**: Presentation order ≠ causal order
-- **Branching**: Multiple active timelines
-- **Cyclical**: Prophecy accuracy, destiny weight
-- **Portal**: Backward simulation, path exploration, coherence validation
-
-### PORTAL Mode: Backward Temporal Reasoning
-
-**Implementation Evidence:**
-- PortalStrategy class - workflows/portal_strategy.py (440+ lines)
-- Portal configuration - generation/config_schema.py:246-310 (18 portal-specific fields)
-- TemporalAgent integration - workflows.py:2560-2666
-  - `generate_antecedent_timepoint()` - workflows.py:2560-2628
-  - `run_portal_simulation()` - workflows.py:2630-2666
-  - Portal event probability boost - workflows.py:2424-2437
-- Validation support - validation.py:1343-1364 (temporal_consistency for PORTAL mode)
-- Test coverage - test_portal_mode.py (8 test classes, comprehensive coverage)
-- Example template - examples/portal_presidential_election.py
-
-#### Portal Architecture
-
-PORTAL mode performs **backward inference** from a known endpoint (portal) to a known origin, discovering plausible paths that connect them.
-
-**Dual-Layer Design:**
-1. **PortalStrategy (workflow)**: Orchestrates backward path exploration
-2. **PORTAL TemporalMode (causality)**: Defines causal rules for backward inference
-
-**Example:**
 ```python
-Portal: "John Doe elected President in 2040"
-Origin: "John Doe is VP of Engineering in 2025"
-Goal: Find the most plausible paths from 2025 → 2040
+class ModelCapability(Enum):
+    STRUCTURED_JSON = auto()      # Reliable JSON output
+    LONG_FORM_TEXT = auto()       # Extended prose generation
+    DIALOG_GENERATION = auto()    # Natural conversation
+    MATHEMATICAL = auto()         # Numerical reasoning
+    LOGICAL_REASONING = auto()    # Formal logic
+    CAUSAL_REASONING = auto()     # Cause-effect analysis
+    TEMPORAL_REASONING = auto()   # Time-based inference
+    LARGE_CONTEXT = auto()        # 32k+ context window
+    VERY_LARGE_CONTEXT = auto()   # 128k+ context window
+    FAST_INFERENCE = auto()       # Low latency
+    COST_EFFICIENT = auto()       # Low cost per token
+    HIGH_QUALITY = auto()         # Premium output quality
+    CREATIVE = auto()             # Novel generation
+    ANALYTICAL = auto()           # Data analysis
+    INSTRUCTION_FOLLOWING = auto()  # Precise adherence
 ```
 
-#### Portal Configuration
+### Model Registry
+
+Only open-source models with licenses permitting commercial synthetic data generation:
+
+| Model | Context | Strengths | License |
+|-------|---------|-----------|---------|
+| **Llama 3.1 8B** | 128k | Fast, cost-efficient | Llama 3.1 |
+| **Llama 3.1 70B** | 128k | Balanced quality/cost, dialog | Llama 3.1 |
+| **Llama 3.1 405B** | 128k | Highest quality | Llama 3.1 |
+| **Llama 4 Scout** | 512k | Multimodal, huge context | Llama 4 |
+| **Qwen 2.5 7B** | 32k | JSON, code, fast | Qwen |
+| **Qwen 2.5 72B** | 128k | Structured output, analytical | Qwen |
+| **QwQ 32B** | 32k | Mathematical, logical reasoning | Qwen |
+| **DeepSeek Chat** | 64k | Balanced, analytical | **MIT** |
+| **DeepSeek R1** | 64k | Deep reasoning, math | **MIT** |
+| **Mistral 7B** | 32k | Fast, cost-efficient | **Apache 2.0** |
+| **Mixtral 8x7B** | 32k | Balanced MoE | **Apache 2.0** |
+| **Mixtral 8x22B** | 64k | High quality MoE | **Apache 2.0** |
+
+### Selection Algorithm
 
 ```python
-TemporalConfig:
-    mode: TemporalMode.PORTAL
+def select_model(action: ActionType, prefer_quality=False,
+                 prefer_speed=False, prefer_cost=False) -> str:
+    requirements = ACTION_REQUIREMENTS[action]
 
-    # Endpoint definition
-    portal_description: str  # Description of final state
-    portal_year: int  # Year of portal endpoint
+    scored_models = []
+    for model_id, profile in MODEL_REGISTRY.items():
+        # Check required capabilities
+        if not requirements.required.issubset(profile.capabilities):
+            continue
 
-    # Origin definition
-    origin_year: int  # Starting point year
-    origin_description: str  # Optional origin context
+        # Score based on preferred capabilities
+        score = len(requirements.preferred & profile.capabilities)
 
-    # Backward exploration
-    backward_steps: int = 15  # Number of intermediate steps
-    path_count: int = 3  # Top N paths to return
-    candidate_antecedents_per_step: int = 5  # Branching factor
+        # Apply preference weights
+        if prefer_quality:
+            score += profile.relative_quality * 2
+        if prefer_speed:
+            score += profile.relative_speed * 2
+        if prefer_cost:
+            score += (1 - profile.relative_cost) * 2
 
-    # Exploration strategy
-    exploration_mode: str = "adaptive"  # reverse_chronological | oscillating | random | adaptive
-    oscillation_complexity_threshold: int = 10  # When to use oscillating
+        scored_models.append((score, model_id))
 
-    # Hybrid scoring weights
-    llm_scoring_weight: float = 0.35  # LLM plausibility assessment
-    historical_precedent_weight: float = 0.20  # Similar historical patterns
-    causal_necessity_weight: float = 0.25  # How necessary is antecedent?
-    entity_capability_weight: float = 0.15  # Can entity do this?
-    # dynamic_context_weight: 0.05 (implicit tiebreaker)
-
-    # Validation
-    coherence_threshold: float = 0.6  # Minimum forward coherence
-    max_backtrack_depth: int = 3  # Fix failed paths N steps back
+    return max(scored_models)[1]  # Return highest-scoring model
 ```
 
-#### Exploration Strategies
+### Fallback Chains
 
-**REVERSE_CHRONOLOGICAL** (100 → 99 → 98 → ... → 1):
-- Standard backward stepping
-- Simple, predictable
-- Used for straightforward scenarios (steps < threshold)
-
-**OSCILLATING** (100 → 1 → 99 → 2 → 98 → 3 → ...):
-- Fill from both ends inward
-- Better for complex scenarios (steps > threshold)
-- Maintains endpoint + origin constraints simultaneously
-
-**RANDOM**:
-- Fill steps in random order
-- Maximum exploration diversity
-- Higher computational cost
-
-**ADAPTIVE**:
-- System chooses based on complexity
-- Default strategy
-
-#### Hybrid Scoring System
-
-Each antecedent state is scored using 5 components:
+If the primary model fails, automatic retry with alternatives:
 
 ```python
-def score_antecedent(ant: PortalState, cons: PortalState) -> float:
-    scores = {
-        "llm": llm_score(ant, cons),  # 0-1, LLM rates plausibility
-        "historical": historical_precedent_score(ant, cons),  # Similar transitions in history
-        "causal": causal_necessity_score(ant, cons),  # How required is ant for cons?
-        "capability": entity_capability_score(ant, cons),  # Can entities do this?
-        "dynamic_context": dynamic_context_score(ant, cons)  # Economic/political/tech plausibility
-    }
-
-    total = (
-        scores["llm"] * 0.35 +
-        scores["historical"] * 0.20 +
-        scores["causal"] * 0.25 +
-        scores["capability"] * 0.15 +
-        scores["dynamic_context"] * 0.05
-    )
-
-    return total
+def get_fallback_chain(action: ActionType, length: int = 3) -> List[str]:
+    """Returns ordered list of models to try for an action."""
+    primary = select_model(action)
+    alternatives = [
+        select_model(action, prefer_cost=True),   # Cost fallback
+        select_model(action, prefer_speed=True),  # Speed fallback
+    ]
+    return [primary] + [m for m in alternatives if m != primary][:length-1]
 ```
 
-#### Forward Coherence Validation
-
-Backward-generated paths must make sense when simulated forward:
+### Integration with LLMService
 
 ```python
-def validate_forward_coherence(path: PortalPath) -> float:
-    """Simulate origin → portal to check coherence"""
-    coherence_scores = []
+from llm_service import LLMService, ActionType
 
-    for i in range(len(path.states) - 1):
-        current = path.states[i]
-        next_state = path.states[i + 1]
+service = LLMService(config)
 
-        # Check if current → next makes forward sense
-        forward_score = simulate_forward_step(current, next_state)
-        coherence_scores.append(forward_score)
-
-    return sum(coherence_scores) / len(coherence_scores)
-```
-
-Paths below `coherence_threshold` are:
-- **PRUNED**: Coherence < 0.3
-- **BACKTRACKED**: 0.3 ≤ coherence < 0.5, try fixing
-- **MARKED**: 0.5 ≤ coherence < threshold, include with warning
-- **ACCEPTED**: Coherence ≥ threshold
-
-#### Pivot Point Detection
-
-Pivot points are **critical decision moments** where paths diverge significantly:
-
-```python
-def detect_pivot_points(path: PortalPath) -> List[int]:
-    """Identify states with high branching factor"""
-    pivots = []
-
-    for i, state in enumerate(path.states):
-        if len(state.children_states) > 5:  # High branching
-            pivots.append(i)
-
-        # Check variance in antecedent generation
-        if state.antecedent_variance > threshold:
-            pivots.append(i)
-
-    return pivots
-```
-
-Pivot points represent moments where:
-- Multiple plausible antecedents exist
-- Small changes cascade into large effects
-- Critical decisions determine path direction
-
-#### Portal Workflow
-
-1. **Generate Portal State**: Parse endpoint description into PortalState
-2. **Select Strategy**: Adaptive selection based on complexity
-3. **Explore Backward Paths**: Generate N candidate antecedents at each step
-4. **Score Antecedents**: Hybrid scoring (LLM + historical + causal + capability + context)
-5. **Validate Forward Coherence**: Check paths make sense origin → portal
-6. **Rank Paths**: Sort by coherence score
-7. **Detect Pivot Points**: Identify critical decision moments
-
-#### Example Usage
-
-```python
-from schemas import TemporalMode
-from generation.config_schema import TemporalConfig
-from workflows import TemporalAgent
-
-# Configure PORTAL mode
-config = TemporalConfig(
-    mode=TemporalMode.PORTAL,
-    portal_description="John Doe elected President in 2040",
-    portal_year=2040,
-    origin_year=2025,
-    backward_steps=15,
-    path_count=3
+# Action-aware call with automatic model selection
+response = service.call_with_action(
+    action=ActionType.DIALOG_SYNTHESIS,
+    system="Generate realistic dialog",
+    user="Two founders discussing a pivot",
+    use_fallback_chain=True  # Retry with alternatives on failure
 )
 
-# Create agent
-agent = TemporalAgent(mode=TemporalMode.PORTAL, store=store, llm_client=llm)
-
-# Run backward simulation
-paths = agent.run_portal_simulation(config)
-
-# Analyze results
-for path in paths:
-    print(f"Path coherence: {path.coherence_score:.2f}")
-    print(f"Pivot points: {len(path.pivot_points)}")
-    for state in path.states:
-        print(f"  {state.year}: {state.description}")
+# Structured output with appropriate model
+entity = service.structured_call_with_action(
+    action=ActionType.ENTITY_POPULATION,
+    system="Generate entity profile",
+    user="Create a skeptical board member",
+    schema=EntityProfile
+)
 ```
 
-See `examples/portal_presidential_election.py` for complete example.
+### License Compliance
 
-#### Simulation-Based Judging Enhancement (Optional)
+All models in the registry permit commercial use including synthetic data generation:
+- **MIT** (DeepSeek): Most permissive, no restrictions
+- **Apache 2.0** (Mistral): Permissive, attribution required
+- **Llama 3.1/4**: Commercial use allowed, some restrictions on scale
+- **Qwen**: Commercial use allowed
 
-**Implementation Evidence:**
-- Real LLM antecedent generation - workflows/portal_strategy.py:264-404 (structured generation)
-- Mini-simulation runner - workflows/portal_strategy.py:406-628 (forward simulation engine)
-- Judge LLM evaluator - workflows/portal_strategy.py:630-796 (holistic evaluation)
-- Integration layer - workflows/portal_strategy.py:798-916 (smart routing)
-- Configuration fields - generation/config_schema.py:312-340 (7 simulation judging parameters)
-- Template variants - generation/config_schema.py:3573-3923 (12 simulation-judged templates)
-
-**Problem:** Static scoring formulas (LLM plausibility + historical precedent + causal necessity + entity capability + dynamic context) cannot capture:
-- **Emergent behaviors** that arise from forward simulation
-- **Dialog realism** between entities over time
-- **Internal consistency** across multiple steps
-- **Non-obvious implications** of candidate antecedents
-
-**Solution:** Instead of scoring candidates with static formulas, run actual forward mini-simulations from each candidate antecedent and use a judge LLM to holistically evaluate simulation realism.
-
-#### Architecture Comparison
-
-**Standard Scoring (Original):**
-```python
-def score_antecedents(candidates: List[PortalState]) -> List[PortalState]:
-    for candidate in candidates:
-        # Compute weighted formula score
-        score = (
-            llm_score(candidate) * 0.35 +
-            historical_precedent(candidate) * 0.20 +
-            causal_necessity(candidate) * 0.25 +
-            entity_capability(candidate) * 0.15 +
-            dynamic_context(candidate) * 0.05
-        )
-        candidate.plausibility_score = score
-
-    return sorted(candidates, key=lambda c: c.plausibility_score, reverse=True)
-```
-
-**Simulation-Based Judging (Enhanced):**
-```python
-def score_antecedents_with_simulation(
-    candidates: List[PortalState],
-    config: TemporalConfig
-) -> List[PortalState]:
-    simulation_results = []
-
-    # Run forward simulations from each candidate
-    for candidate in candidates:
-        sim_result = run_mini_simulation(
-            start_state=candidate,
-            steps=config.simulation_forward_steps,  # e.g., 2 years
-            include_dialog=config.simulation_include_dialog,
-            max_entities=config.simulation_max_entities
-        )
-        simulation_results.append(sim_result)
-
-    # Judge all simulations holistically
-    scores = judge_simulation_realism(
-        candidates=candidates,
-        simulations=simulation_results,
-        judge_model=config.judge_model,  # e.g., Llama 3.1 405B
-        temperature=config.judge_temperature
-    )
-
-    # Assign scores and sort
-    for candidate, score in zip(candidates, scores):
-        candidate.plausibility_score = score
-
-    return sorted(candidates, key=lambda c: c.plausibility_score, reverse=True)
-```
-
-#### Mini-Simulation Runner
-
-**Forward Simulation Engine:**
-```python
-def run_mini_simulation(
-    start_state: PortalState,
-    steps: int,
-    include_dialog: bool,
-    max_entities: int
-) -> Dict[str, Any]:
-    """
-    Run lightweight forward simulation to validate antecedent realism.
-
-    Returns:
-        {
-            "states": [PortalState],  # Forward progression
-            "dialogs": [DialogData],  # Generated conversations
-            "coherence_metrics": Dict,  # Internal consistency scores
-            "simulation_narrative": str,  # Human-readable summary
-            "emergent_events": List[str]  # Unexpected developments
-        }
-    """
-    simulated_states = [start_state]
-    dialogs = []
-    emergent_events = []
-
-    for step in range(steps):
-        current_state = simulated_states[-1]
-        next_year = current_state.year + 1
-
-        # Generate next state using LLM
-        next_state_description = generate_forward_state(current_state, next_year)
-
-        next_state = PortalState(
-            year=next_year,
-            description=next_state_description,
-            entities=current_state.entities.copy(),
-            world_state=current_state.world_state.copy()
-        )
-        simulated_states.append(next_state)
-
-        # Generate dialog between entities if enabled
-        if include_dialog and len(current_state.entities) >= 2:
-            dialog_data = generate_simulation_dialog(
-                state1=current_state,
-                state2=next_state,
-                entities=current_state.entities[:max_entities]
-            )
-            dialogs.append(dialog_data)
-
-        # Detect emergent behaviors
-        if detect_unexpected_event(current_state, next_state):
-            emergent_events.append(describe_emergence(next_state))
-
-    return {
-        "states": simulated_states,
-        "dialogs": dialogs,
-        "coherence_metrics": compute_simulation_coherence(simulated_states),
-        "simulation_narrative": generate_simulation_narrative(simulated_states, dialogs),
-        "emergent_events": emergent_events
-    }
-```
-
-#### Judge LLM Evaluator
-
-**Holistic Realism Assessment:**
-```python
-def judge_simulation_realism(
-    candidates: List[PortalState],
-    simulations: List[Dict],
-    judge_model: str,
-    temperature: float
-) -> List[float]:
-    """
-    Use judge LLM to evaluate which simulation is most realistic.
-
-    Judge evaluates based on:
-    - Forward simulation coherence
-    - Dialog realism and consistency
-    - Internal logical consistency
-    - Causal necessity (does consequent require this antecedent?)
-    - Entity capabilities (can entities actually do this?)
-    - Emergent behavior plausibility
-    """
-
-    # Build comprehensive prompt with all simulation details
-    prompt = f"""Evaluate the realism of {len(candidates)} backward temporal paths.
-
-For each candidate, you have:
-1. The candidate antecedent state (starting point)
-2. {simulations[0]['states'].__len__()} forward simulated states
-3. Dialog between entities (if available)
-4. Emergent events that arose during simulation
-5. Coherence metrics
-
-Rate each candidate 0.0-1.0 based on:
-- Simulation coherence: Do forward states flow logically?
-- Dialog realism: Are conversations believable?
-- Internal consistency: Are there contradictions?
-- Causal necessity: Does this antecedent lead naturally to the consequent?
-- Entity capabilities: Can entities realistically achieve these outcomes?
-
-Return JSON:
-{{
-  "scores": [score1, score2, ...],
-  "reasoning": "Brief explanation of scoring logic",
-  "best_candidate": candidate_number,
-  "key_concerns": ["concern1", "concern2", ...]
-}}
-"""
-
-    result = llm.generate_structured(
-        prompt=prompt,
-        response_model=JudgeResult,
-        system_prompt="You are an expert at evaluating temporal simulation realism.",
-        temperature=temperature,
-        model=judge_model
-    )
-
-    return result.scores
-```
-
-#### Configuration
-
-**Simulation Judging Parameters:**
-```python
-TemporalConfig:
-    # Enable simulation-based judging
-    use_simulation_judging: bool = False  # Default: off (use static scoring)
-
-    # Simulation parameters
-    simulation_forward_steps: int = 2  # How many steps to simulate forward
-    simulation_max_entities: int = 5  # Limit entities for performance
-    simulation_include_dialog: bool = True  # Generate dialog for realism
-
-    # Judge LLM configuration
-    judge_model: str = "meta-llama/llama-3.1-405b-instruct"  # High-quality judge
-    judge_temperature: float = 0.3  # Low temp for consistent judging
-
-    # Performance optimization
-    simulation_cache_results: bool = True  # Cache simulation results
-```
-
-#### Quality Levels
-
-**Quick Variant** (~2x cost, good quality):
-- 1 forward step per candidate
-- No dialog generation
-- Faster judge model (Llama 70B)
-- Use case: Fast exploration, budget-constrained runs
-
-**Standard Variant** (~3x cost, high quality):
-- 2 forward steps per candidate
-- Dialog generation enabled
-- High-quality judge (Llama 405B)
-- Use case: Production runs, high-quality path generation
-
-**Thorough Variant** (~4-5x cost, maximum quality):
-- 3 forward steps per candidate
-- Dialog + extra analysis
-- High-quality judge with low temperature
-- More candidates per step
-- Use case: Research runs, maximum quality path generation
-
-#### Example Usage
-
-```python
-from generation.config_schema import SimulationConfig
-
-# Standard PORTAL (baseline)
-config = SimulationConfig.portal_presidential_election()
-# Cost: ~$5, Runtime: ~10min
-
-# Simulation-judged QUICK (enhanced)
-config_quick = SimulationConfig.portal_presidential_election_simjudged_quick()
-# Cost: ~$10 (~2x), Runtime: ~20min
-
-# Simulation-judged STANDARD (high quality)
-config_standard = SimulationConfig.portal_presidential_election_simjudged()
-# Cost: ~$15 (~3x), Runtime: ~30min
-
-# Simulation-judged THOROUGH (maximum quality)
-config_thorough = SimulationConfig.portal_presidential_election_simjudged_thorough()
-# Cost: ~$25 (~4-5x), Runtime: ~45min
-```
-
-#### Performance Characteristics
-
-**Computational Cost:**
-- Standard: N candidates × static scoring = O(N)
-- Simulation-judged: N candidates × K forward steps × dialog generation = O(N × K)
-- Typical overhead: 2x-5x depending on configuration
-
-**Quality Improvement:**
-- Captures emergent behaviors invisible to static formulas
-- Validates dialog realism through actual generation
-- Detects internal inconsistencies across multiple steps
-- More accurate assessment of entity capabilities
-- Significant improvement in path plausibility for complex scenarios
-
-**Use Cases:**
-- **Quick:** Fast exploration, budget-constrained runs, testing
-- **Standard:** Production runs, high-quality path generation, general use
-- **Thorough:** Research runs, publication-quality paths, maximum realism
-
-**Testing:**
-```bash
-# Run standard PORTAL tests (baseline)
-python run_all_mechanism_tests.py --portal-test-only
-
-# Run simulation-judged QUICK variants
-python run_all_mechanism_tests.py --portal-simjudged-quick-only
-
-# Run simulation-judged STANDARD variants
-python run_all_mechanism_tests.py --portal-simjudged-only
-
-# Run simulation-judged THOROUGH variants
-python run_all_mechanism_tests.py --portal-simjudged-thorough-only
-
-# Run ALL PORTAL variants for comparison
-python run_all_mechanism_tests.py --portal-all
-```
+Models explicitly excluded: OpenAI (usage restrictions), Anthropic (synthetic data restrictions), Google (commercial restrictions).
 
 ---
 
-## M1+M17 Integration: Adaptive Fidelity-Temporal Strategy ✅
+# Unified Fidelity-Temporal Strategy
 
-**Status:** Implemented (Database v2, Phase 7)
+M1 (fidelity) and M17 (temporal mode) aren't independent—they co-determine resource allocation.
 
-### Problem Statement
+## The Integration Problem
 
-Previous implementations treated fidelity allocation (M1) and temporal mode (M17) as independent concerns:
-- **M1 (Heterogeneous Fidelity)**: Resolution levels per entity/timepoint determined by query patterns
-- **M17 (Modal Temporal Causality)**: Temporal progression mode (PEARL, PORTAL, DIRECTORIAL, etc.)
+PORTAL mode needs more tokens than PEARL (backward inference is complex). Entity importance depends on temporal structure. Token budgets must adapt to mode complexity.
 
-This separation caused issues:
-- Token budgets couldn't adapt to temporal mode complexity (PORTAL needs more tokens than PEARL)
-- Fidelity allocation didn't consider temporal strategy requirements
-- No unified planning system for both dimensions
-- Difficult to optimize cost vs quality tradeoffs
+## FidelityTemporalStrategy
 
-### Architectural Solution
-
-**M1+M17 Integration** enables the TemporalAgent to **co-determine** both fidelity allocation AND temporal progression as a unified strategy. The agent considers:
-- **Token budget constraints**: Hard limits or soft guidance
-- **Temporal mode requirements**: PORTAL needs more detail than PEARL
-- **Entity importance**: Central entities get higher fidelity
-- **Timepoint criticality**: Pivotal moments get higher resolution
-- **Planning mode**: Programmatic, adaptive, or hybrid allocation
-
-### Core Components
-
-#### 1. FidelityPlanningMode Enum
-
-Controls how fidelity is allocated across the temporal graph:
+The TemporalAgent co-determines both dimensions:
 
 ```python
-class FidelityPlanningMode(str, Enum):
-    PROGRAMMATIC = "programmatic"  # Static allocation via config
-    ADAPTIVE = "adaptive"          # TemporalAgent decides dynamically
-    HYBRID = "hybrid"              # Combine programmatic + adaptive
+FidelityTemporalStrategy:
+    entity_resolution_map: Dict[str, ResolutionLevel]
+    timepoint_resolution_map: Dict[str, ResolutionLevel]
+    token_budget: Optional[int]
+    temporal_mode_complexity: float  # PORTAL=1.5, PEARL=1.0
+    planning_mode: FidelityPlanningMode  # PROGRAMMATIC | ADAPTIVE | HYBRID
+    budget_mode: TokenBudgetMode  # HARD_CONSTRAINT | SOFT_GUIDANCE | MAX_QUALITY
 ```
 
-**PROGRAMMATIC**: Developer explicitly specifies resolution per entity type
-**ADAPTIVE**: TemporalAgent analyzes entities and allocates based on centrality/query patterns
-**HYBRID**: Start with programmatic baseline, adapt based on runtime observations
+## Fidelity Templates
 
-#### 2. TokenBudgetMode Enum
+Pre-configured strategies for common scenarios:
 
-Controls how token budgets are enforced:
+| Template | Default Resolution | Token Budget | Planning Mode |
+|----------|-------------------|--------------|---------------|
+| minimal | TENSOR_ONLY | 50k | PROGRAMMATIC |
+| balanced | SCENE | 250k | HYBRID |
+| high_quality | GRAPH | 500k | ADAPTIVE |
+| maximum | DIALOG | unlimited | ADAPTIVE |
 
-```python
-class TokenBudgetMode(str, Enum):
-    HARD_CONSTRAINT = "hard_constraint"          # Strict limit, fail if exceeded
-    SOFT_GUIDANCE = "soft_guidance"              # Prefer staying under but allow overrun
-    MAX_QUALITY = "max_quality"                  # Ignore budget, maximize quality
-    ADAPTIVE_FALLBACK = "adaptive_fallback"      # Try max quality, fallback if too expensive
-    ORCHESTRATOR_DIRECTED = "orchestrator_directed"  # Orchestrator controls allocation
-    USER_CONFIGURED = "user_configured"          # User sets explicit allocations
-```
-
-**HARD_CONSTRAINT**: Token budget is absolute limit (raises error if exceeded)
-**SOFT_GUIDANCE**: Prefer staying under budget but allow 20% overrun
-**MAX_QUALITY**: Ignore budget entirely, generate highest quality
-**ADAPTIVE_FALLBACK**: Try high quality first, reduce fidelity if too expensive
-**ORCHESTRATOR_DIRECTED**: Orchestrator pre-allocates budget per entity/timepoint
-**USER_CONFIGURED**: User provides explicit fidelity allocations in config
-
-#### 3. FidelityTemporalStrategy Model
-
-Unified strategy combining fidelity allocation and temporal progression:
+## Temporal Mode Complexity Multipliers
 
 ```python
-@dataclass
-class FidelityTemporalStrategy:
-    """Unified strategy for fidelity allocation + temporal progression"""
-
-    # Fidelity allocation
-    entity_resolution_map: Dict[str, ResolutionLevel]  # Per-entity resolution
-    timepoint_resolution_map: Dict[str, ResolutionLevel]  # Per-timepoint resolution
-    default_resolution: ResolutionLevel = ResolutionLevel.SCENE
-
-    # Token budget tracking
-    token_budget: Optional[int] = None
-    allocated_tokens_per_entity: Dict[str, int] = field(default_factory=dict)
-    allocated_tokens_per_timepoint: Dict[str, int] = field(default_factory=dict)
-    estimated_total_tokens: int = 0
-
-    # Planning metadata
-    planning_mode: FidelityPlanningMode = FidelityPlanningMode.ADAPTIVE
-    budget_mode: TokenBudgetMode = TokenBudgetMode.SOFT_GUIDANCE
-
-    # Temporal mode integration
-    temporal_mode: TemporalMode = TemporalMode.PEARL
-    temporal_mode_complexity: float = 1.0  # Complexity multiplier (PORTAL=1.5, PEARL=1.0)
-
-    # Runtime adaptation
-    adaptation_triggers: List[str] = field(default_factory=list)
-    budget_utilization: float = 0.0  # Actual tokens / budget
-```
-
-#### 4. TemporalAgent Co-Determination
-
-The TemporalAgent now determines both fidelity allocation AND temporal progression:
-
-**Implementation:** workflows/__init__.py:166-253
-
-```python
-class TemporalAgent:
-    def __init__(
-        self,
-        mode: Optional[TemporalMode] = None,
-        store=None,
-        llm_client=None,
-        temporal_config=None  # NEW: Full TemporalConfig for fidelity awareness
-    ):
-        self.mode = mode or TemporalMode.PEARL
-        self.store = store
-        self.llm_client = llm_client
-
-        # M1+M17: Store fidelity-temporal configuration
-        self.temporal_config = temporal_config
-        self.fidelity_strategy = None  # Set during temporal generation
-
-    def determine_fidelity_temporal_strategy(
-        self,
-        temporal_config: TemporalConfig,
-        context: Dict[str, Any]
-    ) -> FidelityTemporalStrategy:
-        """
-        Co-determine fidelity allocation + temporal progression.
-
-        Args:
-            temporal_config: Full temporal configuration
-            context: {
-                "entities": List[Entity],
-                "origin_year": int,
-                "token_budget": int
-            }
-
-        Returns:
-            FidelityTemporalStrategy with unified allocation
-        """
-        entities = context.get("entities", [])
-        token_budget = context.get("token_budget")
-
-        # Determine temporal mode complexity
-        complexity = self._get_temporal_complexity(self.mode)
-
-        # Allocate fidelity based on planning mode
-        if temporal_config.fidelity_planning_mode == FidelityPlanningMode.PROGRAMMATIC:
-            strategy = self._programmatic_allocation(temporal_config, entities)
-        elif temporal_config.fidelity_planning_mode == FidelityPlanningMode.ADAPTIVE:
-            strategy = self._adaptive_allocation(temporal_config, entities, token_budget)
-        else:  # HYBRID
-            strategy = self._hybrid_allocation(temporal_config, entities, token_budget)
-
-        # Apply temporal mode complexity multiplier
-        strategy.temporal_mode_complexity = complexity
-        strategy.estimated_total_tokens = int(
-            strategy.estimated_total_tokens * complexity
-        )
-
-        return strategy
-
-    def _get_temporal_complexity(self, mode: TemporalMode) -> float:
-        """Return complexity multiplier for temporal mode"""
-        complexity_map = {
-            TemporalMode.PEARL: 1.0,          # Standard causality
-            TemporalMode.DIRECTORIAL: 1.2,   # Narrative structure
-            TemporalMode.NONLINEAR: 1.3,     # Complex presentation
-            TemporalMode.BRANCHING: 1.4,     # Multiple timelines
-            TemporalMode.CYCLICAL: 1.3,      # Time loops
-            TemporalMode.PORTAL: 1.5,        # Backward inference (most complex)
-        }
-        return complexity_map.get(mode, 1.0)
-```
-
-#### 5. Fidelity Templates Library
-
-Pre-configured fidelity allocation strategies for common scenarios:
-
-**Implementation:** generation/config_schema.py:3925-4050
-
-```python
-# Fidelity templates library
-FIDELITY_TEMPLATES = {
-    "minimal": {
-        "default_resolution": ResolutionLevel.TENSOR_ONLY,
-        "token_budget": 50000,
-        "budget_mode": TokenBudgetMode.HARD_CONSTRAINT,
-        "planning_mode": FidelityPlanningMode.PROGRAMMATIC
-    },
-    "balanced": {
-        "default_resolution": ResolutionLevel.SCENE,
-        "token_budget": 250000,
-        "budget_mode": TokenBudgetMode.SOFT_GUIDANCE,
-        "planning_mode": FidelityPlanningMode.HYBRID
-    },
-    "high_quality": {
-        "default_resolution": ResolutionLevel.GRAPH,
-        "token_budget": 500000,
-        "budget_mode": TokenBudgetMode.SOFT_GUIDANCE,
-        "planning_mode": FidelityPlanningMode.ADAPTIVE
-    },
-    "maximum": {
-        "default_resolution": ResolutionLevel.DIALOG,
-        "token_budget": None,
-        "budget_mode": TokenBudgetMode.MAX_QUALITY,
-        "planning_mode": FidelityPlanningMode.ADAPTIVE
-    }
+complexity_map = {
+    PEARL: 1.0,        # Baseline
+    DIRECTORIAL: 1.2,  # Narrative structure overhead
+    NONLINEAR: 1.3,    # Complex presentation
+    BRANCHING: 1.4,    # Multiple timelines
+    CYCLICAL: 1.3,     # Prophecy validation
+    PORTAL: 1.5,       # Backward inference (most expensive)
 }
 ```
 
-**Template Usage:**
-```python
-config = SimulationConfig(
-    temporal=TemporalConfig(
-        mode=TemporalMode.PORTAL,
-        fidelity_template="balanced"  # Use balanced template
-    )
-)
-```
+---
 
-#### 6. Database v2 Schema
+# Performance Characteristics
 
-New database schema tracks fidelity metrics for analysis:
+## Token Cost Reduction
 
-**Implementation:** schemas.py:1462-1534
+| Approach | Tokens | Cost |
+|----------|--------|------|
+| Naive (uniform high fidelity) | 50M | ~$500/query |
+| Heterogeneous fidelity | 2.5M | ~$25/query |
+| With TTM compression | 250k | ~$2.50/query |
 
-```sql
-CREATE TABLE runs (
-    -- ... existing v1 fields ...
+## Compression Ratios
 
-    -- M1+M17: Database v2 fields (rows 22-27)
-    schema_version TEXT DEFAULT "2.0",
-    fidelity_strategy_json TEXT,           -- JSON serialized FidelityTemporalStrategy
-    fidelity_distribution TEXT,            -- JSON: {"DIALOG": 3, "SCENE": 5, ...}
-    actual_tokens_used REAL,               -- Actual token consumption
-    token_budget_compliance REAL,          -- actual_tokens / token_budget
-    fidelity_efficiency_score REAL         -- (entities + timepoints) / tokens
-);
-```
+- Context tensor: 1000 dims → 8 dims (99.2%)
+- Biology tensor: 50 dims → 4 dims (92%)
+- Behavior tensor: 100 dims → 8 dims (92%)
+- **Overall at TENSOR_ONLY: 50k → 200 tokens (99.6%)**
 
-**Migration:** Database v1 automatically archived to `runs_v1_archive.db`, new runs use v2 schema.
+## Validation Complexity
 
-#### 7. TemporalConfig Extensions
-
-New fields enable fidelity-temporal co-determination:
-
-**Implementation:** generation/config_schema.py:173-239
-
-```python
-class TemporalConfig(BaseModel):
-    # Existing temporal mode fields
-    mode: TemporalMode = TemporalMode.PEARL
-
-    # M1+M17: Fidelity-temporal integration fields
-    fidelity_planning_mode: Optional[FidelityPlanningMode] = None
-    token_budget: Optional[int] = None
-    token_budget_mode: Optional[TokenBudgetMode] = None
-    default_resolution_level: Optional[ResolutionLevel] = None
-    fidelity_template: Optional[str] = None  # Reference to FIDELITY_TEMPLATES
-
-    # Programmatic allocation (optional)
-    entity_type_resolution_map: Optional[Dict[str, str]] = None
-
-    def __post_init__(self):
-        # Load template if specified
-        if self.fidelity_template and self.fidelity_template in FIDELITY_TEMPLATES:
-            template = FIDELITY_TEMPLATES[self.fidelity_template]
-            self.default_resolution_level = template["default_resolution"]
-            self.token_budget = template["token_budget"]
-            self.token_budget_mode = template["budget_mode"]
-            self.fidelity_planning_mode = template["planning_mode"]
-```
-
-### Workflow Integration
-
-#### Entity Generation Phase
-
-**Implementation:** orchestrator.py:407-450
-
-When entities are generated, fidelity resolution is assigned:
-
-```python
-# Generate entities with fidelity allocation
-entities = generate_entities(
-    count=6,
-    temporal_config=config.temporal
-)
-
-# TemporalAgent determines fidelity strategy
-if config.temporal.fidelity_planning_mode:
-    strategy = temporal_agent.determine_fidelity_temporal_strategy(
-        config.temporal,
-        context={"entities": entities, "token_budget": config.temporal.token_budget}
-    )
-
-    # Apply resolution to entities
-    for entity in entities:
-        resolution = strategy.entity_resolution_map.get(
-            entity.entity_id,
-            strategy.default_resolution
-        )
-        entity.resolution_level = resolution
-```
-
-#### Temporal Timepoint Generation
-
-**Implementation:** e2e_workflows/e2e_runner.py:251-287
-
-Fidelity strategy is determined once at start of temporal generation:
-
-```python
-# Create temporal agent with fidelity configuration
-temporal_agent = TemporalAgent(
-    mode=config.temporal.mode,
-    store=store,
-    llm_client=llm,
-    temporal_config=config.temporal  # Full config for fidelity awareness
-)
-
-# M1+M17: Determine fidelity strategy at start of temporal generation
-if config.temporal.fidelity_planning_mode and config.temporal.token_budget:
-    strategy_context = {
-        "entities": scene_result["entities"],
-        "origin_year": datetime.now().year,
-        "token_budget": config.temporal.token_budget
-    }
-    temporal_agent.fidelity_strategy = temporal_agent.determine_fidelity_temporal_strategy(
-        config.temporal,
-        strategy_context
-    )
-    print(f"  📊 Fidelity strategy determined:")
-    print(f"     Planning mode: {config.temporal.fidelity_planning_mode.value}")
-    print(f"     Token budget: {config.temporal.token_budget:,}")
-    print(f"     Template: {config.temporal.fidelity_template}")
-
-# Generate timepoints with fidelity-aware resolution
-for step in range(config.temporal.timepoint_count):
-    timepoint = temporal_agent.generate_next_timepoint(
-        current_state=current_state,
-        fidelity_strategy=temporal_agent.fidelity_strategy
-    )
-```
-
-#### Metrics Tracking and Completion
-
-**Implementation:** e2e_workflows/e2e_runner.py:577-611
-
-Fidelity metrics are calculated and saved to database v2:
-
-```python
-# M1+M17: Calculate fidelity metrics (Database v2)
-from collections import Counter
-resolution_counts = Counter()
-for entity in scene_result["entities"]:
-    res_level = getattr(entity, 'resolution_level', ResolutionLevel.SCENE)
-    resolution_counts[res_level.value] += 1
-
-fidelity_distribution = json.dumps(dict(resolution_counts))
-
-# Calculate token budget compliance
-if config.temporal.token_budget:
-    token_budget_compliance = actual_tokens / config.temporal.token_budget
-else:
-    token_budget_compliance = None
-
-# Calculate fidelity efficiency score
-quality_score = entities_count + timepoints_count
-if actual_tokens > 0:
-    fidelity_efficiency_score = quality_score / actual_tokens
-else:
-    fidelity_efficiency_score = None
-
-# Save to database v2
-metadata.complete_run(
-    run_id=run_id,
-    entities_created=entities_count,
-    timepoints_created=timepoints_count,
-    # ... existing v1 fields ...
-
-    # M1+M17: Database v2 fields
-    fidelity_strategy_json=json.dumps(temporal_agent.fidelity_strategy),
-    fidelity_distribution=fidelity_distribution,
-    actual_tokens_used=actual_tokens,
-    token_budget_compliance=token_budget_compliance,
-    fidelity_efficiency_score=fidelity_efficiency_score
-)
-```
-
-### Monitoring and Analysis
-
-#### Live Monitor Display
-
-**Implementation:** monitoring/db_inspector.py:144-193
-
-The monitor displays fidelity metrics during live runs:
-
-```python
-def format_snapshot_for_llm(self, snapshot: SimulationSnapshot) -> str:
-    lines = []
-    lines.append(f"=== SIMULATION STATE: {snapshot.run_id} ===")
-    lines.append(f"Template: {snapshot.template_id}")
-    lines.append(f"Progress: {snapshot.entities_created} entities, {snapshot.timepoints_created} timepoints")
-    lines.append(f"Cost: ${snapshot.cost_usd:.3f}")
-
-    # M1+M17: Display fidelity metrics (Database v2)
-    if snapshot.fidelity_distribution:
-        lines.append(f"\nFidelity Distribution (M1):")
-        for res_level, count in sorted(snapshot.fidelity_distribution.items()):
-            lines.append(f"  {res_level}: {count} entities")
-
-    if snapshot.token_budget_compliance is not None:
-        compliance_pct = snapshot.token_budget_compliance * 100
-        status = "✓" if snapshot.token_budget_compliance <= 1.0 else "⚠"
-        lines.append(f"Token Budget Compliance: {status} {compliance_pct:.1f}%")
-
-    if snapshot.fidelity_efficiency_score is not None:
-        lines.append(f"Fidelity Efficiency: {snapshot.fidelity_efficiency_score:.6f} quality/token")
-
-    return "\n".join(lines)
-```
-
-**Example Monitor Output:**
-```
-=== SIMULATION STATE: run_20251102_143052_a7b3c9 ===
-Template: portal_timepoint_unicorn
-Progress: 6 entities, 15 timepoints
-Cost: $12.450
-
-Fidelity Distribution (M1):
-  DIALOG: 2 entities
-  SCENE: 3 entities
-  TENSOR_ONLY: 1 entities
-
-Token Budget Compliance: ✓ 87.3%
-Fidelity Efficiency: 0.000168 quality/token
-```
-
-### Example Usage
-
-#### Minimal Configuration (Programmatic)
-```python
-from schemas import TemporalMode, ResolutionLevel, FidelityPlanningMode, TokenBudgetMode
-from generation.config_schema import SimulationConfig, TemporalConfig
-
-config = SimulationConfig(
-    template_id="custom_scenario",
-    temporal=TemporalConfig(
-        mode=TemporalMode.PEARL,
-        fidelity_template="minimal"  # 50k tokens, TENSOR_ONLY default
-    )
-)
-```
-
-#### Balanced Configuration (Hybrid)
-```python
-config = SimulationConfig(
-    template_id="custom_scenario",
-    temporal=TemporalConfig(
-        mode=TemporalMode.PORTAL,
-        fidelity_template="balanced",  # 250k tokens, SCENE default, hybrid planning
-        token_budget_mode=TokenBudgetMode.SOFT_GUIDANCE
-    )
-)
-```
-
-#### Maximum Quality (Adaptive)
-```python
-config = SimulationConfig(
-    template_id="custom_scenario",
-    temporal=TemporalConfig(
-        mode=TemporalMode.PORTAL,
-        fidelity_template="maximum",  # No budget, DIALOG default, adaptive planning
-        fidelity_planning_mode=FidelityPlanningMode.ADAPTIVE
-    )
-)
-```
-
-#### Custom Programmatic Allocation
-```python
-config = SimulationConfig(
-    template_id="custom_scenario",
-    temporal=TemporalConfig(
-        mode=TemporalMode.DIRECTORIAL,
-        fidelity_planning_mode=FidelityPlanningMode.PROGRAMMATIC,
-        token_budget=150000,
-        token_budget_mode=TokenBudgetMode.HARD_CONSTRAINT,
-        default_resolution_level=ResolutionLevel.SCENE,
-        entity_type_resolution_map={
-            "protagonist": "DIALOG",
-            "antagonist": "DIALOG",
-            "supporting": "GRAPH",
-            "background": "TENSOR_ONLY"
-        }
-    )
-)
-```
-
-### Performance Characteristics
-
-#### Token Budget Compliance
-
-With fidelity-temporal co-determination:
-- **HARD_CONSTRAINT**: 100% compliance (simulation fails if exceeded)
-- **SOFT_GUIDANCE**: 95-105% compliance typical
-- **ADAPTIVE_FALLBACK**: Varies, automatic quality reduction if over budget
-- **MAX_QUALITY**: No compliance requirement
-
-#### Fidelity Efficiency Score
-
-Quality metric: `(entities + timepoints) / tokens_used`
-
-Typical scores:
-- **Minimal (TENSOR_ONLY)**: 0.0008 - 0.0012 quality/token
-- **Balanced (SCENE)**: 0.0002 - 0.0004 quality/token
-- **High Quality (GRAPH)**: 0.0001 - 0.0002 quality/token
-- **Maximum (DIALOG)**: 0.00005 - 0.0001 quality/token
-
-Higher scores indicate more efficient use of tokens (more entities/timepoints per token).
-
-#### Temporal Mode Impact
-
-Token budget multipliers:
-- **PEARL**: 1.0x (baseline)
-- **DIRECTORIAL**: 1.2x (narrative structure overhead)
-- **NONLINEAR**: 1.3x (complex presentation)
-- **BRANCHING**: 1.4x (multiple timelines)
-- **CYCLICAL**: 1.3x (prophecy validation)
-- **PORTAL**: 1.5x (backward inference most complex)
-
-### Template Integration
-
-All 67 simulation templates now support fidelity configuration:
-
-**Default Template Configuration:**
-```python
-# All templates default to balanced fidelity unless overridden
-SimulationConfig.portal_timepoint_unicorn()
-# Uses: fidelity_template="balanced", 250k tokens, SCENE default
-```
-
-**Override Fidelity in Templates:**
-```python
-# Customize fidelity for specific scenario
-config = SimulationConfig.portal_presidential_election()
-config.temporal.fidelity_template = "high_quality"  # Upgrade to 500k tokens
-config.temporal.fidelity_planning_mode = FidelityPlanningMode.ADAPTIVE
-```
-
-### Guarantees
-
-1. **Budget Compliance**: HARD_CONSTRAINT mode prevents budget overruns
-2. **Graceful Degradation**: ADAPTIVE_FALLBACK reduces quality if budget insufficient
-3. **Metric Tracking**: All runs tracked in database v2 with fidelity metrics
-4. **Backward Compatibility**: Templates without fidelity config use v1 behavior
-5. **Monitor Visibility**: Live monitor shows fidelity distribution and compliance
-
-### Testing
-
-**M1+M17 Integration Tests:**
-```bash
-# Test fidelity strategy determination
-python -c "from workflows import TemporalAgent; from schemas import TemporalMode; print('✅ TemporalAgent fidelity integration')"
-
-# Test database v2 schema
-python -c "from metadata.run_tracker import MetadataManager; m = MetadataManager(); print('✅ Database v2 schema')"
-
-# Test fidelity templates
-python -c "from generation.config_schema import FIDELITY_TEMPLATES; print(f'✅ {len(FIDELITY_TEMPLATES)} templates loaded')"
-
-# Run E2E test with fidelity tracking
-python run_all_mechanism_tests.py --timepoint-corporate
-```
+O(n) for n validators using set operations and vector norms.
 
 ---
 
-## Technical Challenges Addressed
-
-1. **Token Budget Allocation**: Query-driven resolution with progressive training (M1, M2, M5)
-2. **Temporal Consistency**: Exposure events + causal chains + validators (M3, M4, M7)
-3. **Memory-Compute Tradeoff**: TTM compression with lazy elevation (M6, M5)
-4. **Knowledge Provenance**: Exposure event DAG for causal audit (M3)
-5. **Simulation Refinement**: Progressive training accumulates quality (M2)
-
----
-
-## Performance Characteristics
-
-### Token Cost Reduction
-- Naive: 50k × 100 × 10 = 50M tokens ≈ $500/query
-- Heterogeneous: ~2.5M tokens ≈ $25/query (95% reduction)
-- With compression: ~250k tokens ≈ $2.50/query (99.5% reduction)
-
-### Validation Complexity
-- O(n) for n validators using set operations and vector norms
-
-### Compression Ratios
-- Context tensor: 1000 dims → 8 dims = 99.2% reduction
-- Biology tensor: 50 dims → 4 dims = 92% reduction
-- Behavior tensor: 100 dims → 8 dims = 92% reduction
-- **Overall: 50k → 200 tokens = 99.6% at TENSOR_ONLY**
-
----
-
-## Integration Architecture
+# Integration Flow
 
 ```
-Query Interface
-    ↓
+Query
+  ↓
 Query Parser
-    ↓
-Entity Resolution (M1, M9)
-    ↓
-Resolution Decision (M2, M5)
-    ↓
-State Loading (M6)
-    ↓
-Validation (M3, M4)
-    ↓
-LLM Synthesis (M10, M11, M13, M15)
-    ↓
+  ↓
+Entity Resolution (M1, M9) — identify/generate entities
+  ↓
+Resolution Decision (M2, M5) — determine fidelity level
+  ↓
+State Loading (M6) — decompress if needed
+  ↓
+Validation (M3, M4) — check causal/knowledge consistency
+  ↓
+Synthesis (M10, M11, M13, M15) — generate response
+  ↓
 Response + Metadata
 ```
 
 ---
 
-## References
+# Part 2: Infrastructure Platform (Vision)
 
-- Pearl, J. (2009). Causality: Models, Reasoning, and Inference
+The simulation engine (18 mechanisms above) is implemented. The following describes the **target infrastructure**—what we're building toward. See [MILESTONES.md](MILESTONES.md) for timeline.
+
+## What Timepoint Does vs. What the Model Does
+
+| Concern | Who Handles It |
+|---------|----------------|
+| Text generation (dialog, descriptions) | LLM (12 open-source models via OpenRouter) |
+| Model selection for action type | Timepoint (M18) |
+| Temporal mode semantics | Timepoint (M17) |
+| Causal chain validation | Timepoint (M7, M4) |
+| Knowledge provenance | Timepoint (M3, M4) |
+| Fidelity management | Timepoint (M1, M2, M5, M6) |
+| Entity state management | Timepoint (M9, M10, M13) |
+| Counterfactual branching | Timepoint (M12) |
+| Forward/backward path exploration | Timepoint (M17 PORTAL) |
+
+**The model generates; Timepoint reasons about time, causality, consistency, and selects the right model for each task.**
+
+## Target: Orchestration Layer (Not Yet Implemented)
+
+```python
+# FUTURE API - NOT IMPLEMENTED
+BatchRunner:
+    workers: int                    # Parallel execution threads
+    queue: PriorityQueue[SimJob]    # Job scheduling
+    rate_limiter: TokenBucket       # API cost management
+
+CostManager:
+    budget_total: float
+    budget_per_job: float
+    token_tracking: Dict[str, int]
+```
+
+**Target functionality:**
+- Batch execution with parallel workers
+- Cost tracking and budget enforcement
+- Progress reporting
+
+## Target: Persistence Layer (Partial)
+
+```python
+# FUTURE API - PARTIAL
+SimulationRun:
+    run_id: str
+    config_hash: str              # Exact reproduction
+    model_version: str
+    paths: List[TemporalPath]
+    pivot_points: List[PivotPoint]
+    cost_tokens: int
+    cost_dollars: float
+
+store.query(mode="portal", cost_under=50.0)
+store.aggregate(group_by="parameter", measure="outcome")
+store.compare(run_a, run_b)
+```
+
+**Current reality:** Basic SQLite storage in `storage.py` and `metadata/runs.db`. Advanced queries not implemented.
+
+## Target: Human Interface Layer (Partial)
+
+**Planned features:**
+- Timeline visualization with branching paths
+- Entity relationship graphs (animated over time)
+- Parameter sensitivity heatmaps
+- Path clustering and representative extraction
+- Narrative generation (executive summaries)
+
+**Current reality:** Basic dashboard exists (Quarto + FastAPI). Visualization features pending.
+
+## Target: Integration Layer (Not Implemented)
+
+**Planned integrations:**
+- Prediction market connectors (Polymarket, Metaculus)
+- Decision system webhooks
+- Research export pipelines
+- REST API with OpenAPI spec
+
+## Target: Deployment Architecture (Not Implemented)
+
+```
+Development:     Docker Compose (single machine)
+Production:      Kubernetes with HPA
+High Performance: Bare metal with Ansible
+Global:          Multi-region with coordination
+```
+
+**Current reality:** Single Python process, no containerization.
+
+---
+
+# References
+
+- Pearl, J. (2009). *Causality: Models, Reasoning, and Inference*
 - Shannon, C. E. (1948). A Mathematical Theory of Communication
 - Schölkopf, B., et al. (2021). Toward Causal Representation Learning
 - Vaswani, A., et al. (2017). Attention Is All You Need
 
 ---
 
-**Document Status:** Technical specification and design reference
-**Implementation Status:** Phase 13 Complete ✅ - 17/17 persistent (100%), 17/17 total verified (100%)
-**Recent Phases:** Phase 10 (ANDOS) ✅, Phase 11 (Resilience) ✅, Phase 12 (Narrative Exports) ✅, Phase 13 (Profile Loading) ✅
-**Last Verified:** November 25, 2025
-**See Also:** [PLAN.md](PLAN.md) for development roadmap and phase history, [README.md](README.md) for quick start
+**Implementation Status**: All 18 mechanisms implemented and verified.
+**Platform Status**: Infrastructure vision; see [MILESTONES.md](MILESTONES.md) for roadmap.
+**See also**: [README.md](README.md) for quick start, [ARCHITECTURE-PLAN.md](ARCHITECTURE-PLAN.md) for near-term work.

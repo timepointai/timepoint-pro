@@ -26,7 +26,7 @@ import time
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Set
+from typing import Dict, Set, Optional
 
 # Auto-load .env file
 def load_env():
@@ -205,6 +205,13 @@ def list_modes():
     print("="*80)
 
     print("\n" + "="*80)
+    print("🗣️  NATURAL LANGUAGE MODE (--nl)")
+    print("  Run any simulation from plain English description")
+    print("  Example: --nl \"Emergency board meeting where CFO reveals bankruptcy\"")
+    print("  Options: --nl-entities N, --nl-timepoints N to override defaults")
+    print("="*80)
+
+    print("\n" + "="*80)
     print("💡 TIP: Use --skip-summaries to reduce cost slightly")
     print("="*80)
     print()
@@ -346,6 +353,122 @@ def run_andos_script(script: str, name: str, expected_mechanisms: Set[str]) -> D
             'error': str(e),
             'expected': expected_mechanisms
         }
+
+
+def run_nl_simulation(
+    nl_input: str,
+    skip_summaries: bool = False,
+    entities: Optional[int] = None,
+    timepoints: Optional[int] = None
+) -> bool:
+    """
+    Run a simulation from natural language input.
+
+    This function takes a natural language description and:
+    1. Uses NLConfigGenerator to generate a simple config
+    2. Converts it to production SimulationConfig via NLToProductionAdapter
+    3. Runs the simulation with e2e_runner
+
+    Args:
+        nl_input: Natural language description of the simulation
+        skip_summaries: Whether to skip LLM-powered summaries
+        entities: Override entity count (optional)
+        timepoints: Override timepoint count (optional)
+
+    Returns:
+        True if simulation succeeded, False otherwise
+
+    Example:
+        python run_all_mechanism_tests.py --nl "Board meeting where CEO announces layoffs"
+    """
+    from generation.resilience_orchestrator import ResilientE2EWorkflowRunner
+    from metadata.run_tracker import MetadataManager
+    from nl_interface import NLConfigGenerator
+    from nl_interface.adapter import convert_nl_to_production
+
+    print("=" * 80)
+    print("NATURAL LANGUAGE SIMULATION")
+    print(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("=" * 80)
+    print()
+    print(f"Input: \"{nl_input}\"")
+    print()
+
+    # Check for API key
+    api_key = os.getenv("OPENROUTER_API_KEY")
+    if not api_key:
+        print("ERROR: OPENROUTER_API_KEY not set")
+        return False
+
+    # Step 1: Generate NL config
+    print("Step 1: Generating NL config...")
+    try:
+        generator = NLConfigGenerator(api_key=api_key)
+        nl_config, confidence = generator.generate_config(nl_input)
+        print(f"  Confidence: {confidence:.1%}")
+        print(f"  Scenario: {nl_config.get('scenario', 'N/A')[:100]}...")
+        print(f"  Entities: {len(nl_config.get('entities', []))}")
+        print(f"  Timepoints: {nl_config.get('timepoint_count', 'N/A')}")
+        print(f"  Temporal Mode: {nl_config.get('temporal_mode', 'N/A')}")
+    except Exception as e:
+        print(f"  ERROR: Failed to generate NL config: {e}")
+        return False
+
+    # Apply overrides if provided
+    if entities is not None:
+        nl_config['entities'] = [{'name': f'Entity{i}', 'role': 'participant'} for i in range(entities)]
+        print(f"  (Entity count overridden to {entities})")
+    if timepoints is not None:
+        nl_config['timepoint_count'] = timepoints
+        print(f"  (Timepoint count overridden to {timepoints})")
+
+    # Step 2: Convert to production config
+    print()
+    print("Step 2: Converting to production SimulationConfig...")
+    try:
+        production_config = convert_nl_to_production(nl_config, confidence)
+        print(f"  World ID: {production_config.world_id}")
+        print(f"  Entities: {production_config.entities.count}")
+        print(f"  Timepoints: {production_config.timepoints.count}")
+        print(f"  Temporal Mode: {production_config.temporal.mode.value}")
+    except Exception as e:
+        print(f"  ERROR: Failed to convert to production config: {e}")
+        return False
+
+    # Step 3: Run simulation
+    print()
+    print("Step 3: Running simulation...")
+    try:
+        metadata_manager = MetadataManager(db_path="metadata/runs.db")
+        runner = ResilientE2EWorkflowRunner(
+            metadata_manager,
+            generate_summary=not skip_summaries
+        )
+        result = runner.run(production_config)
+
+        print()
+        print("=" * 80)
+        print("SIMULATION COMPLETE")
+        print("=" * 80)
+        print(f"  Run ID: {result.run_id}")
+        print(f"  Entities Created: {result.entities_created}")
+        print(f"  Timepoints Created: {result.timepoints_created}")
+        print(f"  Mechanisms Used: {', '.join(sorted(result.mechanisms_used or []))}")
+        print(f"  Cost: ${result.cost_usd:.2f}")
+
+        if hasattr(result, 'summary') and result.summary:
+            print()
+            print("Summary:")
+            print(f"  {result.summary}")
+
+        # Print narrative excerpt
+        _print_narrative_excerpt(result.run_id, production_config.world_id)
+
+        return True
+
+    except Exception as e:
+        print(f"  ERROR: Simulation failed: {e}")
+        return False
 
 
 def run_all_templates(mode: str = 'quick', skip_summaries: bool = False):
@@ -983,6 +1106,25 @@ if __name__ == "__main__":
         type=str,
         help="Run a single template by name (e.g. portal_timepoint_product_market_fit)"
     )
+    # Natural Language Interface
+    parser.add_argument(
+        "--nl",
+        type=str,
+        metavar="DESCRIPTION",
+        help="Run simulation from natural language description (e.g. --nl \"Board meeting where CEO announces layoffs\")"
+    )
+    parser.add_argument(
+        "--nl-entities",
+        type=int,
+        metavar="N",
+        help="Override entity count for NL simulation (used with --nl)"
+    )
+    parser.add_argument(
+        "--nl-timepoints",
+        type=int,
+        metavar="N",
+        help="Override timepoint count for NL simulation (used with --nl)"
+    )
     args = parser.parse_args()
 
     # Handle --list-modes first (doesn't require API key)
@@ -1003,6 +1145,16 @@ if __name__ == "__main__":
     if args.template:
         from run_single_template import run_single_template
         success = run_single_template(args.template, skip_summaries=args.skip_summaries)
+        sys.exit(0 if success else 1)
+
+    # Handle --nl mode (natural language simulation)
+    if args.nl:
+        success = run_nl_simulation(
+            nl_input=args.nl,
+            skip_summaries=args.skip_summaries,
+            entities=args.nl_entities,
+            timepoints=args.nl_timepoints
+        )
         sys.exit(0 if success else 1)
 
     # Show deprecation warning if old flag is used

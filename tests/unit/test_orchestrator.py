@@ -281,7 +281,7 @@ class TestResolutionAssigner:
         graph = extractor.build_graph(sample_spec)
 
         assigner = ResolutionAssigner()
-        assignments = assigner.assign_resolutions(sample_spec, graph)
+        assignments, _ = assigner.assign_resolutions(sample_spec, graph)
 
         # Primary actors should get high resolution
         assert assignments["james_madison"] in [ResolutionLevel.DIALOG, ResolutionLevel.TRAINED]
@@ -297,7 +297,7 @@ class TestResolutionAssigner:
 
         # Washington has high centrality (mentor to Madison)
         assigner = ResolutionAssigner()
-        assignments = assigner.assign_resolutions(sample_spec, graph)
+        assignments, _ = assigner.assign_resolutions(sample_spec, graph)
 
         # Should get high resolution due to centrality
         washington_level = assignments["george_washington"]
@@ -360,7 +360,7 @@ class TestOrchestratorAgent:
         graph = extractor.build_graph(sample_spec)
 
         assigner = ResolutionAssigner()
-        resolution_assignments = assigner.assign_resolutions(sample_spec, graph)
+        resolution_assignments, _ = assigner.assign_resolutions(sample_spec, graph)
 
         seeder = KnowledgeSeeder(store)
         exposure_events = seeder.seed_knowledge(sample_spec, create_exposure_events=False)

@@ -17,6 +17,7 @@ from llm_service.response_parser import ResponseParser
 from llm_service.error_handler import ErrorHandler, RetryConfig
 from llm_service.call_logger import CallLogger
 from llm_service.security_filter import SecurityFilter
+from llm_service.model_selector import ModelSelector, ActionType, ModelCapability
 
 
 class LLMService:
@@ -69,6 +70,9 @@ class LLMService:
 
         # Initialize provider based on config
         self.provider = self._create_provider()
+
+        # Initialize model selector for intelligent model selection
+        self.model_selector = ModelSelector(default_model=config.defaults.model)
 
         # Statistics
         self.call_count = 0
@@ -351,3 +355,332 @@ class LLMService:
             template_name=template_name,
             variables=variables
         )
+
+    # =========================================================================
+    # ACTION-BASED MODEL SELECTION METHODS
+    # =========================================================================
+
+    def call_with_action(
+        self,
+        action: ActionType,
+        system: str,
+        user: str,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        prefer_quality: bool = False,
+        prefer_speed: bool = False,
+        prefer_cost: bool = False,
+        use_fallback_chain: bool = True,
+        **kwargs
+    ) -> LLMResponse:
+        """
+        Make an LLM call with intelligent model selection based on action type.
+
+        Automatically selects the best model for the given action based on:
+        - Required capabilities (e.g., DIALOG_SYNTHESIS needs DIALOG_GENERATION)
+        - Preferred capabilities
+        - Quality/speed/cost preferences
+        - Fallback chain for retries
+
+        Args:
+            action: ActionType enum specifying what this call is for
+            system: System prompt
+            user: User prompt
+            temperature: Sampling temperature
+            max_tokens: Max tokens to generate
+            prefer_quality: Prefer higher quality model
+            prefer_speed: Prefer faster model
+            prefer_cost: Prefer cheaper model
+            use_fallback_chain: Use fallback models on failure
+            **kwargs: Additional parameters
+
+        Returns:
+            LLMResponse with content and metadata
+
+        Example:
+            response = service.call_with_action(
+                action=ActionType.DIALOG_SYNTHESIS,
+                system="You are a dialog generator",
+                user="Generate a conversation between Alice and Bob",
+                prefer_quality=True
+            )
+        """
+        # Get optimal model for this action
+        model = self.model_selector.select_model(
+            action=action,
+            prefer_quality=prefer_quality,
+            prefer_speed=prefer_speed,
+            prefer_cost=prefer_cost,
+        )
+
+        if use_fallback_chain:
+            # Get fallback chain for retries
+            fallback_models = self.model_selector.get_fallback_chain(action)
+            return self._call_with_fallback(
+                system=system,
+                user=user,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                models=fallback_models,
+                call_type=action.name.lower(),
+                **kwargs
+            )
+        else:
+            # Single model call
+            return self.call(
+                system=system,
+                user=user,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                model=model,
+                call_type=action.name.lower(),
+                **kwargs
+            )
+
+    def structured_call_with_action(
+        self,
+        action: ActionType,
+        system: str,
+        user: str,
+        schema: Type[BaseModel],
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        prefer_quality: bool = False,
+        prefer_speed: bool = False,
+        prefer_cost: bool = False,
+        use_fallback_chain: bool = True,
+        **kwargs
+    ) -> BaseModel:
+        """
+        Make a structured LLM call with intelligent model selection.
+
+        Combines action-based model selection with structured output parsing.
+        Automatically selects models with STRUCTURED_JSON capability.
+
+        Args:
+            action: ActionType enum specifying what this call is for
+            system: System prompt
+            user: User prompt
+            schema: Pydantic model for response structure
+            temperature: Sampling temperature
+            max_tokens: Max tokens to generate
+            prefer_quality: Prefer higher quality model
+            prefer_speed: Prefer faster model
+            prefer_cost: Prefer cheaper model
+            use_fallback_chain: Use fallback models on failure
+            **kwargs: Additional parameters
+
+        Returns:
+            Instance of schema class populated from LLM response
+
+        Example:
+            result = service.structured_call_with_action(
+                action=ActionType.ENTITY_POPULATION,
+                system="You are an entity generator",
+                user="Generate entity data for Thomas Jefferson",
+                schema=EntityPopulation
+            )
+        """
+        # Get optimal model for this action
+        model = self.model_selector.select_model(
+            action=action,
+            prefer_quality=prefer_quality,
+            prefer_speed=prefer_speed,
+            prefer_cost=prefer_cost,
+        )
+
+        if use_fallback_chain:
+            # Get fallback chain for retries
+            fallback_models = self.model_selector.get_fallback_chain(action)
+            return self._structured_call_with_fallback(
+                system=system,
+                user=user,
+                schema=schema,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                models=fallback_models,
+                call_type=action.name.lower(),
+                **kwargs
+            )
+        else:
+            # Single model call
+            return self.structured_call(
+                system=system,
+                user=user,
+                schema=schema,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                model=model,
+                call_type=action.name.lower(),
+                **kwargs
+            )
+
+    def _call_with_fallback(
+        self,
+        system: str,
+        user: str,
+        models: list,
+        call_type: str = "generic",
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        **kwargs
+    ) -> LLMResponse:
+        """
+        Make an LLM call with fallback chain on failure.
+
+        Tries each model in sequence until one succeeds.
+
+        Args:
+            system: System prompt
+            user: User prompt
+            models: List of model IDs to try in order
+            call_type: Call type for logging
+            temperature: Sampling temperature
+            max_tokens: Max tokens
+            **kwargs: Additional parameters
+
+        Returns:
+            LLMResponse from first successful model
+        """
+        last_error = None
+
+        for i, model in enumerate(models):
+            try:
+                response = self.call(
+                    system=system,
+                    user=user,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    call_type=f"{call_type}_attempt_{i+1}",
+                    **kwargs
+                )
+                if response.success:
+                    if i > 0:
+                        logging.getLogger("llm_service").info(
+                            f"Fallback succeeded on attempt {i+1} with model {model}"
+                        )
+                    return response
+                last_error = response.error
+            except Exception as e:
+                last_error = str(e)
+                logging.getLogger("llm_service").warning(
+                    f"Model {model} failed (attempt {i+1}/{len(models)}): {e}"
+                )
+
+        # All models failed, return error response
+        return LLMResponse(
+            content="",
+            model=models[-1] if models else "unknown",
+            tokens_used={"prompt": 0, "completion": 0, "total": 0},
+            cost_usd=0.0,
+            latency_ms=0.0,
+            success=False,
+            error=f"All {len(models)} fallback models failed. Last error: {last_error}",
+        )
+
+    def _structured_call_with_fallback(
+        self,
+        system: str,
+        user: str,
+        schema: Type[BaseModel],
+        models: list,
+        call_type: str = "structured",
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        **kwargs
+    ) -> BaseModel:
+        """
+        Make a structured LLM call with fallback chain.
+
+        Tries each model in sequence until one produces valid structured output.
+
+        Args:
+            system: System prompt
+            user: User prompt
+            schema: Pydantic model for response
+            models: List of model IDs to try in order
+            call_type: Call type for logging
+            temperature: Sampling temperature
+            max_tokens: Max tokens
+            **kwargs: Additional parameters
+
+        Returns:
+            Instance of schema from first successful model
+        """
+        last_error = None
+
+        for i, model in enumerate(models):
+            try:
+                result = self.structured_call(
+                    system=system,
+                    user=user,
+                    schema=schema,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    call_type=f"{call_type}_attempt_{i+1}",
+                    **kwargs
+                )
+                if i > 0:
+                    logging.getLogger("llm_service").info(
+                        f"Structured fallback succeeded on attempt {i+1} with model {model}"
+                    )
+                return result
+            except Exception as e:
+                last_error = str(e)
+                logging.getLogger("llm_service").warning(
+                    f"Structured call with {model} failed (attempt {i+1}/{len(models)}): {e}"
+                )
+
+        # All models failed
+        if self.config.error_handling.failsoft_enabled:
+            return self.response_parser._create_null_instance(schema)
+        else:
+            raise Exception(f"All {len(models)} fallback models failed. Last error: {last_error}")
+
+    def select_model(
+        self,
+        action: ActionType,
+        **kwargs
+    ) -> str:
+        """
+        Select the best model for an action without making a call.
+
+        Useful for inspecting model selection before calls.
+
+        Args:
+            action: ActionType to select model for
+            **kwargs: Arguments passed to ModelSelector.select_model
+
+        Returns:
+            Model ID string
+        """
+        return self.model_selector.select_model(action, **kwargs)
+
+    def get_model_info(self, model_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get information about a model.
+
+        Args:
+            model_id: Model identifier
+
+        Returns:
+            Dict with model profile information, or None if not found
+        """
+        profile = self.model_selector.get_model_profile(model_id)
+        if profile is None:
+            return None
+
+        return {
+            "model_id": profile.model_id,
+            "display_name": profile.display_name,
+            "provider": profile.provider,
+            "license": profile.license,
+            "context_tokens": profile.context_tokens,
+            "capabilities": [cap.name for cap in profile.capabilities],
+            "relative_speed": profile.relative_speed,
+            "relative_cost": profile.relative_cost,
+            "relative_quality": profile.relative_quality,
+            "notes": profile.notes,
+        }
