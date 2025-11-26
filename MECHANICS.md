@@ -844,12 +844,28 @@ Divergence points reveal where causal reasoning is unstable—these are the edge
 ### CLI
 
 ```bash
-# Run convergence evaluation after simulations
+# Run convergence evaluation on existing runs
 python run_all_mechanism_tests.py --convergence --convergence-runs 3
 
-# Analyze specific template with more runs
-python run_all_mechanism_tests.py --template hospital_crisis --convergence --convergence-runs 5
+# Run convergence E2E test (run template N times, then compute convergence)
+python run_all_mechanism_tests.py --convergence-e2e --template convergence_test_simple --convergence-runs 3
+
+# Use convergence-optimized templates for fast testing
+python run_all_mechanism_tests.py --convergence-e2e --template convergence_test_standard --convergence-runs 5
+
+# Verbose output with side-by-side comparison
+python run_all_mechanism_tests.py --convergence-e2e --template board_meeting --convergence-runs 3 --convergence-verbose
 ```
+
+### Convergence-Optimized Templates
+
+Three templates designed specifically for fast convergence testing:
+
+| Template | Entities | Timepoints | Est. Time/Run |
+|----------|----------|------------|---------------|
+| `convergence_test_simple` | 3 | 2 | ~30s |
+| `convergence_test_standard` | 5 | 3 | ~60s |
+| `convergence_test_comprehensive` | 7 | 5 | ~90s |
 
 ### API Endpoints
 
@@ -880,7 +896,18 @@ class ConvergenceConfig(BaseModel):
     run_count: int = 3           # Runs per convergence set (2-10)
     min_acceptable_score: float = 0.5  # Minimum score to consider "acceptable"
     store_divergence_points: bool = True
+    e2e_mode: bool = False       # Run template N times then compute convergence
+    verbose: bool = False        # Show side-by-side comparison output
 ```
+
+### E2E Mode vs Standard Mode
+
+| Mode | Command | Description |
+|------|---------|-------------|
+| **Standard** | `--convergence` | Analyze existing runs in database |
+| **E2E** | `--convergence-e2e` | Run template N times, then analyze |
+
+E2E mode is useful for validating that a specific template produces consistent causal structures.
 
 ## Limitations
 
@@ -904,6 +931,6 @@ class ConvergenceConfig(BaseModel):
 
 ---
 
-**Implementation Status**: All 18 mechanisms implemented and verified. Convergence evaluation implemented.
+**Implementation Status**: All 18 mechanisms implemented and verified. Convergence evaluation implemented with E2E testing mode and 3 convergence-optimized templates.
 **Platform Status**: Infrastructure vision; see [MILESTONES.md](MILESTONES.md) for roadmap.
 **See also**: [README.md](README.md) for quick start, [QUICKSTART.md](QUICKSTART.md) for natural language usage.

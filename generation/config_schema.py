@@ -806,6 +806,91 @@ class SimulationConfig(BaseModel):
             )
         )
 
+    # =========================================================================
+    # CONVERGENCE TEST TEMPLATES
+    # Lightweight templates optimized for fast convergence testing
+    # =========================================================================
+
+    @classmethod
+    def convergence_test_simple(cls) -> "SimulationConfig":
+        """
+        Ultra-lightweight template for fast convergence testing.
+
+        Minimal entities (3) and timepoints (2) for ~30s per run.
+        Use for quick convergence validation.
+
+        Example:
+            python run_all_mechanism_tests.py --convergence-e2e --template convergence_test_simple --convergence-runs 3
+        """
+        return cls(
+            scenario_description="A brief team meeting where a decision is made on project direction",
+            world_id="convergence_test_simple",
+            entities=EntityConfig(count=3, types=["human"]),
+            timepoints=CompanyConfig(count=2, resolution="hour"),
+            temporal=TemporalConfig(mode=TemporalMode.PEARL),
+            outputs=OutputConfig(
+                formats=["json"],
+                include_dialogs=True,
+                include_relationships=False,
+                generate_narrative_exports=False
+            )
+        )
+
+    @classmethod
+    def convergence_test_standard(cls) -> "SimulationConfig":
+        """
+        Standard template for convergence testing.
+
+        Moderate entities (5) and timepoints (3) for ~60s per run.
+        Balances speed with meaningful causal structure.
+
+        Example:
+            python run_all_mechanism_tests.py --convergence-e2e --template convergence_test_standard --convergence-runs 3
+        """
+        return cls(
+            scenario_description="A startup strategy session where cofounders debate pivoting the business",
+            world_id="convergence_test_standard",
+            entities=EntityConfig(count=5, types=["human"]),
+            timepoints=CompanyConfig(count=3, resolution="hour"),
+            temporal=TemporalConfig(mode=TemporalMode.PEARL),
+            outputs=OutputConfig(
+                formats=["json"],
+                include_dialogs=True,
+                include_relationships=True,
+                generate_narrative_exports=False
+            )
+        )
+
+    @classmethod
+    def convergence_test_comprehensive(cls) -> "SimulationConfig":
+        """
+        Comprehensive template for detailed convergence testing.
+
+        Full entities (7) and timepoints (5) for ~90s per run.
+        Rich causal structure for thorough convergence analysis.
+
+        Example:
+            python run_all_mechanism_tests.py --convergence-e2e --template convergence_test_comprehensive --convergence-runs 3
+        """
+        return cls(
+            scenario_description=(
+                "An emergency board meeting at a tech company facing a hostile takeover. "
+                "The CEO, CFO, legal counsel, and major shareholders must decide on defensive "
+                "strategies while considering employee welfare and long-term vision."
+            ),
+            world_id="convergence_test_comprehensive",
+            entities=EntityConfig(count=7, types=["human"]),
+            timepoints=CompanyConfig(count=5, resolution="hour"),
+            temporal=TemporalConfig(mode=TemporalMode.PEARL),
+            outputs=OutputConfig(
+                formats=["json"],
+                include_dialogs=True,
+                include_relationships=True,
+                include_knowledge_flow=True,
+                generate_narrative_exports=False
+            )
+        )
+
     @classmethod
     def example_variations(cls) -> "SimulationConfig":
         """Example configuration for generating variations"""

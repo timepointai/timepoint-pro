@@ -22,8 +22,8 @@
 - **Mechanism metrics** — All 18 mechanisms tracked per run
 - **Basic dashboard** — Quarto + FastAPI
 - **Narrative exports** — Markdown, JSON, PDF generation
-- **26 simulation templates** — In `generation/config_schema.py`
-- **Convergence evaluation** — Causal graph consistency analysis across runs (Jaccard similarity, robustness grades A-F, divergence point detection)
+- **29 simulation templates** — In `generation/config_schema.py` (includes 3 convergence-optimized templates)
+- **Convergence evaluation** — Causal graph consistency analysis with E2E testing mode, side-by-side comparison, and robustness grading (A-F)
 
 ### Model Stack (All Open Source)
 
@@ -381,6 +381,8 @@ Broad accessibility and ecosystem.
 | License compliance | **COMPLETE** | 12 models, MIT/Apache 2.0/Llama/Qwen |
 | NL interface | **COMPLETE** | `nl_interface/adapter.py` |
 | Convergence evaluation | **COMPLETE** | `evaluation/convergence.py`, storage layer, dashboard |
+| Convergence E2E testing | **COMPLETE** | `--convergence-e2e` mode in `run_all_mechanism_tests.py` |
+| Convergence templates | **COMPLETE** | 3 optimized templates in `config_schema.py` |
 
 ---
 
