@@ -40,15 +40,20 @@
 ```
 Current Architecture:
 ├── orchestrator.py (1,666 lines) — Scene control
-├── workflows/__init__.py (3,041 lines) — TemporalAgent, modes
+├── workflows/ (9 submodules, <800 lines each) — TemporalAgent, modes
+│   ├── temporal_agent.py, dialog_synthesis.py, portal_strategy.py
+│   ├── entity_training.py, relationship_analysis.py, prospection.py
+│   └── counterfactual.py, animistic.py, scene_environment.py
 ├── llm_service/ — Model selection, providers
-│   ├── service.py (685 lines) — LLM facade
-│   ├── model_selector.py (766 lines) — M18 implementation
+│   ├── service.py — LLM facade
+│   ├── model_selector.py — M18 implementation
 │   └── providers/ — OpenRouter integration
 ├── nl_interface/ — Natural language input
 │   └── adapter.py — NLToProductionAdapter
+├── generation/templates/ — 16 JSON simulation templates
 ├── validation.py (1,365 lines) — 5 physics validators
-├── storage.py (407 lines) — SQLite persistence
+├── storage.py — SQLite persistence + transaction support
+├── dashboards/ — Quarto dashboard with home page
 └── metadata/runs.db — Run tracking
 ```
 
@@ -60,27 +65,23 @@ Current Architecture:
 - Containerization / distributed deployment
 - Advanced dashboard visualizations
 
-### Known Technical Debt
-
-From [ARCHITECTURE-PLAN.md](ARCHITECTURE-PLAN.md):
-- `workflows/__init__.py` needs decomposition (3,041 lines → <800 per file)
-- Some test coverage gaps
-
 ---
 
 ## Phase 1: Stabilization
-**Target: Q1 2026**
+**Target: Q1 2026** | **Status: Partially Complete**
 
 Before adding infrastructure, stabilize the core.
 
-### 1.1 Code Architecture
-- [ ] Break up `workflows/__init__.py` into focused modules
-- [ ] Document all 18 mechanisms with examples
+### 1.1 Code Architecture ✅ COMPLETE
+- [x] Break up `workflows/__init__.py` into focused modules (9 submodules, <800 lines each)
+- [x] Document all 18 mechanisms with examples (MECHANICS.md)
+- [x] Transaction support in storage layer
 - [ ] Increase test coverage to 90%+
 
-### 1.2 Configuration
-- [ ] Move hardcoded Python configs to YAML/JSON
-- [ ] Add config validation with clear error messages
+### 1.2 Configuration ✅ COMPLETE
+- [x] Move hardcoded Python configs to JSON (16 templates in generation/templates/)
+- [x] Config validation via Pydantic (SimulationConfig)
+- [x] Template loading with `SimulationConfig.from_template()`
 - [ ] Config inheritance (base + scenario-specific)
 - [ ] Version tracking for configs
 
@@ -93,7 +94,7 @@ Before adding infrastructure, stabilize the core.
 ### 1.4 Deployment Basics
 - [ ] Dockerfile for single-container deployment
 - [ ] Docker Compose for local dev
-- [ ] Environment variable management
+- [x] Environment variable management (.env support)
 - [ ] Basic CI (run tests on PR)
 
 **Exit criteria:** Clean, tested codebase ready for infrastructure layer.
@@ -348,7 +349,6 @@ Broad accessibility and ecosystem.
 ## Dependencies and Risks
 
 ### Dependencies
-- Complete ARCHITECTURE-PLAN Phase 1 before Phase 1 here
 - Model provider API stability
 - Funding for extended development timeline
 
@@ -392,7 +392,7 @@ Broad accessibility and ecosystem.
 
 **Timeline:** 2-3 years to full platform vision.
 
-**First step:** Complete ARCHITECTURE-PLAN Phase 1 (code stabilization), then Phase 1 here (configuration, persistence basics, containerization).
+**First step:** Complete Phase 1 here (persistence basics, containerization).
 
 ---
 

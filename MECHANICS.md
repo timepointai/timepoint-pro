@@ -746,4 +746,4 @@ Global:          Multi-region with coordination
 
 **Implementation Status**: All 18 mechanisms implemented and verified.
 **Platform Status**: Infrastructure vision; see [MILESTONES.md](MILESTONES.md) for roadmap.
-**See also**: [README.md](README.md) for quick start, [ARCHITECTURE-PLAN.md](ARCHITECTURE-PLAN.md) for near-term work.
+**See also**: [README.md](README.md) for quick start, [QUICKSTART.md](QUICKSTART.md) for natural language usage.

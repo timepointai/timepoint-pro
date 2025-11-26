@@ -302,11 +302,13 @@ All models via OpenRouter, all open-source with commercial synthetic data rights
 
 **Key modules:**
 - `orchestrator.py` (1,666 lines): Scene orchestration, entity generation
-- `workflows/__init__.py` (3,041 lines): TemporalAgent, temporal modes, PORTAL
-- `llm_service/` (NEW): Model selection, providers, logging
+- `workflows/` (9 submodules): TemporalAgent, temporal modes, PORTAL
+  - `temporal_agent.py`, `dialog_synthesis.py`, `portal_strategy.py`, etc.
+- `llm_service/`: Model selection, providers, logging
 - `nl_interface/`: Natural language to simulation config
 - `validation.py` (1,365 lines): 5 physics-inspired validators
-- `storage.py` (407 lines): SQLite persistence layer
+- `storage.py` (407 lines): SQLite persistence layer with transaction support
+- `generation/templates/`: 16 JSON simulation templates
 
 ---
 
@@ -353,7 +355,7 @@ See [MILESTONES.md](MILESTONES.md) for the detailed roadmap.
 
 - **[MECHANICS.md](MECHANICS.md)**: Technical specification of all 18 mechanisms
 - **[MILESTONES.md](MILESTONES.md)**: Roadmap from prototype to platform
-- **[ARCHITECTURE-PLAN.md](ARCHITECTURE-PLAN.md)**: Near-term stabilization work
+- **[QUICKSTART.md](QUICKSTART.md)**: Quick start guide for natural language simulations
 
 ---
 

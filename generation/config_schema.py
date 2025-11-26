@@ -144,6 +144,67 @@ def list_economic_scenarios() -> List[str]:
         return []
 
 
+# ============================================================================
+# Simulation Template Loading
+# ============================================================================
+
+def list_templates() -> List[str]:
+    """
+    List all available simulation template IDs.
+
+    Returns:
+        List of template IDs (without .json extension)
+
+    Example:
+        templates = list_templates()
+        # ['board_meeting', 'jefferson_dinner', 'vc_pitch_pearl', ...]
+    """
+    templates_dir = Path(__file__).parent / "templates"
+
+    if not templates_dir.exists():
+        return []
+
+    return [
+        p.stem for p in templates_dir.glob("*.json")
+        if p.is_file()
+    ]
+
+
+def load_template(template_id: str) -> Dict[str, Any]:
+    """
+    Load a simulation template from JSON.
+
+    Args:
+        template_id: The template identifier (e.g., "board_meeting")
+
+    Returns:
+        Dictionary containing the full template data
+
+    Raises:
+        FileNotFoundError: If template doesn't exist
+        ValueError: If template JSON is invalid
+
+    Example:
+        template = load_template("board_meeting")
+        config = SimulationConfig(**template)
+    """
+    templates_dir = Path(__file__).parent / "templates"
+    template_path = templates_dir / f"{template_id}.json"
+
+    if not template_path.exists():
+        available = list_templates()
+        raise FileNotFoundError(
+            f"Template '{template_id}' not found. Available: {available}"
+        )
+
+    try:
+        with open(template_path, 'r') as f:
+            template = json.load(f)
+        return template
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON in template '{template_id}': {e}")
+
+
 class ResolutionLevel(str, Enum):
     """Entity resolution levels"""
     TENSOR_ONLY = "tensor_only"
@@ -635,6 +696,38 @@ class SimulationConfig(BaseModel):
             self.temporal.cycle_length = self.timepoints.count  # Set default
 
         return self
+
+    @classmethod
+    def from_template(cls, template_id: str) -> "SimulationConfig":
+        """
+        Load a SimulationConfig from a JSON template file.
+
+        Args:
+            template_id: The template identifier (e.g., "board_meeting")
+
+        Returns:
+            SimulationConfig instance populated from the template
+
+        Raises:
+            FileNotFoundError: If template doesn't exist
+            ValueError: If template JSON is invalid or fails validation
+
+        Example:
+            # Load a template
+            config = SimulationConfig.from_template("board_meeting")
+
+            # List available templates
+            from generation.config_schema import list_templates
+            available = list_templates()
+            # ['board_meeting', 'jefferson_dinner', 'vc_pitch_pearl', ...]
+        """
+        template_data = load_template(template_id)
+        return cls(**template_data)
+
+    # ========================================================================
+    # Legacy Example Methods (kept for backward compatibility)
+    # Use from_template() for new code
+    # ========================================================================
 
     @classmethod
     def example_board_meeting(cls) -> "SimulationConfig":

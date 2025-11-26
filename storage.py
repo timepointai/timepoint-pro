@@ -2,20 +2,135 @@
 # storage.py - Database and graph persistence
 # ============================================================================
 from sqlmodel import Session, create_engine, select, SQLModel
-from typing import Optional
+from typing import Optional, Generator
+from contextlib import contextmanager
 import networkx as nx
 import json
 from functools import lru_cache
 
 from schemas import Entity, Timeline, SystemPrompt, ExposureEvent, Timepoint, Dialog, RelationshipTrajectory, QueryHistory
 
+
+class TransactionContext:
+    """
+    Context for atomic database operations within a transaction.
+
+    Provides save methods that use a shared session. The transaction
+    is committed when the context exits normally, or rolled back on exception.
+
+    Example:
+        with store.transaction() as tx:
+            tx.save_entity(entity)
+            tx.save_timepoint(timepoint)
+            tx.save_exposure_event(event)
+            # All succeed or all rollback
+    """
+
+    def __init__(self, session: Session):
+        self._session = session
+
+    def save_entity(self, entity: Entity) -> Entity:
+        """Save an entity within the transaction"""
+        from sqlalchemy.orm.attributes import flag_modified
+
+        existing = self._session.exec(
+            select(Entity).where(Entity.entity_id == entity.entity_id)
+        ).first()
+
+        if existing:
+            existing.entity_type = entity.entity_type
+            existing.timepoint = entity.timepoint
+            existing.temporal_span_start = entity.temporal_span_start
+            existing.temporal_span_end = entity.temporal_span_end
+            existing.tensor = entity.tensor
+            existing.training_count = entity.training_count
+            existing.query_count = entity.query_count
+            existing.eigenvector_centrality = entity.eigenvector_centrality
+            existing.resolution_level = entity.resolution_level
+            existing.entity_metadata = entity.entity_metadata
+            flag_modified(existing, "entity_metadata")
+            self._session.add(existing)
+            return existing
+        else:
+            self._session.add(entity)
+            flag_modified(entity, "entity_metadata")
+            return entity
+
+    def save_timepoint(self, timepoint: Timepoint) -> Timepoint:
+        """Save a timepoint within the transaction"""
+        self._session.add(timepoint)
+        return timepoint
+
+    def save_exposure_event(self, event: ExposureEvent) -> ExposureEvent:
+        """Save an exposure event within the transaction"""
+        self._session.add(event)
+        return event
+
+    def save_exposure_events(self, events: list[ExposureEvent]) -> None:
+        """Batch save exposure events within the transaction"""
+        for event in events:
+            self._session.add(event)
+
+    def save_dialog(self, dialog: Dialog) -> Dialog:
+        """Save a dialog within the transaction"""
+        self._session.add(dialog)
+        return dialog
+
+    def save_relationship_trajectory(self, trajectory: RelationshipTrajectory) -> RelationshipTrajectory:
+        """Save a relationship trajectory within the transaction"""
+        self._session.add(trajectory)
+        return trajectory
+
+    def save_timeline(self, timeline: Timeline) -> Timeline:
+        """Save a timeline within the transaction"""
+        self._session.add(timeline)
+        return timeline
+
+    def save_query_history(self, query_history: QueryHistory) -> QueryHistory:
+        """Save query history within the transaction"""
+        self._session.add(query_history)
+        return query_history
+
+    def save_prospective_state(self, prospective_state) -> None:
+        """Save a prospective state within the transaction"""
+        self._session.add(prospective_state)
+        return prospective_state
+
 class GraphStore:
     """Unified storage for entities, timelines, and graphs"""
-    
+
     def __init__(self, db_url: str = "sqlite:///timepoint.db"):
         self.engine = create_engine(db_url)
         SQLModel.metadata.create_all(self.engine)
-    
+
+    @contextmanager
+    def transaction(self) -> Generator[TransactionContext, None, None]:
+        """
+        Create a transaction context for atomic database operations.
+
+        All operations within the context use the same session and are
+        committed together. If any exception occurs, all changes are
+        rolled back.
+
+        Example:
+            with store.transaction() as tx:
+                tx.save_entity(entity)
+                tx.save_timepoint(timepoint)
+                tx.save_exposure_event(event)
+                # All succeed or all rollback
+
+        Yields:
+            TransactionContext: Context with save methods for atomic operations
+        """
+        with Session(self.engine) as session:
+            tx = TransactionContext(session)
+            try:
+                yield tx
+                session.commit()
+            except Exception:
+                session.rollback()
+                raise
+
     def save_entity(self, entity: Entity) -> Entity:
         from sqlalchemy.orm.attributes import flag_modified
         with Session(self.engine) as session:

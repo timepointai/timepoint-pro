@@ -1,353 +1,365 @@
-# Timepoint Dashboard
+# Timepoint Dashboard System
 
-Beautiful, interactive visualization dashboard for Timepoint simulation runs.
-
-![Dashboard Preview](https://img.shields.io/badge/Status-Beta-yellow)
-![Quarto](https://img.shields.io/badge/Quarto-1.4+-blue)
-![Python](https://img.shields.io/badge/Python-3.10+-green)
-
-## Features
-
-### ✅ Implemented
-
-- **Run Selector** - Browse and load recent simulation runs from SQLite database
-- **Metadata Cards** - View run statistics, costs, timing, and status
-- **Timeline Visualization** - Interactive chronological navigation with vis-timeline
-- **Network Graph** - Entity relationship visualization with Cytoscape.js
-- **Mechanism Coverage** - Radar chart showing which mechanisms were used (ECharts)
-- **Executive Summary** - Display narrative summaries from simulation runs
-- **Beautiful UI** - Modern glassmorphism design with gradients and smooth animations
-
-### 🚧 Stubbed (Coming Soon)
-
-- **PORTAL Mode Visualization** - Backward causality paths with pivot points
-- **Run Comparison** - Side-by-side analysis of multiple simulations
-- **Fountain Viewer** - Embedded screenplay reader with scene navigation
-- **Search & Filter** - Full-text search and timepoint filtering
-- **Export Tools** - PNG/SVG exports and PDF reports
-
-## Quick Start
-
-### 1. Install Quarto
-
-**Option A: Homebrew (requires Xcode license acceptance)**
-```bash
-brew install quarto
-```
-
-**Option B: Direct installer**
-```bash
-# Package is already downloaded in project root
-sudo installer -pkg quarto-1.4.549-macos.pkg -target /
-
-# Verify installation
-quarto --version
-```
-
-### 2. Preview Dashboard
-
-```bash
-cd dashboards
-quarto preview
-```
-
-This will:
-1. Load recent runs from `metadata/runs.db`
-2. Parse narrative JSON from `datasets/*/narrative_*.json`
-3. Render interactive visualizations
-4. Open dashboard in your browser at http://localhost:XXXX
-
-### 3. Build Static Site
-
-```bash
-quarto render
-```
-
-Output goes to `_site/` directory - can be deployed to any static host.
+A comprehensive, real-time dashboard system for browsing, analyzing, and visualizing Timepoint simulation runs.
 
 ## Architecture
 
-### File Structure
+The system consists of two main components:
 
-```
-dashboards/
-├── _quarto.yml          # Project configuration
-├── index.qmd            # Main dashboard
-├── about.qmd            # About page
-├── utils.py             # Python data loaders (SQLite + JSON)
-├── styles.css           # Custom CSS styling
-├── README.md            # This file
-└── components/          # Future modular components (empty for now)
-```
+### 1. FastAPI Backend (`api/`)
+REST API server providing real-time access to the runs database.
 
-### Data Flow
+**Key Files:**
+- `server.py` - FastAPI application with 8 REST endpoints
+- `db.py` - Database query layer with filtering, sorting, and pagination
+- `models.py` - Pydantic models for request/response validation
+- `requirements.txt` - Python dependencies
 
-```
-SQLite (runs.db)
-    ↓
-Python (utils.py) → TimepointDataLoader
-    ↓
-JSON exports → Quarto/Observable
-    ↓
-Visualizations (vis-timeline, Cytoscape, ECharts)
-```
+**Endpoints:**
+- `GET /api/runs` - List runs with comprehensive filtering
+- `GET /api/run/{run_id}` - Get detailed run information
+- `GET /api/narrative/{run_id}` - Get narrative JSON
+- `GET /api/screenplay/{run_id}` - Get Fountain screenplay
+- `GET /api/dialogs/{run_id}` - Get all dialogs
+- `GET /api/templates` - List all unique templates
+- `GET /api/mechanisms` - Get mechanism usage counts
+- `GET /api/meta-analytics` - Aggregate analytics across all runs
 
-### Key Components
+### 2. Quarto Frontend
+Interactive web interface built with Quarto + Observable JS.
 
-#### `utils.py` - Data Loading Layer
+**Pages:**
+- `index.qmd` - Main dashboard with visualizations (timeline, network, metrics)
+- `runs.qmd` - Run selection with filtering and search
+- `analytics.qmd` - Meta-analytics with charts and statistics
+- `screenplay.qmd` - Fountain screenplay viewer with navigation
+- `dialogs.qmd` - Dialog navigator with filtering and export
 
-```python
-from utils import get_recent_runs, load_run, get_most_recent_run
+## Installation & Setup
 
-# Get 20 most recent runs
-runs = get_recent_runs(limit=20)
-
-# Load full data for specific run
-run_data = load_run("run_20251103_105234_3a83d054")
-
-# Get most recent run ID
-latest = get_most_recent_run()
-```
-
-**Functions:**
-- `TimepointDataLoader.get_recent_runs(limit)` - Query SQLite for recent runs
-- `TimepointDataLoader.load_narrative(run_id)` - Parse narrative JSON
-- `TimepointDataLoader.load_screenplay(run_id)` - Load Fountain screenplay
-- `TimepointDataLoader.get_run_summary(run_id)` - Comprehensive run data
-
-#### `index.qmd` - Main Dashboard
-
-Uses Observable JS for reactive visualizations:
-
-1. **Python Cell** - Loads data via `utils.py`
-2. **Observable Cells** - Create interactive components:
-   - Run selector dropdown
-   - Metadata and stats cards
-   - Timeline with vis-timeline
-   - Network graph with Cytoscape.js
-   - Metrics with ECharts
-
-#### `styles.css` - Visual Design
-
-- **Color Palette**: Deep purple (#6366f1) + cyan (#06b6d4) gradients
-- **Typography**: Inter (UI) + JetBrains Mono (code)
-- **Effects**: Glassmorphism cards, smooth hover animations
-- **Responsive**: Mobile-friendly with collapsible grids
-
-## Visualization Libraries
-
-### vis-timeline (Timeline)
-
-```javascript
-import {Timeline} from "https://esm.sh/vis-timeline@7.7.3"
-```
-
-Interactive timeline showing:
-- Timepoint markers on chronological axis
-- Event descriptions on hover
-- Zoom and pan controls
-- Customizable date ranges
-
-### Cytoscape.js (Network Graph)
-
-```javascript
-cytoscape = require("https://esm.sh/cytoscape@3.26.0")
-```
-
-Entity relationship network with:
-- Nodes = entities (sized by importance)
-- Edges = relationships/interactions
-- Physics-based layout (COSE algorithm)
-- Interactive zoom/pan/drag
-
-### ECharts (Charts & Metrics)
-
-```javascript
-echarts = require("https://esm.sh/echarts@5.4.3")
-```
-
-Mechanism coverage radar chart showing:
-- Which mechanisms were used
-- Frequency of mechanism invocation
-- Comparative mechanism usage
-
-## Usage Examples
-
-### Load Specific Run
+### 1. Install API Dependencies
 
 ```bash
-# Edit index.qmd, change this line:
-selected_run_id = "run_20251103_105234_3a83d054"
-
-# Render
-quarto render
+cd dashboards/api
+pip install -r requirements.txt
 ```
 
-### Query Recent Runs in Python
+### 2. Install Quarto
 
-```python
-from utils import TimepointDataLoader
+Download and install Quarto from https://quarto.org/docs/get-started/
 
-loader = TimepointDataLoader()
-runs = loader.get_recent_runs(limit=10)
-
-for run in runs:
-    print(f"{run['run_id']}: {run['template_id']} - ${run['cost_usd']:.2f}")
-```
-
-### Export Run Data
-
-```python
-from utils import TimepointDataLoader
-
-loader = TimepointDataLoader()
-run_json = loader.export_for_observable("run_20251103_105234_3a83d054")
-
-# Use in Observable JS
-print(run_json)
-```
-
-## Customization
-
-### Change Theme
-
-Edit `_quarto.yml`:
-
-```yaml
-format:
-  html:
-    theme:
-      - darkly  # Change to: cosmo, flatly, darkly, etc.
-      - styles.css
-```
-
-### Add New Visualization
-
-1. Create `components/my_viz.qmd`
-2. Add Observable JS code block
-3. Import required libraries via ESM
-4. Reference in `index.qmd` via tabs
-
-### Modify Color Palette
-
-Edit `styles.css`:
-
-```css
-:root {
-  --primary-purple: #6366f1;  /* Change to your color */
-  --primary-cyan: #06b6d4;    /* Change to your color */
-  /* ... */
-}
-```
-
-## Troubleshooting
-
-### Quarto Not Found
-
+Or use Homebrew:
 ```bash
-# Check installation
-which quarto
-
-# If not found, install:
 brew install quarto
-# or
-sudo installer -pkg quarto-1.4.549-macos.pkg -target /
 ```
 
-### No Data Loading
+### 3. Launch Dashboard (Recommended)
 
+Use the provided management scripts:
+
+**Option A: Launch Both Servers Together**
 ```bash
-# Verify database exists
-ls -lh ../metadata/runs.db
-
-# Check Python imports
 cd dashboards
-python3.10 -c "from utils import get_recent_runs; print(get_recent_runs())"
+./dashboard.sh
+```
+This starts both backend and frontend, and stops both when you press Ctrl+C.
+
+**Option B: Launch Separately**
+
+Frontend only:
+```bash
+cd dashboards
+./frontend.sh
 ```
 
-### Visualizations Not Rendering
+Backend only:
+```bash
+cd dashboards
+./backend.sh
+```
 
-1. Check browser console for JavaScript errors
-2. Verify ESM imports are loading (check network tab)
-3. Ensure data has correct structure (`currentRun?.narrative?.timepoints`)
+### 4. Manual Launch (Alternative)
 
-### Styling Not Applied
+**Start API Server:**
+```bash
+cd dashboards/api
+python3.10 server.py
+```
+The API will be available at http://localhost:8000
+API documentation at http://localhost:8000/docs
+
+**Start Quarto Preview Server:**
+```bash
+cd dashboards
+quarto preview --port 8888
+```
+The dashboard will be available at http://localhost:8888
+
+## Management Scripts
+
+Three bash scripts are provided for easy server management:
+
+### `dashboard.sh` - Launch Full System
+Starts both backend API and frontend Quarto server together. Automatically handles:
+- Killing existing processes on both ports
+- Starting backend in background
+- Validating backend is running
+- Starting frontend in foreground
+- Clean shutdown of both servers on Ctrl+C
+
+### `frontend.sh` - Frontend Only
+Manages Quarto preview server:
+- Kills any existing Quarto processes
+- Starts Quarto on port 8888
+- Shows helpful URLs
+
+### `backend.sh` - Backend Only
+Manages FastAPI server:
+- Kills any existing API server processes
+- Starts server on port 8000
+- Shows API documentation URL
+
+## Usage
+
+### Browsing Runs
+
+1. Navigate to **Browse Runs** (http://localhost:8888/runs.html)
+2. Use filters to narrow down results:
+   - **Template** - Filter by template ID
+   - **Status** - completed, running, or failed
+   - **Causal Mode** - STANDARD, PORTAL, etc.
+   - **Date Range** - Filter by start date
+   - **Cost Range** - Min/max cost filters
+   - **Entities/Timepoints** - Minimum thresholds
+   - **Mechanisms** - Comma-separated list (e.g., M1,M5,M17)
+3. Click any row to view the full dashboard for that run
+
+### Viewing Run Details
+
+The main dashboard (index.html?run_id=XXX) shows:
+- **Run Metadata** - ID, template, status, cost, duration
+- **Simulation Stats** - Entities, timepoints, LLM calls, tokens
+- **Mechanisms Used** - Visual badges showing which mechanisms were active
+- **Executive Summary** - Narrative summary if available
+- **Visualizations**:
+  - Timeline view (via vis-timeline)
+  - Network graph (via Cytoscape.js)
+  - Mechanism radar chart (via ECharts)
+- **Detailed Analysis**:
+  - Resolution assignments table
+  - Validations table
+  - Mechanism timeline
+
+### Meta-Analytics
+
+The analytics page (analytics.html) provides:
+- **Overview Metrics** - Total runs, cost, success rate, avg cost
+- **Run Statistics** - Completed, failed, entities, timepoints
+- **Cost Analysis** - Cost over time (last 30 days)
+- **Template Performance** - Top templates by usage
+- **Causal Mode Distribution** - Pie chart
+- **Mechanism Co-Occurrence** - Pairs that frequently appear together
+
+### Screenplay Viewer
+
+View Fountain-formatted screenplays (screenplay.html?run_id=XXX):
+- **Scene Navigation** - Jump to specific scenes
+- **Character Filtering** - Show only scenes with specific characters
+- **Dialog Search** - Full-text search
+- **Statistics** - Scene count, character count, line count
+- **Download** - Export to .fountain file
+
+### Dialog Navigator
+
+Browse and analyze dialogs (dialogs.html?run_id=XXX):
+- **Filters**:
+  - Character - Show dialogs from specific characters
+  - Timepoint - Filter by timepoint
+  - Location - Filter by location
+  - Search - Full-text search
+- **Sorting** - Chronological, by character, or by location
+- **Timeline View** - Visual representation of dialogs across timepoints
+- **Export** - Download filtered dialogs as CSV
+
+## Features
+
+### Real-Time Database Access
+All pages fetch data directly from the API, showing the latest information from the database without manual refresh.
+
+### Comprehensive Filtering
+The runs browser supports 10+ filter parameters:
+- Template ID
+- Status (completed/running/failed)
+- Date range
+- Cost range (min/max)
+- Causal mode
+- Mechanisms (comma-separated)
+- Minimum entities
+- Minimum timepoints
+
+### Sorting & Pagination
+- Sort by: started_at, cost_usd, entities_created, timepoints_created, duration_seconds
+- Order: ASC or DESC
+- Pagination: 10, 25, 50, or 100 per page
+
+### Interactive Visualizations
+- **Timeline** - Chronological navigation of timepoints with vis-timeline
+- **Network Graph** - Character relationships with Cytoscape.js
+- **Charts** - Mechanism radar, cost over time, template distribution with ECharts
+
+### Export Capabilities
+- Fountain screenplay download
+- Dialog CSV export
+- Filtered data export
+
+## Database Schema
+
+The system queries the following tables:
+
+### `runs`
+Core run metadata including template_id, status, cost, entities/timepoints created, etc.
+
+### `mechanism_usage`
+Tracks which mechanisms were used in each run with timestamps and context.
+
+### `resolution_assignments`
+Records entity resolution changes (sketch → low → high).
+
+### `validations`
+Stores validation results for each run.
+
+### Narrative JSON Files
+Located in `datasets/{template}/narrative_{timestamp}.json`
+Contains characters, timepoints, dialogs, and executive summary.
+
+### Screenplay Fountain Files
+Located in `datasets/{template}/screenplay_{timestamp}.fountain`
+Fountain-formatted screenplay output.
+
+## API Query Examples
 
 ```bash
-# Clear Quarto cache
-rm -rf _site _freeze
+# List all runs, paginated
+curl "http://localhost:8000/api/runs?page=1&limit=50"
 
-# Rebuild
-quarto render
+# Filter by template and status
+curl "http://localhost:8000/api/runs?template=hospital_crisis&status=completed"
+
+# Filter by cost range
+curl "http://localhost:8000/api/runs?min_cost=0.1&max_cost=1.0"
+
+# Filter by mechanisms
+curl "http://localhost:8000/api/runs?mechanisms=M1,M5,M17"
+
+# Get specific run details
+curl "http://localhost:8000/api/run/hospital_crisis_20251102_134859_a38592ed"
+
+# Get narrative
+curl "http://localhost:8000/api/narrative/hospital_crisis_20251102_134859_a38592ed"
+
+# Get screenplay
+curl "http://localhost:8000/api/screenplay/hospital_crisis_20251102_134859_a38592ed"
+
+# Get meta-analytics
+curl "http://localhost:8000/api/meta-analytics"
 ```
+
+## Technology Stack
+
+### Backend
+- **FastAPI** - Modern Python web framework
+- **Pydantic** - Data validation
+- **SQLite** - Database (via runs.db)
+- **Uvicorn** - ASGI server
+
+### Frontend
+- **Quarto** - Static site generator with native Observable JS support
+- **Observable JS** - Reactive JavaScript for data visualization
+- **vis-timeline** - Interactive timeline visualization
+- **Cytoscape.js** - Network graph visualization
+- **Apache ECharts** - Chart library for analytics
+- **Fountain.js** - Screenplay parsing and rendering
 
 ## Development
 
-### Local Development with Live Reload
+### Adding New Filters
 
-```bash
-cd dashboards
-quarto preview --port 8080
-```
+To add a new filter to the runs browser:
 
-Edit files and dashboard auto-refreshes.
+1. Add filter input in `runs.qmd`:
+   ```javascript
+   viewof newFilter = Inputs.select(...)
+   ```
 
-### Testing Data Loader
+2. Add filter to query params:
+   ```javascript
+   if (newFilter !== "All") params.append("new_filter", newFilter);
+   ```
 
-```bash
-cd dashboards
-python3.10 -m pytest utils.py -v  # (if tests added)
+3. Add filter support in `api/db.py`:
+   ```python
+   if new_filter:
+       where_clauses.append("new_column = ?")
+       params.append(new_filter)
+   ```
 
-# Manual testing
-python3.10 -c "
-from utils import *
-runs = get_recent_runs(5)
-for r in runs:
-    print(r['run_id'], r['template_id'])
-"
-```
+4. Add parameter to `api/server.py`:
+   ```python
+   new_filter: Optional[str] = Query(None, description="...")
+   ```
 
-## Deployment
+### Adding New Visualizations
 
-### GitHub Pages
+1. Add chart container in the .qmd file
+2. Initialize chart library (ECharts, Cytoscape, etc.)
+3. Fetch data from API
+4. Render visualization
 
-```bash
-quarto publish gh-pages
-```
+### Adding New API Endpoints
 
-### Netlify
+1. Add endpoint in `api/server.py`
+2. Add query function in `api/db.py`
+3. Add response model in `api/models.py` if needed
 
-```bash
-quarto publish netlify
-```
+## Troubleshooting
 
-### Static Host
+### API Not Starting
+- Check that port 8000 is available
+- Verify database path in `api/db.py` (default: `../../metadata/runs.db`)
+- Check Python version (requires 3.10+)
 
-```bash
-quarto render
-# Upload _site/ directory to any static host
-```
+### Quarto Preview Issues
+- Verify Quarto is installed: `quarto --version`
+- Check Python kernel: should use `python3.10`
+- Clear cache: `quarto clean`
 
-## Future Enhancements
+### Empty Visualizations
+- Verify run has narrative data (check `narrative_{timestamp}.json` exists)
+- Check API is returning data: `curl http://localhost:8000/api/narrative/{run_id}`
+- Look for browser console errors
 
-See stubbed features in `index.qmd`:
+### CORS Errors
+- Ensure API is running on localhost:8000
+- Check CORS middleware configuration in `api/server.py`
 
-1. **PORTAL Mode Viz** - Backward causality arrows, pivot highlighting
-2. **Run Comparison** - Side-by-side timelines/networks for 2+ runs
-3. **Fountain Viewer** - Embedded screenplay reader
-4. **Search/Filter** - Entity search, timepoint filtering
-5. **Export Tools** - PNG/SVG/PDF exports
+## Statistics (as of 2025-11-03)
 
-Pull requests welcome!
+- **Total Runs**: 558
+- **Total Cost**: $123.67
+- **Completed Runs**: 454
+- **Success Rate**: 81.4%
+- **Templates**: 64 unique
+- **Mechanisms Tracked**: 17
+- **Database Size**: ~558 runs with full metadata
 
-## Credits
+## Next Steps
 
-- **Framework**: [Quarto](https://quarto.org/) (Observable JS + Python)
-- **Timeline**: [vis-timeline](https://visjs.github.io/vis-timeline/)
-- **Network**: [Cytoscape.js](https://js.cytoscape.org/)
-- **Charts**: [Apache ECharts](https://echarts.apache.org/)
-- **Fonts**: Inter + JetBrains Mono
-
----
-
-**Note**: Dashboard requires Quarto installation. The package `quarto-1.4.549-macos.pkg` has been pre-downloaded in project root for convenience.
+Potential enhancements:
+- Add real-time run monitoring (WebSocket support)
+- Implement run comparison view
+- Add mechanism dependency graph
+- Export full reports as PDF
+- Add user authentication
+- Implement run replay/visualization
+- Add cost prediction models
+- Integrate with CI/CD for automatic testing
