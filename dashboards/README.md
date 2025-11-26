@@ -181,6 +181,17 @@ The convergence page (convergence.html) provides:
 - **D (>=50%)** - Unstable, use with caution
 - **F (<50%)** - Unreliable, do not trust
 
+**Running Convergence E2E Tests:**
+```bash
+# Run convergence E2E test with side-by-side comparison
+python run_all_mechanism_tests.py --convergence-e2e --template convergence_test_simple --convergence-runs 3 --convergence-verbose
+```
+
+Three convergence-optimized templates are available for fast testing:
+- `convergence_test_simple` - 3 entities, 2 timepoints (~30s/run)
+- `convergence_test_standard` - 5 entities, 3 timepoints (~60s/run)
+- `convergence_test_comprehensive` - 7 entities, 5 timepoints (~90s/run)
+
 ### Screenplay Viewer
 
 View Fountain-formatted screenplays (screenplay.html?run_id=XXX):
@@ -372,15 +383,14 @@ To add a new filter to the runs browser:
 - Ensure API is running on localhost:8000
 - Check CORS middleware configuration in `api/server.py`
 
-## Statistics (as of 2025-11-03)
+## Statistics (as of 2025-11-26)
 
-- **Total Runs**: 558
-- **Total Cost**: $123.67
-- **Completed Runs**: 454
-- **Success Rate**: 81.4%
-- **Templates**: 64 unique
-- **Mechanisms Tracked**: 17
-- **Database Size**: ~558 runs with full metadata
+- **Total Runs**: 600+
+- **Total Cost**: ~$130
+- **Success Rate**: ~82%
+- **Templates**: 64+ unique (including 3 convergence-optimized templates)
+- **Mechanisms Tracked**: 18
+- **Convergence E2E**: Fully operational with side-by-side comparison
 
 ## Next Steps
 

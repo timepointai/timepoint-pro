@@ -205,6 +205,300 @@ def run_convergence_analysis(
         return False
 
 
+def run_convergence_e2e(
+    template_name: str,
+    run_count: int = 3,
+    skip_summaries: bool = False,
+    verbose: bool = False
+) -> bool:
+    """
+    Run a template N times consecutively, then compute convergence across those runs.
+
+    This is the full E2E convergence test that:
+    1. Runs the same template run_count times
+    2. Computes convergence (Jaccard similarity) across the runs
+    3. Displays side-by-side comparison of mechanisms and divergence points
+    4. Saves the convergence set to the database
+
+    Args:
+        template_name: Name of the template to run (e.g., "board_meeting")
+        run_count: Number of times to run the template (default: 3)
+        skip_summaries: Whether to skip LLM-powered summaries
+        verbose: Show detailed divergence point information
+
+    Returns:
+        True if all runs succeeded and convergence was computed, False otherwise
+
+    Example:
+        python run_all_mechanism_tests.py --convergence-e2e --template board_meeting --runs 3
+    """
+    from generation.config_schema import SimulationConfig
+    from generation.resilience_orchestrator import ResilientE2EWorkflowRunner
+    from metadata.run_tracker import MetadataManager
+    from evaluation.convergence import CausalGraph, compute_convergence_from_graphs
+    from storage import GraphStore
+    from schemas import ConvergenceSet
+    import uuid
+
+    print("\n" + "=" * 80)
+    print("CONVERGENCE E2E TEST")
+    print("=" * 80)
+    print(f"Template: {template_name}")
+    print(f"Runs: {run_count}")
+    print(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("=" * 80)
+    print()
+
+    # Get the template configuration
+    try:
+        # Try to get the template method dynamically
+        template_method = getattr(SimulationConfig, f"example_{template_name}", None)
+        if not template_method:
+            template_method = getattr(SimulationConfig, template_name, None)
+        if not template_method:
+            template_method = getattr(SimulationConfig, f"convergence_test_{template_name}", None)
+
+        if not template_method:
+            print(f"❌ Template not found: {template_name}")
+            print("   Available templates: board_meeting, hospital_crisis, kami_shrine, etc.")
+            return False
+
+        config = template_method()
+        print(f"✓ Loaded template: {template_name}")
+        print(f"  World ID: {config.world_id}")
+        print(f"  Entities: {config.entities.count}")
+        print(f"  Timepoints: {config.timepoints.count}")
+        print()
+
+    except Exception as e:
+        print(f"❌ Failed to load template: {e}")
+        return False
+
+    # Initialize runner
+    metadata_manager = MetadataManager(db_path="metadata/runs.db")
+    runner = ResilientE2EWorkflowRunner(metadata_manager, generate_summary=not skip_summaries)
+
+    # Run the template N times
+    run_results = []
+    run_ids = []
+    total_cost = 0.0
+
+    print(f"{'='*80}")
+    print(f"PHASE 1: Running {template_name} x{run_count}")
+    print(f"{'='*80}")
+    print()
+
+    for i in range(run_count):
+        print(f"\n[Run {i+1}/{run_count}] Starting...")
+        print("-" * 40)
+
+        try:
+            result = runner.run(config)
+            run_ids.append(result.run_id)
+            mechanisms = set(result.mechanisms_used) if result.mechanisms_used else set()
+
+            run_results.append({
+                'success': True,
+                'run_id': result.run_id,
+                'mechanisms': mechanisms,
+                'entities': result.entities_created,
+                'timepoints': result.timepoints_created,
+                'cost': result.cost_usd or 0.0
+            })
+
+            total_cost += result.cost_usd or 0.0
+            print(f"✅ Run {i+1} complete: {result.run_id}")
+            print(f"   Mechanisms: {', '.join(sorted(mechanisms))}")
+            print(f"   Cost: ${result.cost_usd:.2f}")
+
+        except Exception as e:
+            print(f"❌ Run {i+1} failed: {e}")
+            run_results.append({
+                'success': False,
+                'error': str(e),
+                'mechanisms': set()
+            })
+
+    # Check if we have enough successful runs
+    successful_runs = [r for r in run_results if r['success']]
+    if len(successful_runs) < 2:
+        print(f"\n❌ Not enough successful runs for convergence ({len(successful_runs)}/2 minimum)")
+        return False
+
+    print(f"\n{'='*80}")
+    print(f"PHASE 2: Side-by-Side Comparison")
+    print(f"{'='*80}")
+    print()
+
+    # Display side-by-side comparison
+    print("📊 RUN COMPARISON:")
+    print("-" * 80)
+
+    # Header
+    header = "  {:12s}".format("Metric")
+    for i, run in enumerate(successful_runs):
+        header += " | {:20s}".format(f"Run {i+1}")
+    print(header)
+    print("-" * 80)
+
+    # Run IDs
+    row = "  {:12s}".format("Run ID")
+    for run in successful_runs:
+        row += " | {:20s}".format(run['run_id'][:18] + "..")
+    print(row)
+
+    # Entities
+    row = "  {:12s}".format("Entities")
+    for run in successful_runs:
+        row += " | {:20s}".format(str(run.get('entities', 'N/A')))
+    print(row)
+
+    # Timepoints
+    row = "  {:12s}".format("Timepoints")
+    for run in successful_runs:
+        row += " | {:20s}".format(str(run.get('timepoints', 'N/A')))
+    print(row)
+
+    # Cost
+    row = "  {:12s}".format("Cost")
+    for run in successful_runs:
+        row += " | {:20s}".format(f"${run.get('cost', 0):.2f}")
+    print(row)
+
+    print("-" * 80)
+
+    # Mechanisms comparison
+    print("\n📋 MECHANISM COMPARISON:")
+    print("-" * 80)
+
+    all_mechanisms = set()
+    for run in successful_runs:
+        all_mechanisms.update(run['mechanisms'])
+
+    for mech in sorted(all_mechanisms):
+        row = f"  {mech:12s}"
+        for run in successful_runs:
+            if mech in run['mechanisms']:
+                row += " | {:20s}".format("✓")
+            else:
+                row += " | {:20s}".format("✗")
+        print(row)
+
+    print("-" * 80)
+
+    # Compute convergence
+    print(f"\n{'='*80}")
+    print(f"PHASE 3: Convergence Analysis")
+    print(f"{'='*80}")
+    print()
+
+    # Build causal graphs from run metadata
+    graphs = []
+    for run in successful_runs:
+        graph = CausalGraph(
+            run_id=run['run_id'],
+            template_id=template_name,
+        )
+
+        # Create edges from mechanism co-occurrence
+        if run['mechanisms']:
+            mechanisms = list(run['mechanisms'])
+            for i, m1 in enumerate(mechanisms):
+                for m2 in mechanisms[i+1:]:
+                    graph.temporal_edges.add((m1, m2))
+
+        if run.get('entities', 0) > 0:
+            graph.metadata['entity_count'] = run['entities']
+
+        graphs.append(graph)
+
+    # Compute convergence
+    result = compute_convergence_from_graphs(graphs)
+
+    # Display convergence results
+    print(f"📊 CONVERGENCE RESULTS:")
+    print("-" * 80)
+    print(f"  ├─ Score: {result.convergence_score:.2%}")
+    print(f"  ├─ Grade: {result.robustness_grade}")
+    print(f"  ├─ Min Similarity: {result.min_similarity:.2%}")
+    print(f"  ├─ Max Similarity: {result.max_similarity:.2%}")
+    print(f"  ├─ Consensus Edges: {len(result.consensus_edges)}")
+    print(f"  └─ Contested Edges: {len(result.contested_edges)}")
+
+    # Grade interpretation
+    grade_meanings = {
+        "A": "Excellent - Causal mechanisms are highly robust",
+        "B": "Good - Causal mechanisms are reasonably stable",
+        "C": "Fair - Some variability in causal structure",
+        "D": "Poor - Significant causal divergence",
+        "F": "Fail - Causal mechanisms are highly sensitive to conditions"
+    }
+    print(f"\n  💡 {grade_meanings.get(result.robustness_grade, 'Unknown grade')}")
+
+    # Consensus edges
+    if result.consensus_edges:
+        print(f"\n  ✓ CONSENSUS EDGES (present in ALL runs):")
+        for edge in sorted(result.consensus_edges)[:10]:
+            print(f"     {edge}")
+        if len(result.consensus_edges) > 10:
+            print(f"     ... and {len(result.consensus_edges) - 10} more")
+
+    # Contested edges
+    if result.contested_edges:
+        print(f"\n  ⚠ CONTESTED EDGES (present in SOME runs):")
+        for edge in sorted(result.contested_edges)[:10]:
+            print(f"     {edge}")
+        if len(result.contested_edges) > 10:
+            print(f"     ... and {len(result.contested_edges) - 10} more")
+
+    # Divergence points
+    if result.divergence_points:
+        print(f"\n  🔀 DIVERGENCE POINTS ({len(result.divergence_points)} total):")
+        show_count = len(result.divergence_points) if verbose else min(5, len(result.divergence_points))
+        for dp in result.divergence_points[:show_count]:
+            print(f"     - {dp.edge}: {dp.agreement_ratio:.0%} agreement")
+            if verbose:
+                print(f"       Present in: {', '.join(dp.present_in_runs)}")
+                print(f"       Absent in: {', '.join(dp.absent_in_runs)}")
+        if not verbose and len(result.divergence_points) > 5:
+            print(f"     ... and {len(result.divergence_points) - 5} more (use --convergence-verbose)")
+
+    # Store result in database
+    store = GraphStore("sqlite:///metadata/runs.db")
+    convergence_set = ConvergenceSet(
+        set_id=f"conv_e2e_{uuid.uuid4().hex[:8]}",
+        template_id=template_name,
+        run_ids=json.dumps(result.run_ids),
+        run_count=result.run_count,
+        convergence_score=result.convergence_score,
+        min_similarity=result.min_similarity,
+        max_similarity=result.max_similarity,
+        robustness_grade=result.robustness_grade,
+        consensus_edge_count=len(result.consensus_edges),
+        contested_edge_count=len(result.contested_edges),
+        divergence_points=json.dumps([
+            {"edge": dp.edge, "ratio": dp.agreement_ratio}
+            for dp in result.divergence_points[:10]
+        ])
+    )
+    store.save_convergence_set(convergence_set)
+
+    # Final summary
+    print(f"\n{'='*80}")
+    print("CONVERGENCE E2E TEST COMPLETE")
+    print("=" * 80)
+    print(f"  Template: {template_name}")
+    print(f"  Runs Completed: {len(successful_runs)}/{run_count}")
+    print(f"  Convergence Score: {result.convergence_score:.2%}")
+    print(f"  Robustness Grade: {result.robustness_grade}")
+    print(f"  Total Cost: ${total_cost:.2f}")
+    print(f"  Results Saved: {convergence_set.set_id}")
+    print(f"  Finished: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("=" * 80)
+
+    return len(successful_runs) == run_count
+
+
 def _print_narrative_excerpt(run_id: str, world_id: str):
     """Print narrative excerpt from JSON file for monitoring visibility"""
     try:
@@ -377,6 +671,14 @@ def list_modes():
     print("  --convergence-template:  Filter to specific template")
     print("  --convergence-verbose:   Show detailed divergence points")
     print("  Example: --convergence-only --convergence-template hospital_crisis --convergence-runs 5")
+    print("="*80)
+
+    print("\n" + "="*80)
+    print("🔬 CONVERGENCE E2E MODE (--convergence-e2e)")
+    print("  Run a template N times consecutively, then compute convergence")
+    print("  Includes side-by-side comparison of runs and divergence analysis")
+    print("  Example: --convergence-e2e --template board_meeting --convergence-runs 3")
+    print("  Cost: ~$3-5 for 3 runs of board_meeting")
     print("="*80)
 
     print("\n" + "="*80)
@@ -1320,6 +1622,11 @@ if __name__ == "__main__":
         action="store_true",
         help="Show detailed divergence points in convergence analysis"
     )
+    parser.add_argument(
+        "--convergence-e2e",
+        action="store_true",
+        help="Run template N times (--convergence-runs) then compute convergence with side-by-side comparison"
+    )
     args = parser.parse_args()
 
     # Handle --list-modes first (doesn't require API key)
@@ -1337,9 +1644,24 @@ if __name__ == "__main__":
     print()
 
     # Handle --template mode (single template execution)
-    if args.template:
+    if args.template and not args.convergence_e2e:
         from run_single_template import run_single_template
         success = run_single_template(args.template, skip_summaries=args.skip_summaries)
+        sys.exit(0 if success else 1)
+
+    # Handle --convergence-e2e mode (run template N times, compute convergence)
+    if args.convergence_e2e:
+        if not args.template:
+            print("❌ ERROR: --convergence-e2e requires --template")
+            print("   Example: --convergence-e2e --template board_meeting --convergence-runs 3")
+            sys.exit(1)
+
+        success = run_convergence_e2e(
+            template_name=args.template,
+            run_count=args.convergence_runs,
+            skip_summaries=args.skip_summaries,
+            verbose=args.convergence_verbose
+        )
         sys.exit(0 if success else 1)
 
     # Handle --nl mode (natural language simulation)
