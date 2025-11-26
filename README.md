@@ -253,6 +253,9 @@ export OPENROUTER_API_KEY=your_key_here
 
 # Convergence evaluation (measures causal graph consistency)
 python run_all_mechanism_tests.py --convergence --convergence-runs 3
+
+# Convergence E2E test (run template N times, compute convergence)
+python run_all_mechanism_tests.py --convergence-e2e --template convergence_test_simple --convergence-runs 3
 ```
 
 **Implemented:**
@@ -264,7 +267,7 @@ python run_all_mechanism_tests.py --convergence --convergence-runs 3
 - SQLite persistence (metadata/runs.db)
 - Basic dashboard (Quarto + FastAPI)
 - Narrative exports (Markdown, JSON, PDF)
-- **Convergence evaluation** (causal graph consistency analysis across runs)
+- **Convergence evaluation** (causal graph consistency analysis across runs, E2E testing mode, 3 convergence-optimized templates)
 
 **License-Compliant Model Stack:**
 All models via OpenRouter, all open-source with commercial synthetic data rights:
@@ -324,7 +327,7 @@ All models via OpenRouter, all open-source with commercial synthetic data rights
 - `nl_interface/`: Natural language to simulation config
 - `validation.py` (1,365 lines): 5 physics-inspired validators
 - `storage.py` (407 lines): SQLite persistence layer with transaction support
-- `generation/templates/`: 16 JSON simulation templates
+- `generation/templates/`: 16 JSON simulation templates (+ 29 Python templates in config_schema.py)
 
 ---
 

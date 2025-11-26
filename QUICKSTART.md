@@ -171,6 +171,14 @@ After generating a simulation:
    ./run.sh quick
    ```
 
+4. **Test convergence** (validate causal reasoning consistency):
+   ```bash
+   # Run a template 3 times and compute convergence score
+   python run_all_mechanism_tests.py --convergence-e2e --template convergence_test_simple --convergence-runs 3
+   ```
+
+   This measures how consistently the simulation produces the same causal structures across runs. Grades: A (>=90%), B (>=80%), C (>=70%), D (>=50%), F (<50%).
+
 ## Troubleshooting
 
 **"OPENROUTER_API_KEY not set"**
