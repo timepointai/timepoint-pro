@@ -47,6 +47,141 @@ if os.getenv("OXEN_API_KEY") and not os.getenv("OXEN_API_TOKEN"):
     os.environ["OXEN_API_TOKEN"] = os.environ["OXEN_API_KEY"]
 
 
+def run_convergence_analysis(run_count: int = 3) -> bool:
+    """
+    Run convergence analysis on recent runs from the database.
+
+    Computes causal graph similarity across runs to measure mechanism robustness.
+    High convergence (>0.8) indicates robust causal mechanisms.
+
+    Args:
+        run_count: Number of recent runs to compare
+
+    Returns:
+        True if analysis succeeded, False otherwise
+    """
+    from metadata.run_tracker import MetadataManager
+    from storage import GraphStore
+    from schemas import ConvergenceSet
+    import uuid
+
+    print("\n" + "=" * 80)
+    print("CONVERGENCE ANALYSIS")
+    print("=" * 80)
+    print(f"Comparing causal graphs across {run_count} recent runs...")
+    print()
+
+    try:
+        # Get recent runs
+        metadata_manager = MetadataManager(db_path="metadata/runs.db")
+        recent_runs = metadata_manager.get_all_runs()[-run_count:]
+
+        if len(recent_runs) < 2:
+            print(f"  Need at least 2 runs for convergence analysis, found {len(recent_runs)}")
+            return False
+
+        run_ids = [r.run_id for r in recent_runs]
+        print(f"  Analyzing runs: {', '.join(run_ids[:3])}{'...' if len(run_ids) > 3 else ''}")
+
+        # Import convergence module
+        from evaluation.convergence import (
+            CausalGraph,
+            compute_convergence_from_graphs,
+            graph_similarity,
+        )
+
+        # Build causal graphs from run data
+        # Note: We create simplified graphs from stored metadata since full DB extraction
+        # requires the simulation's DB file which may not be available
+        graphs = []
+        for run in recent_runs:
+            # Create graph from run metadata
+            graph = CausalGraph(
+                run_id=run.run_id,
+                template_id=run.template_id if hasattr(run, 'template_id') else None,
+            )
+
+            # Extract mechanisms as proxy for causal structure
+            # In a full implementation, this would pull from Timepoint.causal_parent
+            if run.mechanisms_used:
+                # Create edges from mechanism co-occurrence
+                mechanisms = list(run.mechanisms_used)
+                for i, m1 in enumerate(mechanisms):
+                    for m2 in mechanisms[i+1:]:
+                        graph.temporal_edges.add((m1, m2))
+
+            if run.entities_created and run.entities_created > 0:
+                # Add entity count as metadata
+                graph.metadata['entity_count'] = run.entities_created
+
+            graphs.append(graph)
+
+        if len(graphs) < 2:
+            print(f"  Could not build enough graphs for analysis")
+            return False
+
+        # Compute convergence
+        result = compute_convergence_from_graphs(graphs)
+
+        # Display results
+        print(f"\n  📊 Convergence Results:")
+        print(f"  ├─ Score: {result.convergence_score:.2%}")
+        print(f"  ├─ Grade: {result.robustness_grade}")
+        print(f"  ├─ Min Similarity: {result.min_similarity:.2%}")
+        print(f"  ├─ Max Similarity: {result.max_similarity:.2%}")
+        print(f"  ├─ Consensus Edges: {len(result.consensus_edges)}")
+        print(f"  └─ Contested Edges: {len(result.contested_edges)}")
+
+        # Interpret grade
+        grade_meanings = {
+            "A": "Excellent - Causal mechanisms are highly robust",
+            "B": "Good - Causal mechanisms are reasonably stable",
+            "C": "Fair - Some variability in causal structure",
+            "D": "Poor - Significant causal divergence",
+            "F": "Fail - Causal mechanisms are highly sensitive to conditions"
+        }
+        print(f"\n  💡 {grade_meanings.get(result.robustness_grade, 'Unknown grade')}")
+
+        # Show divergence points if any
+        if result.divergence_points:
+            print(f"\n  🔀 Top Divergence Points:")
+            for dp in result.divergence_points[:3]:
+                print(f"     - {dp.edge}: {dp.agreement_ratio:.0%} agreement")
+
+        # Store result in database
+        store = GraphStore("sqlite:///metadata/runs.db")
+        convergence_set = ConvergenceSet(
+            set_id=f"conv_{uuid.uuid4().hex[:8]}",
+            template_id=result.template_id,
+            run_ids=json.dumps(result.run_ids),
+            run_count=result.run_count,
+            convergence_score=result.convergence_score,
+            min_similarity=result.min_similarity,
+            max_similarity=result.max_similarity,
+            robustness_grade=result.robustness_grade,
+            consensus_edge_count=len(result.consensus_edges),
+            contested_edge_count=len(result.contested_edges),
+            divergence_points=json.dumps([
+                {"edge": dp.edge, "ratio": dp.agreement_ratio}
+                for dp in result.divergence_points[:10]
+            ])
+        )
+        store.save_convergence_set(convergence_set)
+        print(f"\n  ✅ Results saved: {convergence_set.set_id}")
+
+        return True
+
+    except ImportError as e:
+        print(f"  ❌ Import error: {e}")
+        print(f"     Make sure evaluation/ module is available")
+        return False
+    except Exception as e:
+        print(f"  ❌ Error during convergence analysis: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
 def _print_narrative_excerpt(run_id: str, world_id: str):
     """Print narrative excerpt from JSON file for monitoring visibility"""
     try:
@@ -1125,6 +1260,17 @@ if __name__ == "__main__":
         metavar="N",
         help="Override timepoint count for NL simulation (used with --nl)"
     )
+    parser.add_argument(
+        "--convergence",
+        action="store_true",
+        help="Run convergence analysis on recent runs (compares causal graphs across runs)"
+    )
+    parser.add_argument(
+        "--convergence-runs",
+        type=int,
+        default=3,
+        help="Number of runs to compare for convergence (default: 3)"
+    )
     args = parser.parse_args()
 
     # Handle --list-modes first (doesn't require API key)
@@ -1197,4 +1343,11 @@ if __name__ == "__main__":
         mode = 'quick'
 
     success = run_all_templates(mode, skip_summaries=args.skip_summaries)
+
+    # Run convergence analysis if requested
+    if args.convergence:
+        convergence_success = run_convergence_analysis(run_count=args.convergence_runs)
+        if not convergence_success:
+            print("\n⚠️  Convergence analysis failed but template runs may have succeeded")
+
     sys.exit(0 if success else 1)

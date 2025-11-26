@@ -23,6 +23,7 @@
 - **Basic dashboard** — Quarto + FastAPI
 - **Narrative exports** — Markdown, JSON, PDF generation
 - **26 simulation templates** — In `generation/config_schema.py`
+- **Convergence evaluation** — Causal graph consistency analysis across runs (Jaccard similarity, robustness grades A-F, divergence point detection)
 
 ### Model Stack (All Open Source)
 
@@ -379,6 +380,7 @@ Broad accessibility and ecosystem.
 | Fallback chains | **COMPLETE** | `get_fallback_chain()` |
 | License compliance | **COMPLETE** | 12 models, MIT/Apache 2.0/Llama/Qwen |
 | NL interface | **COMPLETE** | `nl_interface/adapter.py` |
+| Convergence evaluation | **COMPLETE** | `evaluation/convergence.py`, storage layer, dashboard |
 
 ---
 

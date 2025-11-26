@@ -427,3 +427,138 @@ cooccurrence_table = {
   </div>`;
 }
 ```
+
+## Causal Graph Convergence
+
+::: {.callout-tip}
+Convergence measures agreement in causal graphs across independent simulation runs.
+High convergence indicates robust causal mechanisms.
+:::
+
+```{ojs}
+//| echo: false
+
+// Fetch convergence stats
+convergence_stats = {
+  try {
+    const response = await fetch(`${API_BASE}/api/convergence-stats`);
+    if (!response.ok) return { total_sets: 0 };
+    return await response.json();
+  } catch (e) {
+    return { total_sets: 0 };
+  }
+}
+```
+
+::: {.grid}
+
+::: {.g-col-6 .g-col-md-3}
+```{ojs}
+//| echo: false
+
+html`
+<div class="metric-card" style="background: linear-gradient(135deg, #10b981 0%, #34d399 100%);">
+  <div class="metric-value">${convergence_stats.total_sets || 0}</div>
+  <div class="metric-label">Convergence Sets</div>
+</div>
+`
+```
+:::
+
+::: {.g-col-6 .g-col-md-3}
+```{ojs}
+//| echo: false
+
+html`
+<div class="metric-card" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);">
+  <div class="metric-value">${((convergence_stats.average_score || 0) * 100).toFixed(0)}%</div>
+  <div class="metric-label">Avg Convergence</div>
+</div>
+`
+```
+:::
+
+::: {.g-col-6 .g-col-md-3}
+```{ojs}
+//| echo: false
+
+// Grade color mapping
+grade_color = {
+  const grade = (convergence_stats.grade_distribution || {});
+  const grades = Object.keys(grade);
+  const mostCommon = grades.length > 0 ? grades.sort((a, b) => grade[b] - grade[a])[0] : 'N/A';
+  const colors = { 'A': '#10b981', 'B': '#6366f1', 'C': '#f59e0b', 'D': '#f97316', 'F': '#ef4444' };
+  return { grade: mostCommon, color: colors[mostCommon] || '#6b7280' };
+}
+
+html`
+<div class="metric-card" style="background: ${grade_color.color || '#6b7280'};">
+  <div class="metric-value">${grade_color.grade}</div>
+  <div class="metric-label">Most Common Grade</div>
+</div>
+`
+```
+:::
+
+::: {.g-col-6 .g-col-md-3}
+```{ojs}
+//| echo: false
+
+html`
+<div class="metric-card" style="background: linear-gradient(135deg, #14b8a6 0%, #2dd4bf 100%);">
+  <div class="metric-value">${Object.keys(convergence_stats.template_coverage || {}).length}</div>
+  <div class="metric-label">Templates Evaluated</div>
+</div>
+`
+```
+:::
+
+:::
+
+```{ojs}
+//| echo: false
+
+convergence_chart = {
+  const container = html`<div style="height: 300px;"></div>`;
+
+  const grade_dist = convergence_stats.grade_distribution || {};
+
+  if (Object.keys(grade_dist).length === 0) {
+    container.innerHTML = '<p style="padding: 2rem; text-align: center;">No convergence data available. Run <code>--convergence</code> flag with tests.</p>';
+    return container;
+  }
+
+  setTimeout(() => {
+    const chart = echarts.init(container);
+
+    const grades = ['A', 'B', 'C', 'D', 'F'];
+    const colors = ['#10b981', '#6366f1', '#f59e0b', '#f97316', '#ef4444'];
+
+    chart.setOption({
+      title: {
+        text: 'Convergence Grade Distribution',
+        left: 'center',
+        textStyle: { fontSize: 16, fontWeight: 'bold' }
+      },
+      tooltip: { trigger: 'item' },
+      xAxis: {
+        type: 'category',
+        data: grades
+      },
+      yAxis: { type: 'value', name: 'Count' },
+      series: [{
+        type: 'bar',
+        data: grades.map((g, idx) => ({
+          value: grade_dist[g] || 0,
+          itemStyle: { color: colors[idx] }
+        })),
+        label: { show: true, position: 'top' }
+      }]
+    });
+
+    window.addEventListener('resize', () => chart.resize());
+  }, 100);
+
+  return container;
+}
+```

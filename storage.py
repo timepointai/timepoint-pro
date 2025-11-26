@@ -8,7 +8,7 @@ import networkx as nx
 import json
 from functools import lru_cache
 
-from schemas import Entity, Timeline, SystemPrompt, ExposureEvent, Timepoint, Dialog, RelationshipTrajectory, QueryHistory
+from schemas import Entity, Timeline, SystemPrompt, ExposureEvent, Timepoint, Dialog, RelationshipTrajectory, QueryHistory, ConvergenceSet
 
 
 class TransactionContext:
@@ -520,3 +520,97 @@ class GraphStore:
                 ProspectiveState.entity_id == entity_id
             ).order_by(ProspectiveState.created_at.desc())
             return list(session.exec(statement).all())
+
+    # ============================================================================
+    # Convergence Evaluation Storage (Cross-run causal graph comparison)
+    # ============================================================================
+
+    def save_convergence_set(self, convergence_set: ConvergenceSet) -> ConvergenceSet:
+        """
+        Save a convergence analysis result.
+
+        Args:
+            convergence_set: ConvergenceSet object with analysis results
+
+        Returns:
+            Saved ConvergenceSet with ID populated
+        """
+        with Session(self.engine) as session:
+            session.add(convergence_set)
+            session.commit()
+            session.refresh(convergence_set)
+            return convergence_set
+
+    def get_convergence_set(self, set_id: str) -> Optional[ConvergenceSet]:
+        """Get a convergence set by ID"""
+        with Session(self.engine) as session:
+            statement = select(ConvergenceSet).where(ConvergenceSet.set_id == set_id)
+            return session.exec(statement).first()
+
+    def get_convergence_sets(
+        self,
+        template_id: Optional[str] = None,
+        min_score: Optional[float] = None,
+        limit: int = 100
+    ) -> list[ConvergenceSet]:
+        """
+        Get convergence sets with optional filtering.
+
+        Args:
+            template_id: Filter by template ID
+            min_score: Filter by minimum convergence score
+            limit: Maximum results to return
+
+        Returns:
+            List of matching ConvergenceSet objects
+        """
+        with Session(self.engine) as session:
+            statement = select(ConvergenceSet)
+
+            if template_id:
+                statement = statement.where(ConvergenceSet.template_id == template_id)
+
+            if min_score is not None:
+                statement = statement.where(ConvergenceSet.convergence_score >= min_score)
+
+            statement = statement.order_by(ConvergenceSet.created_at.desc()).limit(limit)
+            return list(session.exec(statement).all())
+
+    def get_convergence_stats(self) -> dict:
+        """
+        Get aggregate convergence statistics across all sets.
+
+        Returns:
+            Dictionary with count, average score, grade distribution
+        """
+        with Session(self.engine) as session:
+            all_sets = session.exec(select(ConvergenceSet)).all()
+
+            if not all_sets:
+                return {
+                    "total_sets": 0,
+                    "average_score": 0.0,
+                    "grade_distribution": {},
+                    "template_coverage": {}
+                }
+
+            scores = [s.convergence_score for s in all_sets]
+            grades = [s.robustness_grade for s in all_sets]
+            templates = [s.template_id for s in all_sets if s.template_id]
+
+            grade_distribution = {}
+            for grade in grades:
+                grade_distribution[grade] = grade_distribution.get(grade, 0) + 1
+
+            template_coverage = {}
+            for template in templates:
+                template_coverage[template] = template_coverage.get(template, 0) + 1
+
+            return {
+                "total_sets": len(all_sets),
+                "average_score": sum(scores) / len(scores),
+                "min_score": min(scores),
+                "max_score": max(scores),
+                "grade_distribution": grade_distribution,
+                "template_coverage": template_coverage
+            }

@@ -24,6 +24,9 @@ REST API server providing real-time access to the runs database.
 - `GET /api/templates` - List all unique templates
 - `GET /api/mechanisms` - Get mechanism usage counts
 - `GET /api/meta-analytics` - Aggregate analytics across all runs
+- `GET /api/convergence-stats` - Aggregate convergence statistics
+- `GET /api/convergence-sets` - List convergence sets with filtering
+- `GET /api/convergence-set/{set_id}` - Get detailed convergence set info
 
 ### 2. Quarto Frontend
 Interactive web interface built with Quarto + Observable JS.
@@ -32,6 +35,7 @@ Interactive web interface built with Quarto + Observable JS.
 - `index.qmd` - Main dashboard with visualizations (timeline, network, metrics)
 - `runs.qmd` - Run selection with filtering and search
 - `analytics.qmd` - Meta-analytics with charts and statistics
+- `convergence.qmd` - Convergence analysis with robustness grading
 - `screenplay.qmd` - Fountain screenplay viewer with navigation
 - `dialogs.qmd` - Dialog navigator with filtering and export
 
@@ -160,6 +164,23 @@ The analytics page (analytics.html) provides:
 - **Causal Mode Distribution** - Pie chart
 - **Mechanism Co-Occurrence** - Pairs that frequently appear together
 
+### Convergence Analysis
+
+The convergence page (convergence.html) provides:
+- **Overview Metrics** - Convergence sets, average score, top grade, templates evaluated
+- **Grade Distribution** - Bar chart of A/B/C/D/F robustness grades
+- **Score Range Gauge** - Min/max convergence score visualization
+- **Template Coverage** - Pie chart showing which templates have been evaluated
+- **Recent Convergence Sets** - Table of recent analyses with scores and grades
+- **Educational Content** - Explanation of convergence methodology and interpretation
+
+**Understanding Grades:**
+- **A (>=90%)** - Highly robust causal reasoning
+- **B (>=80%)** - Robust with minor variations
+- **C (>=70%)** - Moderate agreement
+- **D (>=50%)** - Unstable, use with caution
+- **F (<50%)** - Unreliable, do not trust
+
 ### Screenplay Viewer
 
 View Fountain-formatted screenplays (screenplay.html?run_id=XXX):
@@ -262,6 +283,15 @@ curl "http://localhost:8000/api/screenplay/hospital_crisis_20251102_134859_a3859
 
 # Get meta-analytics
 curl "http://localhost:8000/api/meta-analytics"
+
+# Get convergence statistics
+curl "http://localhost:8000/api/convergence-stats"
+
+# List convergence sets with filtering
+curl "http://localhost:8000/api/convergence-sets?min_score=0.7&limit=20"
+
+# Get detailed convergence set
+curl "http://localhost:8000/api/convergence-set/conv_hospital_crisis_20251125"
 ```
 
 ## Technology Stack

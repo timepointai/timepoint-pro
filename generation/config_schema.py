@@ -598,6 +598,39 @@ class VariationConfig(BaseModel):
         return v
 
 
+class ConvergenceConfig(BaseModel):
+    """
+    Configuration for causal graph convergence evaluation.
+
+    Measures agreement in causal graphs across independent runs.
+    High convergence indicates robust causal mechanisms.
+    """
+    enabled: bool = Field(
+        default=False,
+        description="Enable convergence evaluation"
+    )
+    run_count: int = Field(
+        ge=2, le=10, default=3,
+        description="Number of independent runs to compare"
+    )
+    models: List[str] = Field(
+        default_factory=lambda: ["deepseek/deepseek-chat", "meta-llama/llama-3.1-70b-instruct"],
+        description="Different models to use for independent runs (for model-diverse convergence)"
+    )
+    seeds: List[int] = Field(
+        default_factory=lambda: [42, 123, 456],
+        description="Random seeds for independent runs"
+    )
+    min_acceptable_score: float = Field(
+        ge=0.0, le=1.0, default=0.5,
+        description="Minimum convergence score to consider results robust"
+    )
+    store_divergence_points: bool = Field(
+        default=True,
+        description="Store detailed divergence analysis"
+    )
+
+
 class SimulationConfig(BaseModel):
     """
     Complete simulation configuration with validation.
@@ -673,6 +706,12 @@ class SimulationConfig(BaseModel):
     checkpoint_interval: int = Field(
         ge=1, default=10,
         description="Save checkpoint every N entities/timepoints"
+    )
+
+    # Convergence evaluation settings
+    convergence: ConvergenceConfig = Field(
+        default_factory=lambda: ConvergenceConfig(),
+        description="Convergence evaluation configuration"
     )
 
     @model_validator(mode='after')

@@ -1,27 +1,35 @@
-# Timepoint-Daedalus
+# Timepoint v0: Daedalus
 
-**Temporal simulation where detail follows attention, not allocation.**
+**Temporal simulation where detail follows attention, not allocation. Heading towards queryable temporal knowledge graphs of complex, large-scale social network simulations.**
 
 ## tl;dr 
-Timepoint-Daedalus is a temporal simulation framework where detail follows queries, not pre-allocation. Instead of rendering every entity at every moment at full fidelity (expensive, wasteful), the system maintains a 2D resolution surface over (entity, time) that concentrates detail where you actually look. Minor characters exist as 200-token tensor embeddings until someone asks about them—then they're elevated while preserving causal consistency with everything already established.
-The result: in theory, up to a 95% cost reduction without breaking temporal reasoning. You can still ask "what did Jefferson know when he wrote this?" because knowledge provenance is tracked explicitly, not summarized away.
-Bonus weirdness: multiple temporal modes (including backward reasoning from known endpoints), entities that model their own futures, and objects/institutions with animistic agency.
+Timepoint is a synthetic time travel tool, that offers variable-resolution from very high-level view to dialog and inner-thought modeling. The goal of the author is to, eventually, put on a VR headset and zap to any moment in history with extraordinary fidelity, and highly coherent logic, character interactions, and visuals. 
 
-#### Key feature: Timepoint Daedalus can "portal" to a future timepoint and make logical, judged steps backwards to current time, path seeking through simulated reality. See MECHANICS.md for details. 
+The most interesting part to people who have seen pre-release demos, like the talk I did at AI Tinkerers LA on Nov 20, 2025, is PORTAL mode. Timepoint Daedalus can "portal" to a future timepoint and make logical, judged steps backwards to current time, path seeking through simulated reality. See MECHANICS.md for details.
 
 ---
 
-## The Problem with Simulation
+
+Timepoint-Daedalus is a temporal simulation framework where detail follows queries, not pre-allocation. Instead of rendering every entity at every moment at full fidelity (expensive, wasteful), the system maintains a 2D resolution surface over (entity, time) that concentrates detail where you actually look. Minor characters exist as 200-token tensor embeddings until someone asks about them—then they're elevated while preserving causal consistency with everything already established.
+The result: in theory, up to a 95% cost reduction without breaking temporal reasoning. You can still ask "what did Jefferson know when he wrote this?" because knowledge provenance is tracked explicitly, not summarized away.
+Bonus weirdness: multiple temporal modes (including backward reasoning from known endpoints), entities that model their own futures, and objects/institutions with animistic agency.
+Timepoint embraces curiosity, by enabling a set of modular tools for configuring temporal simulations. 
+
+This version is named after Daedalus, the legendary inventor, one who could navigate the labyrinth. But Daedalus also gave a stern warning: don't put too much faith in technology. Social network simulations are not real life -- they're a tool for preparing for the future. And maybe, for predicting it. 🤔
+
+## Some Problem with Simulation
 
 Traditional LLM-based simulations treat fidelity as uniform: every entity, every moment, rendered at the same resolution. This is expensive ($500/query for 100 entities across 10 timepoints) and wasteful—most of that detail is never queried.
 
-Worse, compression-based solutions destroy temporal structure. You can't reason about causality in a lossy summary.
+Worse, compression-based solutions degrade temporal structure. You can't reason about causality in a lossy summary and you can't maintain coherence in ever-growing context windows. 
 
-## The Insight
+## A new approach based on mixed resolution mapping
 
 Timepoint-Daedalus inverts the model: **resolution is query-driven, not pre-allocated.** The system maintains a 2D fidelity surface across entities and time, concentrating detail where queries actually land—like a map that renders at higher resolution only where you zoom.
 
-This isn't caching. It's a fundamentally different stance on what simulation *is*: not a pre-rendered world, but a generative process that resolves on demand while preserving causal structure.
+This isn't caching. It's a fundamentally different stance on what simulation *is*: not a pre-rendered world, but a generative process that resolves on demand while preserving causal structure. 
+
+A key component is tensor-like objects for behaviors and personalities. 
 
 ---
 
@@ -34,6 +42,7 @@ Each (entity, timepoint) pair maintains independent resolution: `TENSOR_ONLY →
 Result: 95% token reduction without temporal incoherence.
 
 ### Multiple Temporal Ontologies
+## A.K.A. Having Fun Bending Time
 
 Time isn't one thing. The system supports distinct temporal modes drawn from narrative theory and causal inference:
 
@@ -44,6 +53,8 @@ Time isn't one thing. The system supports distinct temporal modes drawn from nar
 - **Cyclical**: Prophetic/mythic time where future states constrain past events
 
 Each mode changes what "temporal consistency" means and how the causal validators operate.
+
+Like knobs on a synthesizer, you can tune how Timepoint handles synthetic tie.
 
 ### Knowledge Provenance via Exposure Events
 
@@ -97,6 +108,7 @@ The 18 mechanisms in MECHANICS.md implement these ideas:
 | Knowledge tracking | M3 (graph construction), M4 (embedding), M9 (on-demand generation) |
 | Synthesis | M10 (scene management), M11 (dialog), M13 (multi-entity), M15 (prospection), M16 (animistic agency) |
 | Infrastructure | M14 (circadian patterns), M17 (metadata tracking), **M18 (model selection)** |
+| Evaluation | **Convergence analysis** (causal graph consistency across runs) |
 
 See [MECHANICS.md](MECHANICS.md) for implementation details.
 
@@ -238,6 +250,9 @@ export OPENROUTER_API_KEY=your_key_here
 ./run.sh portal-test        # PORTAL mode tests
 ./run.sh portal-timepoint   # Real founder profiles
 ./run.sh --nl "prompt"      # Natural language input
+
+# Convergence evaluation (measures causal graph consistency)
+python run_all_mechanism_tests.py --convergence --convergence-runs 3
 ```
 
 **Implemented:**
@@ -249,6 +264,7 @@ export OPENROUTER_API_KEY=your_key_here
 - SQLite persistence (metadata/runs.db)
 - Basic dashboard (Quarto + FastAPI)
 - Narrative exports (Markdown, JSON, PDF)
+- **Convergence evaluation** (causal graph consistency analysis across runs)
 
 **License-Compliant Model Stack:**
 All models via OpenRouter, all open-source with commercial synthetic data rights:

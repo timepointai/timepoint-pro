@@ -635,5 +635,38 @@ def entity_population_to_entity(population, entity_id: str, entity_type: str = "
 
 
 # ============================================================================
+# Convergence Evaluation (Cross-run causal graph comparison)
+# ============================================================================
+
+class ConvergenceSet(SQLModel, table=True):
+    """
+    Results of convergence analysis across multiple simulation runs.
+
+    Measures agreement in causal graphs across independent runs (different
+    models/seeds/modes). High convergence indicates robust causal mechanisms.
+    """
+    id: Optional[int] = Field(default=None, primary_key=True)
+    set_id: str = Field(unique=True, index=True)  # Unique identifier
+    template_id: Optional[str] = Field(default=None, index=True)  # Source template
+    run_ids: str = Field(sa_column=Column(JSON))  # JSON list of run_ids compared
+    run_count: int = Field(default=2)  # Number of runs compared
+
+    # Core metrics
+    convergence_score: float = Field(default=0.0)  # Mean Jaccard similarity [0.0-1.0]
+    min_similarity: float = Field(default=0.0)  # Worst-case pairwise similarity
+    max_similarity: float = Field(default=0.0)  # Best-case pairwise similarity
+    robustness_grade: str = Field(default="F")  # A/B/C/D/F grade
+
+    # Divergence details
+    consensus_edge_count: int = Field(default=0)  # Edges in ALL runs
+    contested_edge_count: int = Field(default=0)  # Edges in SOME runs
+    divergence_points: str = Field(default="[]", sa_column=Column(JSON))  # JSON list of divergent edges
+
+    # Metadata
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    extra_data: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+
+
+# ============================================================================
 # Mechanism 17: Modal Temporal Causality
 # ============================================================================

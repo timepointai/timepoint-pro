@@ -210,6 +210,119 @@ async def get_dialogs(run_id: str):
     }
 
 
+@app.get("/api/convergence-stats", tags=["Analytics"])
+async def get_convergence_stats():
+    """
+    Get aggregate convergence statistics across all convergence sets.
+
+    Returns:
+    - total_sets: Number of convergence sets analyzed
+    - average_score: Mean convergence score (0.0-1.0)
+    - min_score/max_score: Range of scores
+    - grade_distribution: Count of A/B/C/D/F grades
+    - template_coverage: Templates with convergence analysis
+    """
+    try:
+        from storage import GraphStore
+
+        store = GraphStore("sqlite:///metadata/runs.db")
+        stats = store.get_convergence_stats()
+
+        return stats
+    except Exception as e:
+        # Return empty stats on error
+        return {
+            "total_sets": 0,
+            "average_score": 0.0,
+            "grade_distribution": {},
+            "template_coverage": {},
+            "error": str(e)
+        }
+
+
+@app.get("/api/convergence-sets", tags=["Analytics"])
+async def get_convergence_sets(
+    template_id: Optional[str] = Query(None, description="Filter by template ID"),
+    min_score: Optional[float] = Query(None, description="Minimum convergence score (0.0-1.0)"),
+    limit: int = Query(50, ge=1, le=100, description="Max results to return")
+):
+    """
+    Get list of convergence sets with optional filtering.
+
+    Returns list of convergence set objects with:
+    - set_id, template_id, run_ids, run_count
+    - convergence_score, robustness_grade
+    - consensus_edge_count, contested_edge_count
+    - created_at
+    """
+    try:
+        from storage import GraphStore
+
+        store = GraphStore("sqlite:///metadata/runs.db")
+        sets = store.get_convergence_sets(
+            template_id=template_id,
+            min_score=min_score,
+            limit=limit
+        )
+
+        # Convert to serializable format
+        return [
+            {
+                "set_id": s.set_id,
+                "template_id": s.template_id,
+                "run_ids": s.run_ids,
+                "run_count": s.run_count,
+                "convergence_score": s.convergence_score,
+                "min_similarity": s.min_similarity,
+                "max_similarity": s.max_similarity,
+                "robustness_grade": s.robustness_grade,
+                "consensus_edge_count": s.consensus_edge_count,
+                "contested_edge_count": s.contested_edge_count,
+                "created_at": s.created_at.isoformat() if s.created_at else None,
+            }
+            for s in sets
+        ]
+    except Exception as e:
+        return []
+
+
+@app.get("/api/convergence-set/{set_id}", tags=["Analytics"])
+async def get_convergence_set(set_id: str):
+    """
+    Get detailed information about a specific convergence set.
+
+    Returns full convergence set with divergence points.
+    """
+    try:
+        from storage import GraphStore
+        import json
+
+        store = GraphStore("sqlite:///metadata/runs.db")
+        s = store.get_convergence_set(set_id)
+
+        if not s:
+            raise HTTPException(status_code=404, detail=f"Convergence set {set_id} not found")
+
+        return {
+            "set_id": s.set_id,
+            "template_id": s.template_id,
+            "run_ids": json.loads(s.run_ids) if isinstance(s.run_ids, str) else s.run_ids,
+            "run_count": s.run_count,
+            "convergence_score": s.convergence_score,
+            "min_similarity": s.min_similarity,
+            "max_similarity": s.max_similarity,
+            "robustness_grade": s.robustness_grade,
+            "consensus_edge_count": s.consensus_edge_count,
+            "contested_edge_count": s.contested_edge_count,
+            "divergence_points": json.loads(s.divergence_points) if isinstance(s.divergence_points, str) else s.divergence_points,
+            "created_at": s.created_at.isoformat() if s.created_at else None,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 if __name__ == "__main__":
     import uvicorn
     print("🚀 Starting Timepoint Dashboard API on http://localhost:8000")

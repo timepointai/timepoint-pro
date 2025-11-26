@@ -1,0 +1,652 @@
+---
+title: "Causal Graph Convergence"
+format:
+  html:
+    page-layout: full
+    code-tools: false
+    include-in-header:
+      - text: |
+          <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+          <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+---
+
+::: {.callout-note}
+## Navigation
+[Home](home.html) | [Browse Runs](runs.html) | [Analytics](analytics.html) | [Dashboard](index.html)
+:::
+
+```{ojs}
+//| echo: false
+
+// API configuration
+API_BASE = "http://localhost:8000"
+
+// Fetch convergence stats
+convergence_stats = {
+  try {
+    const response = await fetch(`${API_BASE}/api/convergence-stats`);
+    if (!response.ok) return { total_sets: 0 };
+    return await response.json();
+  } catch (e) {
+    return { total_sets: 0, error: e.message };
+  }
+}
+
+// Fetch convergence sets
+convergence_sets = {
+  try {
+    const response = await fetch(`${API_BASE}/api/convergence-sets`);
+    if (!response.ok) return [];
+    return await response.json();
+  } catch (e) {
+    return [];
+  }
+}
+```
+
+## Overview
+
+Convergence analysis measures how consistently Timepoint predicts **causal mechanisms** across independent simulation runs. High convergence indicates robust causal chains that don't depend on model choice or random seed.
+
+::: {.grid}
+
+::: {.g-col-6 .g-col-md-3}
+```{ojs}
+//| echo: false
+
+html`
+<div class="convergence-card">
+  <div class="card-icon">&#128202;</div>
+  <div class="card-value">${convergence_stats.total_sets || 0}</div>
+  <div class="card-label">Convergence Sets</div>
+</div>
+`
+```
+:::
+
+::: {.g-col-6 .g-col-md-3}
+```{ojs}
+//| echo: false
+
+html`
+<div class="convergence-card card-score">
+  <div class="card-icon">&#127919;</div>
+  <div class="card-value">${((convergence_stats.average_score || 0) * 100).toFixed(0)}%</div>
+  <div class="card-label">Avg Convergence</div>
+</div>
+`
+```
+:::
+
+::: {.g-col-6 .g-col-md-3}
+```{ojs}
+//| echo: false
+
+grade_info = {
+  const grades = convergence_stats.grade_distribution || {};
+  const entries = Object.entries(grades).sort((a, b) => b[1] - a[1]);
+  const topGrade = entries.length > 0 ? entries[0][0] : 'N/A';
+  const colors = { 'A': '#10b981', 'B': '#6366f1', 'C': '#f59e0b', 'D': '#f97316', 'F': '#ef4444' };
+  return { grade: topGrade, color: colors[topGrade] || '#6b7280' };
+}
+
+html`
+<div class="convergence-card" style="background: linear-gradient(135deg, ${grade_info.color}20, ${grade_info.color}10);">
+  <div class="card-icon">&#127942;</div>
+  <div class="card-value" style="color: ${grade_info.color};">${grade_info.grade}</div>
+  <div class="card-label">Top Grade</div>
+</div>
+`
+```
+:::
+
+::: {.g-col-6 .g-col-md-3}
+```{ojs}
+//| echo: false
+
+html`
+<div class="convergence-card card-templates">
+  <div class="card-icon">&#128196;</div>
+  <div class="card-value">${Object.keys(convergence_stats.template_coverage || {}).length}</div>
+  <div class="card-label">Templates Evaluated</div>
+</div>
+`
+```
+:::
+
+:::
+
+## Grade Distribution
+
+```{ojs}
+//| echo: false
+
+grade_chart = {
+  const container = html`<div style="height: 350px;"></div>`;
+
+  const grade_dist = convergence_stats.grade_distribution || {};
+
+  if (Object.keys(grade_dist).length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">&#128200;</div>
+        <div class="empty-title">No Convergence Data</div>
+        <div class="empty-text">
+          Run simulations with the <code>--convergence</code> flag to generate convergence analysis.<br/>
+          <code>python run_all_mechanism_tests.py --convergence</code>
+        </div>
+      </div>
+    `;
+    return container;
+  }
+
+  setTimeout(() => {
+    const chart = echarts.init(container);
+
+    const grades = ['A', 'B', 'C', 'D', 'F'];
+    const colors = ['#10b981', '#6366f1', '#f59e0b', '#f97316', '#ef4444'];
+    const meanings = [
+      'Excellent - Highly robust causal mechanisms',
+      'Good - Reasonably stable mechanisms',
+      'Fair - Some variability in causal structure',
+      'Poor - Significant causal divergence',
+      'Fail - High sensitivity to conditions'
+    ];
+
+    chart.setOption({
+      title: {
+        text: 'Convergence Grade Distribution',
+        subtext: 'Higher grades indicate more robust causal mechanisms',
+        left: 'center',
+        textStyle: { fontSize: 18, fontWeight: 'bold', color: '#f8fafc' },
+        subtextStyle: { color: '#94a3b8' }
+      },
+      backgroundColor: 'transparent',
+      tooltip: {
+        trigger: 'axis',
+        formatter: (params) => {
+          const idx = grades.indexOf(params[0].name);
+          return `<strong>Grade ${params[0].name}</strong><br/>${meanings[idx]}<br/>Count: ${params[0].value}`;
+        }
+      },
+      xAxis: {
+        type: 'category',
+        data: grades,
+        axisLabel: { color: '#94a3b8', fontSize: 16, fontWeight: 'bold' },
+        axisLine: { lineStyle: { color: '#475569' } }
+      },
+      yAxis: {
+        type: 'value',
+        name: 'Count',
+        nameTextStyle: { color: '#94a3b8' },
+        axisLabel: { color: '#94a3b8' },
+        axisLine: { lineStyle: { color: '#475569' } },
+        splitLine: { lineStyle: { color: '#334155' } }
+      },
+      series: [{
+        type: 'bar',
+        data: grades.map((g, idx) => ({
+          value: grade_dist[g] || 0,
+          itemStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: colors[idx] },
+              { offset: 1, color: colors[idx] + '80' }
+            ])
+          }
+        })),
+        label: {
+          show: true,
+          position: 'top',
+          color: '#f8fafc',
+          fontWeight: 'bold'
+        },
+        barWidth: '60%'
+      }]
+    });
+
+    window.addEventListener('resize', () => chart.resize());
+  }, 100);
+
+  return container;
+}
+```
+
+## Score Range Analysis
+
+```{ojs}
+//| echo: false
+
+range_chart = {
+  const container = html`<div style="height: 300px;"></div>`;
+
+  if (!convergence_stats.min_score && !convergence_stats.max_score) {
+    container.innerHTML = '<p style="text-align: center; color: #94a3b8; padding: 2rem;">Score range data not available</p>';
+    return container;
+  }
+
+  setTimeout(() => {
+    const chart = echarts.init(container);
+
+    chart.setOption({
+      title: {
+        text: 'Convergence Score Range',
+        left: 'center',
+        textStyle: { color: '#f8fafc' }
+      },
+      backgroundColor: 'transparent',
+      tooltip: { trigger: 'item' },
+      series: [{
+        type: 'gauge',
+        startAngle: 180,
+        endAngle: 0,
+        min: 0,
+        max: 100,
+        splitNumber: 5,
+        itemStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+            { offset: 0, color: '#ef4444' },
+            { offset: 0.5, color: '#f59e0b' },
+            { offset: 1, color: '#10b981' }
+          ])
+        },
+        progress: { show: true, width: 30 },
+        pointer: { show: false },
+        axisLine: {
+          lineStyle: { width: 30, color: [[1, '#334155']] }
+        },
+        axisTick: { show: false },
+        splitLine: { show: false },
+        axisLabel: {
+          distance: -40,
+          color: '#94a3b8',
+          formatter: '{value}%'
+        },
+        anchor: { show: false },
+        title: { show: false },
+        detail: {
+          valueAnimation: true,
+          width: '60%',
+          lineHeight: 40,
+          borderRadius: 8,
+          offsetCenter: [0, '-15%'],
+          fontSize: 32,
+          fontWeight: 'bold',
+          formatter: '{value}%',
+          color: '#f8fafc'
+        },
+        data: [{ value: ((convergence_stats.average_score || 0) * 100).toFixed(0) }]
+      }]
+    });
+
+    window.addEventListener('resize', () => chart.resize());
+  }, 100);
+
+  return container;
+}
+```
+
+::: {.grid}
+::: {.g-col-4}
+```{ojs}
+//| echo: false
+html`
+<div class="stat-box stat-min">
+  <div class="stat-label">Minimum Score</div>
+  <div class="stat-value">${((convergence_stats.min_score || 0) * 100).toFixed(0)}%</div>
+</div>
+`
+```
+:::
+::: {.g-col-4}
+```{ojs}
+//| echo: false
+html`
+<div class="stat-box stat-avg">
+  <div class="stat-label">Average Score</div>
+  <div class="stat-value">${((convergence_stats.average_score || 0) * 100).toFixed(0)}%</div>
+</div>
+`
+```
+:::
+::: {.g-col-4}
+```{ojs}
+//| echo: false
+html`
+<div class="stat-box stat-max">
+  <div class="stat-label">Maximum Score</div>
+  <div class="stat-value">${((convergence_stats.max_score || 0) * 100).toFixed(0)}%</div>
+</div>
+`
+```
+:::
+:::
+
+## Template Coverage
+
+```{ojs}
+//| echo: false
+
+template_chart = {
+  const container = html`<div style="height: 400px;"></div>`;
+
+  const coverage = convergence_stats.template_coverage || {};
+
+  if (Object.keys(coverage).length === 0) {
+    container.innerHTML = '<p style="text-align: center; color: #94a3b8; padding: 2rem;">No template coverage data</p>';
+    return container;
+  }
+
+  setTimeout(() => {
+    const chart = echarts.init(container);
+
+    const templates = Object.entries(coverage).sort((a, b) => b[1] - a[1]);
+
+    chart.setOption({
+      title: {
+        text: 'Convergence Sets by Template',
+        left: 'center',
+        textStyle: { color: '#f8fafc' }
+      },
+      backgroundColor: 'transparent',
+      tooltip: { trigger: 'item' },
+      legend: {
+        orient: 'vertical',
+        left: 'left',
+        textStyle: { color: '#94a3b8' }
+      },
+      series: [{
+        type: 'pie',
+        radius: ['40%', '70%'],
+        avoidLabelOverlap: false,
+        itemStyle: {
+          borderRadius: 10,
+          borderColor: '#1e293b',
+          borderWidth: 2
+        },
+        label: {
+          show: true,
+          color: '#f8fafc',
+          formatter: '{b}: {c}'
+        },
+        emphasis: {
+          label: { show: true, fontSize: 16, fontWeight: 'bold' }
+        },
+        data: templates.map(([name, count], idx) => ({
+          value: count,
+          name: name,
+          itemStyle: {
+            color: ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#06b6d4'][idx % 6]
+          }
+        }))
+      }]
+    });
+
+    window.addEventListener('resize', () => chart.resize());
+  }, 100);
+
+  return container;
+}
+```
+
+## Recent Convergence Sets
+
+```{ojs}
+//| echo: false
+
+sets_table = {
+  if (convergence_sets.length === 0) {
+    return html`
+      <div class="empty-state">
+        <div class="empty-icon">&#128269;</div>
+        <div class="empty-title">No Convergence Sets Yet</div>
+        <div class="empty-text">
+          Generate convergence data by running:<br/>
+          <code>python run_all_mechanism_tests.py --convergence</code>
+        </div>
+      </div>
+    `;
+  }
+
+  return html`
+    <div class="sets-table-container">
+      <table class="sets-table">
+        <thead>
+          <tr>
+            <th>Set ID</th>
+            <th>Template</th>
+            <th>Runs</th>
+            <th>Score</th>
+            <th>Grade</th>
+            <th>Consensus</th>
+            <th>Contested</th>
+            <th>Created</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${convergence_sets.map(set => {
+            const gradeColors = { 'A': '#10b981', 'B': '#6366f1', 'C': '#f59e0b', 'D': '#f97316', 'F': '#ef4444' };
+            const gradeColor = gradeColors[set.robustness_grade] || '#6b7280';
+            const created = new Date(set.created_at).toLocaleString();
+
+            return html`
+              <tr class="set-row">
+                <td><code>${set.set_id}</code></td>
+                <td>${set.template_id || 'N/A'}</td>
+                <td>${set.run_count}</td>
+                <td class="score-cell">${(set.convergence_score * 100).toFixed(0)}%</td>
+                <td><span class="grade-badge" style="background: ${gradeColor};">${set.robustness_grade}</span></td>
+                <td>${set.consensus_edge_count}</td>
+                <td>${set.contested_edge_count}</td>
+                <td class="date-cell">${created}</td>
+              </tr>
+            `;
+          })}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+```
+
+## Understanding Convergence
+
+::: {.callout-tip}
+### What is Causal Graph Convergence?
+
+Timepoint uniquely predicts **causal mechanisms**, not just outcomes. Each simulation run generates a causal graph showing:
+
+- **Temporal edges**: Cause-effect chains between timepoints
+- **Knowledge edges**: Information flow between entities via exposure events
+
+**Convergence** measures whether independent runs (different models, seeds, or modes) produce the same causal structure.
+:::
+
+### Interpretation Guide
+
+| Grade | Score Range | Meaning |
+|-------|-------------|---------|
+| **A** | 90-100% | Highly robust - causal mechanisms are consistent across all conditions |
+| **B** | 80-89% | Good - minor variations but core causal structure is stable |
+| **C** | 70-79% | Fair - some sensitivity to model/seed choice |
+| **D** | 50-69% | Poor - significant divergence in causal predictions |
+| **F** | <50% | Fail - causal structure is highly dependent on conditions |
+
+### Key Metrics
+
+- **Consensus Edges**: Causal links present in ALL runs - these are the most robust predictions
+- **Contested Edges**: Causal links present in SOME runs - these indicate sensitive predictions
+- **Divergence Points**: Specific edges where runs disagree most
+
+<style>
+:root {
+  --color-bg-primary: #0f172a;
+  --color-bg-secondary: #1e293b;
+  --color-bg-tertiary: #334155;
+  --color-text-primary: #f8fafc;
+  --color-text-secondary: #cbd5e1;
+  --color-text-muted: #94a3b8;
+  --color-border: #475569;
+  --color-accent: #6366f1;
+}
+
+body {
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+}
+
+.convergence-card {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  text-align: center;
+  transition: all 0.2s;
+}
+
+.convergence-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.card-icon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.card-value {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: var(--color-accent);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.card-score .card-value { color: #10b981; }
+.card-templates .card-value { color: #8b5cf6; }
+
+.card-label {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  margin-top: 0.5rem;
+}
+
+.stat-box {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.stat-min .stat-value { color: #ef4444; }
+.stat-avg .stat-value { color: #f59e0b; }
+.stat-max .stat-value { color: #10b981; }
+
+.empty-state {
+  text-align: center;
+  padding: 4rem 2rem;
+  background: var(--color-bg-secondary);
+  border: 1px dashed var(--color-border);
+  border-radius: 12px;
+}
+
+.empty-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.empty-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.empty-text {
+  color: var(--color-text-muted);
+  line-height: 1.8;
+}
+
+.empty-text code {
+  background: var(--color-bg-tertiary);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.875rem;
+}
+
+.sets-table-container {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.sets-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.sets-table th {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sets-table td {
+  padding: 1rem;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.set-row:hover td {
+  background: var(--color-bg-tertiary);
+}
+
+.sets-table code {
+  font-size: 0.75rem;
+  background: var(--color-bg-primary);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+.score-cell {
+  font-weight: 700;
+  color: var(--color-text-primary);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.grade-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: white;
+}
+
+.date-cell {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+</style>

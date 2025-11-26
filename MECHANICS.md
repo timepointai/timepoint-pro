@@ -744,6 +744,166 @@ Global:          Multi-region with coordination
 
 ---
 
-**Implementation Status**: All 18 mechanisms implemented and verified.
+# Appendix: Convergence Evaluation
+
+**When ground truth is unavailable, self-consistency across independent runs provides a proxy for reliability.**
+
+## The Problem
+
+Traditional simulation evaluation requires ground truth—known outcomes to compare against. But for novel scenarios (future predictions, counterfactuals, "what if" explorations), no ground truth exists. How do we assess whether simulation outputs are reliable?
+
+## The Insight
+
+If the same scenario, run multiple times with different random seeds or model variations, produces consistent causal structures, the underlying mechanisms are likely robust. Divergent causal graphs indicate unstable reasoning that shouldn't be trusted.
+
+This follows from a key principle: **self-consistency is a necessary (not sufficient) condition for validity**. A simulation that contradicts itself across runs definitely has problems; one that converges might still be wrong, but at least it's reliably wrong.
+
+## Causal Graph Structure
+
+Convergence operates on **CausalGraphs** extracted from simulation runs:
+
+```python
+CausalGraph:
+    edges: Set[CausalEdge]
+
+CausalEdge:
+    source: str      # Timepoint ID or Entity ID
+    target: str      # Connected node
+    edge_type: str   # "temporal" | "knowledge" | "causal"
+```
+
+**Edge types:**
+- **Temporal edges**: `Timepoint.causal_parent` relationships (T2 caused by T1)
+- **Knowledge edges**: `ExposureEvent` flow (Entity A learned X from Entity B)
+- **Causal edges**: Explicit causal claims in narrative
+
+## Jaccard Similarity
+
+Graph comparison uses Jaccard similarity—the standard set-overlap metric:
+
+```
+J(A, B) = |A ∩ B| / |A ∪ B|
+```
+
+For causal graphs:
+- `A ∩ B` = edges present in both graphs (consensus)
+- `A ∪ B` = edges present in either graph (total unique edges)
+
+**Interpretation:**
+- J = 1.0: Perfect agreement (identical causal structures)
+- J = 0.5: Half the edges are shared
+- J = 0.0: No overlap (completely different causal reasoning)
+
+## Convergence Score and Grading
+
+For multiple runs (≥2), convergence score is the **mean pairwise Jaccard similarity**:
+
+```python
+def compute_convergence(graphs: List[CausalGraph]) -> float:
+    similarities = []
+    for i in range(len(graphs)):
+        for j in range(i + 1, len(graphs)):
+            sim = jaccard_similarity(graphs[i], graphs[j])
+            similarities.append(sim)
+    return sum(similarities) / len(similarities)
+```
+
+**Robustness Grades:**
+
+| Grade | Score Range | Interpretation |
+|-------|-------------|----------------|
+| **A** | ≥ 90% | Highly robust—causal structure nearly identical across runs |
+| **B** | ≥ 80% | Robust—minor variations but core causal reasoning stable |
+| **C** | ≥ 70% | Moderate—some disagreement on secondary causal links |
+| **D** | ≥ 50% | Unstable—significant divergence, use with caution |
+| **F** | < 50% | Unreliable—causal reasoning inconsistent, do not trust |
+
+## Divergence Points
+
+When graphs disagree, the system identifies **divergence points**—specific causal edges where runs differ:
+
+```python
+def find_divergence_points(graphs: List[CausalGraph]) -> List[DivergencePoint]:
+    all_edges = union(g.edges for g in graphs)
+    divergence = []
+    for edge in all_edges:
+        present_count = sum(1 for g in graphs if edge in g.edges)
+        if present_count < len(graphs):  # Not unanimous
+            divergence.append(DivergencePoint(
+                edge=edge,
+                agreement_ratio=present_count / len(graphs),
+                status="contested"
+            ))
+    return divergence
+```
+
+Divergence points reveal where causal reasoning is unstable—these are the edges to investigate or treat as uncertain.
+
+## Usage
+
+### CLI
+
+```bash
+# Run convergence evaluation after simulations
+python run_all_mechanism_tests.py --convergence --convergence-runs 3
+
+# Analyze specific template with more runs
+python run_all_mechanism_tests.py --template hospital_crisis --convergence --convergence-runs 5
+```
+
+### API Endpoints
+
+```bash
+# Get aggregate convergence statistics
+curl http://localhost:8000/api/convergence-stats
+
+# List convergence sets with filtering
+curl "http://localhost:8000/api/convergence-sets?min_score=0.7&limit=20"
+
+# Get detailed divergence points for a set
+curl http://localhost:8000/api/convergence-set/{set_id}
+```
+
+### Dashboard
+
+The Convergence page (`convergence.html`) provides:
+- Overview metrics (sets, average score, grade distribution)
+- Score distribution visualization
+- Template coverage analysis
+- Detailed divergence point inspection
+
+## Configuration
+
+```python
+class ConvergenceConfig(BaseModel):
+    enabled: bool = False
+    run_count: int = 3           # Runs per convergence set (2-10)
+    min_acceptable_score: float = 0.5  # Minimum score to consider "acceptable"
+    store_divergence_points: bool = True
+```
+
+## Limitations
+
+1. **Self-consistency ≠ correctness**: Converged simulations may still be wrong if the model has systematic biases
+2. **Computational cost**: Each convergence evaluation requires N simulation runs
+3. **Edge detection sensitivity**: Different granularities of causal logging affect scores
+4. **Stochastic elements**: Some divergence is expected from intentional randomness (different entity decisions)
+
+## When to Use Convergence
+
+**Good use cases:**
+- Validating PORTAL mode backward reasoning
+- Comparing template robustness
+- Identifying unstable causal mechanisms
+- Quality assurance before production use
+
+**Not appropriate for:**
+- Single-run scenarios (need ≥2 runs)
+- Intentionally divergent simulations (branching counterfactuals)
+- Real-time evaluation (too slow)
+
+---
+
+**Implementation Status**: All 18 mechanisms implemented and verified. Convergence evaluation implemented.
 **Platform Status**: Infrastructure vision; see [MILESTONES.md](MILESTONES.md) for roadmap.
 **See also**: [README.md](README.md) for quick start, [QUICKSTART.md](QUICKSTART.md) for natural language usage.

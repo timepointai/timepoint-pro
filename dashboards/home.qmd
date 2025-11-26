@@ -40,6 +40,17 @@ recentRuns = await (async () => {
   }
 })()
 
+// Fetch convergence stats
+convergenceStats = await (async () => {
+  try {
+    const response = await fetch(`${API_BASE}/api/convergence-stats`);
+    if (!response.ok) return { total_sets: 0, average_score: 0 };
+    return await response.json();
+  } catch (error) {
+    return { total_sets: 0, average_score: 0 };
+  }
+})()
+
 // Calculate stats
 stats = {
   const totalRuns = recentRuns.length;
@@ -102,6 +113,11 @@ html`
       <div class="stat-value">${stats.totalTokens}k</div>
       <div class="stat-label">Tokens Used</div>
     </div>
+    <div class="stat-card stat-convergence">
+      <div class="stat-icon">&#127919;</div>
+      <div class="stat-value">${convergenceStats.total_sets > 0 ? ((convergenceStats.average_score || 0) * 100).toFixed(0) + '%' : 'N/A'}</div>
+      <div class="stat-label">Avg Convergence</div>
+    </div>
   </div>
 
   <!-- Quick Actions -->
@@ -127,6 +143,11 @@ html`
         <div class="action-icon">&#128172;</div>
         <div class="action-title">Dialogs</div>
         <div class="action-desc">Entity conversations</div>
+      </a>
+      <a href="convergence.html" class="action-card action-convergence">
+        <div class="action-icon">&#127919;</div>
+        <div class="action-title">Convergence</div>
+        <div class="action-desc">Causal graph analysis</div>
       </a>
     </div>
   </div>
@@ -380,6 +401,16 @@ body {
 .stat-success .stat-value { color: var(--color-success); }
 .stat-cost .stat-value { color: var(--color-warning); }
 .stat-tokens .stat-value { color: var(--color-accent-secondary); }
+.stat-convergence .stat-value { color: #10b981; }
+
+.action-convergence {
+  border-color: #10b981 !important;
+}
+
+.action-convergence:hover {
+  border-color: #10b981 !important;
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.2) !important;
+}
 
 .stat-label {
   font-size: 0.875rem;
