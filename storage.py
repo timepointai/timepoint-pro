@@ -221,6 +221,22 @@ class GraphStore:
             statement = select(Timepoint).order_by(Timepoint.timestamp)
             return list(session.exec(statement).all())
 
+    def get_timepoints_by_run(self, run_id: str) -> list[Timepoint]:
+        """Get all timepoints for a specific run, ordered by timestamp"""
+        with Session(self.engine) as session:
+            statement = select(Timepoint).where(
+                Timepoint.run_id == run_id
+            ).order_by(Timepoint.timestamp)
+            return list(session.exec(statement).all())
+
+    def get_exposure_events_by_run(self, run_id: str) -> list[ExposureEvent]:
+        """Get all exposure events for a specific run, ordered by timestamp"""
+        with Session(self.engine) as session:
+            statement = select(ExposureEvent).where(
+                ExposureEvent.run_id == run_id
+            ).order_by(ExposureEvent.timestamp)
+            return list(session.exec(statement).all())
+
     def get_entity_knowledge_at_timepoint(self, entity_id: str, timepoint_id: str) -> list[str]:
         """Get what an entity knew at a specific timepoint"""
         with Session(self.engine) as session:

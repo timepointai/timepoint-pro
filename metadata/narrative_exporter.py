@@ -46,6 +46,7 @@ class TimelineEntry(BaseModel):
     entities_present: List[str] = []
     dialog_turn_count: int = 0
     importance: float = 0.5
+    causal_parent: Optional[str] = None  # Parent timepoint for convergence analysis
 
 
 class DialogExcerpt(BaseModel):
@@ -191,7 +192,8 @@ class NarrativeExporter:
                 timepoint_id=tp.timepoint_id if hasattr(tp, 'timepoint_id') else str(tp),
                 timestamp=str(tp.timestamp) if hasattr(tp, 'timestamp') else None,
                 event_description=tp.event_description if hasattr(tp, 'event_description') else "Event",
-                entities_present=tp.entities_present if hasattr(tp, 'entities_present') else []
+                entities_present=tp.entities_present if hasattr(tp, 'entities_present') else [],
+                causal_parent=tp.causal_parent if hasattr(tp, 'causal_parent') else None
             )
             timeline.append(entry)
 
