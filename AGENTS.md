@@ -7,7 +7,7 @@
 - Stub-then-fill workflow
 
 ## Stack
-Python 3.11+, FastAPI, SQLAlchemy 2.0, Pydantic, pytest, Playwright, ruff, mypy, Docker
+Python 3.10+, FastAPI, SQLAlchemy 2.0, Pydantic, pytest, Playwright, ruff, mypy, Docker
 
 ## Standards
 - Type hints mandatory

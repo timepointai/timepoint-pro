@@ -10,7 +10,7 @@ The system consists of two main components:
 REST API server providing real-time access to the runs database.
 
 **Key Files:**
-- `server.py` - FastAPI application with 8 REST endpoints
+- `server.py` - FastAPI application with 12 REST endpoints
 - `db.py` - Database query layer with filtering, sorting, and pagination
 - `models.py` - Pydantic models for request/response validation
 - `requirements.txt` - Python dependencies

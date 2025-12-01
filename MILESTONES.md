@@ -22,7 +22,7 @@
 - **Mechanism metrics** — All 18 mechanisms tracked per run
 - **Basic dashboard** — Quarto + FastAPI
 - **Narrative exports** — Markdown, JSON, PDF generation
-- **29 simulation templates** — In `generation/config_schema.py` (includes 3 convergence-optimized templates)
+- **69+ simulation templates** — In `generation/config_schema.py` (includes 3 convergence-optimized templates)
 - **Convergence evaluation** — Causal graph consistency analysis with E2E testing mode, side-by-side comparison, and robustness grading (A-F)
 
 ### Model Stack (All Open Source)

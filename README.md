@@ -326,8 +326,8 @@ All models via OpenRouter, all open-source with commercial synthetic data rights
 - `llm_service/`: Model selection, providers, logging
 - `nl_interface/`: Natural language to simulation config
 - `validation.py` (1,365 lines): 5 physics-inspired validators
-- `storage.py` (407 lines): SQLite persistence layer with transaction support
-- `generation/templates/`: 16 JSON simulation templates (+ 29 Python templates in config_schema.py)
+- `storage.py` (632 lines): SQLite persistence layer with transaction support
+- `generation/templates/`: 16 JSON simulation templates (+ 69 Python template methods in config_schema.py)
 
 ---
 
