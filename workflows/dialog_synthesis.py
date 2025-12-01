@@ -14,9 +14,12 @@ Contains:
 from typing import List, Dict, Optional
 from datetime import datetime
 import json
+import logging
 
 from schemas import Entity, Dialog, ExposureEvent
 from metadata.tracking import track_mechanism
+
+logger = logging.getLogger(__name__)
 
 
 @track_mechanism("M8", "embodied_states_pain")
@@ -105,24 +108,53 @@ def get_timepoint_position(timeline: List[Dict], timepoint: 'Timepoint') -> str:
 
 
 def extract_knowledge_references(content: str) -> List[str]:
-    """Extract knowledge items referenced in dialog content"""
-    # Simple keyword extraction - could be enhanced with NLP
-    words = content.lower().split()
+    """
+    Extract knowledge items referenced in dialog content.
+
+    Looks for capitalized words (proper nouns, concepts) that might represent
+    knowledge transfer during dialog. Returns normalized (lowercase) versions
+    for consistent comparison.
+
+    Args:
+        content: Dialog turn content to analyze
+
+    Returns:
+        List of unique knowledge references found (lowercase)
+    """
+    # Split without lowercasing first - we need to detect capitalization
+    words = content.split()
     knowledge_items = []
 
-    # Look for capitalized phrases that might be proper nouns or concepts
-    for i, word in enumerate(words):
-        if word[0].isupper() and len(word) > 3:
-            knowledge_items.append(word)
+    # Look for capitalized words that might be proper nouns or concepts
+    for word in words:
+        # Strip punctuation for checking
+        clean_word = word.strip('.,!?;:"\'-()[]{}')
+        if clean_word and len(clean_word) > 3 and clean_word[0].isupper():
+            # Store lowercase for consistent comparison
+            knowledge_items.append(clean_word.lower())
 
     return list(set(knowledge_items))
 
 
 def create_exposure_event(entity_id: str, information: str, source: str, event_type: str,
                          timestamp: datetime, confidence: float = 0.9,
-                         store: Optional['GraphStore'] = None):
-    """Create an exposure event for information transfer"""
+                         store: Optional['GraphStore'] = None,
+                         timepoint_id: Optional[str] = None):
+    """
+    Create an exposure event for information transfer.
+
+    Args:
+        entity_id: Entity receiving the information
+        information: The knowledge item being transferred
+        source: Entity providing the information
+        event_type: Type of exposure (told, witnessed, etc.)
+        timestamp: When the exposure occurred
+        confidence: Confidence level (0.0-1.0)
+        store: GraphStore to save the event
+        timepoint_id: Optional timepoint ID for context
+    """
     if not store:
+        logger.debug(f"[M3] No store provided, skipping exposure event: {source} -> {entity_id}")
         return
 
     exposure = ExposureEvent(
@@ -131,9 +163,11 @@ def create_exposure_event(entity_id: str, information: str, source: str, event_t
         information=information,
         source=source,
         timestamp=timestamp,
-        confidence=confidence
+        confidence=confidence,
+        timepoint_id=timepoint_id
     )
     store.save_exposure_event(exposure)
+    logger.info(f"[M3] Created exposure event: {source} -> {entity_id} (info: {information[:50] if len(information) > 50 else information})")
 
 
 @track_mechanism("M3", "exposure_event_integration")
@@ -442,10 +476,15 @@ Generate 8-12 dialog turns showing realistic interaction given these constraints
     )
 
     # Create ExposureEvents for information exchange
+    exposure_events_created = 0
     if store:
+        print(f"    [M11→M3] Processing {len(dialog_data.turns)} dialog turns for exposure events")
         for turn in dialog_data.turns:
             # Extract knowledge items mentioned in turn
             mentioned_knowledge = extract_knowledge_references(turn.content)
+
+            if mentioned_knowledge:
+                print(f"    [M11→M3] Turn by {turn.speaker}: {len(mentioned_knowledge)} knowledge refs: {mentioned_knowledge[:3]}")
 
             # Create exposure for all listeners
             for listener in entities:
@@ -458,8 +497,12 @@ Generate 8-12 dialog turns showing realistic interaction given these constraints
                             event_type="told",
                             timestamp=turn.timestamp,
                             confidence=0.9,
-                            store=store
+                            store=store,
+                            timepoint_id=timepoint.timepoint_id  # NEW: Set timepoint context
                         )
+                        exposure_events_created += 1
+
+        print(f"    [M11→M3] Created {exposure_events_created} exposure events from dialog")
 
     # Convert dialog turns to JSON-serializable format (handle datetime objects)
     turns_data = []
