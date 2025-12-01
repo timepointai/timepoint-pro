@@ -22,6 +22,26 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def normalize_timepoint_id(timepoint_id: str, run_id: str) -> str:
+    """
+    Normalize a timepoint ID by stripping the run_id prefix if present.
+
+    This enables convergence comparison across runs - e.g.,
+    "run_123_tp_001_opening" -> "tp_001_opening"
+
+    Args:
+        timepoint_id: The timepoint ID (possibly with run_id prefix)
+        run_id: The run ID to strip
+
+    Returns:
+        Normalized timepoint ID without run_id prefix
+    """
+    prefix = f"{run_id}_"
+    if timepoint_id.startswith(prefix):
+        return timepoint_id[len(prefix):]
+    return timepoint_id
+
+
 @dataclass
 class CausalEdge:
     """A single causal link in the graph."""
@@ -190,16 +210,16 @@ def extract_causal_graph(
     Extract causal graph from a completed simulation run.
 
     Pulls from existing database structures:
-    - Timepoint.causal_parent for temporal chains
-    - ExposureEvent.source/entity_id for knowledge flow
+    - Timepoint.causal_parent for temporal chains (filtered by run_id)
+    - ExposureEvent.source/entity_id for knowledge flow (filtered by run_id)
 
     Args:
-        run_id: Simulation run identifier
+        run_id: Simulation run identifier (used to filter timepoints/events)
         db_path: Path to database (default: metadata/runs.db)
         template_id: Optional template ID for metadata
 
     Returns:
-        CausalGraph with extracted causal structure
+        CausalGraph with extracted causal structure for the specific run
     """
     from storage import GraphStore
     from sqlmodel import Session, select
@@ -214,20 +234,33 @@ def extract_causal_graph(
     timepoints: Set[str] = set()
 
     with Session(store.engine) as session:
-        # Extract temporal chain from timepoints
-        all_timepoints = session.exec(select(Timepoint)).all()
-        for tp in all_timepoints:
-            timepoints.add(tp.timepoint_id)
+        # Extract temporal chain from timepoints - FILTER BY RUN_ID
+        run_timepoints = session.exec(
+            select(Timepoint).where(Timepoint.run_id == run_id)
+        ).all()
+
+        logger.debug(f"Extracting causal graph for run {run_id}: found {len(run_timepoints)} timepoints")
+
+        for tp in run_timepoints:
+            # Normalize timepoint IDs by stripping run_id prefix for convergence comparison
+            normalized_tp_id = normalize_timepoint_id(tp.timepoint_id, run_id)
+            timepoints.add(normalized_tp_id)
             if tp.causal_parent:
-                temporal_edges.add((tp.causal_parent, tp.timepoint_id))
+                normalized_parent = normalize_timepoint_id(tp.causal_parent, run_id)
+                temporal_edges.add((normalized_parent, normalized_tp_id))
             # Track entities present
             if tp.entities_present:
                 for eid in tp.entities_present:
                     entities.add(eid)
 
-        # Extract knowledge flow from exposure events
-        all_events = session.exec(select(ExposureEvent)).all()
-        for event in all_events:
+        # Extract knowledge flow from exposure events - FILTER BY RUN_ID
+        run_events = session.exec(
+            select(ExposureEvent).where(ExposureEvent.run_id == run_id)
+        ).all()
+
+        logger.debug(f"Found {len(run_events)} exposure events for run {run_id}")
+
+        for event in run_events:
             entities.add(event.entity_id)
             if event.source and event.source != event.entity_id:
                 # Knowledge flowed from source to entity
@@ -244,6 +277,9 @@ def extract_causal_graph(
         metadata={
             "extracted_at": datetime.utcnow().isoformat(),
             "db_path": db_path,
+            "timepoint_count": len(timepoints),
+            "temporal_edge_count": len(temporal_edges),
+            "knowledge_edge_count": len(knowledge_edges),
         }
     )
 
