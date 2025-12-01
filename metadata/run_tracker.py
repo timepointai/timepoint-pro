@@ -10,7 +10,7 @@ Tracks:
 """
 
 from typing import Dict, List, Set, Optional, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime, timedelta
 from pathlib import Path
 import json
@@ -126,8 +126,7 @@ class RunMetadata(BaseModel):
         description="Quality metric: output_quality / tokens_used"
     )
 
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class MetadataManager:
@@ -688,61 +687,74 @@ class MetadataManager:
     def get_run(self, run_id: str) -> RunMetadata:
         """Retrieve complete run metadata"""
         conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row  # Use Row factory for column-name access
         cursor = conn.cursor()
 
-        # Get run
-        cursor.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,))
+        # Get run with explicit column names to avoid migration ordering issues
+        cursor.execute("""
+            SELECT
+                run_id, template_id, started_at, completed_at, causal_mode,
+                max_entities, max_timepoints, entities_created, timepoints_created,
+                training_examples, cost_usd, llm_calls, tokens_used, duration_seconds,
+                oxen_repo_url, oxen_dataset_url, status, error_message,
+                summary, summary_generated_at, narrative_exports, narrative_export_generated_at,
+                schema_version, fidelity_strategy_json, fidelity_distribution,
+                actual_tokens_used, token_budget_compliance, fidelity_efficiency_score
+            FROM runs WHERE run_id = ?
+        """, (run_id,))
         row = cursor.fetchone()
         if not row:
+            conn.close()
             raise ValueError(f"Run {run_id} not found")
 
         # Get mechanisms used
         cursor.execute("""
             SELECT DISTINCT mechanism FROM mechanism_usage WHERE run_id = ?
         """, (run_id,))
-        mechanisms_used = {row[0] for row in cursor.fetchall()}
+        mechanisms_used = {r[0] for r in cursor.fetchall()}
 
         conn.close()
 
         # Parse narrative exports if present
         narrative_exports = None
-        if len(row) > 20 and row[20]:
+        narrative_exports_raw = row['narrative_exports']
+        if narrative_exports_raw:
             try:
-                narrative_exports = json.loads(row[20])
+                narrative_exports = json.loads(narrative_exports_raw)
             except:
                 narrative_exports = None
 
-        # Build metadata
+        # Build metadata using column names (not indices) for robustness
         metadata = RunMetadata(
-            run_id=row[0],
-            template_id=row[1],
-            started_at=datetime.fromisoformat(row[2]),
-            completed_at=datetime.fromisoformat(row[3]) if row[3] else None,
-            causal_mode=TemporalMode(row[4]),
-            max_entities=row[5],
-            max_timepoints=row[6],
-            entities_created=row[7],
-            timepoints_created=row[8],
-            training_examples=row[9],
-            cost_usd=row[10],
-            llm_calls=row[11],
-            tokens_used=row[12],
-            duration_seconds=row[13],
-            oxen_repo_url=row[14],
-            oxen_dataset_url=row[15],
-            status=row[16],
-            error_message=row[17],
-            summary=row[18] if len(row) > 18 else None,
-            summary_generated_at=datetime.fromisoformat(row[19]) if len(row) > 19 and row[19] else None,
+            run_id=row['run_id'],
+            template_id=row['template_id'],
+            started_at=datetime.fromisoformat(row['started_at']),
+            completed_at=datetime.fromisoformat(row['completed_at']) if row['completed_at'] else None,
+            causal_mode=TemporalMode(row['causal_mode']),
+            max_entities=row['max_entities'],
+            max_timepoints=row['max_timepoints'],
+            entities_created=row['entities_created'],
+            timepoints_created=row['timepoints_created'],
+            training_examples=row['training_examples'],
+            cost_usd=row['cost_usd'],
+            llm_calls=row['llm_calls'],
+            tokens_used=row['tokens_used'],
+            duration_seconds=row['duration_seconds'],
+            oxen_repo_url=row['oxen_repo_url'],
+            oxen_dataset_url=row['oxen_dataset_url'],
+            status=row['status'],
+            error_message=row['error_message'],
+            summary=row['summary'],
+            summary_generated_at=datetime.fromisoformat(row['summary_generated_at']) if row['summary_generated_at'] else None,
             narrative_exports=narrative_exports,
-            narrative_export_generated_at=datetime.fromisoformat(row[21]) if len(row) > 21 and row[21] else None,
+            narrative_export_generated_at=datetime.fromisoformat(row['narrative_export_generated_at']) if row['narrative_export_generated_at'] else None,
             # M1+M17: Database v2 - Fidelity metrics
-            schema_version=row[22] if len(row) > 22 else "1.0",
-            fidelity_strategy_json=row[23] if len(row) > 23 else None,
-            fidelity_distribution=row[24] if len(row) > 24 else None,
-            actual_tokens_used=row[25] if len(row) > 25 else None,
-            token_budget_compliance=row[26] if len(row) > 26 else None,
-            fidelity_efficiency_score=row[27] if len(row) > 27 else None,
+            schema_version=row['schema_version'] if row['schema_version'] else "2.0",
+            fidelity_strategy_json=row['fidelity_strategy_json'],
+            fidelity_distribution=row['fidelity_distribution'],
+            actual_tokens_used=row['actual_tokens_used'],
+            token_budget_compliance=row['token_budget_compliance'],
+            fidelity_efficiency_score=row['fidelity_efficiency_score'],
             mechanisms_used=mechanisms_used
         )
 

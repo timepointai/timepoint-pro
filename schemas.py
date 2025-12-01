@@ -251,6 +251,7 @@ class ExposureEvent(SQLModel, table=True):
     timestamp: datetime
     confidence: float = Field(default=1.0)
     timepoint_id: Optional[str] = Field(default=None, index=True)  # link to timepoint
+    run_id: Optional[str] = Field(default=None, index=True)  # link to simulation run for convergence
 
 # ============================================================================
 # Mechanism 5: Query Resolution - Query History Tracking
@@ -276,6 +277,7 @@ class Timepoint(SQLModel, table=True):
     entities_present: List[str] = Field(default_factory=list, sa_column=Column(JSON))
     causal_parent: Optional[str] = Field(default=None, index=True)  # previous timepoint_id
     resolution_level: ResolutionLevel = Field(default=ResolutionLevel.SCENE)
+    run_id: Optional[str] = Field(default=None, index=True)  # link to simulation run for convergence
 
 
 # ============================================================================

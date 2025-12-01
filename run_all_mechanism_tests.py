@@ -209,7 +209,8 @@ def run_convergence_e2e(
     template_name: str,
     run_count: int = 3,
     skip_summaries: bool = False,
-    verbose: bool = False
+    verbose: bool = False,
+    model_override: Optional[str] = None
 ) -> bool:
     """
     Run a template N times consecutively, then compute convergence across those runs.
@@ -225,17 +226,18 @@ def run_convergence_e2e(
         run_count: Number of times to run the template (default: 3)
         skip_summaries: Whether to skip LLM-powered summaries
         verbose: Show detailed divergence point information
+        model_override: Override the default LLM model (e.g., "meta-llama/llama-3.1-405b-instruct")
 
     Returns:
         True if all runs succeeded and convergence was computed, False otherwise
 
     Example:
-        python run_all_mechanism_tests.py --convergence-e2e --template board_meeting --runs 3
+        python run_all_mechanism_tests.py --convergence-e2e --template board_meeting --runs 3 --model meta-llama/llama-3.1-405b-instruct
     """
     from generation.config_schema import SimulationConfig
     from generation.resilience_orchestrator import ResilientE2EWorkflowRunner
     from metadata.run_tracker import MetadataManager
-    from evaluation.convergence import CausalGraph, compute_convergence_from_graphs
+    from evaluation.convergence import CausalGraph, compute_convergence_from_graphs, extract_causal_graph
     from storage import GraphStore
     from schemas import ConvergenceSet
     import uuid
@@ -245,6 +247,12 @@ def run_convergence_e2e(
     print("=" * 80)
     print(f"Template: {template_name}")
     print(f"Runs: {run_count}")
+    if model_override:
+        print(f"Model Override: {model_override}")
+        # Set environment variable for downstream LLM client initialization
+        os.environ["TIMEPOINT_MODEL_OVERRIDE"] = model_override
+    else:
+        print(f"Model: default (meta-llama/llama-3.1-70b-instruct)")
     print(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 80)
     print()
@@ -392,25 +400,26 @@ def run_convergence_e2e(
     print(f"{'='*80}")
     print()
 
-    # Build causal graphs from run metadata
+    # Extract real causal graphs from database
+    print("Extracting causal graphs from database...")
     graphs = []
     for run in successful_runs:
-        graph = CausalGraph(
-            run_id=run['run_id'],
-            template_id=template_name,
-        )
+        try:
+            graph = extract_causal_graph(
+                run_id=run['run_id'],
+                db_path="metadata/runs.db",
+                template_id=template_name
+            )
+            graphs.append(graph)
+            print(f"  ├─ Run {run['run_id'][:20]}...: {graph.edge_count} edges ({len(graph.temporal_edges)} temporal, {len(graph.knowledge_edges)} knowledge)")
+        except Exception as e:
+            print(f"  ⚠️ Could not extract graph for run {run['run_id']}: {e}")
 
-        # Create edges from mechanism co-occurrence
-        if run['mechanisms']:
-            mechanisms = list(run['mechanisms'])
-            for i, m1 in enumerate(mechanisms):
-                for m2 in mechanisms[i+1:]:
-                    graph.temporal_edges.add((m1, m2))
-
-        if run.get('entities', 0) > 0:
-            graph.metadata['entity_count'] = run['entities']
-
-        graphs.append(graph)
+    # Check minimum graph count
+    if len(graphs) < 2:
+        print(f"\n❌ Not enough graphs extracted for convergence ({len(graphs)}/2 minimum)")
+        print("   This may indicate the runs didn't persist timepoints/events to the shared database.")
+        return False
 
     # Compute convergence
     result = compute_convergence_from_graphs(graphs)
@@ -1627,6 +1636,12 @@ if __name__ == "__main__":
         action="store_true",
         help="Run template N times (--convergence-runs) then compute convergence with side-by-side comparison"
     )
+    parser.add_argument(
+        "--model",
+        type=str,
+        metavar="MODEL_ID",
+        help="Override default LLM model (e.g. meta-llama/llama-3.1-405b-instruct)"
+    )
     args = parser.parse_args()
 
     # Handle --list-modes first (doesn't require API key)
@@ -1660,7 +1675,8 @@ if __name__ == "__main__":
             template_name=args.template,
             run_count=args.convergence_runs,
             skip_summaries=args.skip_summaries,
-            verbose=args.convergence_verbose
+            verbose=args.convergence_verbose,
+            model_override=args.model
         )
         sys.exit(0 if success else 1)
 

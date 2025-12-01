@@ -37,6 +37,10 @@ from metadata.narrative_exporter import NarrativeExporter
 from andos.layer_computer import compute_andos_layers, validate_andos_layers
 
 
+# Shared database path for convergence analysis (timepoints/events persist across runs)
+SHARED_DB_PATH = "metadata/runs.db"
+
+
 def _infer_interaction_graph(entities: List[Entity]) -> Dict:
     """
     Infer interaction graph for templates without explicit graph.
@@ -83,6 +87,132 @@ class FullE2EWorkflowRunner:
         self.generate_summary = generate_summary
         set_metadata_manager(metadata_manager)
         self.logfire = logfire_setup.get_logfire()
+
+        # Initialize shared store for convergence analysis (persists timepoints/events across runs)
+        self._shared_store: Optional[GraphStore] = None
+
+    def _get_shared_store(self) -> GraphStore:
+        """Get or create the shared store for convergence data persistence."""
+        if self._shared_store is None:
+            # Ensure metadata directory exists
+            Path("metadata").mkdir(parents=True, exist_ok=True)
+            self._shared_store = GraphStore(f"sqlite:///{SHARED_DB_PATH}")
+        return self._shared_store
+
+    def _persist_timepoint_for_convergence(self, timepoint: Timepoint, run_id: str) -> None:
+        """
+        Persist a timepoint to the shared database for convergence analysis.
+
+        This is called after saving to the temp DB, ensuring data survives for
+        cross-run convergence comparisons.
+
+        IMPORTANT: Creates a NEW Timepoint object to avoid SQLAlchemy session detachment
+        issues when copying between temp DB and shared DB.
+
+        Args:
+            timepoint: Timepoint to persist (from temp DB session)
+            run_id: Current run identifier (stored in timepoint.run_id)
+        """
+        try:
+            shared_store = self._get_shared_store()
+
+            # Create a fresh Timepoint copy to avoid session detachment issues
+            # The original timepoint is bound to the temp DB session
+            # IMPORTANT: Prefix timepoint_id with run_id to avoid UNIQUE constraint violations
+            # when the same template is run multiple times (e.g., tp_001_opening exists in both runs)
+            unique_tp_id = f"{run_id}_{timepoint.timepoint_id}"
+            unique_parent_id = f"{run_id}_{timepoint.causal_parent}" if timepoint.causal_parent else None
+
+            fresh_timepoint = Timepoint(
+                timepoint_id=unique_tp_id,
+                timeline_id=timepoint.timeline_id,
+                timestamp=timepoint.timestamp,
+                event_description=timepoint.event_description,
+                entities_present=list(timepoint.entities_present) if timepoint.entities_present else [],
+                causal_parent=unique_parent_id,
+                resolution_level=timepoint.resolution_level,
+                run_id=run_id  # Set run_id for convergence filtering
+            )
+
+            shared_store.save_timepoint(fresh_timepoint)
+        except Exception as e:
+            # Non-fatal - log but don't fail the run
+            print(f"  ⚠️  Failed to persist timepoint for convergence: {e}")
+
+    def _persist_exposure_events_for_convergence(self, scene_result: Dict, run_id: str) -> int:
+        """
+        Persist all exposure events from temp store to shared database for convergence.
+
+        This copies exposure events from the temp DB to the shared DB so that
+        knowledge_edges can be extracted for convergence analysis.
+
+        IMPORTANT: Creates FRESH ExposureEvent objects to avoid SQLAlchemy session
+        detachment issues when copying between temp DB and shared DB.
+
+        Args:
+            scene_result: Scene result containing the temp store
+            run_id: Current run identifier
+
+        Returns:
+            Number of exposure events persisted
+        """
+        from schemas import ExposureEvent
+
+        temp_store = scene_result.get("store")
+        if not temp_store:
+            print("  ⚠️  No temp store available for exposure event persistence")
+            return 0
+
+        try:
+            shared_store = self._get_shared_store()
+            events_persisted = 0
+            events_skipped = 0
+
+            # Get all exposure events from temp store
+            # Note: We need to query all events, not just for specific entities
+            from sqlmodel import Session, select
+            with Session(temp_store.engine) as session:
+                all_events = session.exec(select(ExposureEvent)).all()
+
+                print(f"  📊 Found {len(all_events)} exposure events in temp store")
+
+                for event in all_events:
+                    try:
+                        # Create a FRESH ExposureEvent copy to avoid session detachment issues
+                        # The original event is bound to the temp DB session
+                        fresh_event = ExposureEvent(
+                            entity_id=event.entity_id,
+                            event_type=event.event_type,
+                            information=event.information,
+                            source=event.source,
+                            timestamp=event.timestamp,
+                            confidence=event.confidence,
+                            timepoint_id=event.timepoint_id,
+                            run_id=run_id  # Set run_id for convergence filtering
+                        )
+                        shared_store.save_exposure_event(fresh_event)
+                        events_persisted += 1
+                    except Exception as e:
+                        # Skip duplicates or errors but log them
+                        events_skipped += 1
+                        if events_skipped <= 3:  # Only log first few
+                            print(f"    ⚠️  Skipped event: {e}")
+
+            if events_persisted > 0:
+                print(f"  📊 Persisted {events_persisted} exposure events for convergence")
+            else:
+                print(f"  ⚠️  No exposure events to persist (0 found in temp store)")
+
+            if events_skipped > 0:
+                print(f"  ⚠️  Skipped {events_skipped} events (duplicates/errors)")
+
+            return events_persisted
+
+        except Exception as e:
+            print(f"  ⚠️  Failed to persist exposure events for convergence: {e}")
+            import traceback
+            traceback.print_exc()
+            return 0
 
     def run(self, config: SimulationConfig) -> RunMetadata:
         """
@@ -148,6 +278,10 @@ class FullE2EWorkflowRunner:
                 self._execute_queries(
                     trained_entities, all_timepoints, scene_result, run_id
                 )
+
+                # Step 4.7: Persist exposure events to shared DB for convergence analysis
+                # This must happen AFTER dialogs and queries which create exposure events
+                self._persist_exposure_events_for_convergence(scene_result, run_id)
 
                 # Step 5: Format training data
                 training_data = self._format_training_data(
@@ -416,7 +550,13 @@ class FullE2EWorkflowRunner:
             if not api_key:
                 raise ValueError("OPENROUTER_API_KEY not set")
 
-            llm = LLMClient(api_key=api_key)
+            # Check for model override (used by --model CLI flag in convergence tests)
+            model_override = os.getenv("TIMEPOINT_MODEL_OVERRIDE")
+            if model_override:
+                print(f"  🔧 Model override: {model_override}")
+                llm = LLMClient(api_key=api_key, default_model=model_override)
+            else:
+                llm = LLMClient(api_key=api_key)
 
             # Initialize storage
             db_path = tempfile.mktemp(suffix=".db")
@@ -655,7 +795,7 @@ class FullE2EWorkflowRunner:
 
                 # Convert portal paths to timepoints
                 all_timepoints = self._convert_portal_paths_to_timepoints(
-                    portal_paths, initial_timepoint, store
+                    portal_paths, initial_timepoint, store, run_id
                 )
 
                 # Store portal metadata for downstream processing
@@ -680,6 +820,9 @@ class FullE2EWorkflowRunner:
             all_timepoints = [initial_timepoint]
             current_timepoint = initial_timepoint
 
+            # CONVERGENCE FIX: Persist initial timepoint to shared DB
+            self._persist_timepoint_for_convergence(initial_timepoint, run_id)
+
             # Generate remaining timepoints
             target_count = config.timepoints.count
             for i in range(1, target_count):
@@ -691,8 +834,11 @@ class FullE2EWorkflowRunner:
                         context={"iteration": i, "total": target_count}
                     )
 
-                    # Save to database
+                    # Save to database (temp DB for workflow)
                     store.save_timepoint(next_timepoint)
+
+                    # CONVERGENCE FIX: Also persist to shared DB with run_id
+                    self._persist_timepoint_for_convergence(next_timepoint, run_id)
 
                     all_timepoints.append(next_timepoint)
                     current_timepoint = next_timepoint
@@ -715,7 +861,8 @@ class FullE2EWorkflowRunner:
         self,
         portal_paths: List,
         initial_timepoint: Timepoint,
-        store
+        store,
+        run_id: str
     ) -> List[Timepoint]:
         """
         Convert PortalPath objects to Timepoint objects for E2E pipeline.
@@ -773,8 +920,11 @@ class FullE2EWorkflowRunner:
                 }
             )
 
-            # Save to database
+            # Save to database (temp DB for workflow)
             store.save_timepoint(timepoint)
+
+            # CONVERGENCE FIX: Also persist to shared DB with run_id
+            self._persist_timepoint_for_convergence(timepoint, run_id)
 
             timepoints.append(timepoint)
             previous_timepoint_id = tp_id
@@ -1450,7 +1600,7 @@ class FullE2EWorkflowRunner:
 
             try:
                 from evaluation.convergence import (
-                    CausalGraph,
+                    extract_causal_graph,
                     compute_convergence_from_graphs,
                 )
                 from schemas import ConvergenceSet
@@ -1476,28 +1626,33 @@ class FullE2EWorkflowRunner:
 
                 print(f"  Analyzing {len(recent_runs)} runs of template: {template_id}")
 
-                # Build causal graphs from run metadata
+                # Extract REAL causal graphs from shared database (not mechanism proxies!)
                 graphs = []
                 for run in recent_runs:
-                    graph = CausalGraph(
-                        run_id=run.run_id,
-                        template_id=template_id,
-                    )
+                    try:
+                        # Use extract_causal_graph() to get ACTUAL temporal/knowledge edges
+                        # This reads from SHARED_DB_PATH where timepoints/events were persisted
+                        graph = extract_causal_graph(
+                            run_id=run.run_id,
+                            db_path=SHARED_DB_PATH,
+                            template_id=template_id
+                        )
 
-                    # Use mechanisms as proxy for causal structure
-                    if run.mechanisms_used:
-                        mechanisms = list(run.mechanisms_used)
-                        for i, m1 in enumerate(mechanisms):
-                            for m2 in mechanisms[i+1:]:
-                                graph.temporal_edges.add((m1, m2))
+                        # Log graph statistics for debugging
+                        print(f"    Run {run.run_id}: {len(graph.temporal_edges)} temporal edges, "
+                              f"{len(graph.knowledge_edges)} knowledge edges, "
+                              f"{len(graph.timepoints)} timepoints")
 
-                    if run.entities_created and run.entities_created > 0:
-                        graph.metadata['entity_count'] = run.entities_created
+                        if graph.edge_count > 0:
+                            graphs.append(graph)
+                        else:
+                            print(f"    ⚠️  Run {run.run_id}: empty graph (no edges)")
 
-                    graphs.append(graph)
+                    except Exception as e:
+                        print(f"    ⚠️  Failed to extract graph for {run.run_id}: {e}")
 
                 if len(graphs) < 2:
-                    print(f"  Could not build enough graphs")
+                    print(f"  Could not build enough graphs with edges (got {len(graphs)})")
                     return
 
                 # Compute convergence
