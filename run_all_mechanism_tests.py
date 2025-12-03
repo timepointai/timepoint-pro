@@ -1074,6 +1074,190 @@ def run_nl_simulation(
         return False
 
 
+def run_single_template(template_name: str, skip_summaries: bool = False) -> bool:
+    """Run a single template by name.
+
+    Args:
+        template_name: Name of the template to run (e.g., 'board_meeting')
+        skip_summaries: Skip LLM-powered summaries
+
+    Returns:
+        True if successful, False otherwise
+    """
+    from generation.config_schema import SimulationConfig
+    from generation.resilience_orchestrator import ResilientE2EWorkflowRunner
+    from metadata.run_tracker import MetadataManager
+
+    # Build template lookup from all available templates
+    template_lookup: Dict[str, Tuple] = {}
+
+    # Quick templates
+    quick_templates = [
+        ("board_meeting", SimulationConfig.example_board_meeting(), {"M7"}),
+        ("jefferson_dinner", SimulationConfig.example_jefferson_dinner(), {"M3", "M7"}),
+        ("hospital_crisis", SimulationConfig.example_hospital_crisis(), {"M8", "M14"}),
+        ("kami_shrine", SimulationConfig.example_kami_shrine(), {"M16"}),
+        ("detective_prospection", SimulationConfig.example_detective_prospection(), {"M15"}),
+        ("vc_pitch_pearl", SimulationConfig.example_vc_pitch_pearl(), {"M7", "M11", "M15"}),
+        ("vc_pitch_roadshow", SimulationConfig.example_vc_pitch_roadshow(), {"M3", "M7", "M10", "M13"}),
+    ]
+
+    # Full templates
+    full_templates = [
+        ("empty_house_flashback", SimulationConfig.example_empty_house_flashback(), {"M17", "M13", "M8"}),
+        ("final_problem_branching", SimulationConfig.example_final_problem_branching(), {"M12", "M17", "M15"}),
+        ("hound_shadow_directorial", SimulationConfig.example_hound_shadow_directorial(), {"M17", "M10", "M14"}),
+        ("sign_loops_cyclical", SimulationConfig.example_sign_loops_cyclical(), {"M17", "M15", "M3"}),
+        ("vc_pitch_branching", SimulationConfig.example_vc_pitch_branching(), {"M12", "M15", "M8", "M17"}),
+        ("vc_pitch_strategies", SimulationConfig.example_vc_pitch_strategies(), {"M12", "M10", "M15", "M17"}),
+    ]
+
+    # Timepoint corporate templates
+    timepoint_corporate_templates = [
+        ("timepoint_ipo_reverse", SimulationConfig.timepoint_ipo_reverse_engineering(), {"M12", "M15", "M7", "M13", "M11"}),
+        ("timepoint_acquisition_scenarios", SimulationConfig.timepoint_acquisition_scenarios(), {"M12", "M15", "M11", "M8", "M7", "M13"}),
+        ("timepoint_cofounder_configs", SimulationConfig.timepoint_cofounder_configurations(), {"M12", "M13", "M8", "M7", "M11"}),
+        ("timepoint_equity_incentives", SimulationConfig.timepoint_equity_performance_incentives(), {"M12", "M13", "M7", "M15", "M11", "M8"}),
+        ("timepoint_formation_decisions", SimulationConfig.timepoint_critical_formation_decisions(), {"M12", "M7", "M15", "M11"}),
+        ("timepoint_success_vs_failure", SimulationConfig.timepoint_success_vs_failure_paths(), {"M12", "M7", "M13", "M8", "M11", "M15"}),
+        ("timepoint_launch_marketing", SimulationConfig.timepoint_launch_marketing_campaigns(), {"M3", "M10", "M14"}),
+        ("timepoint_staffing_growth", SimulationConfig.timepoint_staffing_and_growth(), {"M3", "M10", "M14", "M15"}),
+        ("timepoint_personality_archetypes", SimulationConfig.timepoint_founder_personality_archetypes(), {"M12", "M13", "M8", "M7", "M11"}),
+        ("timepoint_charismatic_founder", SimulationConfig.timepoint_charismatic_founder_archetype(), {"M12", "M13", "M8", "M11", "M7"}),
+        ("timepoint_demanding_genius", SimulationConfig.timepoint_demanding_genius_archetype(), {"M12", "M13", "M8", "M7", "M15", "M11"}),
+        ("timepoint_ai_pricing_war", SimulationConfig.timepoint_ai_pricing_war(), {"M12", "M7", "M13", "M15", "M8"}),
+        ("timepoint_ai_capability_leapfrog", SimulationConfig.timepoint_ai_capability_leapfrog(), {"M12", "M9", "M10", "M13"}),
+        ("timepoint_ai_business_model_evolution", SimulationConfig.timepoint_ai_business_model_evolution(), {"M12", "M7", "M13", "M15", "M8"}),
+        ("timepoint_ai_regulatory_divergence", SimulationConfig.timepoint_ai_regulatory_divergence(), {"M12", "M7", "M13", "M14"}),
+    ]
+
+    # Portal templates
+    portal_templates = [
+        ("portal_presidential_election", SimulationConfig.portal_presidential_election(), {"M17", "M15", "M12", "M7", "M13"}),
+        ("portal_startup_unicorn", SimulationConfig.portal_startup_unicorn(), {"M17", "M13", "M8", "M11", "M15", "M7"}),
+        ("portal_academic_tenure", SimulationConfig.portal_academic_tenure(), {"M17", "M15", "M3", "M14", "M13"}),
+        ("portal_startup_failure", SimulationConfig.portal_startup_failure(), {"M17", "M12", "M8", "M13", "M15", "M11"}),
+    ]
+
+    # Portal simjudged variants
+    portal_templates_simjudged_quick = [
+        ("portal_presidential_election_simjudged_quick", SimulationConfig.portal_presidential_election_simjudged_quick(), {"M17", "M15", "M12", "M7", "M13"}),
+        ("portal_startup_unicorn_simjudged_quick", SimulationConfig.portal_startup_unicorn_simjudged_quick(), {"M17", "M13", "M8", "M11", "M15", "M7"}),
+        ("portal_academic_tenure_simjudged_quick", SimulationConfig.portal_academic_tenure_simjudged_quick(), {"M17", "M15", "M3", "M14", "M13"}),
+        ("portal_startup_failure_simjudged_quick", SimulationConfig.portal_startup_failure_simjudged_quick(), {"M17", "M12", "M8", "M13", "M15", "M11"}),
+    ]
+
+    portal_templates_simjudged = [
+        ("portal_presidential_election_simjudged", SimulationConfig.portal_presidential_election_simjudged(), {"M17", "M15", "M12", "M7", "M13"}),
+        ("portal_startup_unicorn_simjudged", SimulationConfig.portal_startup_unicorn_simjudged(), {"M17", "M13", "M8", "M11", "M15", "M7"}),
+        ("portal_academic_tenure_simjudged", SimulationConfig.portal_academic_tenure_simjudged(), {"M17", "M15", "M3", "M14", "M13"}),
+        ("portal_startup_failure_simjudged", SimulationConfig.portal_startup_failure_simjudged(), {"M17", "M12", "M8", "M13", "M15", "M11"}),
+    ]
+
+    portal_templates_simjudged_thorough = [
+        ("portal_presidential_election_simjudged_thorough", SimulationConfig.portal_presidential_election_simjudged_thorough(), {"M17", "M15", "M12", "M7", "M13"}),
+        ("portal_startup_unicorn_simjudged_thorough", SimulationConfig.portal_startup_unicorn_simjudged_thorough(), {"M17", "M13", "M8", "M11", "M15", "M7"}),
+        ("portal_academic_tenure_simjudged_thorough", SimulationConfig.portal_academic_tenure_simjudged_thorough(), {"M17", "M15", "M3", "M14", "M13"}),
+        ("portal_startup_failure_simjudged_thorough", SimulationConfig.portal_startup_failure_simjudged_thorough(), {"M17", "M12", "M8", "M13", "M15", "M11"}),
+    ]
+
+    # Portal timepoint templates
+    portal_timepoint_templates = [
+        ("portal_timepoint_unicorn", SimulationConfig.portal_timepoint_unicorn(), {"M17", "M13", "M7", "M15", "M8", "M11"}),
+        ("portal_timepoint_series_a_success", SimulationConfig.portal_timepoint_series_a_success(), {"M17", "M13", "M7", "M15", "M11"}),
+        ("portal_timepoint_product_market_fit", SimulationConfig.portal_timepoint_product_market_fit(), {"M17", "M13", "M10", "M7", "M15"}),
+        ("portal_timepoint_enterprise_adoption", SimulationConfig.portal_timepoint_enterprise_adoption(), {"M17", "M13", "M7", "M15", "M11", "M8"}),
+        ("portal_timepoint_founder_transition", SimulationConfig.portal_timepoint_founder_transition(), {"M17", "M13", "M8", "M7", "M15"}),
+    ]
+
+    portal_timepoint_templates_simjudged_quick = [
+        ("portal_timepoint_unicorn_simjudged_quick", SimulationConfig.portal_timepoint_unicorn_simjudged_quick(), {"M17", "M13", "M7", "M15", "M8", "M11"}),
+        ("portal_timepoint_series_a_success_simjudged_quick", SimulationConfig.portal_timepoint_series_a_success_simjudged_quick(), {"M17", "M13", "M7", "M15", "M11"}),
+        ("portal_timepoint_product_market_fit_simjudged_quick", SimulationConfig.portal_timepoint_product_market_fit_simjudged_quick(), {"M17", "M13", "M10", "M7", "M15"}),
+        ("portal_timepoint_enterprise_adoption_simjudged_quick", SimulationConfig.portal_timepoint_enterprise_adoption_simjudged_quick(), {"M17", "M13", "M7", "M15", "M11", "M8"}),
+        ("portal_timepoint_founder_transition_simjudged_quick", SimulationConfig.portal_timepoint_founder_transition_simjudged_quick(), {"M17", "M13", "M8", "M7", "M15"}),
+    ]
+
+    portal_timepoint_templates_simjudged = [
+        ("portal_timepoint_unicorn_simjudged", SimulationConfig.portal_timepoint_unicorn_simjudged(), {"M17", "M13", "M7", "M15", "M8", "M11"}),
+        ("portal_timepoint_series_a_success_simjudged", SimulationConfig.portal_timepoint_series_a_success_simjudged(), {"M17", "M13", "M7", "M15", "M11"}),
+        ("portal_timepoint_product_market_fit_simjudged", SimulationConfig.portal_timepoint_product_market_fit_simjudged(), {"M17", "M13", "M10", "M7", "M15"}),
+        ("portal_timepoint_enterprise_adoption_simjudged", SimulationConfig.portal_timepoint_enterprise_adoption_simjudged(), {"M17", "M13", "M7", "M15", "M11", "M8"}),
+        ("portal_timepoint_founder_transition_simjudged", SimulationConfig.portal_timepoint_founder_transition_simjudged(), {"M17", "M13", "M8", "M7", "M15"}),
+    ]
+
+    portal_timepoint_templates_simjudged_thorough = [
+        ("portal_timepoint_unicorn_simjudged_thorough", SimulationConfig.portal_timepoint_unicorn_simjudged_thorough(), {"M17", "M13", "M7", "M15", "M8", "M11"}),
+        ("portal_timepoint_series_a_success_simjudged_thorough", SimulationConfig.portal_timepoint_series_a_success_simjudged_thorough(), {"M17", "M13", "M7", "M15", "M11"}),
+        ("portal_timepoint_product_market_fit_simjudged_thorough", SimulationConfig.portal_timepoint_product_market_fit_simjudged_thorough(), {"M17", "M13", "M10", "M7", "M15"}),
+        ("portal_timepoint_enterprise_adoption_simjudged_thorough", SimulationConfig.portal_timepoint_enterprise_adoption_simjudged_thorough(), {"M17", "M13", "M7", "M15", "M11", "M8"}),
+        ("portal_timepoint_founder_transition_simjudged_thorough", SimulationConfig.portal_timepoint_founder_transition_simjudged_thorough(), {"M17", "M13", "M8", "M7", "M15"}),
+    ]
+
+    # Build the lookup dictionary
+    all_template_lists = [
+        quick_templates,
+        full_templates,
+        timepoint_corporate_templates,
+        portal_templates,
+        portal_templates_simjudged_quick,
+        portal_templates_simjudged,
+        portal_templates_simjudged_thorough,
+        portal_timepoint_templates,
+        portal_timepoint_templates_simjudged_quick,
+        portal_timepoint_templates_simjudged,
+        portal_timepoint_templates_simjudged_thorough,
+    ]
+
+    for template_list in all_template_lists:
+        for name, config, mechanisms in template_list:
+            template_lookup[name] = (config, mechanisms)
+
+    # Look up the template
+    if template_name not in template_lookup:
+        print(f"Unknown template: {template_name}")
+        print(f"Available templates: {sorted(template_lookup.keys())}")
+        return False
+
+    config, mechanisms = template_lookup[template_name]
+
+    # Run it
+    print("=" * 80)
+    print(f"RUNNING SINGLE TEMPLATE: {template_name}")
+    print(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Mechanisms: {', '.join(sorted(mechanisms))}")
+    print("=" * 80)
+    print()
+
+    metadata_manager = MetadataManager(db_path="metadata/runs.db")
+    runner = ResilientE2EWorkflowRunner(metadata_manager, generate_summary=not skip_summaries)
+
+    try:
+        result = runner.run(config)
+
+        print()
+        print("=" * 80)
+        print("SIMULATION COMPLETE")
+        print("=" * 80)
+        print(f"  Run ID: {result.run_id}")
+        print(f"  Dashboard: http://localhost:5001/run/{result.run_id}")
+        print(f"  Entities Created: {result.entities_created}")
+        print(f"  Timepoints Created: {result.timepoints_created}")
+        print(f"  Mechanisms Used: {', '.join(sorted(result.mechanisms_used or []))}")
+        print(f"  Cost: ${result.cost_usd:.2f}")
+
+        if hasattr(result, 'summary') and result.summary:
+            print()
+            print("Summary:")
+            print(f"  {result.summary}")
+
+        return True
+
+    except Exception as e:
+        print(f"ERROR: Simulation failed: {e}")
+        return False
+
+
 def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, parallel_workers: int = 1):
     """Run all mechanism test templates
 
@@ -2019,7 +2203,6 @@ if __name__ == "__main__":
 
     # Handle --template mode (single template execution)
     if args.template and not args.convergence_e2e:
-        from run_single_template import run_single_template
         success = run_single_template(args.template, skip_summaries=args.skip_summaries)
         sys.exit(0 if success else 1)
 
