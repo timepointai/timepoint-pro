@@ -6,7 +6,7 @@
 
 ---
 
-## Phase 0: Current State (November 2025)
+## Phase 0: Current State (December 2025)
 
 **What we have: A working research prototype with intelligent model selection.**
 
@@ -17,7 +17,9 @@
 - **12 Open-Source Models** — All via OpenRouter, all permit commercial synthetic data
 - **PORTAL mode** — Backward temporal reasoning from endpoints to origins
 - **Natural Language Interface** — `nl_interface/` integrated via `NLToProductionAdapter`
-- **Single-run execution** — `./run.sh quick`, `./run.sh portal-test`, `./run.sh --nl "prompt"`
+- **Parallel execution** — `--parallel N` for N concurrent workers with thread-safe rate limiting
+- **Free model support** — `--free`, `--free-fast`, `--list-free-models` for $0 cost testing
+- **Ctrl+C protection** — Double-confirm handler prevents accidental abortion of expensive runs
 - **SQLite persistence** — `metadata/runs.db` for run tracking
 - **Mechanism metrics** — All 18 mechanisms tracked per run
 - **Basic dashboard** — Quarto + FastAPI
@@ -60,11 +62,11 @@ Current Architecture:
 
 ### Not Yet Implemented
 
-- Batch execution / parallelization
 - REST API
 - External integrations (prediction markets, webhooks)
 - Containerization / distributed deployment
 - Advanced dashboard visualizations
+- Distributed execution (1000+ concurrent workers)
 
 ---
 
@@ -103,21 +105,22 @@ Before adding infrastructure, stabilize the core.
 ---
 
 ## Phase 2: Batch Execution
-**Target: Q2 2026**
+**Target: Q2 2026** | **Status: Partially Complete**
 
 Run many simulations in parallel.
 
 ### 2.1 Worker Architecture
-- [ ] Job queue (Redis or similar)
-- [ ] Worker pool with configurable concurrency
+- [x] Worker pool with configurable concurrency (`--parallel N`)
+- [x] Thread-safe rate limiting across workers
+- [ ] Job queue (Redis or similar) for distributed execution
 - [ ] Job status tracking
 - [ ] Retry logic with exponential backoff
 
 ### 2.2 Cost Management
-- [ ] Token counting per job
+- [x] Token counting per job
+- [x] Cost estimation before execution
+- [x] Usage reporting (per-run and aggregate)
 - [ ] Budget caps (per job, per batch)
-- [ ] Cost estimation before execution
-- [ ] Usage reporting
 
 ### 2.3 Batch API
 ```python
@@ -383,20 +386,23 @@ Broad accessibility and ecosystem.
 | Convergence evaluation | **COMPLETE** | `evaluation/convergence.py`, storage layer, dashboard |
 | Convergence E2E testing | **COMPLETE** | `--convergence-e2e` mode in `run_all_mechanism_tests.py` |
 | Convergence templates | **COMPLETE** | 3 optimized templates in `config_schema.py` |
+| Parallel execution | **COMPLETE** | `--parallel N` in `run_all_mechanism_tests.py` |
+| Free model support | **COMPLETE** | `FreeModelSelector` in `llm.py`, `--free`/`--free-fast` flags |
+| Ctrl+C protection | **COMPLETE** | `GracefulInterruptHandler` in `run_all_mechanism_tests.py` |
 
 ---
 
 ## Reality Check
 
-**Where we are:** Working research prototype with 18 novel mechanisms and intelligent model selection.
+**Where we are:** Working research prototype with 18 novel mechanisms, intelligent model selection, and parallel execution.
 
-**What works:** Single-run simulations with full temporal reasoning and automatic model selection.
+**What works:** Single-run and parallel simulations with full temporal reasoning, automatic model selection, and free tier support.
 
-**What's missing:** Batch execution, REST API, integrations, containerization.
+**What's missing:** REST API, external integrations, containerization, distributed execution.
 
 **Timeline:** 2-3 years to full platform vision.
 
-**First step:** Complete Phase 1 here (persistence basics, containerization).
+**First step:** Complete Phase 1 (persistence basics, containerization) and Phase 3 (REST API).
 
 ---
 

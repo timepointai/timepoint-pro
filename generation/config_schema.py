@@ -13,8 +13,25 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
 import json
+import warnings
+from functools import wraps
 from pathlib import Path
 from schemas import FidelityPlanningMode, TokenBudgetMode
+
+
+def _deprecated_template(func):
+    """Decorator to mark template methods as deprecated."""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        warnings.warn(
+            f"{func.__name__} is deprecated. Use TemplateLoader.load_template() "
+            "or SimulationConfig.from_template() instead. "
+            "See generation/templates/catalog.json for available templates.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        return func(*args, **kwargs)
+    return wrapper
 
 
 # ============================================================================
@@ -153,21 +170,29 @@ def list_templates() -> List[str]:
     List all available simulation template IDs.
 
     Returns:
-        List of template IDs (without .json extension)
+        List of template IDs (short names like 'board_meeting')
 
     Example:
         templates = list_templates()
         # ['board_meeting', 'jefferson_dinner', 'vc_pitch_pearl', ...]
+
+    Note:
+        This function now delegates to TemplateLoader for the new
+        JSON-based template system. Template IDs from the catalog
+        (e.g., 'showcase/board_meeting') are returned as short names
+        (e.g., 'board_meeting') for backward compatibility.
     """
-    templates_dir = Path(__file__).parent / "templates"
-
-    if not templates_dir.exists():
-        return []
-
-    return [
-        p.stem for p in templates_dir.glob("*.json")
-        if p.is_file()
-    ]
+    try:
+        from generation.templates.loader import get_loader
+        loader = get_loader()
+        # Return short names for backward compatibility
+        return [info.id.split("/")[-1] for info in loader.list_templates()]
+    except ImportError:
+        # Fallback to legacy behavior if loader not available
+        templates_dir = Path(__file__).parent / "templates"
+        if not templates_dir.exists():
+            return []
+        return [p.stem for p in templates_dir.glob("*.json") if p.is_file()]
 
 
 def load_template(template_id: str) -> Dict[str, Any]:
@@ -175,7 +200,7 @@ def load_template(template_id: str) -> Dict[str, Any]:
     Load a simulation template from JSON.
 
     Args:
-        template_id: The template identifier (e.g., "board_meeting")
+        template_id: The template identifier (e.g., "board_meeting" or "showcase/board_meeting")
 
     Returns:
         Dictionary containing the full template data
@@ -187,22 +212,48 @@ def load_template(template_id: str) -> Dict[str, Any]:
     Example:
         template = load_template("board_meeting")
         config = SimulationConfig(**template)
+
+    Note:
+        This function now delegates to TemplateLoader for the new
+        JSON-based template system. Supports both short names (e.g., 'board_meeting')
+        and full paths (e.g., 'showcase/board_meeting').
     """
-    templates_dir = Path(__file__).parent / "templates"
-    template_path = templates_dir / f"{template_id}.json"
-
-    if not template_path.exists():
-        available = list_templates()
-        raise FileNotFoundError(
-            f"Template '{template_id}' not found. Available: {available}"
-        )
-
     try:
-        with open(template_path, 'r') as f:
-            template = json.load(f)
-        return template
-    except json.JSONDecodeError as e:
-        raise ValueError(f"Invalid JSON in template '{template_id}': {e}")
+        from generation.templates.loader import get_loader
+        loader = get_loader()
+
+        # Try full path first
+        try:
+            config = loader.load_template(template_id)
+            return config.model_dump()
+        except FileNotFoundError:
+            pass
+
+        # Try to find by short name
+        for info in loader.list_templates():
+            if info.id.split("/")[-1] == template_id:
+                config = loader.load_template(info.id)
+                return config.model_dump()
+
+        # Not found in catalog
+        raise FileNotFoundError(f"Template '{template_id}' not found in catalog")
+
+    except ImportError:
+        # Fallback to legacy behavior if loader not available
+        templates_dir = Path(__file__).parent / "templates"
+        template_path = templates_dir / f"{template_id}.json"
+
+        if not template_path.exists():
+            available = list_templates()
+            raise FileNotFoundError(
+                f"Template '{template_id}' not found. Available: {available}"
+            )
+
+        try:
+            with open(template_path, 'r') as f:
+                return json.load(f)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON in template '{template_id}': {e}")
 
 
 class ResolutionLevel(str, Enum):
@@ -470,6 +521,28 @@ class TemporalConfig(BaseModel):
         default=True,
         description="Cache simulation results to avoid redundant computation"
     )
+    simulation_timeout_seconds: int = Field(
+        ge=30, le=600, default=180,
+        description="Overall timeout for each mini-simulation in seconds (default 3 minutes)"
+    )
+    simulation_step_timeout_seconds: int = Field(
+        ge=10, le=120, default=60,
+        description="Timeout for each forward step within a mini-simulation (default 1 minute)"
+    )
+
+    # Parallelization settings for simulation-based judging (speed optimization)
+    max_simulation_workers: int = Field(
+        ge=1, le=10, default=4,
+        description="Max parallel mini-simulations per scoring round (higher = faster but more API load)"
+    )
+    max_antecedent_workers: int = Field(
+        ge=1, le=6, default=3,
+        description="Max parallel state processing in backward exploration"
+    )
+    fast_simulation_model: Optional[str] = Field(
+        default=None,
+        description="Use cheaper/faster model for mini-sims (None = use default model)"
+    )
 
     # M1+M17: Adaptive Fidelity-Temporal Strategy Configuration
     fidelity_planning_mode: FidelityPlanningMode = Field(
@@ -496,6 +569,27 @@ class TemporalConfig(BaseModel):
         default=None,
         description="Custom temporal steps in months (overrides template)"
     )
+
+    @model_validator(mode='after')
+    def apply_fast_simjudged_overrides(self) -> 'TemporalConfig':
+        """Apply fast-simjudged environment variable overrides for speed optimization."""
+        import os
+
+        if os.environ.get("TIMEPOINT_FAST_SIMJUDGED") == "1":
+            # Override simulation settings for faster execution
+            if os.environ.get("TIMEPOINT_CANDIDATE_ANTECEDENTS"):
+                self.candidate_antecedents_per_step = int(os.environ["TIMEPOINT_CANDIDATE_ANTECEDENTS"])
+
+            if os.environ.get("TIMEPOINT_SIMULATION_FORWARD_STEPS"):
+                self.simulation_forward_steps = int(os.environ["TIMEPOINT_SIMULATION_FORWARD_STEPS"])
+
+            if os.environ.get("TIMEPOINT_SIMULATION_INCLUDE_DIALOG"):
+                self.simulation_include_dialog = os.environ["TIMEPOINT_SIMULATION_INCLUDE_DIALOG"].lower() != "false"
+
+            if os.environ.get("TIMEPOINT_MAX_SIMULATION_WORKERS"):
+                self.max_simulation_workers = int(os.environ["TIMEPOINT_MAX_SIMULATION_WORKERS"])
+
+        return self
 
 
 class OutputConfig(BaseModel):
@@ -764,13 +858,25 @@ class SimulationConfig(BaseModel):
         return cls(**template_data)
 
     # ========================================================================
-    # Legacy Example Methods (kept for backward compatibility)
-    # Use from_template() for new code
+    # DEPRECATED: Legacy Example Methods
+    # ========================================================================
+    # These methods are DEPRECATED and will be removed in a future version.
+    # Use the new JSON-based template system instead:
+    #
+    #   from generation.templates.loader import TemplateLoader
+    #   loader = TemplateLoader()
+    #   config = loader.load_template("showcase/board_meeting")
+    #
+    # Or use the convenience function:
+    #   config = SimulationConfig.from_template("board_meeting")
+    #
+    # See generation/templates/catalog.json for the full template catalog.
     # ========================================================================
 
     @classmethod
+    @_deprecated_template
     def example_board_meeting(cls) -> "SimulationConfig":
-        """Example configuration for a board meeting scenario"""
+        """Example configuration for a board meeting scenario (DEPRECATED)"""
         return cls(
             scenario_description="Simulate a tech startup board meeting where CEO proposes an acquisition",
             world_id="board_meeting_example",
@@ -785,8 +891,9 @@ class SimulationConfig(BaseModel):
         )
 
     @classmethod
+    @_deprecated_template
     def example_jefferson_dinner(cls) -> "SimulationConfig":
-        """Example configuration for the Jefferson Dinner scenario"""
+        """Example configuration for the Jefferson Dinner scenario (DEPRECATED)"""
         return cls(
             scenario_description="Simulate the 1790 Compromise Dinner between Jefferson, Hamilton, and Madison",
             world_id="jefferson_dinner",

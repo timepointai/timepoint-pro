@@ -24,9 +24,108 @@ import subprocess
 import argparse
 import time
 import json
+import signal
+import threading
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Set, Optional
+from typing import Dict, Set, Optional, List, Tuple
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# Colorful progress tracking
+from progress_tracker import ProgressTracker, print_success, print_error, print_info
+
+
+# ============================================================================
+# Ctrl+C Double-Confirm Handler
+# ============================================================================
+class GracefulInterruptHandler:
+    """
+    Handles Ctrl+C with a double-confirm dialog to prevent accidental aborts.
+
+    First Ctrl+C: Asks for confirmation
+    Second Ctrl+C (within 3 seconds): Actually exits
+
+    This prevents expensive test runs from being accidentally interrupted.
+    """
+
+    def __init__(self, timeout_seconds: float = 3.0):
+        self.timeout = timeout_seconds
+        self.first_interrupt_time = None
+        self.confirmed = False
+        self._lock = threading.Lock()
+        self._original_handler = None
+        self._enabled = True
+
+    def enable(self):
+        """Enable the double-confirm handler"""
+        self._original_handler = signal.signal(signal.SIGINT, self._handler)
+        self._enabled = True
+
+    def disable(self):
+        """Disable and restore original handler"""
+        if self._original_handler is not None:
+            signal.signal(signal.SIGINT, self._original_handler)
+        self._enabled = False
+
+    def _handler(self, signum, frame):
+        """Handle SIGINT (Ctrl+C) with double-confirm"""
+        if not self._enabled:
+            # If disabled, use default behavior
+            raise KeyboardInterrupt
+
+        with self._lock:
+            now = time.time()
+
+            # Check if this is a second interrupt within timeout
+            if self.first_interrupt_time is not None:
+                elapsed = now - self.first_interrupt_time
+                if elapsed < self.timeout:
+                    # Second Ctrl+C within timeout - actually exit
+                    print("\n\n" + "=" * 60)
+                    print("🛑 CONFIRMED: Aborting test run...")
+                    print("=" * 60)
+                    sys.exit(130)  # Standard exit code for Ctrl+C
+
+            # First interrupt - ask for confirmation
+            self.first_interrupt_time = now
+
+            print("\n")
+            print("=" * 60)
+            print("⚠️  INTERRUPT RECEIVED - Are you sure you want to quit?")
+            print("=" * 60)
+            print(f"   Press Ctrl+C again within {self.timeout:.0f} seconds to confirm")
+            print("   Or wait to continue running...")
+            print("=" * 60)
+            print()
+
+            # Start a thread to clear the interrupt state after timeout
+            def clear_interrupt():
+                time.sleep(self.timeout + 0.1)
+                with self._lock:
+                    if self.first_interrupt_time is not None:
+                        elapsed = time.time() - self.first_interrupt_time
+                        if elapsed >= self.timeout:
+                            self.first_interrupt_time = None
+                            print("   ✓ Interrupt cancelled - continuing test run...")
+                            print()
+
+            thread = threading.Thread(target=clear_interrupt, daemon=True)
+            thread.start()
+
+
+# Global interrupt handler instance
+_interrupt_handler = GracefulInterruptHandler(timeout_seconds=3.0)
+
+
+def enable_graceful_interrupt():
+    """Enable the double-confirm Ctrl+C handler"""
+    _interrupt_handler.enable()
+
+
+def disable_graceful_interrupt():
+    """Disable the double-confirm handler (for cleanup/input prompts)"""
+    _interrupt_handler.disable()
+
 
 # Auto-load .env file
 def load_env():
@@ -581,7 +680,7 @@ def confirm_expensive_run(mode: str, min_cost: float, max_cost: float, runtime_m
     print("⚠️  EXPENSIVE RUN CONFIRMATION REQUIRED")
     print("="*80)
     print(f"Mode: {mode}")
-    print(f"Estimated Cost: ${min_cost:.0f}-${max_cost:.0f}")
+    print(f"Estimated Cost: ${min_cost:.2f}-${max_cost:.2f}")
     print(f"Estimated Runtime: {runtime_min} minutes")
     print()
 
@@ -592,7 +691,12 @@ def confirm_expensive_run(mode: str, min_cost: float, max_cost: float, runtime_m
         print("✓ Starting test run...")
         return True
 
-    response = input("Do you want to proceed? [y/N]: ").strip().lower()
+    # Temporarily disable graceful interrupt during input
+    disable_graceful_interrupt()
+    try:
+        response = input("Do you want to proceed? [y/N]: ").strip().lower()
+    finally:
+        enable_graceful_interrupt()
 
     if response in ['y', 'yes']:
         print("✓ Confirmed. Starting test run...")
@@ -609,58 +713,58 @@ def list_modes():
     print("="*80)
 
     print("\n📚 QUICK MODE (DEFAULT)")
-    print("  Templates: 7 | Cost: $2-5 | Runtime: 8-15 min")
+    print("  Templates: 7 | Cost: $0.15-$0.30 | Runtime: 8-15 min")
     print("  Safe, fast templates for basic mechanism coverage")
 
     print("\n🔬 FULL MODE (--full)")
-    print("  Templates: 13 | Cost: $20-50 | Runtime: 30-60 min")
+    print("  Templates: 13 | Cost: $0.30-$0.80 | Runtime: 30-60 min")
     print("  All quick templates + expensive comprehensive templates")
 
     print("\n🏢 TIMEPOINT CORPORATE MODES")
     print("  --timepoint-forward:")
-    print("    Templates: 15 | Cost: $15-30 | Runtime: 30-60 min")
+    print("    Templates: 15 | Cost: $0.50-$1.00 | Runtime: 30-60 min")
     print("    Forward-mode Timepoint corporate templates (formation + growth + AI marketplace)")
     print("  --timepoint-all:")
-    print("    Templates: 35 | Cost: $81-162 | Runtime: 156-243 min")
+    print("    Templates: 35 | Cost: $2.50-$4.50 | Runtime: 60-120 min")
     print("    ALL Timepoint corporate (15 forward-mode + 20 portal-mode)")
 
     print("\n🌀 PORTAL MODES (Backward Temporal Reasoning)")
     print("  --portal-test-only:")
-    print("    Templates: 4 | Cost: $5-10 | Runtime: 10-15 min")
+    print("    Templates: 4 | Cost: $0.15-$0.30 | Runtime: 10-15 min")
     print("    Standard portal templates (presidential, startup, academic, failure)")
     print("  --portal-simjudged-quick-only:")
-    print("    Templates: 4 | Cost: $10-20 | Runtime: 20-30 min")
+    print("    Templates: 4 | Cost: $0.25-$0.50 | Runtime: 20-30 min")
     print("    Portal + lightweight simulation judging (1 step)")
     print("  --portal-simjudged-only:")
-    print("    Templates: 4 | Cost: $15-30 | Runtime: 30-45 min")
+    print("    Templates: 4 | Cost: $0.40-$0.80 | Runtime: 30-45 min")
     print("    Portal + standard simulation judging (2 steps + dialog)")
     print("  --portal-simjudged-thorough-only:")
-    print("    Templates: 4 | Cost: $25-50 | Runtime: 45-60 min")
+    print("    Templates: 4 | Cost: $0.50-$1.00 | Runtime: 45-60 min")
     print("    Portal + thorough simulation judging (3 steps + analysis)")
     print("  --portal-all:")
-    print("    Templates: 16 | Cost: $55-110 | Runtime: 105-150 min")
+    print("    Templates: 16 | Cost: $1.30-$2.50 | Runtime: 60-90 min")
     print("    ALL portal variants (standard + quick + standard + thorough)")
 
     print("\n🎯 PORTAL TIMEPOINT MODES (Real Founder Profiles)")
     print("  --portal-timepoint-only:")
-    print("    Templates: 5 | Cost: $6-12 | Runtime: 12-18 min")
+    print("    Templates: 5 | Cost: $0.20-$0.40 | Runtime: 12-18 min")
     print("    Standard portal with real Timepoint founders (Sean + Ken)")
     print("  --portal-timepoint-simjudged-quick-only:")
-    print("    Templates: 5 | Cost: $12-24 | Runtime: 24-36 min")
+    print("    Templates: 5 | Cost: $0.40-$0.80 | Runtime: 24-36 min")
     print("    Portal Timepoint + lightweight simulation judging")
     print("  --portal-timepoint-simjudged-only:")
-    print("    Templates: 5 | Cost: $18-36 | Runtime: 36-54 min")
+    print("    Templates: 5 | Cost: $0.60-$1.20 | Runtime: 36-54 min")
     print("    Portal Timepoint + standard simulation judging")
     print("  --portal-timepoint-simjudged-thorough-only:")
-    print("    Templates: 5 | Cost: $30-60 | Runtime: 54-75 min")
+    print("    Templates: 5 | Cost: $0.80-$1.50 | Runtime: 54-75 min")
     print("    Portal Timepoint + thorough simulation judging")
     print("  --portal-timepoint-all:")
-    print("    Templates: 20 | Cost: $66-132 | Runtime: 126-183 min")
+    print("    Templates: 20 | Cost: $2.00-$3.50 | Runtime: 60-100 min")
     print("    ALL portal Timepoint variants (standard + quick + standard + thorough)")
 
     print("\n" + "="*80)
     print("🚀 ULTRA MODE (--ultra-all)")
-    print("  Templates: 64 | Cost: $176-352 | Runtime: 301-468 min")
+    print("  Templates: 64 | Cost: $4.00-$8.00 | Runtime: 120-180 min")
     print("  Run EVERYTHING: quick + full + timepoint corporate + all portal modes")
     print("  Complete system validation across all 17 mechanisms")
     print("="*80)
@@ -687,11 +791,31 @@ def list_modes():
     print("  Run a template N times consecutively, then compute convergence")
     print("  Includes side-by-side comparison of runs and divergence analysis")
     print("  Example: --convergence-e2e --template board_meeting --convergence-runs 3")
-    print("  Cost: ~$3-5 for 3 runs of board_meeting")
+    print("  Cost: ~$0.08-$0.15 for 3 runs of board_meeting")
     print("="*80)
 
     print("\n" + "="*80)
-    print("💡 TIP: Use --skip-summaries to reduce cost slightly")
+    print("🆓 FREE MODEL OPTIONS ($0 cost)")
+    print("="*80)
+    print("  --free:              Use best available free model (quality-focused)")
+    print("                       Prefers: Qwen 235B, Llama 3.3 70B, Gemini Flash")
+    print("  --free-fast:         Use fastest free model (speed-focused)")
+    print("                       Prefers: Gemini Flash, Llama 3.2 3B/1B, Mistral 7B")
+    print("  --list-free-models:  Show all currently available free models")
+    print()
+    print("  Free models rotate availability on OpenRouter.")
+    print("  Use --list-free-models to see what's currently available.")
+    print()
+    print("  Example: python run_all_mechanism_tests.py --free --template board_meeting")
+    print("  Example: python run_all_mechanism_tests.py --free-fast --parallel 4")
+    print("="*80)
+
+    print("\n" + "="*80)
+    print("💡 TIPS")
+    print("="*80)
+    print("  --skip-summaries:  Reduce cost slightly by skipping LLM summaries")
+    print("  --parallel N:      Run N templates in parallel (recommended: 4-6)")
+    print("  --model MODEL_ID:  Use specific model (e.g., meta-llama/llama-3.1-405b-instruct)")
     print("="*80)
     print()
 
@@ -950,8 +1074,14 @@ def run_nl_simulation(
         return False
 
 
-def run_all_templates(mode: str = 'quick', skip_summaries: bool = False):
-    """Run all mechanism test templates"""
+def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, parallel_workers: int = 1):
+    """Run all mechanism test templates
+
+    Args:
+        mode: Test mode (quick, full, portal, etc.)
+        skip_summaries: Skip LLM-powered summaries
+        parallel_workers: Number of parallel workers (1 = sequential)
+    """
     from generation.config_schema import SimulationConfig
     from generation.resilience_orchestrator import ResilientE2EWorkflowRunner
     from metadata.run_tracker import MetadataManager
@@ -959,11 +1089,15 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False):
     print("=" * 80)
     print(f"COMPREHENSIVE MECHANISM COVERAGE TEST ({mode.upper()} MODE)")
     print(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    if parallel_workers > 1:
+        print(f"Parallel Workers: {parallel_workers}")
     print("=" * 80)
     print()
     print("⏱️  Rate Limiting Strategy:")
     print("   - Paid mode (1000 req/min): Minimal delays")
     print("   - Templates: 0s cooldown (16.67 req/sec available)")
+    if parallel_workers > 1:
+        print(f"   - Parallel execution: {parallel_workers} workers (thread-safe rate limiter)")
     print("   - ANDOS scripts: 0s cooldown")
     print("   - Phase transition: 0s")
     print()
@@ -1109,8 +1243,8 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False):
     templates_to_run = quick_templates
     if mode == 'full':
         templates_to_run = quick_templates + full_templates
-        print("⚠️  FULL MODE: Running expensive templates!")
-        print("   Estimated cost: $20-50, Runtime: 30-60 minutes")
+        print("🔬 FULL MODE: Running comprehensive templates")
+        print("   Estimated cost: $0.30-$0.80, Runtime: 30-60 minutes")
         print()
     elif mode == 'portal':
         templates_to_run = portal_templates
@@ -1120,7 +1254,7 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False):
         print("   - portal_startup_unicorn: Idea → $1B+ valuation (6 years)")
         print("   - portal_academic_tenure: PhD → Tenure (10 years)")
         print("   - portal_startup_failure: Seed → Shutdown (4 years)")
-        print("   Estimated cost: $5-10, Runtime: 10-15 minutes")
+        print("   Estimated cost: $0.15-$0.30, Runtime: 10-15 minutes")
         print("   Each template generates multiple backward paths with coherence scoring")
         print()
     elif mode == 'portal_simjudged_quick':
@@ -1130,7 +1264,7 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False):
         print("   - 1 forward step per candidate antecedent")
         print("   - No dialog generation (faster)")
         print("   - Judge LLM: Llama 3.1 70B")
-        print("   Estimated cost: $10-20 (~2x standard), Runtime: 20-30 minutes")
+        print("   Estimated cost: $0.25-$0.50 (~2x standard), Runtime: 20-30 minutes")
         print("   Quality: Good - captures basic emergent behaviors")
         print()
     elif mode == 'portal_simjudged':
@@ -1140,7 +1274,7 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False):
         print("   - 2 forward steps per candidate antecedent")
         print("   - Dialog generation enabled")
         print("   - Judge LLM: Llama 3.1 405B")
-        print("   Estimated cost: $15-30 (~3x standard), Runtime: 30-45 minutes")
+        print("   Estimated cost: $0.40-$0.80 (~3x standard), Runtime: 30-45 minutes")
         print("   Quality: High - captures dialog realism and emergent patterns")
         print()
     elif mode == 'portal_simjudged_thorough':
@@ -1151,7 +1285,7 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False):
         print("   - Dialog generation + extra analysis")
         print("   - Judge LLM: Llama 3.1 405B (low temperature)")
         print("   - More candidates per step for better exploration")
-        print("   Estimated cost: $25-50 (~4-5x standard), Runtime: 45-60 minutes")
+        print("   Estimated cost: $0.50-$1.00 (~4-5x standard), Runtime: 45-60 minutes")
         print("   Quality: Maximum - research-grade path generation")
         print()
     elif mode == 'portal_all':
@@ -1162,7 +1296,7 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False):
         print("   - 4 simulation-judged QUICK variants")
         print("   - 4 simulation-judged STANDARD variants")
         print("   - 4 simulation-judged THOROUGH variants")
-        print("   Estimated cost: $55-110, Runtime: 105-150 minutes")
+        print("   Estimated cost: $1.30-$2.50, Runtime: 60-90 minutes")
         print("   Use this for comprehensive quality comparison across all approaches")
         print()
     elif mode == 'timepoint_corporate':
@@ -1173,7 +1307,7 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False):
         print("   - 2 emergent growth templates (marketing campaigns, staffing & growth)")
         print("   - 3 personality × governance templates (archetypes, charismatic founder, demanding genius)")
         print("   - 4 AI marketplace dynamics templates (pricing war, capability leapfrog, business model evolution, regulatory divergence)")
-        print("   Estimated cost: $15-30, Runtime: 30-60 minutes")
+        print("   Estimated cost: $0.50-$1.00, Runtime: 30-60 minutes")
         print()
     elif mode == 'portal_timepoint':
         templates_to_run = portal_timepoint_templates
@@ -1184,7 +1318,7 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False):
         print("   - portal_timepoint_product_market_fit: $5M ARR + PMF (June 2026 → October 2024)")
         print("   - portal_timepoint_enterprise_adoption: 25 F500 customers (March 2027 → November 2024)")
         print("   - portal_timepoint_founder_transition: Founder departure (September 2027 → October 2024)")
-        print("   Estimated cost: $6-12, Runtime: 12-18 minutes")
+        print("   Estimated cost: $0.20-$0.40, Runtime: 12-18 minutes")
         print("   Each template traces backward from success/failure to founding decisions")
         print()
     elif mode == 'portal_timepoint_simjudged_quick':
@@ -1194,7 +1328,7 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False):
         print("   - 1 forward step per candidate antecedent")
         print("   - No dialog generation (faster)")
         print("   - Judge LLM: Llama 3.1 70B")
-        print("   Estimated cost: $12-24 (~2x standard), Runtime: 24-36 minutes")
+        print("   Estimated cost: $0.40-$0.80 (~2x standard), Runtime: 24-36 minutes")
         print("   Quality: Good - captures basic emergent behaviors with real founder dynamics")
         print()
     elif mode == 'portal_timepoint_simjudged':
@@ -1204,7 +1338,7 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False):
         print("   - 2 forward steps per candidate antecedent")
         print("   - Dialog generation enabled")
         print("   - Judge LLM: Llama 3.1 405B")
-        print("   Estimated cost: $18-36 (~3x standard), Runtime: 36-54 minutes")
+        print("   Estimated cost: $0.60-$1.20 (~3x standard), Runtime: 36-54 minutes")
         print("   Quality: High - captures dialog realism and founder partnership dynamics")
         print()
     elif mode == 'portal_timepoint_simjudged_thorough':
@@ -1215,7 +1349,7 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False):
         print("   - Dialog generation + extra analysis")
         print("   - Judge LLM: Llama 3.1 405B (low temperature)")
         print("   - More candidates per step for better exploration")
-        print("   Estimated cost: $30-60 (~4-5x standard), Runtime: 54-75 minutes")
+        print("   Estimated cost: $0.80-$1.50 (~4-5x standard), Runtime: 54-75 minutes")
         print("   Quality: Maximum - research-grade founder journey analysis")
         print()
     elif mode == 'portal_timepoint_all':
@@ -1226,7 +1360,7 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False):
         print("   - 5 simulation-judged QUICK variants")
         print("   - 5 simulation-judged STANDARD variants")
         print("   - 5 simulation-judged THOROUGH variants")
-        print("   Estimated cost: $66-132, Runtime: 126-183 minutes")
+        print("   Estimated cost: $2.00-$3.50, Runtime: 60-100 minutes")
         print("   Use this for comprehensive quality comparison across all approaches with real founder data")
         print()
     elif mode == 'timepoint_all':
@@ -1238,7 +1372,7 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False):
         print("   - 5 simulation-judged QUICK variants")
         print("   - 5 simulation-judged STANDARD variants")
         print("   - 5 simulation-judged THOROUGH variants")
-        print("   Estimated cost: $81-162, Runtime: 156-243 minutes")
+        print("   Estimated cost: $2.50-$4.50, Runtime: 60-120 minutes")
         print("   Complete Timepoint corporate analysis: forward causality + backward portal reasoning")
         print()
     elif mode == 'ultra_all':
@@ -1255,25 +1389,30 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False):
         print("   - 12 portal simjudged variants (all quality levels)")
         print("   - 5 portal timepoint templates (real founders)")
         print("   - 15 portal timepoint simjudged variants (all quality levels)")
-        print("   Estimated cost: $176-352, Runtime: 301-468 minutes")
+        print("   Estimated cost: $4.00-$8.00, Runtime: 120-180 minutes")
         print("   Complete validation of all 17 mechanisms + ANDOS scripts")
         print()
 
     results = {}
     total_cost = 0.0
 
-    # Confirmation for expensive runs
+    # Confirmation for expensive runs (thresholds updated Dec 2024 based on actual costs)
+    # Format: (min_cost_usd, max_cost_usd, runtime_minutes)
+    # Only trigger confirmation for runs estimated >$2.00
     expensive_modes = {
-        'full': (20, 50, 45),
-        'portal_simjudged': (15, 30, 38),
-        'portal_simjudged_thorough': (25, 50, 53),
-        'portal_all': (55, 110, 128),
-        'portal_timepoint_simjudged': (18, 36, 45),
-        'portal_timepoint_simjudged_thorough': (30, 60, 65),
-        'portal_timepoint_all': (66, 132, 155),
-        'timepoint_all': (81, 162, 243),
-        'timepoint_corporate': (15, 30, 60),
-        'ultra_all': (176, 352, 468)
+        # These modes are now reasonably cheap (<$1), no confirmation needed
+        # 'full': (0.30, 0.80, 45),  # ~$0.50 avg - too cheap to confirm
+        # 'portal_simjudged': (0.40, 0.80, 38),  # ~$0.60 avg
+        # 'portal_simjudged_thorough': (0.50, 1.00, 53),  # ~$0.75 avg
+        # 'portal_timepoint_simjudged': (0.60, 1.20, 45),  # ~$0.90 avg
+        # 'portal_timepoint_simjudged_thorough': (0.80, 1.50, 65),  # ~$1.15 avg
+        # 'timepoint_corporate': (0.50, 1.00, 60),  # ~$0.75 avg
+
+        # Only confirm for runs estimated >$2.00 (still cheap but worth a heads-up)
+        'portal_all': (1.30, 2.50, 90),  # 16 templates
+        'portal_timepoint_all': (2.00, 3.50, 100),  # 20 templates
+        'timepoint_all': (2.50, 4.50, 120),  # 35 templates
+        'ultra_all': (4.00, 8.00, 180)  # 64 templates - largest run
     }
 
     if mode in expensive_modes:
@@ -1282,18 +1421,91 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False):
             print("\nTest run cancelled.")
             sys.exit(0)
 
+    # Initialize progress tracker (includes ANDOS scripts in total)
+    total_jobs = len(templates_to_run) + len(andos_scripts)
+    tracker = ProgressTracker(total_jobs=total_jobs, update_interval=60.0)
+    tracker.print_header(f"TIMEPOINT SIMULATION RUNNER - {mode.upper()}")
+
     # Run pre-programmed templates
     print(f"\n{'='*80}")
     print(f"PHASE 1: Pre-Programmed Templates ({len(templates_to_run)} templates)")
+    if parallel_workers > 1:
+        print(f"Execution: PARALLEL ({parallel_workers} workers)")
+    else:
+        print("Execution: SEQUENTIAL")
     print(f"{'='*80}\n")
 
-    for idx, (name, config, expected) in enumerate(templates_to_run, 1):
-        print(f"[{idx}/{len(templates_to_run)}] {name}")
-        result = run_template(runner, config, name, expected)
-        results[name] = result
-        total_cost += result.get('cost', 0.0)
+    if parallel_workers > 1:
+        # Parallel execution with ThreadPoolExecutor
+        import threading
+        results_lock = threading.Lock()
 
-        # No delay needed in paid mode (1000 req/min = 16.67 req/sec)
+        def run_template_parallel(args):
+            """Wrapper for parallel template execution - creates own runner"""
+            name, config, expected, skip_sums = args
+            # Each thread needs its own runner for isolation
+            thread_metadata_manager = MetadataManager(db_path="metadata/runs.db")
+            thread_runner = ResilientE2EWorkflowRunner(
+                thread_metadata_manager,
+                generate_summary=not skip_sums
+            )
+            return name, run_template(thread_runner, config, name, expected)
+
+        # Prepare jobs
+        jobs = [(name, config, expected, skip_summaries) for name, config, expected in templates_to_run]
+        completed = 0
+
+        print(f"Starting {len(jobs)} templates with {parallel_workers} parallel workers...")
+        print()
+
+        with ThreadPoolExecutor(max_workers=parallel_workers) as executor:
+            # Submit all jobs and mark as started
+            future_to_name = {}
+            for job in jobs:
+                tracker.start_job(job[0])
+                future = executor.submit(run_template_parallel, job)
+                future_to_name[future] = job[0]
+
+            # Process results as they complete
+            for future in as_completed(future_to_name):
+                template_name = future_to_name[future]
+                try:
+                    name, result = future.result()
+                    job_cost = result.get('cost', 0.0)
+                    with results_lock:
+                        results[name] = result
+                        total_cost += job_cost
+                        completed += 1
+                    # Update tracker with completion
+                    tracker.complete_job(name, success=result['success'], cost=job_cost)
+                    tracker.print_status()
+                except Exception as e:
+                    with results_lock:
+                        results[template_name] = {
+                            'success': False,
+                            'error': str(e),
+                            'mechanisms': set(),
+                            'expected': set(),
+                            'cost': 0.0
+                        }
+                        completed += 1
+                    tracker.complete_job(template_name, success=False, error=str(e))
+                    tracker.print_status()
+
+        print(f"\nParallel execution complete: {completed}/{len(jobs)} templates processed")
+    else:
+        # Sequential execution (original behavior)
+        for idx, (name, config, expected) in enumerate(templates_to_run, 1):
+            tracker.start_job(name)
+            print(f"[{idx}/{len(templates_to_run)}] {name}")
+            result = run_template(runner, config, name, expected)
+            results[name] = result
+            job_cost = result.get('cost', 0.0)
+            total_cost += job_cost
+            tracker.complete_job(name, success=result['success'], cost=job_cost)
+            tracker.print_status()
+
+            # No delay needed in paid mode (1000 req/min = 16.67 req/sec)
 
     # Run ANDOS test scripts
     print(f"\n{'='*80}")
@@ -1306,9 +1518,12 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False):
     print()
 
     for idx, (script, name, expected) in enumerate(andos_scripts, 1):
+        tracker.start_job(name)
         print(f"[{idx}/{len(andos_scripts)}] {name}")
         result = run_andos_script(script, name, expected)
         results[name] = result
+        tracker.complete_job(name, success=result['success'], cost=result.get('cost', 0.0))
+        tracker.print_status()
 
         # No delay needed between ANDOS scripts in paid mode
 
@@ -1481,6 +1696,9 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False):
     if total_pdf_size > 0:
         print(f"  Total PDF Size: {total_pdf_size:.1f} KB")
 
+    # Print colorful summary from tracker
+    tracker.print_summary()
+
     # Final summary
     print("\n" + "=" * 80)
     print("TEST RUN COMPLETE")
@@ -1642,11 +1860,97 @@ if __name__ == "__main__":
         metavar="MODEL_ID",
         help="Override default LLM model (e.g. meta-llama/llama-3.1-405b-instruct)"
     )
+    parser.add_argument(
+        "--parallel",
+        type=int,
+        default=1,
+        metavar="N",
+        help="Run templates in parallel with N workers (default: 1 = sequential). Recommended: 4-6 for optimal rate limit usage."
+    )
+    # Free model options
+    parser.add_argument(
+        "--free",
+        action="store_true",
+        help="Use the best available FREE model from OpenRouter (quality-focused, $0 cost)"
+    )
+    parser.add_argument(
+        "--free-fast",
+        action="store_true",
+        help="Use the fastest available FREE model from OpenRouter (speed-focused, $0 cost)"
+    )
+    parser.add_argument(
+        "--list-free-models",
+        action="store_true",
+        help="List all currently available free models on OpenRouter and exit"
+    )
+    parser.add_argument(
+        "--fast-simjudged",
+        action="store_true",
+        help="Speed up simjudged templates: reduce candidates (7→3), forward steps (3→1), disable dialog (~10x faster)"
+    )
+    # New unified template system flags
+    parser.add_argument(
+        "--tier",
+        type=str,
+        choices=["quick", "standard", "comprehensive", "stress"],
+        help="Run templates of a specific tier (quick=<1min, standard=1-5min, comprehensive=5-15min, stress=15min+)"
+    )
+    parser.add_argument(
+        "--category",
+        type=str,
+        choices=["core", "showcase", "portal", "stress", "convergence"],
+        help="Run templates from a specific category"
+    )
+    parser.add_argument(
+        "--mechanism",
+        type=str,
+        metavar="M1-M18",
+        help="Run templates that test a specific mechanism (e.g. M7, M15, M17)"
+    )
+    parser.add_argument(
+        "--list-templates",
+        action="store_true",
+        help="List all available templates with their tier/category/mechanisms and exit"
+    )
     args = parser.parse_args()
 
     # Handle --list-modes first (doesn't require API key)
     if args.list_modes:
         list_modes()
+        sys.exit(0)
+
+    # Handle --list-templates (doesn't require API key)
+    if args.list_templates:
+        from generation.templates.loader import TemplateLoader
+        loader = TemplateLoader()
+        templates = loader.list_templates(
+            tier=args.tier,
+            category=args.category,
+            mechanism=args.mechanism
+        )
+        print("\n" + "=" * 80)
+        print("TEMPLATE CATALOG")
+        print("=" * 80)
+        if args.tier or args.category or args.mechanism:
+            filters = []
+            if args.tier:
+                filters.append(f"tier={args.tier}")
+            if args.category:
+                filters.append(f"category={args.category}")
+            if args.mechanism:
+                filters.append(f"mechanism={args.mechanism}")
+            print(f"Filters: {', '.join(filters)}")
+            print("-" * 80)
+        print(f"{'ID':<40} {'TIER':<12} {'CATEGORY':<12} {'MECHANISMS':<20}")
+        print("-" * 80)
+        for t in sorted(templates, key=lambda x: (x.category.value, x.tier.value, x.id)):
+            mechs = ", ".join(t.mechanisms[:3])
+            if len(t.mechanisms) > 3:
+                mechs += f" +{len(t.mechanisms)-3}"
+            print(f"{t.id:<40} {t.tier.value:<12} {t.category.value:<12} {mechs:<20}")
+        print("-" * 80)
+        print(f"Total: {len(templates)} templates")
+        print()
         sys.exit(0)
 
     # Verify API key
@@ -1657,6 +1961,61 @@ if __name__ == "__main__":
 
     print(f"✓ API keys loaded from .env")
     print()
+
+    # Enable double-confirm handler for Ctrl+C
+    # This prevents accidental interruption of expensive test runs
+    enable_graceful_interrupt()
+    print("🛡️  Ctrl+C protection enabled (press twice to quit)")
+    print()
+
+    # Handle --list-free-models (requires API key)
+    if args.list_free_models:
+        from llm import FreeModelSelector
+        selector = FreeModelSelector(api_key=os.getenv("OPENROUTER_API_KEY"))
+        print(selector.list_free_models())
+        sys.exit(0)
+
+    # Handle --free and --free-fast model selection
+    if args.free or args.free_fast:
+        from llm import FreeModelSelector
+        selector = FreeModelSelector(api_key=os.getenv("OPENROUTER_API_KEY"))
+
+        if args.free and args.free_fast:
+            print("⚠️  Both --free and --free-fast specified, using --free (best quality)")
+
+        if args.free:
+            free_model = selector.get_best_free_model()
+        else:
+            free_model = selector.get_fastest_free_model()
+
+        if not free_model:
+            print("❌ ERROR: No free models currently available on OpenRouter")
+            print("   Free models rotate availability. Try again later or use paid mode.")
+            sys.exit(1)
+
+        # Set as model override
+        args.model = free_model
+        os.environ["TIMEPOINT_MODEL_OVERRIDE"] = free_model
+        print(f"🆓 FREE MODE: Using {free_model}")
+        print(f"   Cost: $0.00 (free tier)")
+        print(f"   Note: Free models have more restrictive rate limits")
+        print()
+
+    # Handle --fast-simjudged flag
+    if args.fast_simjudged:
+        # Set environment variables to override simjudged config defaults
+        os.environ["TIMEPOINT_FAST_SIMJUDGED"] = "1"
+        os.environ["TIMEPOINT_CANDIDATE_ANTECEDENTS"] = "3"  # Reduced from 7
+        os.environ["TIMEPOINT_SIMULATION_FORWARD_STEPS"] = "1"  # Reduced from 3
+        os.environ["TIMEPOINT_SIMULATION_INCLUDE_DIALOG"] = "false"  # Disabled
+        os.environ["TIMEPOINT_MAX_SIMULATION_WORKERS"] = "6"  # Higher parallelism
+        print("⚡ FAST SIMJUDGED MODE:")
+        print("   candidate_antecedents_per_step: 3 (was 7)")
+        print("   simulation_forward_steps: 1 (was 3)")
+        print("   simulation_include_dialog: DISABLED")
+        print("   max_simulation_workers: 6 (parallel)")
+        print("   Expected speedup: ~10x")
+        print()
 
     # Handle --template mode (single template execution)
     if args.template and not args.convergence_e2e:
@@ -1738,7 +2097,7 @@ if __name__ == "__main__":
         )
         sys.exit(0 if convergence_success else 1)
 
-    success = run_all_templates(mode, skip_summaries=args.skip_summaries)
+    success = run_all_templates(mode, skip_summaries=args.skip_summaries, parallel_workers=args.parallel)
 
     # Run convergence analysis if requested
     if args.convergence:

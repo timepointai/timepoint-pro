@@ -162,7 +162,17 @@ class OpenRouterClient:
     ):
         self.api_key = api_key
         self.base_url = base_url.rstrip('/')
-        self.client = httpx.Client(timeout=60.0)
+        # Explicit timeout configuration to prevent hangs:
+        # - connect: 10s for connection establishment
+        # - read: 120s for slow LLM responses (increased from 60s)
+        # - write: 30s for request body upload
+        # - pool: 10s for getting a connection from the pool
+        self.client = httpx.Client(timeout=httpx.Timeout(
+            connect=10.0,
+            read=120.0,
+            write=30.0,
+            pool=10.0
+        ))
 
         # Initialize rate limiter
         self.mode = mode
@@ -361,6 +371,217 @@ class ModelManager:
 
         if len(models) > 10:
             lines.append(f"... and {len(models) - 10} more models")
+
+        return "\n".join(lines)
+
+
+class FreeModelSelector:
+    """
+    Dynamic selector for OpenRouter free models.
+
+    OpenRouter offers free models (identified by ':free' suffix) that rotate availability.
+    This class queries the API to discover currently available free models and selects
+    the best one based on user preference (quality vs speed).
+
+    Usage:
+        selector = FreeModelSelector(api_key)
+        best_model = selector.get_best_free_model()  # Quality-focused
+        fast_model = selector.get_fastest_free_model()  # Speed-focused
+        selector.list_free_models()  # Display all available
+
+    Free Model Characteristics (as of Dec 2024):
+        - Suffix: Models end with ':free' (e.g., 'meta-llama/llama-3.3-70b-instruct:free')
+        - Rate limits: More restrictive than paid tier
+        - Availability: May change without notice (rotating selection)
+        - Quality: Varies - some are very capable (Llama 70B, Qwen 235B)
+    """
+
+    # Known high-quality free models (ranked by preference)
+    QUALITY_RANKED_MODELS = [
+        "qwen/qwen3-235b-a22b:free",  # 235B params, excellent quality
+        "meta-llama/llama-3.3-70b-instruct:free",  # Llama 3.3 70B
+        "meta-llama/llama-3.1-70b-instruct:free",  # Llama 3.1 70B
+        "google/gemini-2.0-flash-exp:free",  # 1M context, fast
+        "mistralai/mistral-large-2411:free",  # Mistral Large
+    ]
+
+    # Known fast free models (ranked by speed)
+    SPEED_RANKED_MODELS = [
+        "google/gemini-2.0-flash-exp:free",  # Extremely fast, 1M context
+        "meta-llama/llama-3.2-3b-instruct:free",  # Small & fast
+        "meta-llama/llama-3.2-1b-instruct:free",  # Tiny & very fast
+        "mistralai/mistral-7b-instruct:free",  # 7B fast
+    ]
+
+    def __init__(self, api_key: str, cache_ttl_hours: int = 1):
+        """
+        Initialize free model selector.
+
+        Args:
+            api_key: OpenRouter API key
+            cache_ttl_hours: How long to cache model list (default: 1 hour for free models)
+        """
+        self.api_key = api_key
+        self.base_url = "https://openrouter.ai/api/v1"
+        self.cache_ttl = timedelta(hours=cache_ttl_hours)
+        self._models_cache: Optional[List[Dict]] = None
+        self._cache_timestamp: Optional[datetime] = None
+
+    def get_free_models(self, force_refresh: bool = False) -> List[Dict]:
+        """
+        Get all currently available free models from OpenRouter.
+
+        Returns:
+            List of model dicts with id, name, context_length, etc.
+        """
+        now = datetime.now()
+
+        # Check cache
+        if (not force_refresh and
+            self._models_cache is not None and
+            self._cache_timestamp is not None and
+            now - self._cache_timestamp < self.cache_ttl):
+            return self._models_cache
+
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
+
+            with httpx.Client(timeout=15.0) as http_client:
+                response = http_client.get(f"{self.base_url}/models", headers=headers)
+                response.raise_for_status()
+
+            models_data = response.json()
+            all_models = models_data.get("data", [])
+
+            # Filter for free models (identified by ':free' suffix)
+            free_models = []
+            for model in all_models:
+                model_id = model.get("id", "")
+                if model_id.endswith(":free"):
+                    free_models.append({
+                        "id": model_id,
+                        "name": model.get("name", model_id),
+                        "context_length": model.get("context_length", 0),
+                        "description": model.get("description", ""),
+                        "pricing": model.get("pricing", {}),
+                        "top_provider": model.get("top_provider", {})
+                    })
+
+            # Sort by context length (higher first)
+            free_models.sort(key=lambda x: -x["context_length"])
+
+            # Cache results
+            self._models_cache = free_models
+            self._cache_timestamp = now
+
+            print(f"🆓 Found {len(free_models)} free models on OpenRouter")
+            return free_models
+
+        except Exception as e:
+            print(f"⚠️ Failed to fetch free models: {e}")
+            if self._models_cache is not None:
+                print("📋 Using cached free model data")
+                return self._models_cache
+            return []
+
+    def get_best_free_model(self) -> Optional[str]:
+        """
+        Get the best available free model (quality-focused).
+
+        Checks known high-quality models first, then falls back to
+        largest context length available.
+
+        Returns:
+            Model ID string or None if no free models available
+        """
+        available = {m["id"] for m in self.get_free_models()}
+
+        if not available:
+            print("⚠️ No free models currently available")
+            return None
+
+        # Check quality-ranked models first
+        for model in self.QUALITY_RANKED_MODELS:
+            if model in available:
+                print(f"🌟 Selected best free model: {model}")
+                return model
+
+        # Fallback to largest context model
+        models = self.get_free_models()
+        if models:
+            best = models[0]  # Already sorted by context length
+            print(f"🌟 Selected free model (largest context): {best['id']}")
+            return best["id"]
+
+        return None
+
+    def get_fastest_free_model(self) -> Optional[str]:
+        """
+        Get the fastest available free model (speed-focused).
+
+        Prioritizes known fast models, then smaller models by context size.
+
+        Returns:
+            Model ID string or None if no free models available
+        """
+        available = {m["id"] for m in self.get_free_models()}
+
+        if not available:
+            print("⚠️ No free models currently available")
+            return None
+
+        # Check speed-ranked models first
+        for model in self.SPEED_RANKED_MODELS:
+            if model in available:
+                print(f"⚡ Selected fastest free model: {model}")
+                return model
+
+        # Fallback to smallest context model (usually faster)
+        models = self.get_free_models()
+        if models:
+            # Sort by context ascending (smaller = usually faster)
+            models_sorted = sorted(models, key=lambda x: x["context_length"])
+            fastest = models_sorted[0]
+            print(f"⚡ Selected free model (smallest/fastest): {fastest['id']}")
+            return fastest["id"]
+
+        return None
+
+    def list_free_models(self) -> str:
+        """
+        Return a formatted string listing all available free models.
+
+        Returns:
+            Formatted string for display
+        """
+        models = self.get_free_models()
+        if not models:
+            return "🆓 No free models currently available on OpenRouter"
+
+        lines = [
+            "🆓 Available FREE Models on OpenRouter:",
+            "-" * 60
+        ]
+
+        for i, model in enumerate(models, 1):
+            ctx_k = model["context_length"] // 1024 if model["context_length"] else 0
+            # Mark quality/speed tier
+            tier = ""
+            if model["id"] in self.QUALITY_RANKED_MODELS[:3]:
+                tier = " ⭐ BEST"
+            elif model["id"] in self.SPEED_RANKED_MODELS[:3]:
+                tier = " ⚡ FAST"
+
+            lines.append(f"  {i:2d}. {model['id']}")
+            lines.append(f"      Context: {ctx_k}K{tier}")
+
+        lines.append("-" * 60)
+        lines.append(f"Total: {len(models)} free models")
+        lines.append("")
+        lines.append("Usage: --free (best quality) or --free-fast (speed)")
 
         return "\n".join(lines)
 
@@ -700,8 +921,14 @@ Return only valid JSON matching this schema exactly, no other text."""
 
         def _api_call():
             # Temporarily increase timeout for large requests
+            # Use explicit timeout configuration for consistency
             original_timeout = self.client.client.timeout
-            self.client.client.timeout = httpx.Timeout(timeout)
+            self.client.client.timeout = httpx.Timeout(
+                connect=10.0,
+                read=timeout,  # Main timeout for slow LLM responses
+                write=30.0,
+                pool=10.0
+            )
 
             try:
                 response = self.client.chat.completions.create(

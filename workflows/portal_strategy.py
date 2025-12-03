@@ -17,10 +17,12 @@ Architecture:
     - Forward validation: backward-generated paths must make forward sense
 """
 
-from typing import List, Dict, Tuple, Optional, Any
+from typing import List, Dict, Tuple, Optional, Any, Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError, as_completed
+import threading
 import numpy as np
 import uuid
 
@@ -319,20 +321,49 @@ class PortalStrategy:
             temp_state = PortalState(year=step_year, month=step_month, description="", entities=[], world_state={})
             print(f"  Backward step {step+1}/{strategy.timepoint_count}: {temp_state.to_year_month_str()} @ {target_resolution}")
 
-            for state in current_states:
-                # Generate N candidate antecedents for this state
-                antecedents = self._generate_antecedents(
-                    state,
-                    target_year=step_year,
-                    target_month=step_month,
-                    target_resolution=target_resolution  # NEW PARAMETER
-                )
+            # Get parallelization settings
+            max_antecedent_workers = getattr(self.config, 'max_antecedent_workers', 3)
 
-                # Score and filter
-                scored = self._score_antecedents(antecedents, state)
-                top_antecedents = scored[:self.config.candidate_antecedents_per_step]
+            # Process states - parallel if multiple states, sequential if just one
+            if len(current_states) > 1 and max_antecedent_workers > 1:
+                # Parallel state processing
+                print(f"    Processing {len(current_states)} states in parallel ({max_antecedent_workers} workers)...")
 
-                next_states.extend(top_antecedents)
+                def process_single_state(state: PortalState) -> List[PortalState]:
+                    """Process a single state: generate antecedents, score, return top candidates."""
+                    antecedents = self._generate_antecedents(
+                        state,
+                        target_year=step_year,
+                        target_month=step_month,
+                        target_resolution=target_resolution
+                    )
+                    scored = self._score_antecedents(antecedents, state)
+                    return scored[:self.config.candidate_antecedents_per_step]
+
+                with ThreadPoolExecutor(max_workers=max_antecedent_workers) as executor:
+                    futures = [executor.submit(process_single_state, state) for state in current_states]
+                    for future in as_completed(futures):
+                        try:
+                            top_antecedents = future.result()
+                            next_states.extend(top_antecedents)
+                        except Exception as e:
+                            print(f"    ⚠️  State processing failed: {e}")
+            else:
+                # Sequential processing for single state or disabled parallelism
+                for state in current_states:
+                    # Generate N candidate antecedents for this state
+                    antecedents = self._generate_antecedents(
+                        state,
+                        target_year=step_year,
+                        target_month=step_month,
+                        target_resolution=target_resolution
+                    )
+
+                    # Score and filter
+                    scored = self._score_antecedents(antecedents, state)
+                    top_antecedents = scored[:self.config.candidate_antecedents_per_step]
+
+                    next_states.extend(top_antecedents)
 
             current_states = next_states
 
@@ -540,6 +571,9 @@ Return as JSON with an "antecedents" array containing {count} antecedent objects
         The simulation results are used by the judge LLM to evaluate which
         candidate antecedent produces the most realistic forward path.
 
+        TIMEOUT PROTECTION: Uses ThreadPoolExecutor with configurable timeout
+        to prevent hangs during LLM calls.
+
         Args:
             candidate_state: Starting state to simulate forward from
             steps: Number of forward steps (default: config.simulation_forward_steps)
@@ -554,87 +588,126 @@ Return as JSON with an "antecedents" array containing {count} antecedent objects
         """
         steps = steps or self.config.simulation_forward_steps
 
-        # Initialize simulation results
-        simulated_states = [candidate_state]
-        dialogs = []
-        emergent_events = []
+        # Get timeout from config (with defaults for backward compatibility)
+        simulation_timeout = getattr(self.config, 'simulation_timeout_seconds', 180)
+        step_timeout = getattr(self.config, 'simulation_step_timeout_seconds', 60)
 
-        # Limit entities for performance
-        max_entities = self.config.simulation_max_entities
-        active_entities = candidate_state.entities[:max_entities] if candidate_state.entities else []
+        def _execute_simulation() -> Dict[str, Any]:
+            """Inner function containing simulation logic, wrapped with timeout."""
+            # Initialize simulation results
+            simulated_states = [candidate_state]
+            dialogs = []
+            emergent_events = []
 
-        # Calculate month step size based on backward_steps configuration
-        # This ensures forward simulation stepping matches backward simulation stepping
-        portal_month_total = self.config.portal_year * 12 + 1
-        origin_month_total = self.config.origin_year * 12 + 1
-        total_months = portal_month_total - origin_month_total
-        month_step = max(1, total_months // self.config.backward_steps)
+            # Limit entities for performance
+            max_entities = self.config.simulation_max_entities
+            active_entities = candidate_state.entities[:max_entities] if candidate_state.entities else []
 
-        # Simulate forward steps
-        for step in range(steps):
-            current = simulated_states[-1]
+            # Calculate month step size based on backward_steps configuration
+            portal_month_total = self.config.portal_year * 12 + 1
+            origin_month_total = self.config.origin_year * 12 + 1
+            total_months = portal_month_total - origin_month_total
+            month_step = max(1, total_months // self.config.backward_steps)
 
-            # Calculate next time point using month-based stepping
-            current_month_total = current.to_total_months()
-            next_month_total = current_month_total + month_step
-            next_year = next_month_total // 12
-            next_month = next_month_total % 12
-            if next_month == 0:  # Handle month 0 → December of previous year
-                next_year -= 1
-                next_month = 12
+            # Simulate forward steps with progress logging
+            for step in range(steps):
+                current = simulated_states[-1]
 
-            # Generate next state description using LLM
-            if self.llm:
-                try:
-                    next_state_description = self._generate_forward_state(current, next_year, next_month)
-                except Exception as e:
-                    print(f"      ⚠️  Forward state generation failed: {e}")
-                    month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-                    next_time_str = f"{month_names[next_month-1]} {next_year}"
-                    next_state_description = f"{next_time_str}: Continuation of {current.description[:50]}..."
-            else:
+                # Calculate next time point using month-based stepping
+                current_month_total = current.to_total_months()
+                next_month_total = current_month_total + month_step
+                next_year = next_month_total // 12
+                next_month = next_month_total % 12
+                if next_month == 0:  # Handle month 0 → December of previous year
+                    next_year -= 1
+                    next_month = 12
+
+                # Progress logging
                 month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
                 next_time_str = f"{month_names[next_month-1]} {next_year}"
-                next_state_description = f"{next_time_str}: Continuation of {current.description[:50]}..."
+                print(f"        Step {step+1}/{steps}: Generating state for {next_time_str}...")
 
-            # Create next state
-            next_state = PortalState(
-                year=next_year,
-                month=next_month,
-                description=next_state_description,
-                entities=active_entities.copy(),
-                world_state=current.world_state.copy(),
-                plausibility_score=0.0
-            )
-            simulated_states.append(next_state)
+                # Generate next state description using LLM with step-level timeout
+                if self.llm:
+                    try:
+                        # Use ThreadPoolExecutor for step-level timeout
+                        with ThreadPoolExecutor(max_workers=1) as step_executor:
+                            future = step_executor.submit(
+                                self._generate_forward_state, current, next_year, next_month
+                            )
+                            try:
+                                next_state_description = future.result(timeout=step_timeout)
+                            except FuturesTimeoutError:
+                                print(f"        ⚠️  Step {step+1} timed out after {step_timeout}s, using fallback")
+                                next_state_description = f"{next_time_str}: Continuation of {current.description[:50]}..."
+                    except Exception as e:
+                        print(f"        ⚠️  Forward state generation failed: {e}")
+                        next_state_description = f"{next_time_str}: Continuation of {current.description[:50]}..."
+                else:
+                    next_state_description = f"{next_time_str}: Continuation of {current.description[:50]}..."
 
-            # Generate dialog if enabled and we have entities
-            if self.config.simulation_include_dialog and len(active_entities) >= 2 and self.llm:
-                try:
-                    dialog_data = self._generate_simulation_dialog(
-                        current_state=current,
-                        next_state=next_state,
-                        entities=active_entities[:3]  # Limit to 3 for dialog
-                    )
-                    dialogs.append(dialog_data)
-                except Exception as e:
-                    print(f"      ⚠️  Dialog generation failed: {e}")
+                # Create next state
+                next_state = PortalState(
+                    year=next_year,
+                    month=next_month,
+                    description=next_state_description,
+                    entities=active_entities.copy(),
+                    world_state=current.world_state.copy(),
+                    plausibility_score=0.0
+                )
+                simulated_states.append(next_state)
 
-        # Compute coherence metrics
-        coherence_metrics = self._compute_simulation_coherence(simulated_states)
+                # Generate dialog if enabled and we have entities
+                if self.config.simulation_include_dialog and len(active_entities) >= 2 and self.llm:
+                    try:
+                        # Use ThreadPoolExecutor for dialog timeout
+                        with ThreadPoolExecutor(max_workers=1) as dialog_executor:
+                            future = dialog_executor.submit(
+                                self._generate_simulation_dialog,
+                                current, next_state, active_entities[:3]
+                            )
+                            try:
+                                dialog_data = future.result(timeout=step_timeout)
+                                dialogs.append(dialog_data)
+                            except FuturesTimeoutError:
+                                print(f"        ⚠️  Dialog generation timed out after {step_timeout}s")
+                    except Exception as e:
+                        print(f"        ⚠️  Dialog generation failed: {e}")
 
-        # Generate narrative summary
-        narrative = self._generate_simulation_narrative(simulated_states, dialogs)
+            # Compute coherence metrics
+            coherence_metrics = self._compute_simulation_coherence(simulated_states)
 
-        return {
-            "states": simulated_states,
-            "dialogs": dialogs,
-            "coherence_metrics": coherence_metrics,
-            "simulation_narrative": narrative,
-            "emergent_events": emergent_events,
-            "candidate_year": candidate_state.year,
-            "simulation_end_year": simulated_states[-1].year if simulated_states else candidate_state.year
-        }
+            # Generate narrative summary
+            narrative = self._generate_simulation_narrative(simulated_states, dialogs)
+
+            return {
+                "states": simulated_states,
+                "dialogs": dialogs,
+                "coherence_metrics": coherence_metrics,
+                "simulation_narrative": narrative,
+                "emergent_events": emergent_events,
+                "candidate_year": candidate_state.year,
+                "simulation_end_year": simulated_states[-1].year if simulated_states else candidate_state.year
+            }
+
+        # Execute simulation with overall timeout protection
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(_execute_simulation)
+            try:
+                return future.result(timeout=simulation_timeout)
+            except FuturesTimeoutError:
+                print(f"      ⚠️  Simulation timed out after {simulation_timeout}s")
+                # Return a minimal result to allow graceful degradation
+                return {
+                    "states": [candidate_state],
+                    "dialogs": [],
+                    "coherence_metrics": {"coherence": 0.3, "continuity": 0.3, "plausibility": 0.3},
+                    "simulation_narrative": f"Simulation timed out after {simulation_timeout}s",
+                    "emergent_events": [],
+                    "candidate_year": candidate_state.year,
+                    "simulation_end_year": candidate_state.year,
+                    "timed_out": True
+                }
 
     def _generate_forward_state(self, current_state: PortalState, next_year: int, next_month: int) -> str:
         """Generate description of next state in forward simulation"""
@@ -1017,23 +1090,32 @@ Focus on: forward coherence, dialog realism, causal necessity, internal consiste
         if not antecedents:
             return []
 
-        print(f"    🎬 SIMULATION JUDGING MODE")
+        # Get parallelization settings with defaults for backward compatibility
+        max_workers = getattr(self.config, 'max_simulation_workers', 4)
+
+        print(f"    🎬 SIMULATION JUDGING MODE (PARALLEL: {max_workers} workers)")
         print(f"    Running mini-simulations for {len(antecedents)} candidates...")
         print(f"    Each simulation: {self.config.simulation_forward_steps} forward steps")
         if self.config.simulation_include_dialog:
             print(f"    Dialog generation: ENABLED")
 
-        # Run simulations for each candidate
-        simulation_results = []
-        for i, ant in enumerate(antecedents):
-            print(f"      Candidate {i+1}/{len(antecedents)}: Simulating forward from year {ant.year}...")
+        # Thread-safe progress tracking
+        progress_lock = threading.Lock()
+        completed_count = [0]  # Using list to allow mutation in closure
+
+        def run_simulation_with_progress(idx: int, ant: PortalState) -> Tuple[int, Dict[str, Any]]:
+            """Run a single simulation and return (index, result) for ordering."""
             try:
                 sim_result = self._run_mini_simulation(ant, self.config.simulation_forward_steps)
-                simulation_results.append(sim_result)
+                with progress_lock:
+                    completed_count[0] += 1
+                    print(f"      ✓ Candidate {idx+1} complete ({completed_count[0]}/{len(antecedents)}) - year {ant.year}")
+                return (idx, sim_result)
             except Exception as e:
-                print(f"      ⚠️  Simulation failed: {e}")
-                # Add empty simulation result
-                simulation_results.append({
+                with progress_lock:
+                    completed_count[0] += 1
+                    print(f"      ⚠️  Candidate {idx+1} failed ({completed_count[0]}/{len(antecedents)}): {e}")
+                return (idx, {
                     "states": [ant],
                     "dialogs": [],
                     "coherence_metrics": {"coherence": 0.3},
@@ -1042,6 +1124,21 @@ Focus on: forward coherence, dialog realism, causal necessity, internal consiste
                     "candidate_year": ant.year,
                     "simulation_end_year": ant.year
                 })
+
+        # Run simulations in parallel
+        simulation_results = [None] * len(antecedents)  # Pre-allocate for ordered results
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all simulations
+            futures = {
+                executor.submit(run_simulation_with_progress, i, ant): i
+                for i, ant in enumerate(antecedents)
+            }
+
+            # Collect results as they complete
+            for future in as_completed(futures):
+                idx, result = future.result()
+                simulation_results[idx] = result
 
         # Judge all simulations
         print(f"    ⚖️  Judge LLM evaluating realism of {len(antecedents)} simulations...")

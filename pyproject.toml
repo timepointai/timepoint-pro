@@ -1,3 +1,10 @@
+[project]
+name = "timepoint-daedalus"
+version = "0.1.0"
+description = "Temporal entity simulation with LLM-driven training and tensor compression"
+readme = "README.md"
+requires-python = ">=3.10,<3.14"
+
 [tool.poetry]
 name = "timepoint-daedalus"
 version = "0.1.0"

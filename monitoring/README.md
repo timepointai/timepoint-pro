@@ -188,15 +188,27 @@ python3.10 -m monitoring.monitor_runner \
 ## LLM Model Options
 
 ### Free Models (Good for Testing)
-- `meta-llama/llama-3.1-8b-instruct:free` (default, fast, cheap)
-- `meta-llama/llama-3.1-70b-instruct:free` (better quality)
+
+OpenRouter offers a rotating selection of free models. Use `--list-free-models` to see what's currently available:
+
+```bash
+python run_all_mechanism_tests.py --list-free-models
+```
+
+Common free models (availability may vary):
+- `meta-llama/llama-3.3-70b-instruct:free` (high quality, 128K context)
+- `qwen/qwen3-235b-a22b:free` (235B params, excellent quality)
+- `google/gemini-2.0-flash-exp:free` (1M context, very fast)
+- `meta-llama/llama-3.2-3b-instruct:free` (small & fast)
+
+Default monitoring: `meta-llama/llama-3.1-8b-instruct:free`
 
 ### Paid Models (Higher Quality)
 - `meta-llama/llama-3.1-70b-instruct` ($0.35/1M tokens)
 - `meta-llama/llama-3.1-405b-instruct` ($5/1M tokens, highest quality)
 
 Cost estimate for 1-hour run with 5-min intervals (12 updates):
-- 8B model: ~$0.02
+- Free models: $0.00
 - 70B model: ~$0.10
 - 405B model: ~$2.00
 

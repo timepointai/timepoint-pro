@@ -102,6 +102,13 @@ class GraphStore:
     def __init__(self, db_url: str = "sqlite:///timepoint.db"):
         self.engine = create_engine(db_url)
         SQLModel.metadata.create_all(self.engine)
+        # Enable WAL mode for better concurrent write performance
+        # (allows multiple readers + one writer simultaneously)
+        if "sqlite" in db_url:
+            from sqlalchemy import text
+            with self.engine.connect() as conn:
+                conn.execute(text("PRAGMA journal_mode=WAL"))
+                conn.commit()
 
     @contextmanager
     def transaction(self) -> Generator[TransactionContext, None, None]:

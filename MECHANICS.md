@@ -548,6 +548,28 @@ All models in the registry permit commercial use including synthetic data genera
 
 Models explicitly excluded: OpenAI (usage restrictions), Anthropic (synthetic data restrictions), Google (commercial restrictions).
 
+### Free Model Support
+
+OpenRouter offers a rotating selection of free models (identified by `:free` suffix). The `FreeModelSelector` class in `llm.py` provides:
+
+```python
+from llm import FreeModelSelector
+
+selector = FreeModelSelector(api_key)
+selector.list_free_models()           # Show all available free models
+selector.get_best_free_model()        # Quality-focused (Qwen 235B, Llama 70B)
+selector.get_fastest_free_model()     # Speed-focused (Gemini Flash, small models)
+```
+
+CLI usage:
+```bash
+python run_all_mechanism_tests.py --free           # Best quality free model
+python run_all_mechanism_tests.py --free-fast      # Fastest free model
+python run_all_mechanism_tests.py --list-free-models  # Show available
+```
+
+Note: Free models have more restrictive rate limits and availability may change without notice.
+
 ---
 
 # Unified Fidelity-Temporal Strategy
@@ -931,6 +953,6 @@ E2E mode is useful for validating that a specific template produces consistent c
 
 ---
 
-**Implementation Status**: All 18 mechanisms implemented and verified. Convergence evaluation implemented with E2E testing mode and 3 convergence-optimized templates.
+**Implementation Status**: All 18 mechanisms implemented and verified. Convergence evaluation implemented with E2E testing mode and 3 convergence-optimized templates. Parallel execution (`--parallel N`) and free model support (`--free`, `--free-fast`) added December 2025.
 **Platform Status**: Infrastructure vision; see [MILESTONES.md](MILESTONES.md) for roadmap.
 **See also**: [README.md](README.md) for quick start, [QUICKSTART.md](QUICKSTART.md) for natural language usage.
