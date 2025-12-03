@@ -1,26 +1,36 @@
-# Timepoint v0: Daedalus
+# Timepoint v0 (Daedalus)
+## PRE RELEASE 
+### A.K.A. Built and tested entirely by one person and his AIs. 
 
 **Temporal simulation where detail follows attention, not allocation. Heading towards queryable temporal knowledge graphs of complex, large-scale social network simulations.**
 
 ## tl;dr 
-Timepoint is a synthetic time travel tool, that offers variable-resolution from very high-level view to dialog and inner-thought modeling. The goal of the author is to, eventually, put on a VR headset and zap to any moment in history with extraordinary fidelity, and highly coherent logic, character interactions, and visuals. 
+Timepoint is a tool to use LLMs to render accurate past and future moments. When you render any Timepoint it produces a variable fidelity social graph, detailed character bios and allows you to steer deterministic and stochastic components of social network simulations. The most interesting part to people who have seen pre-release demos, like the talk I did at AI Tinkerers LA on Nov 20, 2025, is PORTAL mode. Timepoint Daedalus can "portal" to a future timepoint and make logical, judged steps "backwards" from that timepoint to current time, path seeking through simulated reality. This appears highly valuable to people who manage capital. 
 
-The most interesting part to people who have seen pre-release demos, like the talk I did at AI Tinkerers LA on Nov 20, 2025, is PORTAL mode. Timepoint Daedalus can "portal" to a future timepoint and make logical, judged steps backwards to current time, path seeking through simulated reality. See MECHANICS.md for details.
+(See MECHANICS.md for details.)
 
 ---
 
+Editorial note, written entirely by a human, x.com/seanmcdonaldxyz: 
 
-Timepoint-Daedalus is a temporal simulation framework where detail follows queries, not pre-allocation. Instead of rendering every entity at every moment at full fidelity (expensive, wasteful), the system maintains a 2D resolution surface over (entity, time) that concentrates detail where you actually look. Minor characters exist as 200-token tensor embeddings until someone asks about them—then they're elevated while preserving causal consistency with everything already established.
+This is both a context engineering and artistic steering tool, designed and built by one person, with choices representing both technical requirements and artistic experience testing the tool and attempting to utilize the results in my own life. My goal is to make "synthetic time travel" kind of like the movies of my childhood. One day soon I will be able to put on a VR headset and use Timepoint to zap to any moment past or present with high fidelity. As a technology, for now, my inspiration is to make something close to a modular synthesizer, or a sequencer...like a drum machine. Something tooled to how I envision simulating social networks, as much as an artist or storyteller as engineer or data wrangler. 
+
+At scale, this tooling allows for synthetic data generation in important, novel structures and formats. It's also designed to support artistic expression. Ideally a screenwriter will be able to utilize Timepoint with the same sophistication as the best engineer. Our coding agents will be able to operate Timepoint on our behalf, making that possible much sooner than would otherwise be possible. Simulation can be immensely valuable for work in capital markets, but it's also fun, interesting, and valuable for personal coaching and self-improvement. 
+
+---
+
+## Intro:
+
+Timepoint-Daedalus is a v0 Pre-Release of a temporal simulation framework where detail follows queries, not pre-allocation. Instead of rendering every entity at every moment at full fidelity (expensive, wasteful), the system maintains a 2D resolution surface over (entity, time) that concentrates detail where you actually look. Minor characters exist as 200-token tensor embeddings until someone asks about them—then they're elevated while preserving causal consistency with everything already established.
 The result: in theory, up to a 95% cost reduction without breaking temporal reasoning. You can still ask "what did Jefferson know when he wrote this?" because knowledge provenance is tracked explicitly, not summarized away.
 Bonus weirdness: multiple temporal modes (including backward reasoning from known endpoints), entities that model their own futures, and objects/institutions with animistic agency.
 Timepoint embraces curiosity, by enabling a set of modular tools for configuring temporal simulations. 
 
 This version is named after Daedalus, the legendary inventor, one who could navigate the labyrinth. But Daedalus also gave a stern warning: don't put too much faith in technology. Social network simulations are not real life -- they're a tool for preparing for the future. And maybe, for predicting it. 🤔
 
-## Some Problem with Simulation
+## A Major Problem with Simulation: Token Growth with Time Steps of Social Networks Leads to Context Collapse 
 
-Traditional LLM-based simulations treat fidelity as uniform: every entity, every moment, rendered at the same resolution. This is expensive ($500/query for 100 entities across 10 timepoints) and wasteful—most of that detail is never queried.
-
+Traditional LLM-based simulations treat fidelity as uniform: every entity, every moment, rendered at the same resolution. This is expensive and wasteful. Most of that detail is never queried again. 
 Worse, compression-based solutions degrade temporal structure. You can't reason about causality in a lossy summary and you can't maintain coherence in ever-growing context windows. 
 
 ## A new approach based on mixed resolution mapping
@@ -224,15 +234,17 @@ chen_evolution = engine.query(
 
 | Scenario | Naive Cost | Timepoint-Daedalus | Reduction |
 |----------|------------|---------------------|-----------|
-| 5 entities, 5 timepoints | ~$25 | $1-2 | 92-96% |
-| 20 entities, 10 timepoints | ~$100 | $5-8 | 92-95% |
-| 100 entities, 20 timepoints | ~$500 | $20-30 | 94-96% |
+| 5 entities, 3 timepoints | ~$1.00 | $0.02-0.05 | 95-98% |
+| 10 entities, 5 timepoints | ~$3.00 | $0.08-0.15 | 95-97% |
+| 20 entities, 10 timepoints | ~$10.00 | $0.30-0.60 | 94-97% |
+
+*Updated December 2025 based on actual run costs with Llama 4 Scout via OpenRouter.*
 
 Cost reduction comes from query-driven fidelity, not lossy compression—temporal consistency is preserved.
 
 ---
 
-## Current State (November 2025)
+## Current State (December 2025)
 
 **What works today:**
 
@@ -246,10 +258,19 @@ pip install -r requirements.txt
 export OPENROUTER_API_KEY=your_key_here
 
 # Run simulations
-./run.sh quick              # 9 templates, ~$9-18
-./run.sh portal-test        # PORTAL mode tests
-./run.sh portal-timepoint   # Real founder profiles
-./run.sh --nl "prompt"      # Natural language input
+./run.sh quick                              # Quick-tier templates (~$0.15-0.30)
+./run.sh --category portal                  # PORTAL mode templates
+./run.sh --template board_meeting           # Single template by name
+./run.sh --list                             # List all 40 templates
+python run_all_mechanism_tests.py --nl "prompt"  # Natural language input
+
+# Parallel execution (4-6 workers recommended)
+python run_all_mechanism_tests.py --parallel 6
+
+# Free models ($0 cost - uses OpenRouter free tier)
+python run_all_mechanism_tests.py --free --template board_meeting  # Best quality free model
+python run_all_mechanism_tests.py --free-fast --parallel 4         # Fastest free model
+python run_all_mechanism_tests.py --list-free-models               # Show available free models
 
 # Convergence evaluation (measures causal graph consistency)
 python run_all_mechanism_tests.py --convergence --convergence-runs 3
@@ -263,7 +284,9 @@ python run_all_mechanism_tests.py --convergence-e2e --template convergence_test_
 - M18: Intelligent per-action model selection (12 open-source models)
 - PORTAL mode (backward temporal reasoning)
 - Natural language interface integration
-- Single-run execution with full mechanism tracking
+- **Parallel execution** (`--parallel N` for N concurrent workers)
+- **Free model support** (`--free`, `--free-fast`, `--list-free-models`)
+- **Ctrl+C protection** (double-confirm to prevent accidental abortion)
 - SQLite persistence (metadata/runs.db)
 - Basic dashboard (Quarto + FastAPI)
 - Narrative exports (Markdown, JSON, PDF)
@@ -276,8 +299,11 @@ All models via OpenRouter, all open-source with commercial synthetic data rights
 - **Llama License**: Llama 3.1 8B/70B/405B, Llama 4 Scout
 - **Qwen License**: Qwen 2.5 7B/72B, QwQ 32B
 
+**Free Models Available** (rotating selection, $0 cost):
+- Quality-focused: `qwen/qwen3-235b-a22b:free`, `meta-llama/llama-3.3-70b-instruct:free`
+- Speed-focused: `google/gemini-2.0-flash-exp:free` (1M context!)
+
 **Not yet implemented:**
-- Batch execution / parallelization
 - REST API
 - External integrations (prediction markets, webhooks)
 - Containerization / distributed deployment
@@ -327,7 +353,7 @@ All models via OpenRouter, all open-source with commercial synthetic data rights
 - `nl_interface/`: Natural language to simulation config
 - `validation.py` (1,365 lines): 5 physics-inspired validators
 - `storage.py` (632 lines): SQLite persistence layer with transaction support
-- `generation/templates/`: 16 JSON simulation templates (+ 69 Python template methods in config_schema.py)
+- `generation/templates/`: 40 JSON simulation templates organized by category (core, showcase, portal, stress, convergence)
 
 ---
 
@@ -340,9 +366,9 @@ All models via OpenRouter, all open-source with commercial synthetic data rights
 - Scenarios where you'll query specific entities/moments deeply
 
 **Not the right tool (yet):**
-- High-volume batch simulations (no parallelization yet)
 - Production systems requiring SLAs (research prototype)
 - Real-time applications (LLM latency dominates)
+- Enterprise-scale (1000+ concurrent runs) - needs distributed infrastructure
 
 ---
 
@@ -380,4 +406,10 @@ See [MILESTONES.md](MILESTONES.md) for the detailed roadmap.
 
 ## License
 
-MIT
+Apache 
+
+
+#### *Footnote: Why 'Daedalus'?*
+
+Daedalus mastered the labyrinth, but offered a strong warning: trust this technology too much and it will be dangerous. Just as if you do not use it enough. Be like Daedalus; not like Icarus. Social network simulation is powerful, but not reality, and never will be. 
+

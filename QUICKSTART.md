@@ -3,7 +3,7 @@
 ## TL;DR - One Command
 
 ```bash
-python examples/demo_orchestrator.py --event "emergency board meeting about a merger"
+python run_all_mechanism_tests.py --nl "emergency board meeting about a merger"
 ```
 
 That's it! Just describe what you want to simulate in plain English.
@@ -35,60 +35,68 @@ export OPENROUTER_API_KEY="your_key_here"
 
 ## Examples
 
-**Note**: All commands require environment variables to be loaded first (see Setup above). The `echo "y" |` prefix automatically confirms the cost estimate prompt.
+**Note**: All commands require environment variables to be loaded first (see Setup above).
 
-### Basic Usage
+### Natural Language Mode
 ```bash
-# Emergency board meeting (auto-confirm with echo "y")
-echo "y" | python examples/demo_orchestrator.py --event "emergency board meeting where 4 executives debate whether to accept acquisition offer"
+# Emergency board meeting
+python run_all_mechanism_tests.py --nl "emergency board meeting where 4 executives debate whether to accept acquisition offer"
 
 # Historical event
-echo "y" | python examples/demo_orchestrator.py --event "apollo 13 crisis - the moment they discover the oxygen tank explosion"
+python run_all_mechanism_tests.py --nl "apollo 13 crisis - the moment they discover the oxygen tank explosion"
 
 # Fiction scenario
-echo "y" | python examples/demo_orchestrator.py --event "detective interrogates 3 witnesses about a murder"
+python run_all_mechanism_tests.py --nl "detective interrogates 3 witnesses about a murder"
 ```
 
-### With Custom Settings
+### Template-Based Mode
 ```bash
-# More entities and timepoints
-echo "y" | python examples/demo_orchestrator.py --event "constitutional convention" --entities 8 --timepoints 5
+# List all 40 available templates
+./run.sh --list
 
-# Different temporal mode (narrative-focused)
-echo "y" | python examples/demo_orchestrator.py --event "shakespearean tragedy" --mode directorial
+# Run a single template
+./run.sh --template board_meeting
+./run.sh --template constitutional_convention_day1
 
-# Branching timeline (what-if scenarios)
-echo "y" | python examples/demo_orchestrator.py --event "cuban missile crisis decision point" --mode branching
+# Run templates by category
+./run.sh --category core          # 18 mechanism isolation tests
+./run.sh --category showcase      # 10 production-ready scenarios
+./run.sh --category portal        # 4 backward reasoning scenarios
+
+# Run templates by tier (complexity)
+./run.sh quick                    # Fast tests (~2-3 min each)
+./run.sh standard                 # Moderate tests (~5-10 min)
+./run.sh comprehensive            # Thorough tests (~15-30 min)
 ```
 
 ### Test Without Cost
 ```bash
-# Dry run mode - no API calls, uses mock data (no confirmation needed)
-python examples/demo_orchestrator.py --event "test scenario" --dry-run
+# Dry run mode - no API calls, uses mock data
+python run_all_mechanism_tests.py --dry-run --template board_meeting
 ```
 
 ## What You Get
 
 Each simulation generates:
 
-✅ **Entities** - Characters with:
+**Entities** - Characters with:
 - Unique personalities
 - Knowledge states
 - Roles and relationships
 - Cognitive tensors
 
-✅ **Timepoints** - Causal sequence of events with:
+**Timepoints** - Causal sequence of events with:
 - Event descriptions
 - Timestamps
 - Entity presence tracking
 - Causal links (what caused what)
 
-✅ **Relationships** - Network graph of:
+**Relationships** - Network graph of:
 - How entities relate to each other
 - Social connections
 - Information flow
 
-✅ **Knowledge Flow** - Exposure events showing:
+**Knowledge Flow** - Exposure events showing:
 - What each entity knows
 - When they learned it
 - How confident they are
@@ -103,12 +111,29 @@ Results are saved to `output/simulations/`:
 
 ## Cost
 
-Typical runs cost **$0.05-0.20** depending on:
+Typical runs cost **$0.02-0.10** depending on:
 - Number of entities (1-20)
 - Number of timepoints (1-10)
 - Temporal mode complexity
 
-The script will show estimated cost and ask for confirmation before running.
+*Updated December 2025: Costs are ~10x lower than previous estimates due to efficient Llama 4 Scout pricing.*
+
+### Free Mode ($0 cost)
+
+Use OpenRouter's free tier models for zero-cost testing:
+
+```bash
+# Best quality free model (Qwen 235B, Llama 70B, etc.)
+python run_all_mechanism_tests.py --free --template board_meeting
+
+# Fastest free model (Gemini Flash, smaller Llama)
+python run_all_mechanism_tests.py --free-fast --template board_meeting
+
+# List currently available free models
+python run_all_mechanism_tests.py --list-free-models
+```
+
+Note: Free models have more restrictive rate limits and availability may rotate.
 
 ## Temporal Modes
 
@@ -122,62 +147,66 @@ The script will show estimated cost and ask for confirmation before running.
 ## Advanced Options
 
 ```bash
-# All options (use echo "y" | to auto-confirm, or --dry-run to skip)
-echo "y" | python examples/demo_orchestrator.py \
-  --event "your description" \
-  --entities 5 \              # Max entities (1-20, default: 4)
-  --timepoints 4 \            # Max timepoints (1-10, default: 3)
-  --mode directorial \        # Temporal mode (default: pearl)
-  --dry-run                   # Test without API costs
+# Natural language with parallel execution
+python run_all_mechanism_tests.py --nl "your description" --parallel 4
+
+# Run all templates in a category
+./run.sh --category showcase --parallel 6
+
+# Filter by mechanism
+./run.sh --mechanism M1,M7,M11
+
+# Skip LLM summary generation (faster, cheaper)
+./run.sh --tier quick --skip-summaries
 
 # Help
-python examples/demo_orchestrator.py --help
+python run_all_mechanism_tests.py --help
+./run.sh --help
 ```
 
 ## Tips for Writing Good Prompts
 
 **Good prompts are specific:**
-- ✅ "Emergency board meeting where CFO reveals bankruptcy, 4 executives debate 3 options"
-- ❌ "Meeting"
+- "Emergency board meeting where CFO reveals bankruptcy, 4 executives debate 3 options"
+- "Meeting" (too vague)
 
 **Include context:**
-- ✅ "Apollo 13 crew discovers oxygen tank explosion, must decide how to return to Earth"
-- ❌ "Space problem"
+- "Apollo 13 crew discovers oxygen tank explosion, must decide how to return to Earth"
+- "Space problem" (too vague)
 
 **Specify key characters:**
-- ✅ "Detective interrogates CEO, CFO, and janitor about missing money"
-- ❌ "Interrogation"
+- "Detective interrogates CEO, CFO, and janitor about missing money"
+- "Interrogation" (too vague)
 
 **Describe the tension:**
-- ✅ "Founders fight over whether to take VC money or bootstrap, relationship at breaking point"
-- ❌ "Business decision"
+- "Founders fight over whether to take VC money or bootstrap, relationship at breaking point"
+- "Business decision" (too vague)
 
 ## Next Steps
 
 After generating a simulation:
 
-1. **Query the data**:
-   ```bash
-   python cli.py mode=interactive
-   ```
-
-2. **Generate training data**:
-   ```bash
-   python scripts/legacy_runners/run_character_engine.py
-   ```
-
-3. **Run full E2E pipeline**:
+1. **Run the E2E pipeline**:
    ```bash
    ./run.sh quick
    ```
 
-4. **Test convergence** (validate causal reasoning consistency):
+2. **Test convergence** (validate causal reasoning consistency):
    ```bash
    # Run a template 3 times and compute convergence score
-   python run_all_mechanism_tests.py --convergence-e2e --template convergence_test_simple --convergence-runs 3
+   python run_all_mechanism_tests.py --convergence-e2e --template convergence/simple --convergence-runs 3
    ```
 
    This measures how consistently the simulation produces the same causal structures across runs. Grades: A (>=90%), B (>=80%), C (>=70%), D (>=50%), F (<50%).
+
+3. **Explore templates by mechanism**:
+   ```bash
+   # See which templates test which mechanisms
+   ./run.sh --list
+
+   # Run all templates that test M7 (causal chains)
+   ./run.sh --mechanism M7
+   ```
 
 ## Troubleshooting
 
@@ -187,9 +216,6 @@ After generating a simulation:
 **"Illegal header value" with embedded newlines**
 → Your API key has line breaks. Ensure it's on a single line in `.env` with no line breaks
 → When exporting manually, use one line: `export OPENROUTER_API_KEY="your_key_here"`
-
-**"EOFError: EOF when reading a line"**
-→ Script is waiting for confirmation prompt. Use `echo "y" | python demo_orchestrator.py ...`
 
 **"ModuleNotFoundError: No module named 'msgspec'"**
 → Install missing dependency: `uv pip install msgspec`
@@ -201,47 +227,26 @@ After generating a simulation:
 → API key invalid or not loaded. Verify key in `.env` and export environment variables
 
 **Simulation takes too long**
-→ Reduce `--entities` and `--timepoints`
+→ Use `--skip-summaries` flag or choose a quick-tier template
 
 **Costs too high**
-→ Use `--dry-run` for testing, or reduce complexity
+→ Use `--free` for testing, or use quick-tier templates
 
 ## Example Output
 
 ```
-📋 Scene: Emergency Board Meeting - TechCorp Crisis
-
-   1. sarah_chen
-      Role: CEO
-      Resolution: dialog
-      Knowledge: 8 items
-         Sample: Company has 6 weeks of runway remaining due to burn rate...
-      Personality: optimistic, visionary, determined
-
-   2. michael_rodriguez
-      Role: CFO
-      Knowledge: 12 items
-         Sample: Q3 revenue projections missed by 40%, cash reserves critical...
-      Personality: analytical, risk-averse, pragmatic
-
-⏱️  Timepoints: 3
-
-   1. crisis_discovery
-      Event: CFO discovers company has 6 weeks of runway left
-      Entities: 4
-      Caused by: None (root)
-
-   2. emergency_meeting
-      Event: Board convenes to discuss options
-      Entities: 4
-      Caused by: crisis_discovery
-
-🔗 Relationships: 6
-   sarah_chen --[reports_to]--> james_thompson
-   michael_rodriguez --[conflicts_with]--> lisa_park
-
-💰 Cost: $0.12
-   Time: 87.3s
+================================================================================
+TEMPLATE CATALOG
+================================================================================
+ID                                       TIER         CATEGORY     MECHANISMS
+--------------------------------------------------------------------------------
+core/m01_heterogeneous_fidelity          quick        core         M1
+core/m07_causal_chains                   quick        core         M7
+showcase/board_meeting                   standard     showcase     M1, M7, M11 +1
+portal/startup_unicorn                   comprehensive portal      M17, M13, M7 +1
+stress/constitutional_convention_day1    stress       stress       M1, M2, M3 +7
+--------------------------------------------------------------------------------
+Total: 40 templates
 ```
 
 ---
@@ -249,5 +254,10 @@ After generating a simulation:
 **Ready to try?**
 
 ```bash
-python examples/demo_orchestrator.py --event "your natural language prompt here"
+# Natural language
+python run_all_mechanism_tests.py --nl "your natural language prompt here"
+
+# Or pick a template
+./run.sh --list
+./run.sh --template board_meeting
 ```
