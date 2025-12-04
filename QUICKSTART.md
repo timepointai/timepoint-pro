@@ -182,6 +182,46 @@ python run_all_mechanism_tests.py --help
 - "Founders fight over whether to take VC money or bootstrap, relationship at breaking point"
 - "Business decision" (too vague)
 
+## Tensor Persistence API
+
+Tensors can be stored, searched, and composed via the REST API:
+
+```bash
+# Start the API server
+uvicorn api.main:app --reload
+
+# Create a tensor (requires API key)
+curl -X POST http://localhost:8000/tensors \
+  -H "X-API-Key: your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "entity_id": "ceo_alice",
+    "category": "character",
+    "description": "CEO with analytical mindset",
+    "values": {
+      "context": [0.1, 0.2, ...],  # 100 dimensions
+      "biology": [0.3, 0.4, ...],  # 124 dimensions
+      "behavior": [0.5, 0.6, ...]  # 100 dimensions
+    }
+  }'
+
+# Search tensors semantically
+curl -X POST http://localhost:8000/search \
+  -H "X-API-Key: your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "analytical leadership style", "n_results": 5}'
+
+# Compose multiple tensors
+curl -X POST http://localhost:8000/search/compose \
+  -H "X-API-Key: your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{"tensor_ids": ["tensor_1", "tensor_2"], "method": "weighted_blend"}'
+```
+
+See `api/` directory for full endpoint documentation.
+
+---
+
 ## Next Steps
 
 After generating a simulation:
