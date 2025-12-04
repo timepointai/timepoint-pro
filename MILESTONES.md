@@ -62,11 +62,22 @@ Current Architecture:
 
 ### Not Yet Implemented
 
-- REST API
 - External integrations (prediction markets, webhooks)
 - Containerization / distributed deployment
 - Advanced dashboard visualizations
 - Distributed execution (1000+ concurrent workers)
+
+### Tensor Persistence System (NEW - December 2025)
+
+| Phase | Component | Status | Tests |
+|-------|-----------|--------|-------|
+| 1 | SQLite tensor CRUD + versioning | **COMPLETE** | 26 |
+| 2 | Training history tracking | **COMPLETE** | 37 |
+| 3 | RAG semantic search + composition | **COMPLETE** | 28 |
+| 4 | Parquet export, branching, conflicts | **COMPLETE** | 28 |
+| 5 | Permissions + audit logging | **COMPLETE** | 73 |
+| 6 | REST API (minimal) | **COMPLETE** | 49 |
+| **Total** | | | **260 tests** |
 
 ---
 
@@ -88,11 +99,17 @@ Before adding infrastructure, stabilize the core.
 - [ ] Config inheritance (base + scenario-specific)
 - [ ] Version tracking for configs
 
-### 1.3 Persistence
+### 1.3 Persistence ✅ SUBSTANTIALLY COMPLETE
+- [x] SQLite tensor database with full CRUD
+- [x] Version history and optimistic locking
+- [x] RAG-based semantic search
+- [x] Tensor composition (weighted blend, max pool, hierarchical)
+- [x] Parquet export for data versioning
+- [x] Permission system (private/shared/public)
+- [x] Access audit logging
+- [x] REST API with auth
 - [ ] PostgreSQL option for production
-- [ ] Schema documentation
-- [ ] Basic query interface (by date, by template, by cost)
-- [ ] Data export (JSONL for training data)
+- [ ] Schema documentation (partial - see PERSISTENCE-PLAN.md)
 
 ### 1.4 Deployment Basics
 - [ ] Dockerfile for single-container deployment
@@ -143,19 +160,29 @@ results = timepoint.run_batch(
 ---
 
 ## Phase 3: REST API
-**Target: Q3 2026**
+**Target: Q3 2026** | **Status: Partially Complete (Tensor API)**
 
 Programmatic access for external systems.
 
-### 3.1 API Endpoints
+### 3.1 Tensor API Endpoints ✅ COMPLETE (December 2025)
+- [x] Tensor CRUD endpoints (POST/GET/PUT/DELETE /tensors)
+- [x] Semantic search endpoint (POST /search)
+- [x] Tensor composition endpoint (POST /search/compose)
+- [x] Find similar tensors (GET /search/similar/{id})
+- [x] Share/fork endpoints
+- [x] Health check endpoint
+- [x] OpenAPI spec generation (FastAPI auto-docs)
+
+### 3.2 Authentication & Access ✅ COMPLETE
+- [x] API key management (create, verify, revoke)
+- [x] Permission enforcement (private/shared/public)
+- [x] Access audit logging
+
+### 3.3 Simulation API (Remaining)
 - [ ] Run submission endpoint
 - [ ] Batch submission endpoint
 - [ ] Status and results endpoints
 - [ ] Query interface (GET runs with filters)
-- [ ] OpenAPI spec generation
-
-### 3.2 Authentication & Limits
-- [ ] API key management
 - [ ] Rate limiting
 - [ ] Usage quotas
 
@@ -389,20 +416,28 @@ Broad accessibility and ecosystem.
 | Parallel execution | **COMPLETE** | `--parallel N` in `run_all_mechanism_tests.py` |
 | Free model support | **COMPLETE** | `FreeModelSelector` in `llm.py`, `--free`/`--free-fast` flags |
 | Ctrl+C protection | **COMPLETE** | `GracefulInterruptHandler` in `run_all_mechanism_tests.py` |
+| Tensor persistence | **COMPLETE** | `tensor_persistence.py`, `tensor_rag.py`, `tensor_versioning.py` |
+| Permission system | **COMPLETE** | `access/permissions.py`, `access/audit.py` |
+| Tensor REST API | **COMPLETE** | `api/` module with FastAPI, 49 tests |
 
 ---
 
 ## Reality Check
 
-**Where we are:** Working research prototype with 18 novel mechanisms, intelligent model selection, and parallel execution.
+**Where we are:** Working research prototype with 18 novel mechanisms, intelligent model selection, parallel execution, and **complete tensor persistence system** (260 tests).
 
-**What works:** Single-run and parallel simulations with full temporal reasoning, automatic model selection, and free tier support.
+**What works:**
+- Single-run and parallel simulations with full temporal reasoning
+- Automatic model selection and free tier support
+- Tensor persistence with SQLite, versioning, RAG search
+- Permission system (private/shared/public) with audit logging
+- REST API for tensor CRUD, search, and composition
 
-**What's missing:** REST API, external integrations, containerization, distributed execution.
+**What's missing:** Simulation REST API, external integrations, containerization, distributed execution.
 
 **Timeline:** 2-3 years to full platform vision.
 
-**First step:** Complete Phase 1 (persistence basics, containerization) and Phase 3 (REST API).
+**First step:** Complete containerization and Simulation REST API endpoints.
 
 ---
 

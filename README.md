@@ -303,8 +303,15 @@ All models via OpenRouter, all open-source with commercial synthetic data rights
 - Quality-focused: `qwen/qwen3-235b-a22b:free`, `meta-llama/llama-3.3-70b-instruct:free`
 - Speed-focused: `google/gemini-2.0-flash-exp:free` (1M context!)
 
+**Tensor Persistence System (Phases 1-6):**
+- Phase 1: SQLite tensor database with CRUD, versioning, maturity queries
+- Phase 2: Training history tracking
+- Phase 3: RAG-based semantic search and tensor composition
+- Phase 4: Parquet export, branching, conflict resolution
+- Phase 5: Permission system (private/shared/public), audit logging
+- Phase 6: REST API (minimal - CRUD, search, composition endpoints)
+
 **Not yet implemented:**
-- REST API
 - External integrations (prediction markets, webhooks)
 - Containerization / distributed deployment
 
@@ -332,6 +339,19 @@ All models via OpenRouter, all open-source with commercial synthetic data rights
 │  └─────────────────────────────┬─────────────────────────┘  │
 │                                │                            │
 │  ┌─────────────────────────────▼─────────────────────────┐  │
+│  │              Tensor Persistence Layer                  │  │
+│  │  ┌──────────────┐  ┌─────────────┐  ┌──────────────┐   │  │
+│  │  │tensor_persist│  │ tensor_rag  │  │access/perms  │   │  │
+│  │  │(CRUD+version)│  │(search+comp)│  │(ACL+audit)   │   │  │
+│  │  └──────────────┘  └─────────────┘  └──────────────┘   │  │
+│  └─────────────────────────────┬─────────────────────────┘  │
+│                                │                            │
+│  ┌─────────────────────────────▼─────────────────────────┐  │
+│  │                    api/ (REST)                        │  │
+│  │              FastAPI endpoints + auth                 │  │
+│  └───────────────────────────────────────────────────────┘  │
+│                                │                            │
+│  ┌─────────────────────────────▼─────────────────────────┐  │
 │  │                    storage.py                         │  │
 │  │              (SQLite persistence)                     │  │
 │  └───────────────────────────────────────────────────────┘  │
@@ -354,6 +374,15 @@ All models via OpenRouter, all open-source with commercial synthetic data rights
 - `validation.py` (1,365 lines): 5 physics-inspired validators
 - `storage.py` (632 lines): SQLite persistence layer with transaction support
 - `generation/templates/`: 40 JSON simulation templates organized by category (core, showcase, portal, stress, convergence)
+
+**Tensor Persistence modules (260 tests):**
+- `tensor_persistence.py`: SQLite-backed tensor CRUD with versioning
+- `tensor_serialization.py`: Tensor serialization/deserialization
+- `tensor_rag.py`: Semantic search and tensor composition
+- `tensor_versioning.py`: Parquet export, branching, conflict resolution
+- `access/permissions.py`: Permission enforcement (private/shared/public)
+- `access/audit.py`: Access audit logging and analytics
+- `api/`: FastAPI REST endpoints with API key auth
 
 ---
 
