@@ -48,6 +48,10 @@ class TensorRecord:
     version: int = 1
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    # Phase 3: Retrieval fields
+    description: Optional[str] = None  # Natural language description for RAG
+    category: Optional[str] = None     # Category path (e.g., "profession/detective")
+    embedding_blob: Optional[bytes] = None  # Cached embedding for search
 
     def __post_init__(self):
         now = datetime.utcnow()
@@ -159,6 +163,29 @@ class TensorDatabase:
                 ON tensor_records(world_id)
             """)
 
+            # Phase 3: Add retrieval columns if missing (migration)
+            cursor = conn.execute("PRAGMA table_info(tensor_records)")
+            columns = {row[1] for row in cursor.fetchall()}
+
+            if "description" not in columns:
+                conn.execute(
+                    "ALTER TABLE tensor_records ADD COLUMN description TEXT"
+                )
+            if "category" not in columns:
+                conn.execute(
+                    "ALTER TABLE tensor_records ADD COLUMN category TEXT"
+                )
+            if "embedding_blob" not in columns:
+                conn.execute(
+                    "ALTER TABLE tensor_records ADD COLUMN embedding_blob BLOB"
+                )
+
+            # Index for category lookups
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_tensor_category
+                ON tensor_records(category)
+            """)
+
             # Version history table
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS tensor_versions (
@@ -239,7 +266,10 @@ class TensorDatabase:
                         maturity = ?,
                         training_cycles = ?,
                         version = ?,
-                        updated_at = ?
+                        updated_at = ?,
+                        description = ?,
+                        category = ?,
+                        embedding_blob = ?
                     WHERE tensor_id = ?
                 """, (
                     record.entity_id,
@@ -249,6 +279,9 @@ class TensorDatabase:
                     record.training_cycles,
                     new_version,
                     now,
+                    record.description,
+                    record.category,
+                    record.embedding_blob,
                     record.tensor_id,
                 ))
                 record.version = new_version
@@ -258,8 +291,9 @@ class TensorDatabase:
                 conn.execute("""
                     INSERT INTO tensor_records
                     (tensor_id, entity_id, world_id, tensor_blob, maturity,
-                     training_cycles, version, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     training_cycles, version, created_at, updated_at,
+                     description, category, embedding_blob)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     record.tensor_id,
                     record.entity_id,
@@ -270,6 +304,9 @@ class TensorDatabase:
                     record.version,
                     now,
                     now,
+                    record.description,
+                    record.category,
+                    record.embedding_blob,
                 ))
 
             # Always create version entry
@@ -315,6 +352,9 @@ class TensorDatabase:
                 version=row["version"],
                 created_at=datetime.fromisoformat(row["created_at"]),
                 updated_at=datetime.fromisoformat(row["updated_at"]),
+                description=row["description"] if "description" in row.keys() else None,
+                category=row["category"] if "category" in row.keys() else None,
+                embedding_blob=row["embedding_blob"] if "embedding_blob" in row.keys() else None,
             )
 
     def delete_tensor(self, tensor_id: str) -> bool:
