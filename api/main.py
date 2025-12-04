@@ -21,13 +21,20 @@ from typing import Optional
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from .models import HealthResponse, ErrorResponse
-from .routes import tensors_router, search_router
+from .routes import tensors_router, search_router, simulations_router
 from .deps import (
     get_settings,
     get_tensor_db,
     cleanup_dependencies,
+)
+from .middleware.rate_limit import (
+    get_limiter,
+    rate_limit_exceeded_handler,
+    get_rate_limit_config,
 )
 
 
@@ -44,9 +51,11 @@ async def lifespan(app: FastAPI):
     """
     # Startup
     settings = get_settings()
+    rate_limit_config = get_rate_limit_config()
     print(f"Starting Tensor API v{settings.api_version}")
     print(f"Database: {settings.db_path}")
     print(f"RAG enabled: {settings.enable_rag}")
+    print(f"Rate limiting: {'enabled' if rate_limit_config.enabled else 'disabled'}")
 
     # Initialize database
     try:
@@ -117,9 +126,17 @@ All endpoints require an API key in the `X-API-Key` header.
         allow_headers=["*"],
     )
 
+    # Add rate limiter to app state
+    limiter = get_limiter()
+    application.state.limiter = limiter
+
+    # Add rate limit exception handler
+    application.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+
     # Include routers
     application.include_router(tensors_router)
     application.include_router(search_router)
+    application.include_router(simulations_router)
 
     # Add exception handlers
     @application.exception_handler(HTTPException)
@@ -170,12 +187,15 @@ All endpoints require an API key in the `X-API-Key` header.
             db_status = f"unhealthy: {str(e)}"
             tensor_count = 0
 
+        rate_config = get_rate_limit_config()
+
         return HealthResponse(
             status="healthy" if db_status == "healthy" else "degraded",
             version=settings.api_version,
             timestamp=datetime.utcnow(),
             database=db_status,
             tensor_count=tensor_count,
+            rate_limiting=rate_config.enabled,
         )
 
     return application

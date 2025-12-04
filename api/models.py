@@ -308,6 +308,7 @@ class HealthResponse(BaseModel):
     timestamp: datetime = Field(..., description="Response timestamp")
     database: str = Field(..., description="Database status")
     tensor_count: int = Field(..., description="Total tensor count")
+    rate_limiting: bool = Field(default=True, description="Rate limiting enabled")
 
 
 class ErrorResponse(BaseModel):
