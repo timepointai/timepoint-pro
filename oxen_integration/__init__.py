@@ -45,6 +45,31 @@ from .evaluation import (
     EvaluationExample,
 )
 
+# Phase 4: Tensor versioning (optional - requires pyarrow)
+try:
+    from .parquet_schemas import (
+        get_template_schema,
+        get_instance_schema,
+        tensor_record_to_parquet_row,
+        parquet_row_to_tensor_record,
+        write_templates_parquet,
+        write_instances_parquet,
+        read_templates_parquet,
+        read_instances_parquet,
+    )
+    from .tensor_versioning import (
+        TensorVersionController,
+        SyncResult,
+        FetchResult,
+    )
+    from .sync import (
+        TensorSyncManager,
+        SyncState,
+    )
+    TENSOR_VERSIONING_AVAILABLE = True
+except ImportError:
+    TENSOR_VERSIONING_AVAILABLE = False
+
 __all__ = [
     # Main client
     "OxenClient",
@@ -72,6 +97,13 @@ __all__ = [
     "TimepointEvaluator",
     "EvaluationResults",
     "EvaluationExample",
+    # Tensor versioning (Phase 4)
+    "TENSOR_VERSIONING_AVAILABLE",
+    "TensorVersionController",
+    "TensorSyncManager",
+    "SyncResult",
+    "FetchResult",
+    "SyncState",
 ]
 
 __version__ = "0.1.0"
