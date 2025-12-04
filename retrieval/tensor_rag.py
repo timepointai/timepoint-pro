@@ -5,12 +5,16 @@ Provides semantic search over stored tensors using embeddings,
 with composition and resolution capabilities.
 
 Phase 3: Retrieval System
+Phase 5: Optional permission filtering for access control
 """
 
 import numpy as np
 from dataclasses import dataclass
-from typing import List, Optional, Union
+from typing import List, Optional, Union, TYPE_CHECKING
 from pathlib import Path
+
+if TYPE_CHECKING:
+    from access.permissions import PermissionEnforcer
 
 from schemas import TTMTensor
 from tensor_persistence import TensorDatabase, TensorRecord
@@ -49,7 +53,8 @@ class TensorRAG:
         tensor_db: TensorDatabase,
         embedding_model: str = "all-MiniLM-L6-v2",
         embedding_dim: int = 384,
-        auto_build_index: bool = True
+        auto_build_index: bool = True,
+        permission_enforcer: Optional["PermissionEnforcer"] = None
     ):
         """
         Initialize TensorRAG.
@@ -59,10 +64,12 @@ class TensorRAG:
             embedding_model: Name of sentence-transformers model
             embedding_dim: Dimension of embeddings
             auto_build_index: Whether to build index from database on init
+            permission_enforcer: Optional PermissionEnforcer for access control (Phase 5)
         """
         self.tensor_db = tensor_db
         self.embedding_model_name = embedding_model
         self.embedding_dim = embedding_dim
+        self.permission_enforcer = permission_enforcer
 
         # Lazy load embedding model
         self._embedder = None
@@ -135,7 +142,8 @@ class TensorRAG:
         query: str,
         n_results: int = 10,
         min_maturity: float = 0.0,
-        categories: Optional[List[str]] = None
+        categories: Optional[List[str]] = None,
+        user_id: Optional[str] = None
     ) -> List[SearchResult]:
         """
         Search for tensors matching a query.
@@ -145,6 +153,9 @@ class TensorRAG:
             n_results: Maximum number of results
             min_maturity: Minimum maturity threshold
             categories: Optional list of categories to filter
+            user_id: Optional user ID for permission filtering (Phase 5).
+                     If provided with permission_enforcer, only returns
+                     tensors the user can read.
 
         Returns:
             List of SearchResults sorted by score descending
@@ -153,21 +164,26 @@ class TensorRAG:
             # Return all tensors if no query
             tensors = self.tensor_db.list_tensors()
             results = []
-            for record in tensors[:n_results]:
+            for record in tensors[:n_results * 3]:  # Get more for filtering
                 if record.maturity >= min_maturity:
                     if categories is None or (record.category and any(c in record.category for c in categories)):
+                        # Apply permission filter if enabled
+                        if not self._check_read_permission(record.tensor_id, user_id):
+                            continue
                         results.append(SearchResult(
                             tensor_id=record.tensor_id,
                             score=1.0,
                             tensor_record=record
                         ))
+                        if len(results) >= n_results:
+                            break
             return results
 
         # Generate query embedding
         query_embedding = self.generate_embedding(query)
 
         # Search index (get more than needed for filtering)
-        search_k = n_results * 3
+        search_k = n_results * 5 if user_id else n_results * 3
         raw_results = self.index.search(query_embedding, k=search_k)
 
         # Build results with filtering
@@ -189,6 +205,10 @@ class TensorRAG:
                 if not any(c in record.category for c in categories):
                     continue
 
+            # Apply permission filter if enabled (Phase 5)
+            if not self._check_read_permission(tensor_id, user_id):
+                continue
+
             results.append(SearchResult(
                 tensor_id=tensor_id,
                 score=max(0.0, min(1.0, score)),  # Clamp to [0, 1]
@@ -199,6 +219,32 @@ class TensorRAG:
                 break
 
         return results
+
+    def _check_read_permission(
+        self,
+        tensor_id: str,
+        user_id: Optional[str]
+    ) -> bool:
+        """
+        Check if user has read permission for tensor.
+
+        Returns True if:
+        - No permission_enforcer is configured (permissions disabled)
+        - No user_id provided (anonymous access, no filtering)
+        - User has read permission
+
+        Args:
+            tensor_id: Tensor to check
+            user_id: User requesting access
+
+        Returns:
+            True if access allowed
+        """
+        # If no enforcer or no user_id, allow all
+        if self.permission_enforcer is None or user_id is None:
+            return True
+
+        return self.permission_enforcer.can_read(user_id, tensor_id)
 
     def compose(
         self,
