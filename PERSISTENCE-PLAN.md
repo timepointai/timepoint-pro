@@ -10,7 +10,7 @@ This document outlines a comprehensive plan for implementing granular tensor per
 4. **Oxen AI version control** for tensor lineage and branching
 5. **Access permissions** supporting future public API
 
-**Status**: Phases 1-6 COMPLETE. Minimal API implementation.
+**Status**: Phases 1-7 COMPLETE. Tensor resolution integrated into E2E workflow.
 
 ---
 
@@ -1245,6 +1245,36 @@ class PermissionEnforcer:
 - `tests/unit/test_api.py`
 - `tests/integration/test_api_integration.py`
 
+### Phase 7: E2E Workflow Integration (1-2 weeks) ✅ COMPLETE
+
+**Goal**: Integrate tensor resolution into actual simulation workflow
+
+- [x] Wire TensorRAG into `e2e_runner.py`
+- [x] Add `_resolve_existing_tensor()` method with resolution logic
+- [x] Update `_initialize_baseline_tensors()` to check database first
+- [x] Create archetype system using REAL tensor pipeline (16 archetypes: CEO, Detective, Doctor, etc.)
+- [x] Add resolution metrics tracking to run metadata (cache hit rate, etc.)
+- [x] Add database migration for tensor resolution columns
+- [x] Unit tests for tensor resolution (10 tests)
+- [x] Unit tests for archetype seeds (32 tests)
+- [x] Archetype generation script
+
+**IMPORTANT DESIGN NOTE**: Archetype tensors are generated through the REAL Timepoint tensor
+pipeline (baseline → LLM population → training), NOT hardcoded values. This ensures:
+- Archetypes are grounded in actual LLM reasoning about character traits
+- The same process is used for archetypes and real entities
+- Proper maturity tracking and validation
+
+**Files created/modified**:
+- `e2e_workflows/e2e_runner.py` (modified: tensor resolution integration)
+- `retrieval/archetype_seeds.py` (refactored: LLM-based generation, not hardcoded values)
+- `metadata/run_tracker.py` (modified: tensor resolution metrics)
+- `scripts/generate_archetypes.py` (new: CLI for archetype generation)
+- `tests/unit/test_tensor_resolution.py`
+- `tests/unit/test_archetype_seeds.py`
+
+**Total Tests**: 133 tensor-related unit tests passing
+
 ---
 
 ## Technical Specifications
@@ -1333,4 +1363,4 @@ The implementation is phased over approximately 4-5 months, with each phase buil
 
 *Document created: 2025-12-03*
 *Updated: 2025-12-04*
-*Status: Phases 1-6 COMPLETE (260 tests). Rate limiting and Simulation API in progress.*
+*Status: Phases 1-7 COMPLETE (133 tensor tests). Archetype system refactored to use real tensor pipeline.*
