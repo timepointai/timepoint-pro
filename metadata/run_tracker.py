@@ -126,6 +126,24 @@ class RunMetadata(BaseModel):
         description="Quality metric: output_quality / tokens_used"
     )
 
+    # Phase 7: Tensor Resolution Metrics
+    tensor_resolution_stats: Optional[str] = Field(
+        default=None,
+        description="JSON dict with tensor resolution statistics"
+    )
+    entities_resolved_from_cache: int = Field(
+        default=0,
+        description="Number of entities resolved from existing tensors"
+    )
+    entities_new_baseline: int = Field(
+        default=0,
+        description="Number of entities requiring new baseline tensors"
+    )
+    tensor_cache_hit_rate: Optional[float] = Field(
+        default=None,
+        description="Percentage of entities resolved from cache (0.0-1.0)"
+    )
+
     model_config = ConfigDict(use_enum_values=True)
 
 
@@ -278,6 +296,21 @@ class MetadataManager:
         for col_name, col_type in v2_columns.items():
             if col_name not in columns:
                 print(f"📝 Migrating database v1→v2: Adding '{col_name}' column...")
+                cursor.execute(f"ALTER TABLE runs ADD COLUMN {col_name} {col_type}")
+                conn.commit()
+                print(f"   ✓ {col_name} column added")
+
+        # Phase 7: Tensor Resolution Metrics columns
+        resolution_columns = {
+            'tensor_resolution_stats': "TEXT",
+            'entities_resolved_from_cache': "INTEGER DEFAULT 0",
+            'entities_new_baseline': "INTEGER DEFAULT 0",
+            'tensor_cache_hit_rate': "REAL"
+        }
+
+        for col_name, col_type in resolution_columns.items():
+            if col_name not in columns:
+                print(f"📝 Migrating database: Adding '{col_name}' column (Phase 7 tensor resolution)...")
                 cursor.execute(f"ALTER TABLE runs ADD COLUMN {col_name} {col_type}")
                 conn.commit()
                 print(f"   ✓ {col_name} column added")
@@ -442,7 +475,12 @@ class MetadataManager:
         fidelity_distribution: Optional[str] = None,
         actual_tokens_used: Optional[float] = None,
         token_budget_compliance: Optional[float] = None,
-        fidelity_efficiency_score: Optional[float] = None
+        fidelity_efficiency_score: Optional[float] = None,
+        # Phase 7: Tensor Resolution Metrics
+        tensor_resolution_stats: Optional[str] = None,
+        entities_resolved_from_cache: int = 0,
+        entities_new_baseline: int = 0,
+        tensor_cache_hit_rate: Optional[float] = None
     ) -> RunMetadata:
         """Complete a run and finalize metadata"""
         conn = sqlite3.connect(self.db_path)
@@ -479,7 +517,11 @@ class MetadataManager:
                 fidelity_distribution = ?,
                 actual_tokens_used = ?,
                 token_budget_compliance = ?,
-                fidelity_efficiency_score = ?
+                fidelity_efficiency_score = ?,
+                tensor_resolution_stats = ?,
+                entities_resolved_from_cache = ?,
+                entities_new_baseline = ?,
+                tensor_cache_hit_rate = ?
             WHERE run_id = ?
         """, (
             completed_at.isoformat(),
@@ -499,6 +541,10 @@ class MetadataManager:
             actual_tokens_used,
             token_budget_compliance,
             fidelity_efficiency_score,
+            tensor_resolution_stats,
+            entities_resolved_from_cache,
+            entities_new_baseline,
+            tensor_cache_hit_rate,
             run_id
         ))
 
@@ -608,7 +654,11 @@ class MetadataManager:
                     fidelity_distribution = ?,
                     actual_tokens_used = ?,
                     token_budget_compliance = ?,
-                    fidelity_efficiency_score = ?
+                    fidelity_efficiency_score = ?,
+                    tensor_resolution_stats = ?,
+                    entities_resolved_from_cache = ?,
+                    entities_new_baseline = ?,
+                    tensor_cache_hit_rate = ?
                 WHERE run_id = ?
             """, (
                 metadata.template_id,
@@ -637,6 +687,10 @@ class MetadataManager:
                 metadata.actual_tokens_used,
                 metadata.token_budget_compliance,
                 metadata.fidelity_efficiency_score,
+                metadata.tensor_resolution_stats,
+                metadata.entities_resolved_from_cache,
+                metadata.entities_new_baseline,
+                metadata.tensor_cache_hit_rate,
                 metadata.run_id
             ))
         else:
@@ -649,8 +703,10 @@ class MetadataManager:
                     oxen_repo_url, oxen_dataset_url, status, error_message,
                     summary, summary_generated_at, narrative_exports, narrative_export_generated_at,
                     fidelity_strategy_json, fidelity_distribution, actual_tokens_used,
-                    token_budget_compliance, fidelity_efficiency_score
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    token_budget_compliance, fidelity_efficiency_score,
+                    tensor_resolution_stats, entities_resolved_from_cache,
+                    entities_new_baseline, tensor_cache_hit_rate
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 metadata.run_id,
                 metadata.template_id,
@@ -678,7 +734,11 @@ class MetadataManager:
                 metadata.fidelity_distribution,
                 metadata.actual_tokens_used,
                 metadata.token_budget_compliance,
-                metadata.fidelity_efficiency_score
+                metadata.fidelity_efficiency_score,
+                metadata.tensor_resolution_stats,
+                metadata.entities_resolved_from_cache,
+                metadata.entities_new_baseline,
+                metadata.tensor_cache_hit_rate
             ))
 
         conn.commit()
@@ -699,7 +759,9 @@ class MetadataManager:
                 oxen_repo_url, oxen_dataset_url, status, error_message,
                 summary, summary_generated_at, narrative_exports, narrative_export_generated_at,
                 schema_version, fidelity_strategy_json, fidelity_distribution,
-                actual_tokens_used, token_budget_compliance, fidelity_efficiency_score
+                actual_tokens_used, token_budget_compliance, fidelity_efficiency_score,
+                tensor_resolution_stats, entities_resolved_from_cache,
+                entities_new_baseline, tensor_cache_hit_rate
             FROM runs WHERE run_id = ?
         """, (run_id,))
         row = cursor.fetchone()
@@ -755,6 +817,11 @@ class MetadataManager:
             actual_tokens_used=row['actual_tokens_used'],
             token_budget_compliance=row['token_budget_compliance'],
             fidelity_efficiency_score=row['fidelity_efficiency_score'],
+            # Phase 7: Tensor Resolution Metrics
+            tensor_resolution_stats=row['tensor_resolution_stats'],
+            entities_resolved_from_cache=row['entities_resolved_from_cache'] or 0,
+            entities_new_baseline=row['entities_new_baseline'] or 0,
+            tensor_cache_hit_rate=row['tensor_cache_hit_rate'],
             mechanisms_used=mechanisms_used
         )
 

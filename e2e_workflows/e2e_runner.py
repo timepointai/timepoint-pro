@@ -94,6 +94,9 @@ class FullE2EWorkflowRunner:
         # Phase 1 Tensor Persistence: Initialize dedicated tensor database
         self._tensor_db = None  # Lazy initialization
 
+        # Phase 7: TensorRAG for resolution (lazy initialization)
+        self._tensor_rag = None
+
     def _get_shared_store(self) -> GraphStore:
         """Get or create the shared store for convergence data persistence."""
         if self._shared_store is None:
@@ -116,6 +119,92 @@ class FullE2EWorkflowRunner:
             tensor_db_path = "metadata/tensors.db"
             self._tensor_db = TensorDatabase(tensor_db_path)
         return self._tensor_db
+
+    def _get_tensor_rag(self):
+        """
+        Get or create TensorRAG for tensor resolution.
+
+        Phase 7: Lazy initialization of TensorRAG for resolving existing tensors
+        before creating new ones. This enables tensor reuse across runs.
+        """
+        if self._tensor_rag is None:
+            from retrieval.tensor_rag import TensorRAG
+            tensor_db = self._get_tensor_db()
+            self._tensor_rag = TensorRAG(
+                tensor_db=tensor_db,
+                auto_build_index=True  # Build index from existing tensors
+            )
+        return self._tensor_rag
+
+    def _resolve_existing_tensor(
+        self,
+        entity: "Entity",
+        world_id: str,
+        scenario_context: str,
+        min_score: float = 0.75
+    ) -> Optional["TTMTensor"]:
+        """
+        Phase 7: Attempt to resolve an existing tensor for this entity.
+
+        Searches the tensor database for similar tensors that could be reused
+        or adapted for this entity. Returns None if no suitable match found.
+
+        Args:
+            entity: Entity to find tensor for
+            world_id: World/template identifier
+            scenario_context: Scenario description for context
+            min_score: Minimum similarity score for reuse (default 0.75)
+
+        Returns:
+            TTMTensor if suitable match found, None otherwise
+        """
+        try:
+            tensor_rag = self._get_tensor_rag()
+
+            # Check if we have any tensors indexed
+            if tensor_rag.index_size == 0:
+                return None
+
+            # Build entity description for search
+            entity_description = f"{entity.entity_id} ({entity.entity_type})"
+            if hasattr(entity, 'entity_metadata') and entity.entity_metadata:
+                role = entity.entity_metadata.get('role', '')
+                background = entity.entity_metadata.get('background', '')
+                if role:
+                    entity_description += f" - {role}"
+                if background:
+                    entity_description += f": {background}"
+
+            # Search for matching tensors
+            results = tensor_rag.search(
+                query=f"{entity_description} in {scenario_context}",
+                n_results=3,
+                min_maturity=0.3  # Allow less mature tensors for adaptation
+            )
+
+            if not results:
+                return None
+
+            # Check if best match meets threshold
+            best_match = results[0]
+            if best_match.score >= min_score:
+                print(f"    🔍 Found existing tensor: {best_match.tensor_id} (score: {best_match.score:.3f})")
+                from tensor_serialization import deserialize_tensor
+                return deserialize_tensor(best_match.tensor_record.tensor_blob)
+
+            # Check for composition opportunity (multiple weaker matches)
+            if len(results) >= 2:
+                composable = [r for r in results if r.score >= 0.4]
+                if len(composable) >= 2:
+                    # Compose from multiple similar tensors
+                    print(f"    🔀 Composing from {len(composable)} similar tensors")
+                    return tensor_rag.compose(composable[:3])
+
+            return None
+
+        except Exception as e:
+            print(f"    ⚠️  Tensor resolution failed: {e}")
+            return None
 
     def _persist_tensor_to_db(
         self,
@@ -686,25 +775,31 @@ class FullE2EWorkflowRunner:
         self, scene_result: Dict, run_id: str
     ) -> None:
         """
-        Step 2.5: Initialize baseline tensors (NEW - Phase 11 Architecture Pivot).
+        Step 2.5: Initialize baseline tensors (Phase 7 + Phase 11 Architecture Pivot).
 
-        This replaces prospection-based initialization with baseline + LLM-guided approach:
-        1. Create baseline tensors (instant, no LLM, no bias leakage)
-        2. Set maturity to 0.0
-        3. Mark for LLM-guided population during ANDOS training
+        Phase 7 Enhancement: First tries to resolve existing tensors from database
+        before falling back to baseline creation. This enables tensor reuse.
+
+        Flow:
+        1. Try to resolve existing tensor from TensorRAG (cache hit)
+        2. If no match, create baseline tensor (instant, no LLM, no bias leakage)
+        3. Set maturity appropriately (inherited or 0.0)
+        4. Mark for LLM-guided population during ANDOS training if needed
 
         Architectural improvements:
-        - OLD: Prospection was MANDATORY for initialization (mechanism theater)
-        - NEW: Baseline initialization is instant and deterministic
-        - M15 (Prospection) becomes truly OPTIONAL again
+        - Phase 7: Tensor resolution for reuse across runs
+        - Phase 11: Baseline initialization is instant and deterministic
+        - M15 (Prospection) becomes truly OPTIONAL
         - No indirect bias leakage through shared LLM context
-        - LLM-guided population happens DURING ANDOS training (per-entity isolation)
         """
         with self.logfire.span("step:baseline_tensor_init"):
             print("\nStep 2.5: Initializing baseline tensors...")
 
             entities = scene_result["entities"]
             store = scene_result["store"]
+            config = scene_result.get("config")
+            world_id = config.world_id if config else "unknown"
+            scenario_context = config.scenario_description if config else ""
 
             # Import baseline tensor creation
             from tensor_initialization import create_baseline_tensor, create_fallback_tensor
@@ -713,13 +808,31 @@ class FullE2EWorkflowRunner:
 
             entities_initialized = 0
             entities_failed = 0
+            entities_resolved = 0  # Phase 7: Track cache hits
 
             for entity in entities:
                 try:
-                    print(f"  Creating baseline tensor for {entity.entity_id}...")
+                    # Phase 7: First try to resolve existing tensor
+                    resolved_tensor = self._resolve_existing_tensor(
+                        entity=entity,
+                        world_id=world_id,
+                        scenario_context=scenario_context,
+                        min_score=0.75
+                    )
 
-                    # Create baseline tensor (instant, no LLM)
-                    tensor = create_baseline_tensor(entity)
+                    if resolved_tensor is not None:
+                        # Cache hit - use resolved tensor
+                        tensor = resolved_tensor
+                        entities_resolved += 1
+                        needs_population = False  # Already trained
+                        inherited_maturity = 0.5  # Assume moderate maturity from cache
+                        print(f"  ✓ {entity.entity_id}: resolved from cache (maturity: {inherited_maturity:.2f})")
+                    else:
+                        # Cache miss - create baseline tensor (instant, no LLM)
+                        print(f"  Creating baseline tensor for {entity.entity_id}...")
+                        tensor = create_baseline_tensor(entity)
+                        needs_population = True
+                        inherited_maturity = 0.0
 
                     # Serialize tensor to entity.tensor
                     entity.tensor = json.dumps({
@@ -728,23 +841,23 @@ class FullE2EWorkflowRunner:
                         "behavior_vector": base64.b64encode(tensor.behavior_vector).decode('utf-8')
                     })
 
-                    # Set maturity and training metadata
-                    entity.tensor_maturity = 0.0  # Baseline only, needs population + training
-                    entity.tensor_training_cycles = 0
-                    entity.entity_metadata["baseline_initialized"] = True
-                    entity.entity_metadata["needs_llm_population"] = True
-                    entity.entity_metadata["needs_training"] = True
+                    # Set maturity and training metadata based on resolution result
+                    entity.tensor_maturity = inherited_maturity
+                    entity.tensor_training_cycles = 0 if needs_population else 1
+                    entity.entity_metadata["baseline_initialized"] = not needs_population
+                    entity.entity_metadata["needs_llm_population"] = needs_population
+                    entity.entity_metadata["needs_training"] = needs_population
+                    entity.entity_metadata["tensor_resolved_from_cache"] = (resolved_tensor is not None)
 
-                    # Save entity with baseline tensor
+                    # Save entity with tensor
                     store.save_entity(entity)
 
                     # Phase 1 Tensor Persistence: Also persist to dedicated tensor database
-                    config = scene_result.get("config")
-                    world_id = config.world_id if config else "unknown"
                     self._persist_tensor_to_db(entity, world_id, run_id)
 
                     entities_initialized += 1
-                    print(f"  ✓ {entity.entity_id}: baseline tensor created (maturity: 0.0)")
+                    if needs_population:
+                        print(f"  ✓ {entity.entity_id}: baseline tensor created (maturity: {inherited_maturity:.2f})")
 
                 except Exception as e:
                     print(f"  ⚠️  Failed to create baseline for {entity.entity_id}: {e}")
@@ -762,11 +875,10 @@ class FullE2EWorkflowRunner:
                         entity.tensor_training_cycles = 0
                         entity.entity_metadata["baseline_initialized"] = False
                         entity.entity_metadata["fallback_tensor"] = True
+                        entity.entity_metadata["tensor_resolved_from_cache"] = False
                         store.save_entity(entity)
 
                         # Phase 1 Tensor Persistence: Persist fallback tensor too
-                        config = scene_result.get("config")
-                        world_id = config.world_id if config else "unknown"
                         self._persist_tensor_to_db(entity, world_id, run_id)
 
                         entities_initialized += 1
@@ -774,16 +886,22 @@ class FullE2EWorkflowRunner:
                     except Exception as fallback_err:
                         print(f"  ❌ Fatal: Even fallback failed for {entity.entity_id}: {fallback_err}")
 
-            print(f"✓ Initialized {entities_initialized} entities with baseline tensors")
+            print(f"✓ Initialized {entities_initialized} entities with tensors")
+            if entities_resolved > 0:
+                print(f"  🔍 Phase 7: {entities_resolved} tensors resolved from cache (reuse enabled)")
             if entities_failed > 0:
                 print(f"  ⚠️  {entities_failed} entities used fallback tensors")
-            print(f"  📝 Note: LLM-guided population happens during ANDOS training (Step 4)")
+            needs_pop_count = entities_initialized - entities_resolved
+            if needs_pop_count > 0:
+                print(f"  📝 {needs_pop_count} entities need LLM-guided population (Step 4)")
             print(f"  💾 Tensors persisted to dedicated database: metadata/tensors.db")
 
             self.logfire.info(
                 "Baseline tensor initialization complete",
                 entities_initialized=entities_initialized,
-                entities_failed=entities_failed
+                entities_resolved=entities_resolved,
+                entities_failed=entities_failed,
+                cache_hit_rate=entities_resolved / max(1, entities_initialized)
             )
 
     def _compute_andos_layers(
