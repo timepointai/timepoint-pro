@@ -70,29 +70,50 @@ Timepoint Daedalus Command Center
 USAGE:
     ./run.sh <command> [options]
     ./run.sh <shortcut>              (quick, standard, core, etc.)
+    ./run.sh <template>              (board_meeting, startup_unicorn, etc.)
 
 COMMANDS:
-    run       Execute simulations
-    list      List templates, runs, or stats
-    status    Show run status and results
-    export    Export run data
-    clean     Cleanup old data
-    api       API server operations
+    run         Execute simulations
+    list        List templates, runs, or stats
+    status      Show run status and results
+    export      Export run data
+    clean       Cleanup old data
+    api         API server operations
+    e2e         Full E2E testing modes
+    convergence Convergence analysis
 
-SHORTCUTS (run quick/standard/comprehensive/stress/core/showcase/portal/all):
-    ./run.sh quick                   Run all quick-tier templates
-    ./run.sh core                    Run all core mechanism tests
-    ./run.sh showcase                Run showcase templates
+PRESETS (run by tier or category):
+    ./run.sh quick                   Quick-tier templates (~$0.02-0.05 each)
+    ./run.sh standard                Standard-tier templates (~$0.05-0.20)
+    ./run.sh comprehensive           Comprehensive templates (~$0.20-1.00)
+    ./run.sh core                    All 18 mechanism tests (M1-M18)
+    ./run.sh showcase                10 production-ready scenarios
+    ./run.sh portal                  4 backward reasoning scenarios
+
+DIRECT TEMPLATES (41 total):
+    ./run.sh board_meeting           Showcase: Board meeting simulation
+    ./run.sh startup_unicorn         Portal: $1B valuation backward reasoning
+    ./run.sh m07_causal_chains       Core: Causal chain mechanism test
+    ./run.sh convergence_simple      Test: Convergence evaluation
+
+E2E TESTING:
+    ./run.sh e2e full                All templates (expensive!)
+    ./run.sh e2e portal-all          All portal testing modes
+    ./run.sh e2e convergence-e2e board_meeting  Run 3x + analyze
+
+FREE MODELS ($0 cost):
+    ./run.sh run --free board_meeting
+    ./run.sh run --free-fast quick
 
 QUICK EXAMPLES:
-    ./run.sh run board_meeting       Run single template
+    ./run.sh board_meeting           Run single template
     ./run.sh run --tier quick        Run by tier
     ./run.sh list                    List all templates
     ./run.sh status                  Show recent runs
-    ./run.sh export last             Export last run to markdown
+    ./run.sh convergence history     Show convergence results
 
 Run './run.sh <command> --help' for command-specific help.
-Run './run.sh help' for full documentation.
+Run './run.sh help' for full documentation with all 41 templates.
 EOF
 }
 
@@ -107,6 +128,7 @@ COMMANDS
 
 RUN - Execute Simulations
     ./run.sh run [TEMPLATE|PRESET] [OPTIONS]
+    ./run.sh <template_name>         (direct shortcut)
 
     Presets (shortcut: ./run.sh <preset>):
         quick           All quick-tier templates (~2-3 min each)
@@ -131,29 +153,73 @@ RUN - Execute Simulations
         --skip-summaries      Skip LLM summary generation (faster)
         --budget USD          Stop if cost exceeds budget
 
-    Persistence Options:
-        --persist             Enable tensor persistence (default)
-        --no-persist          Disable tensor persistence
-        --db PATH             Custom runs database path
-        --tensor-db PATH      Custom tensor database path
+    Free Model Options ($0 cost):
+        --free                Use best quality free model
+        --free-fast           Use fastest free model
+        --list-free-models    List available free models
 
-    Monitoring Options:
-        --monitor             Enable real-time LLM monitoring
-        --chat                Interactive chat during monitoring
-        --interval SECS       Monitor check interval (default: 300)
+    Model Override:
+        --model MODEL         Override LLM (e.g., deepseek/deepseek-chat)
+
+    Portal Testing Modes:
+        --portal-all                    All portal modes
+        --portal-test-only              Basic portal test
+        --portal-simjudged-quick        Quick simjudged portal
+        --portal-simjudged              Standard simjudged
+        --portal-simjudged-thorough     Thorough simjudged
+        --portal-timepoint-only         Portal timepoint test
+        --portal-timepoint-all          All portal timepoint modes
+
+    Timepoint Testing Modes:
+        --timepoint-forward             Forward temporal generation
+        --timepoint-all                 All timepoint modes
+
+    Convergence Options:
+        --convergence                   Run analysis after
+        --convergence-runs N            Number of runs
+        --convergence-e2e               Run N times + analyze
+
+    Natural Language:
+        --nl "PROMPT"                   Generate from prompt
+        --nl-entities N                 Entity count (default: 4)
+        --nl-timepoints N               Timepoint count (default: 3)
 
     API Mode Options:
-        --api                 Submit via REST API (tracks quotas)
+        --api                 Submit via REST API
         --api-url URL         API base URL
         --api-key KEY         API key
-        --api-batch-size N    Jobs per batch (default: 10)
+        --api-batch-size N    Jobs per batch
         --api-budget USD      API budget cap
-        --api-wait            Wait for API completion
+        --api-wait            Wait for completion
 
-    Output Options:
-        --quiet               Minimal output
-        --verbose             Detailed output
-        --export FORMAT       Auto-export on completion (md|json)
+E2E - Full E2E Testing
+    ./run.sh e2e <MODE> [OPTIONS]
+
+    Modes:
+        full              All templates (expensive!)
+        ultra-all         Maximum coverage
+        portal-all        All portal modes
+        timepoint-all     All timepoint modes
+        convergence-e2e   Run template N times + analyze
+
+    Options:
+        --runs N          Runs for convergence (default: 3)
+        --model MODEL     Override model
+        --parallel N      Concurrent tests
+        --verbose         Detailed output
+
+CONVERGENCE - Convergence Analysis
+    ./run.sh convergence <ACTION> [OPTIONS]
+
+    Actions:
+        analyze           Analyze recent runs (default)
+        e2e               Run N times + analyze
+        history           Show result history
+
+    Options:
+        --runs N          Runs to analyze (default: 3)
+        --template TPL    Filter by template
+        --verbose         Show divergence details
 
 LIST - Show Information
     ./run.sh list [WHAT] [OPTIONS]
@@ -173,94 +239,136 @@ LIST - Show Information
 STATUS - Show Run Status
     ./run.sh status [RUN_ID] [OPTIONS]
 
-    Options:
-        RUN_ID          Specific run ID (default: latest)
-        --watch         Live monitoring mode
-        --full          Show full details including entities
-
 EXPORT - Export Run Data
     ./run.sh export <RUN_ID|last> [OPTIONS]
-
-    Options:
-        --format FMT    Export format: md, json, parquet (default: md)
-        --output PATH   Output path (default: ./exports/)
-        --include-all   Include all artifacts
 
 CLEAN - Cleanup Data
     ./run.sh clean <WHAT> [OPTIONS]
 
-    What to clean:
-        runs            Old simulation runs
-        tensors         Orphaned tensor data
-        exports         Old export files
-        all             Everything (requires --confirm)
-
-    Options:
-        --older-than N  Only items older than N days
-        --dry-run       Show what would be deleted
-        --confirm       Required for destructive operations
-
 API - API Server Operations
     ./run.sh api <ACTION> [OPTIONS]
 
-    Actions:
-        start           Start API server (port 8080)
-        stop            Stop API server
-        usage           Show current quota usage
-        submit PRESET   Submit templates via API
+================================================================================
+ALL 41 TEMPLATES
+================================================================================
 
-TEMPLATE CATEGORIES (44 total)
-------------------------------
-    core (18)           Mechanism isolation tests (M1-M18)
-    showcase (10)       Production-ready scenarios
-    portal (4)          Backward reasoning scenarios
-    stress (6)          High-complexity stress tests
-    convergence (3)     Convergence evaluation tests
+CORE - Mechanism Isolation Tests (18)
+-------------------------------------
+  m01_heterogeneous_fidelity    M1: Different resolution levels in same scene
+  m02_progressive_training      M2: Entity quality improves through queries
+  m03_exposure_events           M3: Knowledge propagates with provenance
+  m04_physics_validation        M4: Info conservation, energy budget, inertia
+  m05_lazy_resolution           M5: Query-driven resolution elevation
+  m06_tensor_compression        M6: TTM tensor compression/reconstruction
+  m07_causal_chains             M7: Temporal ordering, causal parent validation
+  m08_embodied_states           M8: Physical state affects cognition
+  m09_on_demand_entities        M9: Missing entities auto-generated
+  m10_scene_atmosphere          M10: Environment influences behavior
+  m11_dialog_synthesis          M11: Multi-turn contextual conversation
+  m12_counterfactual            M12: Timeline branches at decision points
+  m13_relationships             M13: Trust/tension evolves over time
+  m14_circadian                 M14: Time-of-day affects behavior
+  m15_prospection               M15: Entity models future states
+  m16_animistic                 M16: Non-human entities have agency
+  m17_modal_causality           M17: PORTAL backward reasoning
+  m18_model_selection           M18: Action-appropriate LLM selection
 
+SHOWCASE - Production Scenarios (10)
+------------------------------------
+  board_meeting                 Tech startup board meeting (M1,M7,M11,M13)
+  jefferson_dinner              1790 Compromise Dinner (M3,M7,M11,M13)
+  hospital_crisis               ER night shift (M8,M14)
+  detective_prospection         Holmes models Moriarty (M15,M7)
+  kami_shrine                   Japanese shrine ritual (M16)
+  vc_pitch_pearl                Pre-seed pitch - pearl causality
+  vc_pitch_branching            Pre-seed pitch - counterfactual
+  vc_pitch_roadshow             Multi-meeting VC roadshow
+  vc_pitch_strategies           Multiple negotiation strategies
+  hound_shadow_directorial      Detective on foggy moors - directorial
+
+PORTAL - Backward Reasoning (4)
+-------------------------------
+  startup_unicorn               PORTAL: $1B valuation → founding
+  presidential_election         PORTAL: Election victory → candidacy
+  academic_tenure               PORTAL: Tenure → PhD start
+  startup_failure               PORTAL: Shutdown → founding
+
+STRESS - High Complexity (6)
+----------------------------
+  constitutional_convention_day1  28 entities, 500 timepoints ($500-1000)
+  scarlet_study_deep              101 timepoints, all 17 mechanisms ($50-100)
+  empty_house_flashback           81 timepoints nonlinear ($30-50)
+  final_problem_branching         61 timepoints, 4 branches ($25-40)
+  sign_loops_cyclical             Cyclical temporal patterns ($20-35)
+  tensor_resolution_hybrid        Tests all tensor resolution paths
+
+CONVERGENCE - Consistency Testing (3)
+-------------------------------------
+  convergence_simple              Ultra-lightweight (~$0.02)
+  convergence_standard            Moderate complexity (~$0.05)
+  convergence_comprehensive       Rich causal structure (~$0.10)
+
+================================================================================
 TEMPLATE TIERS
---------------
-    quick               Fast tests (~2-3 min, <$1 each)
-    standard            Moderate tests (~5-10 min, $1-3 each)
-    comprehensive       Thorough tests (~15-30 min, $5-10 each)
-    stress              Complex tests (~30-60 min, $10-20 each)
+================================================================================
+  quick          Fast tests (~30s-2min, <$0.05 each)
+  standard       Moderate tests (~2-5 min, $0.05-0.20)
+  comprehensive  Thorough tests (~5-15 min, $0.20-1.00)
+  stress         Complex tests (~15-60+ min, $20-1000)
 
+================================================================================
 EXAMPLES
---------
-    # Quick start
-    ./run.sh quick                          # Run quick tier
-    ./run.sh run board_meeting              # Single template
+================================================================================
 
-    # Filtered runs
-    ./run.sh run --tier quick --parallel 4  # Quick tier, 4 parallel
-    ./run.sh run --category core            # All core tests
-    ./run.sh run --mechanism M1,M7,M11      # Specific mechanisms
+# Direct template execution
+./run.sh board_meeting                    # Showcase template
+./run.sh startup_unicorn                  # Portal template
+./run.sh m07_causal_chains                # Core mechanism test
 
-    # With monitoring
-    ./run.sh run --monitor quick            # Real-time analysis
-    ./run.sh run --monitor --chat board_meeting
+# By tier/category
+./run.sh quick                            # All quick-tier
+./run.sh run --tier quick --parallel 4    # Quick with parallelism
+./run.sh run --category core              # All 18 mechanism tests
 
-    # Cost control
-    ./run.sh run --dry-run comprehensive    # See cost estimate
-    ./run.sh run --budget 5.00 standard     # Stop at $5
+# Free models ($0 cost)
+./run.sh run --free board_meeting         # Best free model
+./run.sh run --free-fast quick            # Fastest free model
 
-    # Via API
-    ./run.sh api usage                      # Check quotas
-    ./run.sh run --api quick                # Submit to API
+# Model override
+./run.sh run --model deepseek/deepseek-chat board_meeting
 
-    # Results
-    ./run.sh status                         # Latest run
-    ./run.sh export last --format json      # Export results
-    ./run.sh list runs --limit 10           # Recent runs
+# Portal testing
+./run.sh run --portal-all                 # All portal modes
+./run.sh run --portal-simjudged-thorough  # Thorough portal
 
+# Convergence testing
+./run.sh convergence e2e board_meeting    # Run 3x + analyze
+./run.sh convergence e2e --runs 5 convergence_simple
+./run.sh convergence history              # Show results
+
+# E2E testing
+./run.sh e2e full                         # All templates
+./run.sh e2e portal-all                   # All portal modes
+./run.sh e2e convergence-e2e --runs 3 --template board_meeting
+
+# Natural language
+./run.sh run --nl "Simulate a startup board meeting about pivoting"
+
+# API mode
+./run.sh api start                        # Start server
+./run.sh run --api board_meeting          # Submit via API
+./run.sh api usage                        # Check quotas
+
+================================================================================
 ENVIRONMENT
------------
-    Required in .env:
-        OPENROUTER_API_KEY    For LLM API access
-        OXEN_API_KEY          For dataset uploads
+================================================================================
+Required in .env:
+    OPENROUTER_API_KEY    For LLM API access
+    OXEN_API_KEY          For dataset uploads
 
-    Optional:
-        TIMEPOINT_API_KEY     For API mode
-        TIMEPOINT_API_URL     API server URL
+Optional:
+    TIMEPOINT_API_KEY     For API mode
+    TIMEPOINT_API_URL     API server URL
 
 ================================================================================
 EOF
@@ -296,6 +404,31 @@ cmd_run() {
     local quiet=false
     local verbose=false
     local auto_export=""
+    # Portal testing modes
+    local portal_test_only=false
+    local portal_all=false
+    local portal_simjudged_quick=false
+    local portal_simjudged=false
+    local portal_simjudged_thorough=false
+    local portal_timepoint_only=false
+    local portal_timepoint_all=false
+    # Timepoint testing modes
+    local timepoint_forward=false
+    local timepoint_all=false
+    # Free model options
+    local free_mode=false
+    local free_fast=false
+    local list_free=false
+    # Model override
+    local model_override=""
+    # Convergence options
+    local convergence=false
+    local convergence_runs=""
+    local convergence_e2e=false
+    # Natural language
+    local nl_prompt=""
+    local nl_entities=""
+    local nl_timepoints=""
 
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -323,6 +456,31 @@ cmd_run() {
             --quiet) quiet=true; shift ;;
             --verbose) verbose=true; shift ;;
             --export) auto_export="$2"; shift 2 ;;
+            # Portal testing modes
+            --portal-test-only) portal_test_only=true; shift ;;
+            --portal-all) portal_all=true; shift ;;
+            --portal-simjudged-quick|--portal-simjudged-quick-only) portal_simjudged_quick=true; shift ;;
+            --portal-simjudged|--portal-simjudged-only) portal_simjudged=true; shift ;;
+            --portal-simjudged-thorough|--portal-simjudged-thorough-only) portal_simjudged_thorough=true; shift ;;
+            --portal-timepoint-only) portal_timepoint_only=true; shift ;;
+            --portal-timepoint-all) portal_timepoint_all=true; shift ;;
+            # Timepoint testing modes
+            --timepoint-forward) timepoint_forward=true; shift ;;
+            --timepoint-all) timepoint_all=true; shift ;;
+            # Free model options
+            --free) free_mode=true; shift ;;
+            --free-fast) free_fast=true; shift ;;
+            --list-free-models) list_free=true; shift ;;
+            # Model override
+            --model) model_override="$2"; shift 2 ;;
+            # Convergence options
+            --convergence) convergence=true; shift ;;
+            --convergence-runs) convergence_runs="$2"; shift 2 ;;
+            --convergence-e2e) convergence_e2e=true; shift ;;
+            # Natural language
+            --nl) nl_prompt="$2"; shift 2 ;;
+            --nl-entities) nl_entities="$2"; shift 2 ;;
+            --nl-timepoints) nl_timepoints="$2"; shift 2 ;;
             quick|standard|comprehensive|stress|core|showcase|portal|convergence|all)
                 preset="$1"; shift ;;
             -*)
@@ -338,10 +496,59 @@ cmd_run() {
 
     check_env
 
+    # Handle special modes that exit early
+    if [[ "$list_free" == "true" ]]; then
+        print_header "Available Free Models"
+        $PYTHON run_all_mechanism_tests.py --list-free-models
+        exit 0
+    fi
+
     # Build python command arguments
     local py_args=()
 
-    if [[ -n "$template" ]]; then
+    # Natural language mode
+    if [[ -n "$nl_prompt" ]]; then
+        py_args+=(--nl "$nl_prompt")
+        [[ -n "$nl_entities" ]] && py_args+=(--nl-entities "$nl_entities")
+        [[ -n "$nl_timepoints" ]] && py_args+=(--nl-timepoints "$nl_timepoints")
+        print_header "Natural Language Simulation"
+        print_info "Prompt: $nl_prompt"
+    # Portal testing modes
+    elif [[ "$portal_all" == "true" ]]; then
+        py_args+=(--portal-all)
+        print_header "Running All Portal Modes"
+    elif [[ "$portal_test_only" == "true" ]]; then
+        py_args+=(--portal-test-only)
+        print_header "Running Portal Test Only"
+    elif [[ "$portal_simjudged_quick" == "true" ]]; then
+        py_args+=(--portal-simjudged-quick-only)
+        print_header "Running Portal SimJudged Quick"
+    elif [[ "$portal_simjudged" == "true" ]]; then
+        py_args+=(--portal-simjudged-only)
+        print_header "Running Portal SimJudged"
+    elif [[ "$portal_simjudged_thorough" == "true" ]]; then
+        py_args+=(--portal-simjudged-thorough-only)
+        print_header "Running Portal SimJudged Thorough"
+    elif [[ "$portal_timepoint_only" == "true" ]]; then
+        py_args+=(--portal-timepoint-only)
+        print_header "Running Portal Timepoint Only"
+    elif [[ "$portal_timepoint_all" == "true" ]]; then
+        py_args+=(--portal-timepoint-all)
+        print_header "Running Portal Timepoint All"
+    # Timepoint testing modes
+    elif [[ "$timepoint_forward" == "true" ]]; then
+        py_args+=(--timepoint-forward)
+        print_header "Running Timepoint Forward"
+    elif [[ "$timepoint_all" == "true" ]]; then
+        py_args+=(--timepoint-all)
+        print_header "Running All Timepoint Modes"
+    # Convergence E2E
+    elif [[ "$convergence_e2e" == "true" ]]; then
+        py_args+=(--convergence-e2e)
+        [[ -n "$convergence_runs" ]] && py_args+=(--convergence-runs "$convergence_runs")
+        print_header "Running Convergence E2E Test"
+    # Standard template/preset selection
+    elif [[ -n "$template" ]]; then
         py_args+=(--template "$template")
     elif [[ -n "$preset" ]]; then
         case "$preset" in
@@ -356,6 +563,17 @@ cmd_run() {
     [[ -n "$mechanism" ]] && py_args+=(--mechanism "$mechanism")
     [[ -n "$parallel" ]] && py_args+=(--parallel "$parallel")
     [[ "$skip_summaries" == "true" ]] && py_args+=(--skip-summaries)
+
+    # Free model options
+    [[ "$free_mode" == "true" ]] && py_args+=(--free)
+    [[ "$free_fast" == "true" ]] && py_args+=(--free-fast)
+
+    # Model override
+    [[ -n "$model_override" ]] && py_args+=(--model "$model_override")
+
+    # Convergence (post-run analysis)
+    [[ "$convergence" == "true" ]] && py_args+=(--convergence)
+    [[ -n "$convergence_runs" ]] && py_args+=(--convergence-runs "$convergence_runs")
 
     # API mode
     if [[ "$api_mode" == "true" ]]; then
@@ -415,27 +633,88 @@ run - Execute simulations
 USAGE:
     ./run.sh run [TEMPLATE|PRESET] [OPTIONS]
     ./run.sh <PRESET>                    (shortcut)
+    ./run.sh <template_name>             (direct template)
 
 PRESETS:
     quick, standard, comprehensive, stress
     core, showcase, portal, convergence, all
 
-OPTIONS:
+SELECTION OPTIONS:
     --tier TIER           Filter by tier
     --category CAT        Filter by category
     --mechanism M1,M2     Filter by mechanisms
+    --template TPL        Run specific template
+
+EXECUTION OPTIONS:
     --parallel N          Concurrent templates
     --dry-run             Cost estimate only
     --skip-summaries      Skip LLM summaries
     --budget USD          Spending limit
     --monitor             Real-time monitoring
-    --api                 Submit via API
+
+FREE MODEL OPTIONS ($0 cost):
+    --free                Use best quality free model
+    --free-fast           Use fastest free model
+    --list-free-models    Show available free models
+
+MODEL OPTIONS:
+    --model MODEL         Override LLM model for all calls
+                          Examples: deepseek/deepseek-chat
+                                    meta-llama/llama-3.1-70b-instruct
+
+PORTAL TESTING MODES:
+    --portal-all                    All portal testing modes
+    --portal-test-only              Basic portal test
+    --portal-simjudged-quick        Quick simjudged portal
+    --portal-simjudged              Standard simjudged portal
+    --portal-simjudged-thorough     Thorough simjudged portal
+    --portal-timepoint-only         Portal timepoint test
+    --portal-timepoint-all          All portal timepoint modes
+
+TIMEPOINT TESTING MODES:
+    --timepoint-forward             Forward temporal generation
+    --timepoint-all                 All timepoint modes
+
+CONVERGENCE OPTIONS:
+    --convergence                   Run convergence analysis after
+    --convergence-runs N            Number of runs for analysis
+    --convergence-e2e               Run template N times + analyze
+
+NATURAL LANGUAGE:
+    --nl "PROMPT"                   Natural language simulation
+    --nl-entities N                 Number of entities (default: 4)
+    --nl-timepoints N               Number of timepoints (default: 3)
+
+API MODE OPTIONS:
+    --api                 Submit via REST API
+    --api-url URL         API base URL
+    --api-key KEY         API key
+    --api-batch-size N    Jobs per batch
+    --api-budget USD      API budget cap
+    --api-wait            Wait for completion
 
 EXAMPLES:
+    # Basic usage
     ./run.sh run board_meeting
     ./run.sh run --tier quick --parallel 4
     ./run.sh quick
-    ./run.sh run --dry-run comprehensive
+
+    # Free models ($0 cost)
+    ./run.sh run --free board_meeting
+    ./run.sh run --free-fast --parallel 4 quick
+
+    # Portal testing
+    ./run.sh run --portal-all
+    ./run.sh run --portal-simjudged-thorough
+
+    # Convergence testing
+    ./run.sh run --convergence-e2e --convergence-runs 3 board_meeting
+
+    # Natural language
+    ./run.sh run --nl "Simulate a startup board meeting about pivoting"
+
+    # Model override
+    ./run.sh run --model deepseek/deepseek-chat board_meeting
 EOF
 }
 
@@ -789,6 +1068,244 @@ EOF
 }
 
 # ============================================================================
+# COMMAND: E2E (Full E2E Workflow Testing)
+# ============================================================================
+
+cmd_e2e() {
+    local mode=""
+    local runs=3
+    local model=""
+    local verbose=false
+    local template=""
+    local parallel=""
+    local skip_summaries=false
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -h|--help) show_e2e_help; exit 0 ;;
+            --runs) runs="$2"; shift 2 ;;
+            --model) model="$2"; shift 2 ;;
+            --verbose) verbose=true; shift ;;
+            --template) template="$2"; shift 2 ;;
+            --parallel) parallel="$2"; shift 2 ;;
+            --skip-summaries) skip_summaries=true; shift ;;
+            full|ultra-all|portal-all|timepoint-all|convergence-e2e)
+                mode="$1"; shift ;;
+            -*)
+                print_error "Unknown option: $1"
+                exit 1 ;;
+            *)
+                if [[ -z "$template" ]]; then
+                    template="$1"
+                fi
+                shift ;;
+        esac
+    done
+
+    check_env
+
+    if [[ -z "$mode" ]]; then
+        print_error "E2E mode required"
+        show_e2e_help
+        exit 1
+    fi
+
+    local py_args=()
+
+    case "$mode" in
+        full)
+            py_args+=(--full)
+            print_header "Running FULL E2E Test Suite"
+            print_warning "This runs ALL templates - expensive!"
+            ;;
+        ultra-all)
+            py_args+=(--ultra-all)
+            print_header "Running ULTRA-ALL E2E Test Suite"
+            print_warning "Maximum coverage - very expensive!"
+            ;;
+        portal-all)
+            py_args+=(--portal-all)
+            print_header "Running All Portal Modes"
+            ;;
+        timepoint-all)
+            py_args+=(--timepoint-all)
+            print_header "Running All Timepoint Modes"
+            ;;
+        convergence-e2e)
+            py_args+=(--convergence-e2e)
+            py_args+=(--convergence-runs "$runs")
+            if [[ -n "$template" ]]; then
+                py_args+=(--template "$template")
+            fi
+            print_header "Running Convergence E2E Test"
+            print_info "Running template $runs times + convergence analysis"
+            ;;
+    esac
+
+    [[ -n "$model" ]] && py_args+=(--model "$model")
+    [[ -n "$parallel" ]] && py_args+=(--parallel "$parallel")
+    [[ "$skip_summaries" == "true" ]] && py_args+=(--skip-summaries)
+    [[ "$verbose" == "true" ]] && py_args+=(--convergence-verbose)
+
+    print_info "Command: $PYTHON run_all_mechanism_tests.py ${py_args[*]}"
+    $PYTHON run_all_mechanism_tests.py "${py_args[@]}"
+}
+
+show_e2e_help() {
+    cat << 'EOF'
+e2e - Full E2E Workflow Testing
+
+USAGE:
+    ./run.sh e2e <MODE> [OPTIONS]
+
+MODES:
+    full              Run ALL templates (expensive!)
+    ultra-all         Maximum coverage - all tests + all portal modes
+    portal-all        All portal testing modes
+    timepoint-all     All timepoint testing modes
+    convergence-e2e   Run template N times + convergence analysis
+
+OPTIONS:
+    --runs N          Number of runs for convergence (default: 3)
+    --model MODEL     Override LLM model for all tests
+    --template TPL    Template for convergence-e2e mode
+    --parallel N      Concurrent templates
+    --skip-summaries  Skip LLM summary generation
+    --verbose         Show detailed convergence divergence points
+
+EXAMPLES:
+    ./run.sh e2e full                           # All templates
+    ./run.sh e2e portal-all                     # All portal modes
+    ./run.sh e2e convergence-e2e board_meeting  # Run 3x + analyze
+    ./run.sh e2e convergence-e2e --runs 5 --template convergence_simple
+    ./run.sh e2e ultra-all --parallel 4         # Maximum test coverage
+
+COST ESTIMATES:
+    full:         $10-50 (depends on model)
+    ultra-all:    $50-200
+    portal-all:   $5-20
+    timepoint-all: $5-15
+    convergence-e2e: $0.15-3.00 per run × N runs
+EOF
+}
+
+# ============================================================================
+# COMMAND: CONVERGENCE (Convergence Analysis)
+# ============================================================================
+
+cmd_convergence() {
+    local action=""
+    local runs=3
+    local template=""
+    local verbose=false
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -h|--help) show_convergence_help; exit 0 ;;
+            --runs) runs="$2"; shift 2 ;;
+            --template) template="$2"; shift 2 ;;
+            --verbose) verbose=true; shift ;;
+            analyze|e2e|history)
+                action="$1"; shift ;;
+            -*)
+                print_error "Unknown option: $1"
+                exit 1 ;;
+            *)
+                if [[ -z "$template" ]]; then
+                    template="$1"
+                fi
+                shift ;;
+        esac
+    done
+
+    check_env
+
+    if [[ -z "$action" ]]; then
+        action="analyze"
+    fi
+
+    local py_args=()
+
+    case "$action" in
+        analyze)
+            py_args+=(--convergence-only)
+            py_args+=(--convergence-runs "$runs")
+            [[ -n "$template" ]] && py_args+=(--convergence-template "$template")
+            [[ "$verbose" == "true" ]] && py_args+=(--convergence-verbose)
+            print_header "Convergence Analysis"
+            print_info "Analyzing last $runs runs"
+            ;;
+        e2e)
+            py_args+=(--convergence-e2e)
+            py_args+=(--convergence-runs "$runs")
+            [[ -n "$template" ]] && py_args+=(--template "$template")
+            [[ "$verbose" == "true" ]] && py_args+=(--convergence-verbose)
+            print_header "Convergence E2E Test"
+            print_info "Running template $runs times + analysis"
+            ;;
+        history)
+            print_header "Convergence History"
+            $PYTHON -c "
+from storage import GraphStore
+store = GraphStore('sqlite:///metadata/runs.db')
+try:
+    from sqlmodel import Session, select
+    from schemas import ConvergenceSet
+    with Session(store.engine) as session:
+        sets = session.exec(select(ConvergenceSet).order_by(ConvergenceSet.created_at.desc()).limit(10)).all()
+        if not sets:
+            print('No convergence results found')
+        else:
+            print(f\"{'SET_ID':<20} {'TEMPLATE':<25} {'SCORE':<10} {'GRADE':<6}\")
+            print('-' * 65)
+            for s in sets:
+                print(f\"{s.set_id:<20} {(s.template_id or '-'):<25} {s.convergence_score:.1%:<10} {s.robustness_grade:<6}\")
+except Exception as e:
+    print(f'Error: {e}')
+"
+            return
+            ;;
+    esac
+
+    print_info "Command: $PYTHON run_all_mechanism_tests.py ${py_args[*]}"
+    $PYTHON run_all_mechanism_tests.py "${py_args[@]}"
+}
+
+show_convergence_help() {
+    cat << 'EOF'
+convergence - Convergence Analysis
+
+USAGE:
+    ./run.sh convergence <ACTION> [OPTIONS]
+
+ACTIONS:
+    analyze         Analyze recent runs (default)
+    e2e             Run template N times + analyze
+    history         Show convergence result history
+
+OPTIONS:
+    --runs N        Number of runs to analyze (default: 3)
+    --template TPL  Filter by template ID
+    --verbose       Show detailed divergence points
+
+EXAMPLES:
+    ./run.sh convergence                           # Analyze last 3 runs
+    ./run.sh convergence analyze --runs 5          # Analyze last 5 runs
+    ./run.sh convergence analyze --template board_meeting
+    ./run.sh convergence e2e board_meeting         # Run 3x + analyze
+    ./run.sh convergence e2e --runs 5 convergence_simple
+    ./run.sh convergence history                   # Show history
+
+CONVERGENCE GRADES:
+    A: Excellent (>90%) - Highly robust causal mechanisms
+    B: Good (80-90%) - Reasonably stable
+    C: Fair (70-80%) - Some variability
+    D: Poor (60-70%) - Significant divergence
+    F: Fail (<60%) - Highly sensitive to conditions
+EOF
+}
+
+# ============================================================================
 # COMMAND: API
 # ============================================================================
 
@@ -856,6 +1373,82 @@ EOF
 }
 
 # ============================================================================
+# TEMPLATE SHORTCUTS - All 41 templates accessible by name
+# ============================================================================
+
+# Core mechanism tests (M1-M18)
+CORE_TEMPLATES=(
+    "m01_heterogeneous_fidelity"
+    "m02_progressive_training"
+    "m03_exposure_events"
+    "m04_physics_validation"
+    "m05_lazy_resolution"
+    "m06_tensor_compression"
+    "m07_causal_chains"
+    "m08_embodied_states"
+    "m09_on_demand_entities"
+    "m10_scene_atmosphere"
+    "m11_dialog_synthesis"
+    "m12_counterfactual"
+    "m13_relationships"
+    "m14_circadian"
+    "m15_prospection"
+    "m16_animistic"
+    "m17_modal_causality"
+    "m18_model_selection"
+)
+
+# Showcase templates
+SHOWCASE_TEMPLATES=(
+    "board_meeting"
+    "jefferson_dinner"
+    "hospital_crisis"
+    "detective_prospection"
+    "kami_shrine"
+    "vc_pitch_pearl"
+    "vc_pitch_branching"
+    "vc_pitch_roadshow"
+    "vc_pitch_strategies"
+    "hound_shadow_directorial"
+)
+
+# Portal templates
+PORTAL_TEMPLATES=(
+    "startup_unicorn"
+    "presidential_election"
+    "academic_tenure"
+    "startup_failure"
+)
+
+# Stress templates
+STRESS_TEMPLATES=(
+    "constitutional_convention_day1"
+    "scarlet_study_deep"
+    "empty_house_flashback"
+    "final_problem_branching"
+    "sign_loops_cyclical"
+    "tensor_resolution_hybrid"
+)
+
+# Convergence templates
+CONVERGENCE_TEMPLATES=(
+    "convergence_simple"
+    "convergence_standard"
+    "convergence_comprehensive"
+)
+
+# Function to check if argument is a known template
+is_template() {
+    local name="$1"
+    for t in "${CORE_TEMPLATES[@]}" "${SHOWCASE_TEMPLATES[@]}" "${PORTAL_TEMPLATES[@]}" "${STRESS_TEMPLATES[@]}" "${CONVERGENCE_TEMPLATES[@]}"; do
+        if [[ "$t" == "$name" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+# ============================================================================
 # MAIN DISPATCH
 # ============================================================================
 
@@ -894,8 +1487,37 @@ main() {
         api)
             cmd_api "$@"
             ;;
+        e2e)
+            cmd_e2e "$@"
+            ;;
+        convergence)
+            cmd_convergence "$@"
+            ;;
         # Shortcuts - direct presets
-        quick|standard|comprehensive|stress|core|showcase|portal|convergence|all)
+        quick|standard|comprehensive|stress|core|showcase|portal|all)
+            cmd_run "$cmd" "$@"
+            ;;
+        # Core mechanism templates (M1-M18)
+        m01_*|m02_*|m03_*|m04_*|m05_*|m06_*|m07_*|m08_*|m09_*|m10_*|m11_*|m12_*|m13_*|m14_*|m15_*|m16_*|m17_*|m18_*)
+            cmd_run "$cmd" "$@"
+            ;;
+        # Showcase templates
+        board_meeting|jefferson_dinner|hospital_crisis|detective_prospection|kami_shrine)
+            cmd_run "$cmd" "$@"
+            ;;
+        vc_pitch_pearl|vc_pitch_branching|vc_pitch_roadshow|vc_pitch_strategies|hound_shadow_directorial)
+            cmd_run "$cmd" "$@"
+            ;;
+        # Portal templates
+        startup_unicorn|presidential_election|academic_tenure|startup_failure)
+            cmd_run "$cmd" "$@"
+            ;;
+        # Stress templates
+        constitutional_convention_day1|scarlet_study_deep|empty_house_flashback|final_problem_branching|sign_loops_cyclical|tensor_resolution_hybrid)
+            cmd_run "$cmd" "$@"
+            ;;
+        # Convergence templates
+        convergence_simple|convergence_standard|convergence_comprehensive)
             cmd_run "$cmd" "$@"
             ;;
         # Legacy flag support
@@ -903,8 +1525,13 @@ main() {
             cmd_run "$cmd" "$@"
             ;;
         *)
-            # Assume it's a template name
-            cmd_run "$cmd" "$@"
+            # Check if it's a known template, otherwise try as template name
+            if is_template "$cmd"; then
+                cmd_run "$cmd" "$@"
+            else
+                # Assume it's a template name anyway
+                cmd_run "$cmd" "$@"
+            fi
             ;;
     esac
 }
