@@ -191,11 +191,33 @@ git clone https://github.com/yourusername/timepoint-daedalus.git
 cd timepoint-daedalus
 pip install -r requirements.txt
 
-# Set your OpenRouter API key
-export OPENROUTER_API_KEY=your_key_here
+# Set your OpenRouter API key (add to .env file)
+echo "OPENROUTER_API_KEY=your_key_here" >> .env
 
 # Run a simulation
-./run.sh quick
+./run.sh quick                    # Quick-tier templates
+./run.sh run board_meeting        # Single template
+./run.sh list                     # List all templates
+./run.sh status                   # Show recent runs
+./run.sh --help                   # Full help
+```
+
+### Command Structure
+
+```bash
+./run.sh <command> [options]
+
+Commands:
+  run       Execute simulations
+  list      List templates, runs, mechanisms
+  status    Show run status and results
+  export    Export run data (md, json)
+  clean     Cleanup old data
+  api       API server operations
+
+Shortcuts:
+  ./run.sh quick                  # = ./run.sh run quick
+  ./run.sh core                   # = ./run.sh run --category core
 ```
 
 ### Basic Usage
@@ -257,26 +279,33 @@ pip install -r requirements.txt
 # Set API key
 export OPENROUTER_API_KEY=your_key_here
 
-# Run simulations
+# Run simulations (new subcommand syntax)
 ./run.sh quick                              # Quick-tier templates (~$0.15-0.30)
-./run.sh --category portal                  # PORTAL mode templates
-./run.sh --template board_meeting           # Single template by name
-./run.sh --list                             # List all 40 templates
-python run_all_mechanism_tests.py --nl "prompt"  # Natural language input
+./run.sh run board_meeting                  # Single template by name
+./run.sh run --category portal              # PORTAL mode templates
+./run.sh list                               # List all 44 templates
+./run.sh list --category core               # List by category
+./run.sh status                             # Show recent runs
 
 # Parallel execution (4-6 workers recommended)
-python run_all_mechanism_tests.py --parallel 6
+./run.sh run --parallel 6 quick
 
 # Free models ($0 cost - uses OpenRouter free tier)
-python run_all_mechanism_tests.py --free --template board_meeting  # Best quality free model
-python run_all_mechanism_tests.py --free-fast --parallel 4         # Fastest free model
-python run_all_mechanism_tests.py --list-free-models               # Show available free models
+./run.sh run --free board_meeting           # Best quality free model
+./run.sh run --free-fast --parallel 4 core  # Fastest free model
+./run.sh list --free-models                 # Show available free models
 
 # Convergence evaluation (measures causal graph consistency)
-python run_all_mechanism_tests.py --convergence --convergence-runs 3
+./run.sh run --convergence --convergence-runs 3 convergence_test_simple
 
-# Convergence E2E test (run template N times, compute convergence)
-python run_all_mechanism_tests.py --convergence-e2e --template convergence_test_simple --convergence-runs 3
+# API server and remote execution
+./run.sh api start                          # Start API server on :8080
+./run.sh api status                         # Check API health
+./run.sh run --api board_meeting            # Submit via API
+
+# Export results
+./run.sh export last                        # Export most recent run
+./run.sh export <run_id> --format json      # Export specific run
 ```
 
 **Implemented:**
@@ -291,6 +320,10 @@ python run_all_mechanism_tests.py --convergence-e2e --template convergence_test_
 - Basic dashboard (Quarto + FastAPI)
 - Narrative exports (Markdown, JSON, PDF)
 - **Convergence evaluation** (causal graph consistency analysis across runs, E2E testing mode, 3 convergence-optimized templates)
+- **REST API** (FastAPI with auth, rate limiting, batch submission)
+- **Usage quotas** (per-tier monthly limits: free/basic/pro/enterprise)
+- **Python SDK** (`api/client.py` for programmatic access)
+- **CLI-API integration** (`--api` flag for remote execution)
 
 **License-Compliant Model Stack:**
 All models via OpenRouter, all open-source with commercial synthetic data rights:
@@ -303,13 +336,13 @@ All models via OpenRouter, all open-source with commercial synthetic data rights
 - Quality-focused: `qwen/qwen3-235b-a22b:free`, `meta-llama/llama-3.3-70b-instruct:free`
 - Speed-focused: `google/gemini-2.0-flash-exp:free` (1M context!)
 
-**Tensor Persistence System (Phases 1-6):**
+**Tensor Persistence System (Phases 1-6, 329+ tests):**
 - Phase 1: SQLite tensor database with CRUD, versioning, maturity queries
 - Phase 2: Training history tracking
 - Phase 3: RAG-based semantic search and tensor composition
 - Phase 4: Parquet export, branching, conflict resolution
 - Phase 5: Permission system (private/shared/public), audit logging
-- Phase 6: REST API (minimal - CRUD, search, composition endpoints)
+- Phase 6: REST API with auth, rate limiting, batch submission, usage quotas
 
 **Not yet implemented:**
 - External integrations (prediction markets, webhooks)
@@ -373,16 +406,18 @@ All models via OpenRouter, all open-source with commercial synthetic data rights
 - `nl_interface/`: Natural language to simulation config
 - `validation.py` (1,365 lines): 5 physics-inspired validators
 - `storage.py` (632 lines): SQLite persistence layer with transaction support
-- `generation/templates/`: 40 JSON simulation templates organized by category (core, showcase, portal, stress, convergence)
+- `generation/templates/`: 44 JSON simulation templates organized by category (core, showcase, portal, stress, convergence)
 
-**Tensor Persistence modules (260 tests):**
+**Tensor Persistence modules (329+ tests):**
 - `tensor_persistence.py`: SQLite-backed tensor CRUD with versioning
 - `tensor_serialization.py`: Tensor serialization/deserialization
 - `tensor_rag.py`: Semantic search and tensor composition
 - `tensor_versioning.py`: Parquet export, branching, conflict resolution
 - `access/permissions.py`: Permission enforcement (private/shared/public)
 - `access/audit.py`: Access audit logging and analytics
-- `api/`: FastAPI REST endpoints with API key auth
+- `api/`: FastAPI REST endpoints with auth, rate limiting, batch submission
+- `api/client.py`: Python SDK for programmatic API access
+- `api/usage_bridge.py`: CLI-to-API usage quota tracking
 
 ---
 
@@ -403,18 +438,18 @@ All models via OpenRouter, all open-source with commercial synthetic data rights
 
 ## The Vision
 
-Timepoint today is a **simulation engine**. The roadmap leads toward a **simulation infrastructure platform**:
+Timepoint today is a **simulation engine** with a **complete REST API**. The roadmap leads toward a **simulation infrastructure platform**:
 
 **Near-term (Q1-Q2 2026):**
-- Batch execution with parallel workers
+- ~~REST API for programmatic access~~ **COMPLETE** (Dec 2025)
+- ~~Batch execution with parallel workers~~ **COMPLETE** (Dec 2025)
 - PostgreSQL for production persistence
-- REST API for programmatic access
-- Containerized deployment
+- Containerized deployment (Docker, Kubernetes)
 
 **Medium-term (Q3-Q4 2026):**
 - External integrations (prediction markets, decision systems)
 - Advanced dashboard (timeline visualization, entity graphs)
-- Distributed execution at scale
+- Distributed execution at scale (1000+ workers)
 
 **Long-term (2027+):**
 - Consumer experiences ("synthetic time travel")
