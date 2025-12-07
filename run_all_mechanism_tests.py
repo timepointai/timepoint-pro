@@ -811,6 +811,25 @@ def list_modes():
     print("="*80)
 
     print("\n" + "="*80)
+    print("🌐 API MODE (--api)")
+    print("="*80)
+    print("  Submit simulations via REST API instead of direct execution")
+    print("  Enables usage quota tracking and batch submission")
+    print()
+    print("  --api:              Enable API mode (submit via REST API)")
+    print("  --api-url URL:      API base URL (default: http://localhost:8080)")
+    print("  --api-key KEY:      API key (or set TIMEPOINT_API_KEY env var)")
+    print("  --api-batch-size N: Simulations per batch (default: 10, max: 100)")
+    print("  --api-budget USD:   Budget cap for batch submission")
+    print("  --api-wait:         Wait for batch completion before exiting")
+    print("  --api-usage:        Show current API usage and quota status")
+    print()
+    print("  Example: python run_all_mechanism_tests.py --api --api-wait")
+    print("  Example: python run_all_mechanism_tests.py --api --api-budget 1.00 --full")
+    print("  Example: python run_all_mechanism_tests.py --api-usage")
+    print("="*80)
+
+    print("\n" + "="*80)
     print("💡 TIPS")
     print("="*80)
     print("  --skip-summaries:  Reduce cost slightly by skipping LLM summaries")
@@ -1895,6 +1914,296 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, paralle
     return passed == (passed + failed)
 
 
+def run_templates_via_api(
+    templates: List[Tuple[str, any, Set[str]]],
+    api_key: str,
+    api_url: str = "http://localhost:8080",
+    batch_size: int = 10,
+    budget_cap: Optional[float] = None,
+    wait_for_completion: bool = False,
+    parallel_jobs: int = 4,
+    fail_fast: bool = False,
+) -> bool:
+    """
+    Submit simulation templates via the REST API instead of direct execution.
+
+    This enables usage quota tracking and integrates CLI runs with the API
+    infrastructure.
+
+    Args:
+        templates: List of (name, config, mechanisms) tuples
+        api_key: API key for authentication
+        api_url: API base URL
+        batch_size: Number of simulations per batch
+        budget_cap: Optional budget cap in USD
+        wait_for_completion: Whether to wait for batches to finish
+        parallel_jobs: Number of parallel jobs per batch
+        fail_fast: Stop batch on first failure
+
+    Returns:
+        True if all batches submitted (and optionally completed) successfully
+    """
+    try:
+        from api.client import TimePointClient, QuotaExceededError, BatchTooLargeError
+    except ImportError:
+        print("❌ ERROR: api.client module not found")
+        print("   Make sure the api/ directory is in your Python path")
+        return False
+
+    print("=" * 80)
+    print("API MODE: Submitting simulations via REST API")
+    print(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"API URL: {api_url}")
+    print(f"Templates: {len(templates)}")
+    print(f"Batch Size: {batch_size}")
+    if budget_cap:
+        print(f"Budget Cap: ${budget_cap:.2f}")
+    print("=" * 80)
+    print()
+
+    # Initialize client
+    try:
+        client = TimePointClient(api_key=api_key, base_url=api_url)
+        if not client.is_healthy():
+            print("❌ ERROR: API server is not healthy")
+            print(f"   Check that the server is running at {api_url}")
+            return False
+        print("✓ Connected to API server")
+    except Exception as e:
+        print(f"❌ ERROR: Failed to connect to API: {e}")
+        return False
+
+    # Check usage quota first
+    try:
+        usage = client.get_usage()
+        print(f"✓ Current usage:")
+        print(f"   Tier: {usage.tier}")
+        print(f"   Simulations: {usage.simulations_used}/{usage.simulations_limit} ({usage.simulations_remaining} remaining)")
+        print(f"   Cost: ${usage.cost_used_usd:.2f}/${usage.cost_limit_usd:.2f}")
+
+        if usage.is_quota_exceeded:
+            print(f"❌ ERROR: Quota exceeded - {usage.quota_exceeded_reason}")
+            return False
+
+        if len(templates) > usage.simulations_remaining:
+            print(f"⚠️  WARNING: Planning to run {len(templates)} templates but only {usage.simulations_remaining} simulations remaining")
+            print("   Some templates may not run due to quota limits")
+    except Exception as e:
+        print(f"⚠️  WARNING: Could not check usage quota: {e}")
+
+    print()
+
+    # Build simulation requests from templates
+    simulation_requests = []
+    for name, config, mechanisms in templates:
+        # Extract configuration details
+        sim_request = {
+            "template_id": name,
+            "entity_count": config.entities.count if hasattr(config, 'entities') and hasattr(config.entities, 'count') else 3,
+            "timepoint_count": config.timepoints.count if hasattr(config, 'timepoints') and hasattr(config.timepoints, 'count') else 5,
+        }
+
+        # Add custom scenario if available
+        if hasattr(config, 'scenario') and config.scenario:
+            sim_request["custom_scenario"] = config.scenario
+
+        simulation_requests.append(sim_request)
+
+    # Split into batches
+    batches = []
+    for i in range(0, len(simulation_requests), batch_size):
+        batch = simulation_requests[i:i + batch_size]
+        batches.append(batch)
+
+    print(f"Prepared {len(batches)} batch(es) of up to {batch_size} simulations each")
+    print()
+
+    # Submit batches
+    submitted_batches = []
+    total_submitted = 0
+
+    for batch_num, batch in enumerate(batches, 1):
+        print(f"[Batch {batch_num}/{len(batches)}] Submitting {len(batch)} simulations...")
+
+        try:
+            # Calculate per-batch budget if total budget specified
+            batch_budget = None
+            if budget_cap:
+                batch_budget = budget_cap / len(batches)
+
+            batch_response = client.submit_batch(
+                simulations=batch,
+                budget_cap_usd=batch_budget,
+                priority="normal",
+                fail_fast=fail_fast,
+                parallel_jobs=parallel_jobs,
+            )
+
+            submitted_batches.append(batch_response)
+            total_submitted += len(batch)
+            print(f"   ✓ Batch {batch_response.batch_id} submitted")
+            print(f"   Status: {batch_response.status}")
+            print(f"   Jobs: {batch_response.progress.total_jobs}")
+
+        except QuotaExceededError as e:
+            print(f"   ❌ Quota exceeded: {e}")
+            break
+        except BatchTooLargeError as e:
+            print(f"   ❌ Batch too large: {e}")
+            print(f"   Try reducing --api-batch-size")
+            break
+        except Exception as e:
+            print(f"   ❌ Failed to submit batch: {e}")
+            continue
+
+    print()
+    print(f"Submitted {total_submitted}/{len(templates)} simulations in {len(submitted_batches)} batches")
+
+    # If not waiting, just print batch IDs and exit
+    if not wait_for_completion:
+        print()
+        print("=" * 80)
+        print("BATCH SUBMISSION COMPLETE")
+        print("=" * 80)
+        print("Batches submitted (use API to check status):")
+        for batch in submitted_batches:
+            print(f"  - {batch.batch_id}")
+        print()
+        print("To check status:")
+        print(f"  curl -H 'X-API-Key: YOUR_KEY' {api_url}/simulations/batch/{{batch_id}}")
+        print()
+        print("Or add --api-wait to wait for completion")
+        return len(submitted_batches) > 0
+
+    # Wait for all batches to complete
+    print()
+    print("Waiting for batches to complete...")
+    print("-" * 80)
+
+    all_completed = True
+    total_cost = 0.0
+    total_completed = 0
+    total_failed = 0
+
+    for batch in submitted_batches:
+        print(f"\n[Batch {batch.batch_id}]")
+
+        def progress_callback(b):
+            print(f"  Progress: {b.progress.progress_percent:.0f}% "
+                  f"({b.progress.completed_jobs} done, "
+                  f"{b.progress.failed_jobs} failed, "
+                  f"{b.progress.running_jobs} running)")
+
+        try:
+            final_batch = client.wait_for_batch(
+                batch.batch_id,
+                timeout=3600,  # 1 hour timeout
+                poll_interval=5,
+                callback=progress_callback,
+            )
+
+            total_cost += final_batch.cost.actual_cost_usd
+            total_completed += final_batch.progress.completed_jobs
+            total_failed += final_batch.progress.failed_jobs
+
+            if final_batch.status == "completed":
+                print(f"  ✓ Completed: {final_batch.progress.completed_jobs} jobs, ${final_batch.cost.actual_cost_usd:.2f}")
+            elif final_batch.status == "failed":
+                print(f"  ❌ Failed: {final_batch.error_message}")
+                all_completed = False
+            elif final_batch.status == "cancelled":
+                print(f"  ⚠️  Cancelled: {final_batch.progress.cancelled_jobs} jobs")
+                all_completed = False
+            else:
+                print(f"  ⚠️  Status: {final_batch.status}")
+
+        except TimeoutError:
+            print(f"  ⚠️  Timeout waiting for batch")
+            all_completed = False
+        except Exception as e:
+            print(f"  ❌ Error: {e}")
+            all_completed = False
+
+    # Final summary
+    print()
+    print("=" * 80)
+    print("API MODE COMPLETE")
+    print(f"Finished: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Batches: {len(submitted_batches)}")
+    print(f"Jobs Completed: {total_completed}")
+    print(f"Jobs Failed: {total_failed}")
+    print(f"Total Cost: ${total_cost:.2f}")
+    print("=" * 80)
+
+    return all_completed
+
+
+def show_api_usage(api_key: str, api_url: str = "http://localhost:8080") -> bool:
+    """
+    Display current API usage and quota status.
+
+    Args:
+        api_key: API key for authentication
+        api_url: API base URL
+
+    Returns:
+        True if usage was retrieved successfully
+    """
+    try:
+        from api.client import TimePointClient
+    except ImportError:
+        print("❌ ERROR: api.client module not found")
+        return False
+
+    try:
+        client = TimePointClient(api_key=api_key, base_url=api_url)
+        usage = client.get_usage()
+
+        print()
+        print("=" * 80)
+        print("API USAGE STATUS")
+        print("=" * 80)
+        print(f"User ID: {usage.user_id}")
+        print(f"Tier: {usage.tier.upper()}")
+        print(f"Period: {usage.period}")
+        print(f"Days Remaining: {usage.days_remaining}")
+        print()
+        print("📊 Current Usage:")
+        print(f"  API Calls:   {usage.api_calls_used:>8,} / {usage.api_calls_limit:>8,} ({usage.api_calls_remaining:,} remaining)")
+        print(f"  Simulations: {usage.simulations_used:>8,} / {usage.simulations_limit:>8,} ({usage.simulations_remaining:,} remaining)")
+        print(f"  Cost:        ${usage.cost_used_usd:>7.2f} / ${usage.cost_limit_usd:>7.2f} (${usage.cost_remaining_usd:.2f} remaining)")
+        print(f"  Tokens:      {usage.tokens_used:>8,}")
+        print()
+        print("📋 Limits:")
+        print(f"  Max Batch Size: {usage.max_batch_size} simulations")
+        print()
+
+        if usage.is_quota_exceeded:
+            print("❌ QUOTA EXCEEDED")
+            print(f"   Reason: {usage.quota_exceeded_reason}")
+        else:
+            print("✓ Quota OK - you can submit more simulations")
+
+        print("=" * 80)
+
+        # Get usage history
+        try:
+            history = client.get_usage_history(periods=3)
+            if history.get("history"):
+                print()
+                print("📈 Recent History:")
+                for period in history["history"]:
+                    print(f"  {period['period']}: {period['simulations_used']} sims, ${period['cost_used_usd']:.2f}")
+        except Exception:
+            pass  # History is optional
+
+        return True
+
+    except Exception as e:
+        print(f"❌ ERROR: {e}")
+        return False
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Comprehensive Mechanism Coverage Test")
     parser.add_argument(
@@ -2096,6 +2405,48 @@ if __name__ == "__main__":
         action="store_true",
         help="List all available templates with their tier/category/mechanisms and exit"
     )
+    # API mode options (Phase 6 integration)
+    parser.add_argument(
+        "--api",
+        action="store_true",
+        help="Submit simulations via REST API instead of direct execution (tracks usage quotas)"
+    )
+    parser.add_argument(
+        "--api-url",
+        type=str,
+        default="http://localhost:8080",
+        metavar="URL",
+        help="API base URL (default: http://localhost:8080)"
+    )
+    parser.add_argument(
+        "--api-key",
+        type=str,
+        metavar="KEY",
+        help="API key for authentication (defaults to TIMEPOINT_API_KEY env var)"
+    )
+    parser.add_argument(
+        "--api-batch-size",
+        type=int,
+        default=10,
+        metavar="N",
+        help="Number of simulations per batch when using --api (default: 10, max: 100)"
+    )
+    parser.add_argument(
+        "--api-budget",
+        type=float,
+        metavar="USD",
+        help="Budget cap in USD for API batch submission (optional)"
+    )
+    parser.add_argument(
+        "--api-wait",
+        action="store_true",
+        help="Wait for batch completion when using --api (default: submit and exit)"
+    )
+    parser.add_argument(
+        "--api-usage",
+        action="store_true",
+        help="Show current API usage and quota status, then exit"
+    )
     args = parser.parse_args()
 
     # Handle --list-modes first (doesn't require API key)
@@ -2137,14 +2488,25 @@ if __name__ == "__main__":
         print()
         sys.exit(0)
 
-    # Verify API key
-    if not os.getenv("OPENROUTER_API_KEY"):
+    # Handle --api-usage first (requires API key from env or arg)
+    if args.api_usage:
+        api_key = args.api_key or os.getenv("TIMEPOINT_API_KEY")
+        if not api_key:
+            print("❌ ERROR: API key required for --api-usage")
+            print("   Set TIMEPOINT_API_KEY env var or use --api-key")
+            sys.exit(1)
+        success = show_api_usage(api_key, args.api_url)
+        sys.exit(0 if success else 1)
+
+    # Verify OpenRouter API key (not needed for --api mode which uses TIMEPOINT_API_KEY)
+    if not args.api and not os.getenv("OPENROUTER_API_KEY"):
         print("❌ ERROR: OPENROUTER_API_KEY not set")
         print("Checked .env file - not found or empty")
         sys.exit(1)
 
-    print(f"✓ API keys loaded from .env")
-    print()
+    if not args.api:
+        print(f"✓ API keys loaded from .env")
+        print()
 
     # Enable double-confirm handler for Ctrl+C
     # This prevents accidental interruption of expensive test runs
@@ -2279,6 +2641,70 @@ if __name__ == "__main__":
             verbose=args.convergence_verbose
         )
         sys.exit(0 if convergence_success else 1)
+
+    # Handle --api mode: submit via REST API instead of direct execution
+    if args.api:
+        api_key = args.api_key or os.getenv("TIMEPOINT_API_KEY")
+        if not api_key:
+            print("❌ ERROR: API key required for --api mode")
+            print("   Set TIMEPOINT_API_KEY env var or use --api-key")
+            sys.exit(1)
+
+        # Build template list for the selected mode (same logic as run_all_templates)
+        from generation.config_schema import SimulationConfig
+
+        quick_templates = [
+            ("board_meeting", SimulationConfig.example_board_meeting(), {"M7"}),
+            ("jefferson_dinner", SimulationConfig.example_jefferson_dinner(), {"M3", "M7"}),
+            ("hospital_crisis", SimulationConfig.example_hospital_crisis(), {"M8", "M14"}),
+            ("kami_shrine", SimulationConfig.example_kami_shrine(), {"M16"}),
+            ("detective_prospection", SimulationConfig.example_detective_prospection(), {"M15"}),
+            ("vc_pitch_pearl", SimulationConfig.example_vc_pitch_pearl(), {"M7", "M11", "M15"}),
+            ("vc_pitch_roadshow", SimulationConfig.example_vc_pitch_roadshow(), {"M3", "M7", "M10", "M13"}),
+        ]
+
+        full_templates = [
+            ("empty_house_flashback", SimulationConfig.example_empty_house_flashback(), {"M17", "M13", "M8"}),
+            ("final_problem_branching", SimulationConfig.example_final_problem_branching(), {"M12", "M17", "M15"}),
+            ("hound_shadow_directorial", SimulationConfig.example_hound_shadow_directorial(), {"M17", "M10", "M14"}),
+            ("sign_loops_cyclical", SimulationConfig.example_sign_loops_cyclical(), {"M17", "M15", "M3"}),
+            ("vc_pitch_branching", SimulationConfig.example_vc_pitch_branching(), {"M12", "M15", "M8", "M17"}),
+            ("vc_pitch_strategies", SimulationConfig.example_vc_pitch_strategies(), {"M12", "M10", "M15", "M17"}),
+        ]
+
+        portal_templates = [
+            ("portal_presidential_election", SimulationConfig.portal_presidential_election(), {"M17", "M15", "M12", "M7", "M13"}),
+            ("portal_startup_unicorn", SimulationConfig.portal_startup_unicorn(), {"M17", "M13", "M8", "M11", "M15", "M7"}),
+            ("portal_academic_tenure", SimulationConfig.portal_academic_tenure(), {"M17", "M15", "M3", "M14", "M13"}),
+            ("portal_startup_failure", SimulationConfig.portal_startup_failure(), {"M17", "M12", "M8", "M13", "M15", "M11"}),
+        ]
+
+        # Select templates based on mode
+        if mode == 'quick':
+            api_templates = quick_templates
+        elif mode == 'full':
+            api_templates = quick_templates + full_templates
+        elif mode == 'portal':
+            api_templates = portal_templates
+        elif mode in ('portal_simjudged_quick', 'portal_simjudged', 'portal_simjudged_thorough', 'portal_all'):
+            # Portal variants - use standard portal templates for API mode
+            api_templates = portal_templates
+            print(f"⚠️  Note: Simjudged variants not supported in API mode, using standard portal templates")
+        else:
+            # Default to quick for other modes
+            api_templates = quick_templates
+            print(f"⚠️  Note: Mode '{mode}' using quick templates for API mode")
+
+        success = run_templates_via_api(
+            templates=api_templates,
+            api_key=api_key,
+            api_url=args.api_url,
+            batch_size=min(args.api_batch_size, 100),
+            budget_cap=args.api_budget,
+            wait_for_completion=args.api_wait,
+            parallel_jobs=args.parallel,
+        )
+        sys.exit(0 if success else 1)
 
     success = run_all_templates(mode, skip_summaries=args.skip_summaries, parallel_workers=args.parallel)
 

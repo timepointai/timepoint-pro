@@ -36,6 +36,14 @@ from metadata.run_summarizer import generate_run_summary
 from metadata.narrative_exporter import NarrativeExporter
 from andos.layer_computer import compute_andos_layers, validate_andos_layers
 
+# Usage bridge for API quota tracking (Phase 6 integration)
+try:
+    from api.usage_bridge import UsageBridge, get_usage_bridge
+    USAGE_TRACKING_AVAILABLE = True
+except ImportError:
+    USAGE_TRACKING_AVAILABLE = False
+    UsageBridge = None
+
 
 # Shared database path for convergence analysis (timepoints/events persist across runs)
 SHARED_DB_PATH = "metadata/runs.db"
@@ -75,13 +83,23 @@ class FullE2EWorkflowRunner:
     This is the production workflow orchestrator.
     """
 
-    def __init__(self, metadata_manager: MetadataManager, generate_summary: bool = True):
+    def __init__(
+        self,
+        metadata_manager: MetadataManager,
+        generate_summary: bool = True,
+        track_usage: bool = True,
+        user_id: Optional[str] = None,
+        user_tier: str = "basic"
+    ):
         """
         Initialize E2E runner.
 
         Args:
             metadata_manager: Metadata tracking manager
             generate_summary: Whether to generate LLM-powered run summaries (default: True)
+            track_usage: Whether to track usage for API quota (default: True)
+            user_id: User ID for usage tracking (defaults to CLI_USER or env var)
+            user_tier: User tier for quota limits (default: basic)
         """
         self.metadata_manager = metadata_manager
         self.generate_summary = generate_summary
@@ -96,6 +114,16 @@ class FullE2EWorkflowRunner:
 
         # Phase 7: TensorRAG for resolution (lazy initialization)
         self._tensor_rag = None
+
+        # Phase 6: Usage tracking for CLI/API quota integration
+        self._usage_bridge = None
+        self._track_usage = track_usage and USAGE_TRACKING_AVAILABLE
+        if self._track_usage:
+            try:
+                self._usage_bridge = UsageBridge(user_id=user_id, tier=user_tier)
+            except Exception as e:
+                print(f"  [UsageBridge] Warning: Could not initialize usage tracking: {e}")
+                self._track_usage = False
 
     def _get_shared_store(self) -> GraphStore:
         """Get or create the shared store for convergence data persistence."""
@@ -411,6 +439,16 @@ class FullE2EWorkflowRunner:
         # Set thread-local run ID for tracking
         set_current_run_id(run_id)
 
+        # Phase 6: Check usage quota before starting
+        if self._track_usage and self._usage_bridge:
+            if not self._usage_bridge.check_quota(simulation_count=1):
+                raise RuntimeError(
+                    f"Usage quota exceeded. Cannot start simulation. "
+                    f"Check your quota with --api-usage or contact support."
+                )
+            # Record simulation start for tracking
+            self._usage_bridge.record_simulation_start(run_id)
+
         print(f"\n{'='*80}")
         print(f"STARTING E2E WORKFLOW: {run_id}")
         print(f"Template: {config.world_id}")
@@ -550,6 +588,18 @@ class FullE2EWorkflowRunner:
                 tokens_used=0,
                 error_message=str(e)
             )
+
+            # Phase 6: Record failed simulation to usage tracking
+            if self._track_usage and self._usage_bridge:
+                try:
+                    self._usage_bridge.record_simulation(
+                        run_id=run_id,
+                        success=False,
+                        cost_usd=0.0,
+                        tokens=0
+                    )
+                except Exception as usage_err:
+                    print(f"  ⚠️  Failed to record usage for failed run: {usage_err}")
 
             raise
 
@@ -1883,6 +1933,19 @@ class FullE2EWorkflowRunner:
                 token_budget_compliance=token_budget_compliance,
                 fidelity_efficiency_score=fidelity_efficiency_score
             )
+
+            # Phase 6: Record simulation completion to usage tracking
+            if self._track_usage and self._usage_bridge:
+                try:
+                    self._usage_bridge.record_simulation(
+                        run_id=run_id,
+                        success=True,
+                        cost_usd=actual_cost,
+                        tokens=actual_tokens
+                    )
+                    print(f"  📊 Usage recorded: ${actual_cost:.4f}, {actual_tokens:,} tokens")
+                except Exception as e:
+                    print(f"  ⚠️  Failed to record usage: {e}")
 
             print(f"✓ Metadata complete")
             print(f"  - Run ID: {run_id}")

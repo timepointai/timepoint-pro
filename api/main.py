@@ -25,7 +25,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from .models import HealthResponse, ErrorResponse
-from .routes import tensors_router, search_router, simulations_router
+from .routes import tensors_router, search_router, simulations_router, batch_router
 from .deps import (
     get_settings,
     get_tensor_db,
@@ -36,6 +36,8 @@ from .middleware.rate_limit import (
     rate_limit_exceeded_handler,
     get_rate_limit_config,
 )
+from .middleware.usage_quota import get_quota_config
+from .usage_storage import get_usage_database
 
 
 # ============================================================================
@@ -52,18 +54,28 @@ async def lifespan(app: FastAPI):
     # Startup
     settings = get_settings()
     rate_limit_config = get_rate_limit_config()
+    quota_config = get_quota_config()
     print(f"Starting Tensor API v{settings.api_version}")
     print(f"Database: {settings.db_path}")
     print(f"RAG enabled: {settings.enable_rag}")
     print(f"Rate limiting: {'enabled' if rate_limit_config.enabled else 'disabled'}")
+    print(f"Usage quotas: {'enabled' if quota_config.enabled else 'disabled'}")
 
-    # Initialize database
+    # Initialize tensor database
     try:
         db = get_tensor_db()
         stats = db.get_stats()
-        print(f"Database initialized: {stats['total_tensors']} tensors")
+        print(f"Tensor database initialized: {stats['total_tensors']} tensors")
     except Exception as e:
-        print(f"Warning: Database initialization failed: {e}")
+        print(f"Warning: Tensor database initialization failed: {e}")
+
+    # Initialize usage database
+    try:
+        usage_db = get_usage_database()
+        usage_stats = usage_db.get_stats()
+        print(f"Usage database initialized: {usage_stats['active_users']} active users")
+    except Exception as e:
+        print(f"Warning: Usage database initialization failed: {e}")
 
     yield
 
@@ -98,9 +110,9 @@ def create_app(
         title=title or settings.api_title,
         version=version or settings.api_version,
         description="""
-Timepoint-Daedalus Tensor API
+Timepoint-Daedalus API
 
-Provides access to cognitive tensors for character simulation.
+Provides access to cognitive tensors and simulation management.
 
 ## Features
 
@@ -108,10 +120,18 @@ Provides access to cognitive tensors for character simulation.
 - **Semantic Search**: Natural language search over tensor descriptions
 - **Permission Control**: Private, shared, and public access levels
 - **Tensor Composition**: Combine multiple tensors
+- **Simulation Jobs**: Create and manage simulation jobs
+- **Batch Submission**: Submit multiple simulations in a single request
+- **Usage Quotas**: Track and enforce monthly usage limits
 
 ## Authentication
 
 All endpoints require an API key in the `X-API-Key` header.
+
+## Rate Limiting
+
+Rate limits are enforced per-tier (free, basic, pro, enterprise).
+See /simulations/batch/usage for current usage.
         """,
         lifespan=lifespan,
         debug=debug or settings.debug,
@@ -134,13 +154,26 @@ All endpoints require an API key in the `X-API-Key` header.
     application.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
     # Include routers
+    # NOTE: batch_router must come BEFORE simulations_router so that
+    # /simulations/batch/* routes are matched before /simulations/{job_id}
     application.include_router(tensors_router)
     application.include_router(search_router)
+    application.include_router(batch_router)
     application.include_router(simulations_router)
 
     # Add exception handlers
     @application.exception_handler(HTTPException)
     async def http_exception_handler(request: Request, exc: HTTPException):
+        # Handle dict detail (from usage quota middleware)
+        if isinstance(exc.detail, dict):
+            return JSONResponse(
+                status_code=exc.status_code,
+                content={
+                    **exc.detail,
+                    "request_id": str(uuid.uuid4()),
+                },
+            )
+        # Handle string detail (standard HTTPException)
         return JSONResponse(
             status_code=exc.status_code,
             content=ErrorResponse(

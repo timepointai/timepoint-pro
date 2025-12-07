@@ -105,6 +105,12 @@ def get_rate_limit_config() -> RateLimitConfig:
     return _config
 
 
+def reset_rate_limit_config() -> None:
+    """Reset rate limit config (for testing)."""
+    global _config
+    _config = None
+
+
 # ============================================================================
 # User Tier Detection
 # ============================================================================

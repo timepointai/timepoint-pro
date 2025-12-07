@@ -1232,17 +1232,31 @@ class PermissionEnforcer:
 - [x] Health check endpoint
 - [x] OpenAPI documentation (auto-generated)
 - [x] API tests (49 tests)
-- [ ] Rate limiting middleware (TODO)
+- [x] Rate limiting middleware (slowapi with per-tier limits)
+- [x] Simulation REST API (job submission, status, cancel, templates)
+- [x] Batch submission API (2-100 jobs per batch, budget caps, fail-fast) - 22 tests
+- [x] Usage quotas (monthly limits per tier: free/basic/pro/enterprise) - 34 tests
 - [ ] Client SDK (Python) (TODO)
 
 **Files created**:
 - `api/main.py`
 - `api/routes/tensors.py`
 - `api/routes/search.py`
+- `api/routes/simulations.py`
+- `api/routes/batch.py`
 - `api/models.py`
+- `api/models_simulation.py`
+- `api/models_batch.py`
 - `api/deps.py`
 - `api/auth.py`
+- `api/middleware/rate_limit.py`
+- `api/middleware/usage_quota.py`
+- `api/simulation_runner.py`
+- `api/batch_runner.py`
+- `api/usage_storage.py`
 - `tests/unit/test_api.py`
+- `tests/unit/test_batch_api.py`
+- `tests/unit/test_usage_quota.py`
 - `tests/integration/test_api_integration.py`
 
 ### Phase 7: E2E Workflow Integration (1-2 weeks) ✅ COMPLETE
@@ -1362,5 +1376,5 @@ The implementation is phased over approximately 4-5 months, with each phase buil
 ---
 
 *Document created: 2025-12-03*
-*Updated: 2025-12-04*
-*Status: Phases 1-7 COMPLETE (133 tensor tests). Archetype system refactored to use real tensor pipeline.*
+*Updated: 2025-12-06*
+*Status: Phases 1-7 COMPLETE (316+ tests). Rate limiting, simulation REST API, batch submission API, and usage quotas complete. Archetype system uses real tensor pipeline.*

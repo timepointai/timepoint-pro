@@ -40,6 +40,15 @@ MECHANISM=""
 PARALLEL=""
 SKIP_SUMMARIES=false
 
+# API mode settings (Phase 6)
+API_MODE=false
+API_URL="http://localhost:8080"
+API_KEY=""
+API_BATCH_SIZE=""
+API_BUDGET=""
+API_WAIT=false
+API_USAGE=false
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -97,6 +106,15 @@ MONITORING OPTIONS:
     --llm-model MODEL      LLM model for monitor (default: meta-llama/llama-3.1-70b-instruct)
     --monitor-mode MODE    Monitor mode: both|snapshot|compare (default: both)
 
+API MODE OPTIONS:
+    --api                  Submit simulations via REST API (tracks usage quotas)
+    --api-url URL          API base URL (default: http://localhost:8080)
+    --api-key KEY          API key (or set TIMEPOINT_API_KEY env var)
+    --api-batch-size N     Simulations per batch (default: 10, max: 100)
+    --api-budget USD       Budget cap for batch submission
+    --api-wait             Wait for batch completion before exiting
+    --api-usage            Show current API usage and quota status, then exit
+
 OTHER OPTIONS:
     --open-dashboard       Print dashboard URL after successful run
     -h, --help             Show this help message
@@ -149,6 +167,13 @@ EXAMPLES:
     ----------
     ./run.sh --monitor quick                  # Real-time LLM analysis
     ./run.sh --monitor --chat quick           # Interactive chat during run
+
+    API Mode (Usage Quota Tracking):
+    -------------------------------
+    ./run.sh --api quick                      # Submit via API (tracks usage)
+    ./run.sh --api --api-wait quick           # Wait for completion
+    ./run.sh --api --api-budget 1.00 --full   # With budget cap
+    ./run.sh --api-usage                      # Check current usage/quotas
 
     Single Template Deep Dive:
     -------------------------
@@ -225,6 +250,34 @@ while [[ $# -gt 0 ]]; do
             SKIP_SUMMARIES=true
             shift
             ;;
+        --api)
+            API_MODE=true
+            shift
+            ;;
+        --api-url)
+            API_URL="$2"
+            shift 2
+            ;;
+        --api-key)
+            API_KEY="$2"
+            shift 2
+            ;;
+        --api-batch-size)
+            API_BATCH_SIZE="$2"
+            shift 2
+            ;;
+        --api-budget)
+            API_BUDGET="$2"
+            shift 2
+            ;;
+        --api-wait)
+            API_WAIT=true
+            shift
+            ;;
+        --api-usage)
+            API_USAGE=true
+            shift
+            ;;
         --open-dashboard)
             OPEN_DASHBOARD=true
             shift
@@ -283,6 +336,32 @@ if [[ "$SKIP_SUMMARIES" == "true" ]]; then
     TEST_FLAGS="$TEST_FLAGS --skip-summaries"
 fi
 
+# Build API flags
+if [[ "$API_MODE" == "true" ]]; then
+    TEST_FLAGS="$TEST_FLAGS --api"
+    TEST_FLAGS="$TEST_FLAGS --api-url $API_URL"
+fi
+
+if [[ -n "$API_KEY" ]]; then
+    TEST_FLAGS="$TEST_FLAGS --api-key $API_KEY"
+fi
+
+if [[ -n "$API_BATCH_SIZE" ]]; then
+    TEST_FLAGS="$TEST_FLAGS --api-batch-size $API_BATCH_SIZE"
+fi
+
+if [[ -n "$API_BUDGET" ]]; then
+    TEST_FLAGS="$TEST_FLAGS --api-budget $API_BUDGET"
+fi
+
+if [[ "$API_WAIT" == "true" ]]; then
+    TEST_FLAGS="$TEST_FLAGS --api-wait"
+fi
+
+if [[ "$API_USAGE" == "true" ]]; then
+    TEST_FLAGS="$TEST_FLAGS --api-usage"
+fi
+
 # Handle shortcut modes if no explicit flags were set
 if [[ -z "$TEST_FLAGS" && -n "$MODE" ]]; then
     case "$MODE" in
@@ -323,12 +402,21 @@ if [[ -z "$TEST_FLAGS" && -n "$MODE" ]]; then
     esac
 fi
 
-# Check if any selection was made
-if [[ -z "$TEST_FLAGS" && -z "$MODE" ]]; then
+# Check if any selection was made (API-usage mode doesn't need template selection)
+if [[ -z "$TEST_FLAGS" && -z "$MODE" && "$API_USAGE" != "true" ]]; then
     print_error "No mode or template selection specified"
     echo ""
     show_help
     exit 1
+fi
+
+# Handle --api-usage standalone (doesn't need template selection)
+if [[ "$API_USAGE" == "true" && -z "$TEST_FLAGS" ]]; then
+    TEST_FLAGS="--api-usage"
+    if [[ -n "$API_KEY" ]]; then
+        TEST_FLAGS="$TEST_FLAGS --api-key $API_KEY"
+    fi
+    TEST_FLAGS="$TEST_FLAGS --api-url $API_URL"
 fi
 
 # ============================================================================
@@ -351,10 +439,22 @@ source .env
 # Export auto-confirm environment variable for subprocess
 export TIMEPOINT_AUTO_CONFIRM
 
-# Verify API keys
-if [[ -z "$OPENROUTER_API_KEY" ]]; then
-    print_error "OPENROUTER_API_KEY not set in .env"
-    exit 1
+# Verify API keys based on mode
+if [[ "$API_MODE" == "true" || "$API_USAGE" == "true" ]]; then
+    # API mode uses TIMEPOINT_API_KEY
+    if [[ -z "$API_KEY" && -z "$TIMEPOINT_API_KEY" ]]; then
+        print_error "API key required for --api mode"
+        print_info "Set TIMEPOINT_API_KEY in .env or use --api-key"
+        exit 1
+    fi
+    print_success "API mode - using TIMEPOINT_API_KEY"
+else
+    # Direct mode uses OPENROUTER_API_KEY
+    if [[ -z "$OPENROUTER_API_KEY" ]]; then
+        print_error "OPENROUTER_API_KEY not set in .env"
+        exit 1
+    fi
+    print_success "Direct mode - using OPENROUTER_API_KEY"
 fi
 
 print_success "Environment loaded"
@@ -373,6 +473,18 @@ if [[ "$MONITOR" == "true" ]]; then
     echo "  - Check Interval: ${MONITOR_INTERVAL}s"
     echo "  - LLM Model: $LLM_MODEL"
     echo "  - Monitor Mode: $MONITOR_MODE"
+fi
+echo "API Mode: $API_MODE"
+if [[ "$API_MODE" == "true" ]]; then
+    echo "  - API URL: $API_URL"
+    echo "  - Batch Size: ${API_BATCH_SIZE:-10}"
+    if [[ -n "$API_BUDGET" ]]; then
+        echo "  - Budget Cap: \$$API_BUDGET"
+    fi
+    echo "  - Wait for Completion: $API_WAIT"
+fi
+if [[ "$API_USAGE" == "true" ]]; then
+    echo "API Usage Check: true"
 fi
 echo ""
 

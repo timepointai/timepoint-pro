@@ -160,7 +160,7 @@ results = timepoint.run_batch(
 ---
 
 ## Phase 3: REST API
-**Target: Q3 2026** | **Status: Partially Complete (Tensor API)**
+**Target: Q3 2026** | **Status: Substantially Complete (December 2025)**
 
 Programmatic access for external systems.
 
@@ -178,17 +178,21 @@ Programmatic access for external systems.
 - [x] Permission enforcement (private/shared/public)
 - [x] Access audit logging
 
-### 3.3 Simulation API (Remaining)
-- [ ] Run submission endpoint
-- [ ] Batch submission endpoint
-- [ ] Status and results endpoints
-- [ ] Query interface (GET runs with filters)
-- [ ] Rate limiting
-- [ ] Usage quotas
+### 3.3 Simulation API ✅ COMPLETE (December 2025)
+- [x] Run submission endpoint (POST /simulations)
+- [x] Status and results endpoints (GET /simulations/{id}, GET /simulations/{id}/result)
+- [x] Job listing endpoint (GET /simulations)
+- [x] Cancel endpoint (POST /simulations/{id}/cancel)
+- [x] Statistics endpoint (GET /simulations/stats)
+- [x] Template listing (GET /simulations/templates)
+- [x] Rate limiting (slowapi with per-tier limits)
+- [x] Job concurrency tracking
+- [x] Batch submission endpoint (POST /simulations/batch) - 22 tests
+- [x] Usage quotas (monthly limits per tier) - 34 tests
 
 **Note:** Model selection (originally Phase 3) is already implemented as M18.
 
-**Exit criteria:** External systems can submit and query simulations via API.
+**Exit criteria:** External systems can submit and query simulations via API. ✅ (Basic functionality complete)
 
 ---
 
@@ -419,12 +423,17 @@ Broad accessibility and ecosystem.
 | Tensor persistence | **COMPLETE** | `tensor_persistence.py`, `tensor_rag.py`, `tensor_versioning.py` |
 | Permission system | **COMPLETE** | `access/permissions.py`, `access/audit.py` |
 | Tensor REST API | **COMPLETE** | `api/` module with FastAPI, 49 tests |
+| Simulation REST API | **COMPLETE** | `api/routes/simulations.py` - CRUD, status, cancel |
+| Rate limiting | **COMPLETE** | `api/middleware/rate_limit.py` - slowapi, per-tier limits |
+| Batch submission API | **COMPLETE** | `api/routes/batch.py`, `api/batch_runner.py` - 22 tests |
+| Usage quotas | **COMPLETE** | `api/middleware/usage_quota.py`, `api/usage_storage.py` - 34 tests |
+| CLI-API integration | **COMPLETE** | `api/client.py` (SDK), `api/usage_bridge.py`, `--api` flag - 21 tests |
 
 ---
 
 ## Reality Check
 
-**Where we are:** Working research prototype with 18 novel mechanisms, intelligent model selection, parallel execution, and **complete tensor persistence system** (260 tests).
+**Where we are:** Working research prototype with 18 novel mechanisms, intelligent model selection, parallel execution, and **complete tensor persistence system** (329+ tests).
 
 **What works:**
 - Single-run and parallel simulations with full temporal reasoning
@@ -432,12 +441,17 @@ Broad accessibility and ecosystem.
 - Tensor persistence with SQLite, versioning, RAG search
 - Permission system (private/shared/public) with audit logging
 - REST API for tensor CRUD, search, and composition
+- Simulation REST API (job submission, status, cancel, templates)
+- Rate limiting with per-tier controls (free/basic/pro/enterprise)
+- Batch submission API (2-100 jobs per batch, budget caps, fail-fast)
+- Usage quotas (monthly limits for API calls, simulations, cost)
+- CLI-API integration (`./run.sh --api`, Python SDK, usage bridge)
 
-**What's missing:** Simulation REST API, external integrations, containerization, distributed execution.
+**What's missing:** External integrations, containerization, distributed execution.
 
 **Timeline:** 2-3 years to full platform vision.
 
-**First step:** Complete containerization and Simulation REST API endpoints.
+**First step:** Complete containerization (Dockerfile, Docker Compose).
 
 ---
 
