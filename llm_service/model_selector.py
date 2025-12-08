@@ -30,6 +30,9 @@ from enum import Enum, auto
 from typing import Dict, List, Optional, Set, Any
 from dataclasses import dataclass, field
 from functools import lru_cache
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class ModelCapability(Enum):
@@ -543,6 +546,51 @@ class ModelSelector:
                     self._capability_index[cap] = set()
                 self._capability_index[cap].add(model_id)
 
+        # Restricted model prefixes - these may cause issues with synthetic data
+        # or have API-specific behaviors (like extended thinking) that aren't supported
+        self._restricted_prefixes = [
+            "anthropic/",   # Claude models - extended thinking blocks can cause API errors
+            "openai/",      # OpenAI - TOS prohibits synthetic data generation
+            "google/",      # Google - TOS prohibits synthetic data generation
+        ]
+
+    def _check_restricted_model(self, model_id: str) -> bool:
+        """
+        Check if a model ID is from a restricted provider and log warnings.
+
+        Restricted models include:
+        - Anthropic (Claude) - Extended thinking blocks can cause session state errors
+        - OpenAI - TOS prohibits synthetic data generation
+        - Google - TOS prohibits synthetic data generation
+
+        Args:
+            model_id: Model identifier to check
+
+        Returns:
+            True if model is restricted (warning logged), False otherwise
+        """
+        model_lower = model_id.lower()
+
+        for prefix in self._restricted_prefixes:
+            if model_lower.startswith(prefix):
+                provider = prefix.rstrip("/")
+
+                if provider == "anthropic":
+                    logger.warning(
+                        f"⚠️  Model '{model_id}' is from Anthropic. Note: Extended thinking "
+                        f"features can cause 'thinking blocks cannot be modified' errors if "
+                        f"conversation state accumulates. Consider using open-source models."
+                    )
+                else:
+                    logger.warning(
+                        f"⚠️  Model '{model_id}' is from {provider}. TOS may prohibit "
+                        f"synthetic data generation. Consider using open-source models "
+                        f"from the registry (Llama, Qwen, DeepSeek, Mistral)."
+                    )
+                return True
+
+        return False
+
     def select_model(
         self,
         action: ActionType,
@@ -764,3 +812,27 @@ def get_fallback_models(
         List of model IDs
     """
     return get_default_selector().get_fallback_chain(action, chain_length)
+
+
+def check_model_restrictions(model_id: str) -> bool:
+    """
+    Check if a model ID is from a restricted provider.
+
+    Restricted providers include:
+    - Anthropic (Claude): Extended thinking can cause session state errors
+    - OpenAI: TOS prohibits synthetic data generation
+    - Google: TOS prohibits synthetic data generation
+
+    Use this to validate externally-provided model IDs before making API calls.
+
+    Args:
+        model_id: Model identifier to check (e.g., "anthropic/claude-3-opus")
+
+    Returns:
+        True if model is restricted (warning logged), False otherwise
+
+    Example:
+        >>> if check_model_restrictions(user_provided_model):
+        ...     print("Using restricted model - proceed with caution")
+    """
+    return get_default_selector()._check_restricted_model(model_id)
