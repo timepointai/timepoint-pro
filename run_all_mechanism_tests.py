@@ -1434,12 +1434,12 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, paralle
 
     # ANDOS test scripts (always run)
     andos_scripts = [
-        ("test_m5_query_evolution.py", "M5 Query Evolution", {"M5"}),
-        ("test_m9_missing_witness.py", "M9 Missing Witness", {"M9"}),
-        ("test_m10_scene_analysis.py", "M10 Scene Analysis", {"M10"}),
-        ("test_m12_alternate_history.py", "M12 Alternate History", {"M12"}),
-        ("test_m13_synthesis.py", "M13 Multi-Entity Synthesis", {"M13"}),
-        ("test_m14_circadian.py", "M14 Circadian Patterns", {"M14"}),
+        ("tests/mechanisms/test_m5_query_evolution.py", "M5 Query Evolution", {"M5"}),
+        ("tests/mechanisms/test_m9_missing_witness.py", "M9 Missing Witness", {"M9"}),
+        ("tests/mechanisms/test_m10_scene_analysis.py", "M10 Scene Analysis", {"M10"}),
+        ("tests/mechanisms/test_m12_alternate_history.py", "M12 Alternate History", {"M12"}),
+        ("tests/mechanisms/test_m13_synthesis.py", "M13 Multi-Entity Synthesis", {"M13"}),
+        ("tests/mechanisms/test_m14_circadian.py", "M14 Circadian Patterns", {"M14"}),
     ]
 
     # Select templates based on mode

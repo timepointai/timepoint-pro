@@ -344,6 +344,10 @@ All models via OpenRouter, all open-source with commercial synthetic data rights
 - Phase 5: Permission system (private/shared/public), audit logging
 - Phase 6: REST API with auth, rate limiting, batch submission, usage quotas
 
+**Mechanism Test Coverage (13/13 passing, Dec 2025):**
+- Phase 1 Templates: board_meeting, jefferson_dinner, hospital_crisis, kami_shrine, detective_prospection, vc_pitch_pearl, vc_pitch_roadshow
+- Phase 2 ANDOS Scripts: M5 (Query Evolution), M9 (Missing Witness), M10 (Scene Analysis), M12 (Alternate History), M13 (Multi-Entity Synthesis), M14 (Circadian Patterns)
+
 **Not yet implemented:**
 - External integrations (prediction markets, webhooks)
 - Containerization / distributed deployment

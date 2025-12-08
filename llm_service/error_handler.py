@@ -21,6 +21,8 @@ class ErrorType(str, Enum):
     API_ERROR = "api_error"
     NETWORK_ERROR = "network_error"
     VALIDATION_ERROR = "validation_error"
+    INSUFFICIENT_CREDITS = "insufficient_credits"  # 402 error - non-retryable
+    THINKING_BLOCKS_ERROR = "thinking_blocks"  # Anthropic extended thinking state error - non-retryable
     UNKNOWN = "unknown"
 
 
@@ -35,6 +37,10 @@ class RetryConfig:
 
     def __post_init__(self):
         if self.retry_on_types is None:
+            # NOTE: INSUFFICIENT_CREDITS and THINKING_BLOCKS_ERROR are intentionally
+            # NOT in this list - they are non-retryable errors:
+            # - INSUFFICIENT_CREDITS: Payment/quota issue, retrying won't help
+            # - THINKING_BLOCKS_ERROR: Anthropic session state issue, requires new session
             self.retry_on_types = [
                 ErrorType.RATE_LIMIT,
                 ErrorType.TIMEOUT,
@@ -146,6 +152,15 @@ class ErrorHandler:
         """
         error_str = str(error).lower()
         error_type_name = type(error).__name__.lower()
+
+        # Anthropic thinking blocks error (non-retryable - session state issue)
+        # This happens when extended thinking is enabled and conversation accumulates thinking blocks
+        if any(term in error_str for term in ['thinking', 'redacted_thinking', 'thinking blocks']):
+            return ErrorType.THINKING_BLOCKS_ERROR
+
+        # Insufficient credits (non-retryable - payment issue)
+        if any(term in error_str for term in ['insufficient credits', '402', 'payment required']):
+            return ErrorType.INSUFFICIENT_CREDITS
 
         # Rate limiting
         if any(term in error_str for term in ['rate limit', '429', 'too many requests']):
