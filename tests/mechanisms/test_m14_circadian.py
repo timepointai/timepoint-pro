@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 # Ensure we can import from project
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from generation.config_schema import SimulationConfig
 from generation.resilience_orchestrator import ResilientE2EWorkflowRunner
