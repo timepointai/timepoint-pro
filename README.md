@@ -469,6 +469,7 @@ See [MILESTONES.md](MILESTONES.md) for the detailed roadmap.
 - **[MECHANICS.md](MECHANICS.md)**: Technical specification of all 18 mechanisms
 - **[MILESTONES.md](MILESTONES.md)**: Roadmap from prototype to platform
 - **[QUICKSTART.md](QUICKSTART.md)**: Quick start guide for natural language simulations
+- **[SYNTH.md](SYNTH.md)**: SynthasAIzer control paradigm (Moog-inspired UX layer)
 
 ---
 
