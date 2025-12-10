@@ -9,6 +9,7 @@ Provides:
 - LLM client configuration
 - Async test support
 - Test file tracking and timestamp monitoring
+- SynthasAIzer paradigm fixtures (templates, patches, envelopes, voices)
 """
 import ast
 import os
@@ -533,3 +534,175 @@ def shared_tensor_db():
                     os.unlink(wal_path)
         except Exception:
             pass
+
+
+# ============================================================================
+# SynthasAIzer Paradigm Fixtures (Templates, Patches, Envelopes, Voices)
+# ============================================================================
+
+@pytest.fixture(scope="session")
+def template_loader():
+    """
+    Provide TemplateLoader for all tests.
+
+    Session-scoped for efficiency - catalog is loaded once.
+    Use this fixture to access templates via the SynthasAIzer patch system.
+    """
+    from generation.templates.loader import TemplateLoader
+    return TemplateLoader()
+
+
+@pytest.fixture(scope="function")
+def sample_envelope():
+    """
+    Provide a sample ADSR envelope configuration.
+
+    Default values represent a balanced entity lifecycle:
+    - attack: 0.2 (20% of simulation for entity to reach full presence)
+    - decay: 0.1 (10% transition to sustain level)
+    - sustain: 0.8 (80% presence during main phase)
+    - release: 0.3 (30% for graceful exit)
+    """
+    from synth import EnvelopeConfig
+    return EnvelopeConfig(attack=0.2, decay=0.1, sustain=0.8, release=0.3)
+
+
+@pytest.fixture(scope="function")
+def sample_voice():
+    """
+    Provide a sample voice configuration for entity mixing.
+
+    Default values represent a fully active entity:
+    - mute: False (entity is audible/visible)
+    - solo: False (not soloed)
+    - gain: 1.0 (full presence level)
+    """
+    from synth import VoiceConfig
+    return VoiceConfig(mute=False, solo=False, gain=1.0)
+
+
+@pytest.fixture(scope="function")
+def sample_synth_entity(sample_envelope, sample_voice):
+    """
+    Provide a sample entity with SynthasAIzer envelope and voice settings.
+
+    Combines base entity with envelope lifecycle and voice mixing controls.
+    """
+    from schemas import Entity, ResolutionLevel
+    from synth import EntityEnvelopeState, apply_envelope_to_entity
+
+    entity = Entity(
+        entity_id="synth_entity_001",
+        entity_type="human",
+        timepoint="test_tp_001",
+        resolution_level=ResolutionLevel.TENSOR_ONLY,
+        entity_metadata={"role": "synth_test_subject"}
+    )
+
+    # Apply envelope state
+    envelope_state = EntityEnvelopeState(
+        entity_id=entity.entity_id,
+        config=sample_envelope,
+        current_phase="sustain",
+        phase_progress=0.5,
+        current_level=sample_envelope.sustain
+    )
+
+    return {
+        "entity": entity,
+        "envelope": sample_envelope,
+        "voice": sample_voice,
+        "envelope_state": envelope_state
+    }
+
+
+@pytest.fixture(scope="function")
+def patch_categories(template_loader) -> List[str]:
+    """
+    Provide list of all available patch categories.
+
+    Categories follow SynthasAIzer naming convention:
+    corporate, historical, crisis, mystical, mystery, mechanism, portal, stress, convergence
+    """
+    return template_loader.list_patch_categories()
+
+
+@pytest.fixture(scope="function")
+def mechanism_templates(template_loader) -> List[str]:
+    """
+    Provide list of mechanism template IDs (M1-M18 coverage).
+
+    These templates are designed to test specific TTM mechanisms.
+    """
+    return template_loader.list_patches_by_category("mechanism")
+
+
+@pytest.fixture(scope="function")
+def showcase_templates(template_loader) -> List[str]:
+    """
+    Provide list of showcase template IDs.
+
+    Showcase templates demonstrate full SynthasAIzer capabilities
+    with envelopes, voices, and rich configurations.
+    """
+    return [t.id for t in template_loader.list_templates(category="showcase")]
+
+
+@pytest.fixture(scope="function")
+def load_template(template_loader):
+    """
+    Factory fixture to load templates by ID.
+
+    Usage:
+        def test_my_template(load_template):
+            config = load_template("showcase/founding_fathers")
+            assert config.entities.count >= 3
+    """
+    def _load(template_id: str):
+        return template_loader.load_template(template_id)
+    return _load
+
+
+@pytest.fixture(scope="function")
+def get_patch_metadata(template_loader):
+    """
+    Factory fixture to get patch metadata by template ID.
+
+    Usage:
+        def test_patch_info(get_patch_metadata):
+            patch = get_patch_metadata("showcase/founding_fathers")
+            assert "historical" in patch.tags
+    """
+    def _get(template_id: str):
+        return template_loader.get_patch_metadata(template_id)
+    return _get
+
+
+@pytest.fixture(scope="function")
+def sample_simulation_config(template_loader):
+    """
+    Provide a sample SimulationConfig loaded from a template.
+
+    Uses board_meeting as a reliable, well-configured template.
+    """
+    return template_loader.load_template("core/board_meeting")
+
+
+@pytest.fixture(scope="function")
+def envelope_progression():
+    """
+    Provide envelope progression test data.
+
+    Returns list of (phase, progress, expected_level) tuples
+    for testing envelope calculations.
+    """
+    return [
+        ("attack", 0.0, 0.0),
+        ("attack", 0.5, 0.5),
+        ("attack", 1.0, 1.0),
+        ("decay", 0.0, 1.0),
+        ("decay", 1.0, 0.8),  # sustain level
+        ("sustain", 0.5, 0.8),
+        ("release", 0.0, 0.8),
+        ("release", 1.0, 0.0),
+    ]

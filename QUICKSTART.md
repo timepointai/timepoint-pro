@@ -51,17 +51,17 @@ python run_all_mechanism_tests.py --nl "detective interrogates 3 witnesses about
 
 ### Template-Based Mode
 ```bash
-# List all 40 available templates
-./run.sh --list
+# List all 41 available templates
+./run.sh list
 
 # Run a single template
-./run.sh --template board_meeting
-./run.sh --template constitutional_convention_day1
+./run.sh run board_meeting
+./run.sh run constitutional_convention_day1
 
 # Run templates by category
-./run.sh --category core          # 18 mechanism isolation tests
-./run.sh --category showcase      # 10 production-ready scenarios
-./run.sh --category portal        # 4 backward reasoning scenarios
+./run.sh run --category core          # 18 mechanism isolation tests
+./run.sh run --category showcase      # 10 production-ready scenarios
+./run.sh run --category portal        # 4 backward reasoning scenarios
 
 # Run templates by tier (complexity)
 ./run.sh quick                    # Fast tests (~2-3 min each)
@@ -151,16 +151,15 @@ Note: Free models have more restrictive rate limits and availability may rotate.
 python run_all_mechanism_tests.py --nl "your description" --parallel 4
 
 # Run all templates in a category
-./run.sh --category showcase --parallel 6
+./run.sh run --category showcase --parallel 6
 
 # Filter by mechanism
-./run.sh --mechanism M1,M7,M11
+./run.sh run --mechanism M1,M7,M11
 
 # Skip LLM summary generation (faster, cheaper)
-./run.sh --tier quick --skip-summaries
+./run.sh quick --skip-summaries
 
 # Help
-python run_all_mechanism_tests.py --help
 ./run.sh --help
 ```
 
@@ -242,10 +241,10 @@ After generating a simulation:
 3. **Explore templates by mechanism**:
    ```bash
    # See which templates test which mechanisms
-   ./run.sh --list
+   ./run.sh list
 
    # Run all templates that test M7 (causal chains)
-   ./run.sh --mechanism M7
+   ./run.sh run --mechanism M7
    ```
 
 ## Troubleshooting
@@ -286,7 +285,7 @@ showcase/board_meeting                   standard     showcase     M1, M7, M11 +
 portal/startup_unicorn                   comprehensive portal      M17, M13, M7 +1
 stress/constitutional_convention_day1    stress       stress       M1, M2, M3 +7
 --------------------------------------------------------------------------------
-Total: 40 templates
+Total: 41 templates
 ```
 
 ---
@@ -298,6 +297,6 @@ Total: 40 templates
 python run_all_mechanism_tests.py --nl "your natural language prompt here"
 
 # Or pick a template
-./run.sh --list
-./run.sh --template board_meeting
+./run.sh list
+./run.sh run board_meeting
 ```

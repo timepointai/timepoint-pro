@@ -95,6 +95,9 @@ class ActionType(Enum):
     SUMMARIZATION = auto()             # Summarize content
     NARRATIVE_EXPORT = auto()          # Generate narrative
 
+    # Knowledge operations (M19)
+    KNOWLEDGE_EXTRACTION = auto()      # Extract knowledge items from dialog
+
 
 @dataclass
 class ModelProfile:
@@ -492,6 +495,14 @@ ACTION_REQUIREMENTS: Dict[ActionType, Dict[str, Any]] = {
         "required": {ModelCapability.LONG_FORM_TEXT},
         "preferred": {ModelCapability.HIGH_QUALITY},
         "min_context_tokens": 8192,
+    },
+
+    # Knowledge operations (M19)
+    # NOTE: Avoid reasoning models (DeepSeek R1, QwQ) - they output thinking tokens that break JSON
+    ActionType.KNOWLEDGE_EXTRACTION: {
+        "required": {ModelCapability.STRUCTURED_JSON, ModelCapability.INSTRUCTION_FOLLOWING},
+        "preferred": {ModelCapability.HIGH_QUALITY, ModelCapability.LARGE_CONTEXT, ModelCapability.DIALOG_GENERATION},
+        "min_context_tokens": 16384,  # Need context for causal graph + dialog
     },
 }
 

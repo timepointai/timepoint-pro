@@ -1,14 +1,26 @@
 # ============================================================================
-# workflows/dialog_synthesis.py - Dialog Synthesis (Mechanism 8, 11)
+# workflows/dialog_synthesis.py - Dialog Synthesis (Mechanism 8, 11, 19)
 # ============================================================================
 """
-Dialog synthesis with body-mind coupling.
+Dialog synthesis with body-mind coupling and intelligent knowledge extraction.
 
 Contains:
 - couple_pain_to_cognition: Apply pain effects to cognitive state (@M8)
 - couple_illness_to_cognition: Apply illness effects to cognitive state
 - synthesize_dialog: Generate conversation with full context (@M11)
+- Knowledge extraction via M19 LLM agent (replaces naive word extraction)
 - Helper functions for exposure events, relationship metrics, etc.
+
+Knowledge Extraction (M19):
+    Dialog synthesis now uses workflows.knowledge_extraction.extract_knowledge_from_dialog()
+    for intelligent LLM-based extraction of semantic knowledge items. This replaced
+    the naive extract_knowledge_references() function which just grabbed capitalized words.
+
+    The M19 agent:
+    - Extracts complete semantic units (not single words)
+    - Understands context from causal graph
+    - Categorizes knowledge (fact, decision, opinion, plan, etc.)
+    - Assigns confidence and causal relevance scores
 """
 
 from typing import List, Dict, Optional
@@ -109,31 +121,27 @@ def get_timepoint_position(timeline: List[Dict], timepoint: 'Timepoint') -> str:
 
 def extract_knowledge_references(content: str) -> List[str]:
     """
-    Extract knowledge items referenced in dialog content.
+    DEPRECATED: Naive capitalization-based extraction.
 
-    Looks for capitalized words (proper nouns, concepts) that might represent
-    knowledge transfer during dialog. Returns normalized (lowercase) versions
-    for consistent comparison.
+    This function is deprecated and should NOT be used. It produced garbage
+    like "we'll", "thanks", "what" because it just grabbed capitalized words.
+
+    Use workflows.knowledge_extraction.extract_knowledge_from_dialog() instead,
+    which uses an LLM agent (M19) for intelligent semantic extraction.
+
+    Kept for backward compatibility but returns empty list.
 
     Args:
         content: Dialog turn content to analyze
 
     Returns:
-        List of unique knowledge references found (lowercase)
+        Empty list (deprecated - use LLM extraction instead)
     """
-    # Split without lowercasing first - we need to detect capitalization
-    words = content.split()
-    knowledge_items = []
-
-    # Look for capitalized words that might be proper nouns or concepts
-    for word in words:
-        # Strip punctuation for checking
-        clean_word = word.strip('.,!?;:"\'-()[]{}')
-        if clean_word and len(clean_word) > 3 and clean_word[0].isupper():
-            # Store lowercase for consistent comparison
-            knowledge_items.append(clean_word.lower())
-
-    return list(set(knowledge_items))
+    logger.warning(
+        "[DEPRECATED] extract_knowledge_references() is deprecated. "
+        "Use workflows.knowledge_extraction.extract_knowledge_from_dialog() instead."
+    )
+    return []  # Return empty - extraction now handled by M19 agent
 
 
 def create_exposure_event(entity_id: str, information: str, source: str, event_type: str,
@@ -475,34 +483,49 @@ Generate 8-12 dialog turns showing realistic interaction given these constraints
         max_tokens=2000
     )
 
-    # Create ExposureEvents for information exchange
+    # Create ExposureEvents using M19 Knowledge Extraction Agent (LLM-based)
     exposure_events_created = 0
     if store:
-        print(f"    [M11→M3] Processing {len(dialog_data.turns)} dialog turns for exposure events")
+        print(f"    [M11→M19] Extracting knowledge from {len(dialog_data.turns)} dialog turns using LLM agent")
+
+        # Import M19 knowledge extraction
+        from workflows.knowledge_extraction import (
+            extract_knowledge_from_dialog,
+            create_exposure_events_from_knowledge
+        )
+
+        # Prepare dialog turns as dicts for extraction
+        turns_for_extraction = []
         for turn in dialog_data.turns:
-            # Extract knowledge items mentioned in turn
-            mentioned_knowledge = extract_knowledge_references(turn.content)
+            turn_dict = turn.dict() if hasattr(turn, 'dict') else turn.model_dump()
+            turns_for_extraction.append(turn_dict)
 
-            if mentioned_knowledge:
-                print(f"    [M11→M3] Turn by {turn.speaker}: {len(mentioned_knowledge)} knowledge refs: {mentioned_knowledge[:3]}")
+        # Run LLM-based knowledge extraction (M19)
+        extraction_result = extract_knowledge_from_dialog(
+            dialog_turns=turns_for_extraction,
+            entities=entities,
+            timepoint=timepoint,
+            llm=llm,
+            store=store,
+            dialog_id=f"dialog_{timepoint.timepoint_id}"
+        )
 
-            # Create exposure for all listeners
-            for listener in entities:
-                if listener.entity_id != turn.speaker:
-                    for knowledge_item in mentioned_knowledge:
-                        create_exposure_event(
-                            entity_id=listener.entity_id,
-                            information=knowledge_item,
-                            source=turn.speaker,
-                            event_type="told",
-                            timestamp=turn.timestamp,
-                            confidence=0.9,
-                            store=store,
-                            timepoint_id=timepoint.timepoint_id  # NEW: Set timepoint context
-                        )
-                        exposure_events_created += 1
+        # Create exposure events from extracted knowledge (M19→M3)
+        exposure_events_created = create_exposure_events_from_knowledge(
+            extraction_result=extraction_result,
+            timepoint=timepoint,
+            store=store
+        )
 
-        print(f"    [M11→M3] Created {exposure_events_created} exposure events from dialog")
+        # Log extraction summary
+        if extraction_result.items:
+            print(f"    [M19→M3] Extracted {len(extraction_result.items)} knowledge items ({extraction_result.items_per_turn:.2f}/turn)")
+            for item in extraction_result.items[:3]:  # Show first 3
+                print(f"      - [{item.category}] {item.content[:60]}...")
+        else:
+            print(f"    [M19] No meaningful knowledge extracted (normal for casual dialog)")
+
+        print(f"    [M19→M3] Created {exposure_events_created} exposure events from knowledge extraction")
 
     # Convert dialog turns to JSON-serializable format (handle datetime objects)
     turns_data = []

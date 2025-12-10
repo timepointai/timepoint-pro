@@ -109,13 +109,13 @@ The system generates entities at appropriate resolution, simulates the scenario 
 
 ## Architecture (Brief)
 
-The 18 mechanisms in MECHANICS.md implement these ideas:
+The 19 mechanisms in MECHANICS.md implement these ideas:
 
 | Concept | Mechanisms |
 |---------|------------|
 | Heterogeneous fidelity | M1 (fidelity graphs), M2 (progressive training), M5 (lazy elevation), M6 (tensor compression) |
 | Temporal reasoning | M7 (causal chains), M8 (vertical expansion), M12 (counterfactual branching) |
-| Knowledge tracking | M3 (graph construction), M4 (embedding), M9 (on-demand generation) |
+| Knowledge tracking | M3 (graph construction), M4 (embedding), M9 (on-demand generation), **M19 (knowledge extraction)** |
 | Synthesis | M10 (scene management), M11 (dialog), M13 (multi-entity), M15 (prospection), M16 (animistic agency) |
 | Infrastructure | M14 (circadian patterns), M17 (metadata tracking), **M18 (model selection)** |
 | Evaluation | **Convergence analysis** (causal graph consistency across runs) |
@@ -309,7 +309,7 @@ export OPENROUTER_API_KEY=your_key_here
 ```
 
 **Implemented:**
-- 18 simulation mechanisms (M1-M18)
+- 19 simulation mechanisms (M1-M19)
 - M18: Intelligent per-action model selection (12 open-source models)
 - PORTAL mode (backward temporal reasoning)
 - Natural language interface integration
@@ -467,7 +467,7 @@ See [MILESTONES.md](MILESTONES.md) for the detailed roadmap.
 
 ## Documentation
 
-- **[MECHANICS.md](MECHANICS.md)**: Technical specification of all 18 mechanisms
+- **[MECHANICS.md](MECHANICS.md)**: Technical specification of all 19 mechanisms
 - **[MILESTONES.md](MILESTONES.md)**: Roadmap from prototype to platform
 - **[QUICKSTART.md](QUICKSTART.md)**: Quick start guide for natural language simulations
 - **[SYNTH.md](SYNTH.md)**: SynthasAIzer control paradigm (Moog-inspired UX layer)

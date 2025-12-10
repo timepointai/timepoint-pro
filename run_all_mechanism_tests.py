@@ -146,6 +146,92 @@ if os.getenv("OXEN_API_KEY") and not os.getenv("OXEN_API_TOKEN"):
     os.environ["OXEN_API_TOKEN"] = os.environ["OXEN_API_KEY"]
 
 
+# ============================================================================
+# SynthasAIzer Template Loading (Unified TemplateLoader Pattern)
+# ============================================================================
+
+def get_template_loader():
+    """Get cached TemplateLoader instance."""
+    if not hasattr(get_template_loader, '_loader'):
+        from generation.templates.loader import TemplateLoader
+        get_template_loader._loader = TemplateLoader()
+    return get_template_loader._loader
+
+
+def load_template_by_name(name: str) -> Tuple[Optional['SimulationConfig'], Set[str]]:
+    """
+    Load a template by name using TemplateLoader.
+
+    Supports both short names (e.g., 'board_meeting') and full IDs (e.g., 'showcase/board_meeting').
+
+    Args:
+        name: Template name or full ID
+
+    Returns:
+        Tuple of (SimulationConfig, mechanism_set) or (None, set()) if not found
+    """
+    from generation.config_schema import SimulationConfig
+
+    loader = get_template_loader()
+    catalog = loader.get_catalog()
+
+    # Try direct lookup first
+    template_info = catalog.templates.get(name)
+
+    # Try with common prefixes
+    if not template_info:
+        for prefix in ['showcase/', 'core/', 'portal/', 'stress/', 'convergence/']:
+            full_id = f"{prefix}{name}"
+            template_info = catalog.templates.get(full_id)
+            if template_info:
+                name = full_id
+                break
+
+    if not template_info:
+        return None, set()
+
+    try:
+        config = loader.load_template(name)
+        # TemplateInfo is a dataclass, access mechanisms as attribute
+        mechanisms = set(template_info.mechanisms)
+        return config, mechanisms
+    except Exception as e:
+        print(f"Warning: Failed to load template '{name}': {e}")
+        return None, set()
+
+
+def list_available_templates() -> List[str]:
+    """List all available template IDs from TemplateLoader."""
+    loader = get_template_loader()
+    return [t.id for t in loader.list_templates()]
+
+
+def get_templates_by_category(category: str) -> List[Tuple[str, Set[str]]]:
+    """
+    Get all templates in a category.
+
+    Args:
+        category: Category name (e.g., 'showcase', 'portal', 'mechanism')
+
+    Returns:
+        List of (template_id, mechanism_set) tuples
+    """
+    loader = get_template_loader()
+    catalog = loader.get_catalog()
+
+    template_ids = catalog.patches.get(category, [])
+    result = []
+
+    for tid in template_ids:
+        template_info = catalog.templates.get(tid)
+        if template_info:
+            # TemplateInfo is a dataclass, access mechanisms as attribute
+            mechanisms = set(template_info.mechanisms)
+            result.append((tid, mechanisms))
+
+    return result
+
+
 def run_convergence_analysis(
     run_count: int = 3,
     template_filter: Optional[str] = None,
@@ -748,7 +834,7 @@ def list_modes():
     print("\n🎯 PORTAL TIMEPOINT MODES (Real Founder Profiles)")
     print("  --portal-timepoint-only:")
     print("    Templates: 5 | Cost: $0.20-$0.40 | Runtime: 12-18 min")
-    print("    Standard portal with real Timepoint founders (Sean + Ken)")
+    print("    Standard portal with real Timepoint founder profiles")
     print("  --portal-timepoint-simjudged-quick-only:")
     print("    Templates: 5 | Cost: $0.40-$0.80 | Runtime: 24-36 min")
     print("    Portal Timepoint + lightweight simulation judging")
@@ -1336,7 +1422,7 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, paralle
         ("vc_pitch_strategies", SimulationConfig.example_vc_pitch_strategies(), {"M12", "M10", "M15", "M17"}),
         # WARNING: These are VERY expensive!
         # ("variations", SimulationConfig.example_variations(), {"M1", "M2"}),  # 100 variations
-        # ("scarlet_study_deep", SimulationConfig.example_scarlet_study_deep(), {"M1-M17"}),  # 101 timepoints
+        # ("scarlet_study_deep", SimulationConfig.example_scarlet_study_deep(), {"M1-M19"}),  # 101 timepoints
     ]
 
     # Timepoint Corporate Formation Analysis (new category)
@@ -1515,7 +1601,7 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, paralle
     elif mode == 'portal_timepoint':
         templates_to_run = portal_timepoint_templates
         print("🌀 PORTAL TIMEPOINT MODE: Real Founder Stories (Standard)")
-        print("   Running 5 PORTAL templates with real Timepoint founder profiles (Sean + Ken):")
+        print("   Running 5 PORTAL templates with real Timepoint founder profiles:")
         print("   - portal_timepoint_unicorn: $1.2B Series C (March 2030 → October 2024)")
         print("   - portal_timepoint_series_a_success: $50M Series A (December 2026 → February 2025)")
         print("   - portal_timepoint_product_market_fit: $5M ARR + PMF (June 2026 → October 2024)")
@@ -1770,14 +1856,14 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, paralle
             if run.mechanisms_used:
                 historical_mechanisms.update(run.mechanisms_used)
 
-        print(f"\nTotal Coverage: {len(historical_mechanisms)}/17 ({len(historical_mechanisms)/17*100:.1f}%)")
+        print(f"\nTotal Coverage: {len(historical_mechanisms)}/19 ({len(historical_mechanisms)/19*100:.1f}%)")
         print(f"Tracked: {', '.join(sorted(historical_mechanisms))}")
 
-        missing = set([f"M{i}" for i in range(1, 18)]) - historical_mechanisms
+        missing = set([f"M{i}" for i in range(1, 20)]) - historical_mechanisms
         if missing:
             print(f"\n⚠️  Missing: {', '.join(sorted(missing))}")
         else:
-            print("\n🎉 SUCCESS: All 17 mechanisms tracked!")
+            print("\n🎉 SUCCESS: All 19 mechanisms tracked!")
 
     except Exception as e:
         print(f"Could not check metadata: {e}")
@@ -2397,7 +2483,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--mechanism",
         type=str,
-        metavar="M1-M18",
+        metavar="M1-M19",
         help="Run templates that test a specific mechanism (e.g. M7, M15, M17)"
     )
     parser.add_argument(

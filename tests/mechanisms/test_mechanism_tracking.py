@@ -4,6 +4,7 @@ Test mechanism tracking by running one template.
 """
 import sys
 from generation.config_schema import SimulationConfig
+from generation.templates.loader import TemplateLoader
 from generation.resilience_orchestrator import ResilientE2EWorkflowRunner
 from metadata.run_tracker import MetadataManager
 from metadata.coverage_matrix import CoverageMatrix
@@ -14,13 +15,14 @@ metadata_manager = MetadataManager()
 # Initialize E2E runner
 runner = ResilientE2EWorkflowRunner(metadata_manager)
 
-# Run jefferson_dinner template
+# Run jefferson_dinner template using TemplateLoader for SynthasAIzer compliance
 print("=" * 80)
 print("Testing Mechanism Tracking: jefferson_dinner")
 print("=" * 80)
 print()
 
-config = SimulationConfig.example_jefferson_dinner()
+loader = TemplateLoader()
+config = loader.load_template("showcase/jefferson_dinner")
 try:
     result_metadata = runner.run(config)
 

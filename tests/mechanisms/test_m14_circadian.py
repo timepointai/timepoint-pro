@@ -19,6 +19,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from generation.config_schema import SimulationConfig
+from generation.templates.loader import TemplateLoader
 from generation.resilience_orchestrator import ResilientE2EWorkflowRunner
 from metadata.run_tracker import MetadataManager
 
@@ -41,7 +42,9 @@ def main():
     runner = ResilientE2EWorkflowRunner(metadata_manager)
 
     # Use hospital_crisis template which explicitly demonstrates M14
-    config = SimulationConfig.example_hospital_crisis()
+    # Using TemplateLoader for SynthasAIzer compliance
+    loader = TemplateLoader()
+    config = loader.load_template("showcase/hospital_crisis")
 
     try:
         # Step 1: Run E2E workflow (creates entities via ANDOS)

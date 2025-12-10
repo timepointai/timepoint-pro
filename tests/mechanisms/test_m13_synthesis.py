@@ -19,6 +19,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from generation.config_schema import SimulationConfig
+from generation.templates.loader import TemplateLoader
 from generation.resilience_orchestrator import ResilientE2EWorkflowRunner
 from metadata.run_tracker import MetadataManager
 
@@ -42,7 +43,9 @@ def main():
 
     # Use empty_house_flashback template which explicitly demonstrates M13
     # This template has multiple entities and relationship evolution
-    config = SimulationConfig.example_empty_house_flashback()
+    # Using TemplateLoader for SynthasAIzer compliance
+    loader = TemplateLoader()
+    config = loader.load_template("stress/empty_house_flashback")
 
     try:
         # Step 1: Run E2E workflow (creates entities via ANDOS)

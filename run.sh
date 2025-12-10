@@ -90,7 +90,7 @@ PRESETS (run by tier or category):
     ./run.sh quick                   Quick-tier templates (~$0.02-0.05 each)
     ./run.sh standard                Standard-tier templates (~$0.05-0.20)
     ./run.sh comprehensive           Comprehensive templates (~$0.20-1.00)
-    ./run.sh core                    All 18 mechanism tests (M1-M18)
+    ./run.sh core                    All 19 mechanism tests (M1-M19)
     ./run.sh showcase                10 production-ready scenarios
     ./run.sh portal                  4 backward reasoning scenarios
 
@@ -143,7 +143,7 @@ RUN - Execute Simulations
         standard        All standard-tier templates (~5-10 min each)
         comprehensive   All comprehensive-tier templates (~15-30 min)
         stress          All stress-tier templates (~30-60 min)
-        core            All 18 core mechanism tests
+        core            All 19 core mechanism tests
         showcase        Production-ready scenarios
         portal          Backward reasoning scenarios
         convergence     Convergence evaluation tests
@@ -236,11 +236,11 @@ TEST - Run Pytest Test Suites
         unit              Unit tests (fast, isolated)
         integration       Integration tests
         e2e               End-to-end tests
-        mechanisms        All mechanism tests (M1-M18)
+        mechanisms        All mechanism tests (M1-M19)
         synth             SynthasAIzer tests (53 tests)
 
     Shortcuts:
-        m1, m2, ... m18   Run specific mechanism tests
+        m1, m2, ... m19   Run specific mechanism tests
 
     Options:
         --coverage        Generate coverage report
@@ -279,7 +279,7 @@ LIST - Show Information
         templates       All templates with metadata (default)
         runs            Recent simulation runs
         usage           API usage statistics
-        mechanisms      All 18 mechanisms
+        mechanisms      All 19 mechanisms
         patches         Template patches by category (SYNTH.md)
 
     Options:
@@ -305,7 +305,7 @@ API - API Server Operations
 ALL 41 TEMPLATES
 ================================================================================
 
-CORE - Mechanism Isolation Tests (18)
+CORE - Mechanism Isolation Tests (19)
 -------------------------------------
   m01_heterogeneous_fidelity    M1: Different resolution levels in same scene
   m02_progressive_training      M2: Entity quality improves through queries
@@ -325,6 +325,7 @@ CORE - Mechanism Isolation Tests (18)
   m16_animistic                 M16: Non-human entities have agency
   m17_modal_causality           M17: PORTAL backward reasoning
   m18_model_selection           M18: Action-appropriate LLM selection
+  m19_knowledge_extraction      M19: Semantic knowledge extraction from dialog
 
 SHOWCASE - Production Scenarios (10)
 ------------------------------------
@@ -349,7 +350,7 @@ PORTAL - Backward Reasoning (4)
 STRESS - High Complexity (6)
 ----------------------------
   constitutional_convention_day1  28 entities, 500 timepoints ($500-1000)
-  scarlet_study_deep              101 timepoints, all 17 mechanisms ($50-100)
+  scarlet_study_deep              101 timepoints, all 19 mechanisms ($50-100)
   empty_house_flashback           81 timepoints nonlinear ($30-50)
   final_problem_branching         61 timepoints, 4 branches ($25-40)
   sign_loops_cyclical             Cyclical temporal patterns ($20-35)
@@ -381,7 +382,7 @@ EXAMPLES
 # By tier/category
 ./run.sh quick                            # All quick-tier
 ./run.sh run --tier quick --parallel 4    # Quick with parallelism
-./run.sh run --category core              # All 18 mechanism tests
+./run.sh run --category core              # All 19 mechanism tests
 
 # Free models ($0 cost)
 ./run.sh run --free board_meeting         # Best free model
@@ -415,7 +416,7 @@ EXAMPLES
 # Testing
 ./run.sh test                             # All pytest tests
 ./run.sh test synth                       # SynthasAIzer tests (53 tests)
-./run.sh test mechanisms                  # All M1-M18 mechanism tests
+./run.sh test mechanisms                  # All M1-M19 mechanism tests
 ./run.sh test m7                          # M7 causal chain tests
 ./run.sh test unit --parallel 4           # Parallel unit tests
 ./run.sh test --coverage                  # With coverage report
@@ -854,7 +855,7 @@ else:
                 print_warning "API usage tracking not available"
             ;;
         mechanisms)
-            print_header "Simulation Mechanisms (M1-M18)"
+            print_header "Simulation Mechanisms (M1-M19)"
             cat << 'MECHS'
 M1   Heterogeneous Fidelity    Per-entity resolution levels
 M2   Progressive Training      Resolution elevation over time
@@ -874,6 +875,7 @@ M15  Prospection               Future prediction
 M16  Animistic Reasoning       Non-human entity modeling
 M17  Modal Causality           Possibility reasoning
 M18  Model Selection           Intelligent LLM routing
+M19  Knowledge Extraction      Semantic knowledge from dialog
 MECHS
             ;;
         patches)
@@ -936,7 +938,7 @@ WHAT:
     templates     All templates (default)
     runs          Recent simulation runs
     usage         API usage statistics
-    mechanisms    All 18 mechanisms
+    mechanisms    All 19 mechanisms
     patches       Template patches by category (SYNTH.md)
 
 OPTIONS:
@@ -1536,7 +1538,7 @@ cmd_test() {
             --parallel|-n) parallel="$2"; shift 2 ;;
             --verbose|-v) verbose=true; shift ;;
             --marker|-m) marker="$2"; shift 2 ;;
-            m1|m2|m3|m4|m5|m6|m7|m8|m9|m10|m11|m12|m13|m14|m15|m16|m17|m18)
+            m1|m2|m3|m4|m5|m6|m7|m8|m9|m10|m11|m12|m13|m14|m15|m16|m17|m18|m19)
                 marker="$1"; shift ;;
             -*) extra_args+=("$1"); shift ;;
             *) extra_args+=("$1"); shift ;;
@@ -1597,11 +1599,11 @@ SUITES:
     unit            Unit tests (fast, isolated)
     integration     Integration tests
     e2e             End-to-end tests
-    mechanisms      All mechanism tests (M1-M18)
+    mechanisms      All mechanism tests (M1-M19)
     synth           SynthasAIzer tests (envelopes, voices, patches)
 
 MECHANISM SHORTCUTS:
-    m1, m2, ... m18     Run specific mechanism tests
+    m1, m2, ... m19     Run specific mechanism tests
 
 OPTIONS:
     --marker, -m MARKER   Custom pytest marker
@@ -1621,7 +1623,7 @@ EXAMPLES:
 PYTEST MARKERS (from pytest.ini):
     unit, integration, system, e2e    Test levels
     synth, template, patch, envelope  SynthasAIzer paradigm
-    mechanism, m1-m18                 Mechanism isolation
+    mechanism, m1-m19                 Mechanism isolation
     llm, slow                         Resource markers
 EOF
 }
@@ -1827,7 +1829,7 @@ print(len(mm.get_recent_runs(1000)))
 # TEMPLATE SHORTCUTS - All 41 templates accessible by name
 # ============================================================================
 
-# Core mechanism tests (M1-M18)
+# Core mechanism tests (M1-M19)
 CORE_TEMPLATES=(
     "m01_heterogeneous_fidelity"
     "m02_progressive_training"
@@ -1960,8 +1962,8 @@ main() {
         quick|standard|comprehensive|stress|core|showcase|portal|all)
             cmd_run "$cmd" "$@"
             ;;
-        # Core mechanism templates (M1-M18)
-        m01_*|m02_*|m03_*|m04_*|m05_*|m06_*|m07_*|m08_*|m09_*|m10_*|m11_*|m12_*|m13_*|m14_*|m15_*|m16_*|m17_*|m18_*)
+        # Core mechanism templates (M1-M19)
+        m01_*|m02_*|m03_*|m04_*|m05_*|m06_*|m07_*|m08_*|m09_*|m10_*|m11_*|m12_*|m13_*|m14_*|m15_*|m16_*|m17_*|m18_*|m19_*)
             cmd_run "$cmd" "$@"
             ;;
         # Showcase templates

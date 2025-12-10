@@ -17,6 +17,7 @@ import warnings
 from functools import wraps
 from pathlib import Path
 from schemas import FidelityPlanningMode, TokenBudgetMode
+from synth import EnvelopeConfig, VoiceConfig, VoiceMixer, DEFAULT_ENVELOPE, DEFAULT_VOICE
 
 
 def _deprecated_template(func):
@@ -357,6 +358,24 @@ class EntityConfig(BaseModel):
         ge=0, le=6, default=0,
         description="Animistic entity inclusion level (0=humans only, 6=all types)"
     )
+
+    # SynthasAIzer controls (optional, backward compatible)
+    envelope: Optional[EnvelopeConfig] = Field(
+        default=None,
+        description="ADSR envelope for entity presence lifecycle (None = flat intensity)"
+    )
+    default_voice: Optional[VoiceConfig] = Field(
+        default=None,
+        description="Default voice controls for entities (None = full participation)"
+    )
+
+    def get_envelope(self) -> EnvelopeConfig:
+        """Get envelope config, falling back to default if not set."""
+        return self.envelope or DEFAULT_ENVELOPE
+
+    def get_default_voice(self) -> VoiceConfig:
+        """Get default voice config, falling back to default if not set."""
+        return self.default_voice or DEFAULT_VOICE
 
     @field_validator('types')
     @classmethod

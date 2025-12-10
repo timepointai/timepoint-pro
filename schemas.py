@@ -309,6 +309,74 @@ class DialogData(BaseModel):
     relationship_impacts: Dict[str, float] = {}  # how relationships changed (entity_pair -> delta)
     atmosphere_evolution: List[Dict[str, float]] = []  # atmosphere changes over time
 
+    @field_validator('relationship_impacts', mode='before')
+    @classmethod
+    def flatten_nested_relationship_impacts(cls, v):
+        """
+        Flatten nested relationship_impacts from LLM output.
+
+        LLMs often return: {"entity_a": {"entity_b": 0.2, "entity_c": 0.3}, ...}
+        But schema expects: {"entity_a_entity_b": 0.2, "entity_a_entity_c": 0.3, ...}
+        """
+        if not v:
+            return {}
+        if not isinstance(v, dict):
+            return {}
+
+        # Check if already flat (all values are floats/ints)
+        all_flat = all(isinstance(val, (int, float)) for val in v.values())
+        if all_flat:
+            return v
+
+        # Flatten nested dict
+        flattened = {}
+        for entity_a, impacts in v.items():
+            if isinstance(impacts, dict):
+                for entity_b, delta in impacts.items():
+                    if isinstance(delta, (int, float)):
+                        # Create sorted key to avoid duplicate pairs
+                        pair_key = f"{entity_a}_{entity_b}"
+                        flattened[pair_key] = float(delta)
+            elif isinstance(impacts, (int, float)):
+                # Already flat pair
+                flattened[entity_a] = float(impacts)
+        return flattened
+
+
+# ============================================================================
+# Knowledge Extraction (M19 - LLM-based knowledge item extraction)
+# ============================================================================
+
+class KnowledgeItem(BaseModel):
+    """
+    A meaningful knowledge item extracted from dialog by the Knowledge Extraction Agent.
+
+    Unlike naive word extraction, these are semantic units representing actual
+    information transfer: facts, decisions, opinions, plans, revelations.
+
+    Created by: workflows/knowledge_extraction.py
+    Used by: M3 (Exposure Events), M11 (Dialog Synthesis)
+    """
+    content: str  # The actual knowledge (complete semantic unit, not a word)
+    speaker: str  # entity_id who shared this knowledge
+    listeners: List[str]  # entity_ids who received this knowledge
+    category: str  # fact, decision, opinion, plan, revelation, question, agreement
+    confidence: float = 0.9  # 0.0-1.0, extraction confidence
+    context: Optional[str] = None  # Why this knowledge matters in the scene
+    source_turn_index: Optional[int] = None  # Which dialog turn this came from
+    causal_relevance: float = 0.5  # 0.0-1.0, how important for causal chain
+
+
+class KnowledgeExtractionResult(BaseModel):
+    """Result of LLM-based knowledge extraction from a dialog."""
+    items: List[KnowledgeItem]
+    dialog_id: str
+    timepoint_id: str
+    extraction_model: str  # Which LLM performed extraction
+    total_turns_analyzed: int
+    items_per_turn: float  # Average knowledge items per turn
+    extraction_timestamp: datetime
+
 
 class Dialog(SQLModel, table=True):
     """Complete dialog conversation between entities"""

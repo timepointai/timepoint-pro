@@ -13,7 +13,7 @@ Knowledge Provenance: Entities can't magically know things. Knowledge has tracke
 Entity Simulation: On-demand entity generation, scene-level collective behavior, dialog synthesis with full context, relationship evolution tracking, prospection (entities modeling their futures), and animistic agency (objects/institutions that "want" things).
 Infrastructure: Intelligent model selection (M18) matches actions to optimal LLMs—math-heavy tasks use reasoning models, dialog uses conversational models, with automatic fallbacks and license compliance for commercial synthetic data.
 
-The 18 mechanisms are implementations of these ideas. The ideas are the value; the mechanisms are derivable.
+The 19 mechanisms are implementations of these ideas. The ideas are the value; the mechanisms are derivable.
 
 ---
 
@@ -39,7 +39,7 @@ The 18 mechanisms group into five pillars:
 |--------|---------|------------|
 | **Fidelity Management** | Allocate detail where queries land | M1, M2, M5, M6 |
 | **Temporal Reasoning** | Multiple notions of time and causality | M7, M8, M12, M14, M17 |
-| **Knowledge Provenance** | Track who knows what, from whom, when | M3, M4 |
+| **Knowledge Provenance** | Track who knows what, from whom, when | M3, M4, M19 |
 | **Entity Simulation** | Generate and synthesize entity behavior | M9, M10, M11, M13, M15, M16 |
 | **Infrastructure** | Model selection, cost optimization | M18 |
 
@@ -288,6 +288,140 @@ def validate_information(entity, context):
 **Biological Constraints**: Physical limitations (illness, fatigue, location) constrain behavior.
 
 **Network Flow**: Information propagation respects relationship topology.
+
+## M19: Knowledge Extraction Agent
+
+The problem: naive approaches to extracting knowledge from dialog produce garbage. A function that simply grabs capitalized words longer than 3 characters catches "We'll", "Thanks", "What", "Michael" (sentence-initial words, contractions, common words).
+
+M19 solves this with an LLM-based Knowledge Extraction Agent that understands semantic meaning.
+
+### The Old Problem (Pre-M19)
+
+```python
+# BROKEN: Naive capitalization-based extraction
+def extract_knowledge_references(content: str) -> List[str]:
+    words = content.split()
+    knowledge_items = []
+    for word in words:
+        clean_word = word.strip('.,!?;:"\'-()[]{}')
+        if clean_word and len(clean_word) > 3 and clean_word[0].isupper():
+            knowledge_items.append(clean_word.lower())
+    return list(set(knowledge_items))
+
+# Result: ["we'll", "thanks", "what", "michael", "i've"]  # TRASH
+```
+
+### The M19 Solution
+
+An LLM agent receives:
+1. **Dialog turns** to analyze
+2. **Causal graph context** (existing knowledge in the system)
+3. **Entity metadata** (who is speaking, who is listening)
+
+It returns structured `KnowledgeItem` objects:
+
+```python
+KnowledgeItem:
+    content: str           # Complete semantic unit (not a single word!)
+    speaker: str           # Entity who communicated this
+    listeners: List[str]   # Entities who received it
+    category: str          # fact, decision, opinion, plan, revelation, question, agreement
+    confidence: float      # 0.0-1.0, extraction confidence
+    context: Optional[str] # Why this matters in the scene
+    causal_relevance: float # 0.0-1.0, importance for causal chain
+```
+
+### What Gets Extracted
+
+**Good extractions:**
+- "Michael believes the project deadline is unrealistic"
+- "The board approved the $2M budget increase"
+- "Sarah revealed that the prototype failed last week"
+- "They agreed to postpone the launch until Q3"
+
+**Not extracted (correctly ignored):**
+- Greetings: "Hello", "Thanks", "Good morning"
+- Contractions: "We'll", "I've", "That's"
+- Single names without context: "Michael", "Sarah"
+- Filler words: "What", "Well", "Actually"
+
+### Knowledge Categories
+
+| Category | Description | Example |
+|----------|-------------|---------|
+| **fact** | Verifiable information | "The meeting is at 3pm" |
+| **decision** | Choice communicated | "We decided to pivot to B2B" |
+| **opinion** | Subjective view | "I think the design needs work" |
+| **plan** | Intended future action | "We'll launch in March" |
+| **revelation** | New information changing understanding | "The competitor already filed the patent" |
+| **question** | Only if reveals information itself | "Did you know about the acquisition?" |
+| **agreement** | Consensus reached | "We all agree on the pricing" |
+
+### RAG-Aware Prompting
+
+The agent receives **causal context** from existing exposure events to:
+1. **Avoid redundant extraction** - Don't store facts already in the system
+2. **Recognize novel information** - New facts worth storing
+3. **Understand relationships** - How new knowledge connects to existing
+
+```python
+def build_causal_context(entities, store):
+    """Build context from existing knowledge for the extraction agent."""
+    for entity in entities:
+        # Get recent exposure events
+        exposures = store.get_exposure_events(entity.entity_id, limit=10)
+        # Include static knowledge from metadata
+        static = entity.entity_metadata.get("knowledge_state", [])
+        # Format as context for LLM
+        ...
+```
+
+### Integration with Dialog Synthesis (M11)
+
+M19 is called automatically during dialog synthesis:
+
+```python
+# In synthesize_dialog():
+# 1. Generate dialog (M11)
+dialog_data = llm.generate_dialog(prompt, max_tokens=2000)
+
+# 2. Extract knowledge using M19 agent
+extraction_result = extract_knowledge_from_dialog(
+    dialog_turns=dialog_data.turns,
+    entities=entities,
+    timepoint=timepoint,
+    llm=llm,
+    store=store
+)
+
+# 3. Create exposure events for listeners (M19→M3)
+exposure_events_created = create_exposure_events_from_knowledge(
+    extraction_result=extraction_result,
+    timepoint=timepoint,
+    store=store
+)
+```
+
+### Model Selection
+
+Knowledge extraction uses M18 model selection with specific requirements:
+
+```python
+ActionType.KNOWLEDGE_EXTRACTION: {
+    "required": {STRUCTURED_JSON, LOGICAL_REASONING},
+    "preferred": {HIGH_QUALITY, CAUSAL_REASONING, LARGE_CONTEXT},
+    "min_context_tokens": 16384,  # Need context for causal graph + dialog
+}
+```
+
+### Cleanup Script
+
+For simulations with old garbage exposure events, use:
+
+```bash
+python scripts/cleanup_old_exposure_events.py --dry-run  # Preview
+python scripts/cleanup_old_exposure_events.py --backup   # Delete with backup
+```
 
 ---
 
@@ -949,6 +1083,6 @@ E2E mode is useful for validating that a specific template produces consistent c
 
 ---
 
-**Implementation Status**: All 18 mechanisms implemented and verified. Convergence evaluation implemented with E2E testing mode and 3 convergence-optimized templates. Parallel execution (`--parallel N`) and free model support (`--free`, `--free-fast`) added December 2025.
+**Implementation Status**: All 19 mechanisms implemented and verified. M19 (Knowledge Extraction Agent) added December 2025 to replace naive capitalization-based extraction with LLM-based semantic understanding. Convergence evaluation implemented with E2E testing mode and 3 convergence-optimized templates. Parallel execution (`--parallel N`) and free model support (`--free`, `--free-fast`) added December 2025.
 **Platform Status**: Infrastructure vision; see [MILESTONES.md](MILESTONES.md) for roadmap.
 **See also**: [README.md](README.md) for quick start, [QUICKSTART.md](QUICKSTART.md) for natural language usage.

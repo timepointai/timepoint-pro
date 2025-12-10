@@ -88,7 +88,7 @@ def test_profile_loading():
     print("  2. E2E Runner passes entity_config to orchestrator")
     print("  3. Orchestrator loads profiles from JSON")
     print("  4. Orchestrator generates remaining entities via LLM")
-    print("  5. Simulation completes with Sean and Ken as entities")
+    print("  5. Simulation completes with profile-defined entities")
     print()
     print("Starting simulation (this may take a few minutes)...")
     print()
@@ -107,8 +107,8 @@ def test_profile_loading():
         print(f"Cost: ${result.cost_usd:.4f}")
         print()
 
-        # Verify Sean and Ken are in the entities
-        print("Checking if Sean and Ken were loaded...")
+        # Verify profile-defined entities loaded
+        print("Checking if profile entities were loaded...")
         # Note: Can't easily access entities from result metadata, but if we got here
         # and entities_created matches expected count, profiles likely loaded
 
