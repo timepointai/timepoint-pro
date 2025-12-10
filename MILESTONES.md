@@ -22,9 +22,9 @@
 - **Ctrl+C protection** — Double-confirm handler prevents accidental abortion of expensive runs
 - **SQLite persistence** — `metadata/runs.db` for run tracking
 - **Mechanism metrics** — All 18 mechanisms tracked per run
-- **Basic dashboard** — Quarto + FastAPI
+- **API backend** — FastAPI REST API
 - **Narrative exports** — Markdown, JSON, PDF generation
-- **69+ simulation templates** — In `generation/config_schema.py` (includes 3 convergence-optimized templates)
+- **41 simulation templates** — In `generation/templates/` (JSON-based with patch metadata, includes 3 convergence templates)
 - **Convergence evaluation** — Causal graph consistency analysis with E2E testing mode, side-by-side comparison, and robustness grading (A-F)
 
 ### Model Stack (All Open Source)
@@ -53,10 +53,11 @@ Current Architecture:
 │   └── providers/ — OpenRouter integration
 ├── nl_interface/ — Natural language input
 │   └── adapter.py — NLToProductionAdapter
-├── generation/templates/ — 16 JSON simulation templates
+├── generation/templates/ — 41 JSON simulation templates with patch metadata
+├── synth/ — SynthasAIzer control layer (envelopes, voices, events)
 ├── validation.py (1,365 lines) — 5 physics validators
 ├── storage.py — SQLite persistence + transaction support
-├── dashboards/ — Quarto dashboard with home page
+├── dashboards/ — FastAPI REST API backend
 └── metadata/runs.db — Run tracking
 ```
 

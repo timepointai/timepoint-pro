@@ -283,7 +283,7 @@ export OPENROUTER_API_KEY=your_key_here
 ./run.sh quick                              # Quick-tier templates (~$0.15-0.30)
 ./run.sh run board_meeting                  # Single template by name
 ./run.sh run --category portal              # PORTAL mode templates
-./run.sh list                               # List all 44 templates
+./run.sh list                               # List all 41 templates
 ./run.sh list --category core               # List by category
 ./run.sh status                             # Show recent runs
 
@@ -317,7 +317,7 @@ export OPENROUTER_API_KEY=your_key_here
 - **Free model support** (`--free`, `--free-fast`, `--list-free-models`)
 - **Ctrl+C protection** (double-confirm to prevent accidental abortion)
 - SQLite persistence (metadata/runs.db)
-- Basic dashboard (Quarto + FastAPI)
+- API backend (FastAPI REST API)
 - Narrative exports (Markdown, JSON, PDF)
 - **Convergence evaluation** (causal graph consistency analysis across runs, E2E testing mode, 3 convergence-optimized templates)
 - **REST API** (FastAPI with auth, rate limiting, batch submission)
@@ -410,7 +410,8 @@ All models via OpenRouter, all open-source with commercial synthetic data rights
 - `nl_interface/`: Natural language to simulation config
 - `validation.py` (1,365 lines): 5 physics-inspired validators
 - `storage.py` (632 lines): SQLite persistence layer with transaction support
-- `generation/templates/`: 44 JSON simulation templates organized by category (core, showcase, portal, stress, convergence)
+- `generation/templates/`: 41 JSON simulation templates organized by category (core, showcase, portal, stress, convergence)
+- `synth/`: SynthasAIzer control layer (ADSR envelopes, voice controls, events)
 
 **Tensor Persistence modules (329+ tests):**
 - `tensor_persistence.py`: SQLite-backed tensor CRUD with versioning

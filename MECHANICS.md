@@ -734,7 +734,7 @@ store.compare(run_a, run_b)
 - Path clustering and representative extraction
 - Narrative generation (executive summaries)
 
-**Current reality:** Basic dashboard exists (Quarto + FastAPI). Visualization features pending.
+**Current reality:** API backend exists (FastAPI). Frontend archived to `archive/quarto-frontend` branch. Visualization features pending.
 
 ## Target: Integration Layer (Not Implemented)
 
@@ -902,13 +902,9 @@ curl "http://localhost:8000/api/convergence-sets?min_score=0.7&limit=20"
 curl http://localhost:8000/api/convergence-set/{set_id}
 ```
 
-### Dashboard
+### API Access
 
-The Convergence page (`convergence.html`) provides:
-- Overview metrics (sets, average score, grade distribution)
-- Score distribution visualization
-- Template coverage analysis
-- Detailed divergence point inspection
+Convergence data is available via the REST API (see endpoints above). Frontend archived to `archive/quarto-frontend` branch.
 
 ## Configuration
 

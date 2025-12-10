@@ -27,7 +27,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Enable CORS for Quarto frontend
+# Enable CORS for API clients
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # In production, specify exact origins

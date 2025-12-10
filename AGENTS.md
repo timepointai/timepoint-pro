@@ -1,27 +1,35 @@
-# Project Configuration
+# Project Configuration (AI Agent Reference)
 
 ## Philosophy
 - Pythonic: type hints, dataclasses, protocols
-- HTMX frontend, SQLite→PostgreSQL
-- TDD: pytest >80% coverage
-- Stub-then-fill workflow
+- SQLite persistence (metadata/runs.db), FastAPI backend
+- TDD: pytest with mechanism markers (M1-M18)
+- SynthasAIzer paradigm: templates as "patches", ADSR envelopes for entity lifecycle
 
 ## Stack
-Python 3.10+, FastAPI, SQLAlchemy 2.0, Pydantic, pytest, Playwright, ruff, mypy, Docker
+Python 3.10+, FastAPI, Pydantic, pytest, ruff, mypy
 
 ## Standards
 - Type hints mandatory
 - Google docstrings with examples
 - Line length: 100
 - Logging not print
-- Coverage: 80% minimum
+- Use `TemplateLoader` for template access (not deprecated `SimulationConfig.example_*()`)
 
-## Workflow
-1. Write signature + docstring + types
-2. Write failing test
-3. Implement minimal
-4. Refactor
-5. `pytest -v --cov=src --cov-fail-under=80`
+## Key Commands
+```bash
+./run.sh list                    # List all 41 templates
+./run.sh run board_meeting       # Run single template
+./run.sh run --category core     # Run by category
+./run.sh quick                   # Quick tier tests
+```
+
+## Testing
+```bash
+pytest -v -m synth               # SynthasAIzer tests
+pytest -v -m mechanism           # All M1-M18 tests
+pytest -v -m "m1 or m7"          # Specific mechanisms
+```
 
 ## Commits
 `type(scope): description` - types: feat, fix, refactor, test, docs, chore
