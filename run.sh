@@ -81,6 +81,10 @@ COMMANDS:
     api         API server operations
     e2e         Full E2E testing modes
     convergence Convergence analysis
+    test        Run pytest test suites
+    dashboard   Start/stop API backend
+    doctor      Check environment setup
+    info        Show system information
 
 PRESETS (run by tier or category):
     ./run.sh quick                   Quick-tier templates (~$0.02-0.05 each)
@@ -111,6 +115,10 @@ QUICK EXAMPLES:
     ./run.sh list                    List all templates
     ./run.sh status                  Show recent runs
     ./run.sh convergence history     Show convergence results
+    ./run.sh test synth              Run SynthasAIzer tests
+    ./run.sh dashboard               Start API backend
+    ./run.sh doctor                  Check environment
+    ./run.sh info                    Show system info
 
 Run './run.sh <command> --help' for command-specific help.
 Run './run.sh help' for full documentation with all 41 templates.
@@ -221,6 +229,49 @@ CONVERGENCE - Convergence Analysis
         --template TPL    Filter by template
         --verbose         Show divergence details
 
+TEST - Run Pytest Test Suites
+    ./run.sh test [SUITE] [OPTIONS]
+
+    Suites:
+        unit              Unit tests (fast, isolated)
+        integration       Integration tests
+        e2e               End-to-end tests
+        mechanisms        All mechanism tests (M1-M18)
+        synth             SynthasAIzer tests (53 tests)
+
+    Shortcuts:
+        m1, m2, ... m18   Run specific mechanism tests
+
+    Options:
+        --coverage        Generate coverage report
+        --parallel N      Run N tests in parallel
+        --verbose         Verbose output
+
+DASHBOARD - API Backend Server
+    ./run.sh dashboard [ACTION]
+
+    Actions:
+        start             Start API backend (default)
+        stop              Stop API backend
+
+DOCTOR - Environment Check
+    ./run.sh doctor
+
+    Validates:
+        - Python 3.10+ installation
+        - .env file and API keys
+        - Database paths
+        - Key dependencies (pytest, synth, TemplateLoader)
+
+INFO - System Information
+    ./run.sh info
+
+    Shows:
+        - Version info
+        - Template count
+        - Test file count
+        - Database statistics
+
 LIST - Show Information
     ./run.sh list [WHAT] [OPTIONS]
 
@@ -229,11 +280,13 @@ LIST - Show Information
         runs            Recent simulation runs
         usage           API usage statistics
         mechanisms      All 18 mechanisms
+        patches         Template patches by category (SYNTH.md)
 
     Options:
         --limit N       Limit results (default: 20)
         --tier TIER     Filter templates by tier
         --category CAT  Filter templates by category
+        --patches [CAT] List patches (optionally by category)
         --json          Output as JSON
 
 STATUS - Show Run Status
@@ -358,6 +411,22 @@ EXAMPLES
 ./run.sh api start                        # Start server
 ./run.sh run --api board_meeting          # Submit via API
 ./run.sh api usage                        # Check quotas
+
+# Testing
+./run.sh test                             # All pytest tests
+./run.sh test synth                       # SynthasAIzer tests (53 tests)
+./run.sh test mechanisms                  # All M1-M18 mechanism tests
+./run.sh test m7                          # M7 causal chain tests
+./run.sh test unit --parallel 4           # Parallel unit tests
+./run.sh test --coverage                  # With coverage report
+
+# Dashboard
+./run.sh dashboard                        # Start API backend
+./run.sh dashboard stop                   # Stop API backend
+
+# Utilities
+./run.sh doctor                           # Check environment
+./run.sh info                             # Show system info
 
 ================================================================================
 ENVIRONMENT
@@ -727,17 +796,29 @@ cmd_list() {
     local limit=20
     local tier=""
     local category=""
+    local patch_category=""
     local json_out=false
 
     while [[ $# -gt 0 ]]; do
         case $1 in
             -h|--help) show_list_help; exit 0 ;;
-            templates|runs|usage|mechanisms) what="$1"; shift ;;
+            templates|runs|usage|mechanisms|patches) what="$1"; shift ;;
             --limit) limit="$2"; shift 2 ;;
             --tier) tier="$2"; shift 2 ;;
             --category) category="$2"; shift 2 ;;
+            --patches) what="patches"; shift
+                # Check if next arg is a category (not a flag)
+                if [[ $# -gt 0 && "$1" != -* ]]; then
+                    patch_category="$1"; shift
+                fi
+                ;;
             --json) json_out=true; shift ;;
-            *) shift ;;
+            *)
+                # Could be a patch category for --patches
+                if [[ "$what" == "patches" && -z "$patch_category" ]]; then
+                    patch_category="$1"
+                fi
+                shift ;;
         esac
     done
 
@@ -795,6 +876,52 @@ M17  Modal Causality           Possibility reasoning
 M18  Model Selection           Intelligent LLM routing
 MECHS
             ;;
+        patches)
+            if [[ -n "$patch_category" ]]; then
+                print_header "Patches: $patch_category"
+            else
+                print_header "Template Patches (SYNTH.md)"
+            fi
+            $PYTHON -c "
+from generation.templates.loader import TemplateLoader
+import json
+
+loader = TemplateLoader()
+patch_category = '$patch_category'
+json_out = $([[ "$json_out" == "true" ]] && echo "True" || echo "False")
+
+if patch_category:
+    # List patches in specific category
+    patches = loader.list_patches_by_category(patch_category)
+    if json_out:
+        print(json.dumps({'category': patch_category, 'patches': patches}, indent=2))
+    else:
+        if not patches:
+            print(f'No patches found in category: {patch_category}')
+            cats = ', '.join(loader.list_patch_categories())
+            print(f'\\nAvailable categories: {cats}')
+        else:
+            for p in patches:
+                meta = loader.get_patch_metadata(p)
+                if meta:
+                    print(f'  {meta.name:<25} {p}')
+                    print(f'    {meta.description}')
+                    tags_str = ', '.join(meta.tags)
+                    print(f'    Tags: {tags_str}')
+                    print()
+                else:
+                    print(f'  {p}')
+else:
+    # List all categories and patch counts
+    if json_out:
+        from dataclasses import asdict
+        patches = loader.get_all_patches()
+        serializable = {k: asdict(v) for k, v in patches.items()}
+        print(json.dumps(serializable, indent=2))
+    else:
+        print(loader.get_patches_report())
+"
+            ;;
     esac
 }
 
@@ -810,17 +937,34 @@ WHAT:
     runs          Recent simulation runs
     usage         API usage statistics
     mechanisms    All 18 mechanisms
+    patches       Template patches by category (SYNTH.md)
 
 OPTIONS:
     --limit N        Limit results
     --tier TIER      Filter by tier
     --category CAT   Filter by category
+    --patches [CAT]  List patches (optionally filter by category)
     --json           JSON output
+
+PATCH CATEGORIES (SYNTH.md):
+    corporate     Business/startup scenarios
+    historical    Historical events
+    crisis        High-stakes emergency scenarios
+    mystical      Spiritual/animistic scenarios
+    mystery       Detective/investigation scenarios
+    mechanism     Core mechanism isolation tests
+    portal        Backward reasoning scenarios
+    stress        High-complexity stress tests
+    convergence   Consistency evaluation tests
 
 EXAMPLES:
     ./run.sh list
     ./run.sh list runs --limit 10
     ./run.sh list templates --tier quick
+    ./run.sh list patches                   # All patch categories
+    ./run.sh list patches corporate         # Patches in corporate category
+    ./run.sh list --patches mystery         # Alternative syntax
+    ./run.sh list patches --json            # JSON output
 EOF
 }
 
@@ -1373,6 +1517,313 @@ EOF
 }
 
 # ============================================================================
+# COMMAND: TEST (Pytest Integration)
+# ============================================================================
+
+cmd_test() {
+    local suite=""
+    local marker=""
+    local coverage=false
+    local parallel=""
+    local verbose=false
+    local extra_args=()
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -h|--help) show_test_help; exit 0 ;;
+            unit|integration|e2e|mechanisms|synth) suite="$1"; shift ;;
+            --coverage|--cov) coverage=true; shift ;;
+            --parallel|-n) parallel="$2"; shift 2 ;;
+            --verbose|-v) verbose=true; shift ;;
+            --marker|-m) marker="$2"; shift 2 ;;
+            m1|m2|m3|m4|m5|m6|m7|m8|m9|m10|m11|m12|m13|m14|m15|m16|m17|m18)
+                marker="$1"; shift ;;
+            -*) extra_args+=("$1"); shift ;;
+            *) extra_args+=("$1"); shift ;;
+        esac
+    done
+
+    local pytest_args=(-v)
+
+    # Apply suite-based markers
+    case "$suite" in
+        unit) pytest_args+=(-m "unit") ;;
+        integration) pytest_args+=(-m "integration") ;;
+        e2e) pytest_args+=(-m "e2e") ;;
+        mechanisms) pytest_args+=(-m "mechanism") ;;
+        synth) pytest_args+=(-m "synth") ;;
+    esac
+
+    # Apply specific marker
+    if [[ -n "$marker" ]]; then
+        pytest_args+=(-m "$marker")
+    fi
+
+    # Coverage
+    if [[ "$coverage" == "true" ]]; then
+        pytest_args+=(--cov=. --cov-report=html --cov-report=term)
+    fi
+
+    # Parallel execution
+    if [[ -n "$parallel" ]]; then
+        pytest_args+=(-n "$parallel")
+    fi
+
+    # Verbose
+    if [[ "$verbose" == "true" ]]; then
+        pytest_args+=(-vv)
+    fi
+
+    # Extra args
+    pytest_args+=("${extra_args[@]}")
+
+    print_header "Running Tests"
+    [[ -n "$suite" ]] && print_info "Suite: $suite"
+    [[ -n "$marker" ]] && print_info "Marker: $marker"
+    print_info "Command: $PYTHON -m pytest ${pytest_args[*]}"
+    echo ""
+
+    $PYTHON -m pytest "${pytest_args[@]}"
+}
+
+show_test_help() {
+    cat << 'EOF'
+test - Run pytest test suites
+
+USAGE:
+    ./run.sh test [SUITE] [OPTIONS]
+
+SUITES:
+    unit            Unit tests (fast, isolated)
+    integration     Integration tests
+    e2e             End-to-end tests
+    mechanisms      All mechanism tests (M1-M18)
+    synth           SynthasAIzer tests (envelopes, voices, patches)
+
+MECHANISM SHORTCUTS:
+    m1, m2, ... m18     Run specific mechanism tests
+
+OPTIONS:
+    --marker, -m MARKER   Custom pytest marker
+    --coverage, --cov     Generate coverage report
+    --parallel, -n N      Run N tests in parallel
+    --verbose, -v         Verbose output
+
+EXAMPLES:
+    ./run.sh test                     # All tests
+    ./run.sh test unit                # Unit tests only
+    ./run.sh test synth               # SynthasAIzer tests (53 tests)
+    ./run.sh test mechanisms          # All mechanism tests
+    ./run.sh test m7                  # M7 causal chain tests
+    ./run.sh test --coverage          # With coverage report
+    ./run.sh test unit --parallel 4   # Parallel unit tests
+
+PYTEST MARKERS (from pytest.ini):
+    unit, integration, system, e2e    Test levels
+    synth, template, patch, envelope  SynthasAIzer paradigm
+    mechanism, m1-m18                 Mechanism isolation
+    llm, slow                         Resource markers
+EOF
+}
+
+# ============================================================================
+# COMMAND: DASHBOARD
+# ============================================================================
+
+cmd_dashboard() {
+    local action="start"
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -h|--help) show_dashboard_help; exit 0 ;;
+            start) action="start"; shift ;;
+            stop) action="stop"; shift ;;
+            *) shift ;;
+        esac
+    done
+
+    case "$action" in
+        start)
+            print_header "Starting API Backend"
+            print_info "URL: http://localhost:8000"
+            print_info "API Docs: http://localhost:8000/docs"
+            cd dashboards && ./backend.sh
+            ;;
+        stop)
+            print_header "Stopping API Backend"
+            pkill -f "api/server.py" 2>/dev/null || true
+            lsof -ti:8000 2>/dev/null | xargs kill -9 2>/dev/null || true
+            print_success "API backend stopped"
+            ;;
+    esac
+}
+
+show_dashboard_help() {
+    cat << 'EOF'
+dashboard - API backend server
+
+USAGE:
+    ./run.sh dashboard [ACTION]
+
+ACTIONS:
+    start           Start API backend (default)
+    stop            Stop API backend
+
+URLS:
+    API:        http://localhost:8000
+    API Docs:   http://localhost:8000/docs
+
+ENDPOINTS:
+    GET  /runs              List simulation runs
+    GET  /runs/{id}         Get run details
+    GET  /entities          List entities
+    GET  /timepoints        List timepoints
+    GET  /mechanisms        Get mechanism stats
+    POST /submit            Submit new simulation
+
+EXAMPLES:
+    ./run.sh dashboard              # Start API backend
+    ./run.sh dashboard stop         # Stop API backend
+EOF
+}
+
+# ============================================================================
+# COMMAND: DOCTOR (Environment Check)
+# ============================================================================
+
+cmd_doctor() {
+    print_header "Environment Doctor"
+    local errors=0
+
+    # Python version
+    echo -n "Python 3.10+... "
+    if command -v python3.10 &> /dev/null; then
+        version=$($PYTHON --version 2>&1)
+        print_success "$version"
+    else
+        print_error "python3.10 not found"
+        ((errors++))
+    fi
+
+    # .env file
+    echo -n ".env file... "
+    if [[ -f .env ]]; then
+        print_success "found"
+    else
+        print_error "missing"
+        ((errors++))
+    fi
+
+    # API keys
+    if [[ -f .env ]]; then
+        source .env
+
+        echo -n "OPENROUTER_API_KEY... "
+        if [[ -n "$OPENROUTER_API_KEY" ]]; then
+            print_success "set (${#OPENROUTER_API_KEY} chars)"
+        else
+            print_error "missing"
+            ((errors++))
+        fi
+
+        echo -n "OXEN_API_KEY... "
+        if [[ -n "$OXEN_API_KEY" ]]; then
+            print_success "set (${#OXEN_API_KEY} chars)"
+        else
+            print_warning "missing (optional)"
+        fi
+    fi
+
+    # Database
+    echo -n "Runs database... "
+    if [[ -f "$DB_PATH" ]]; then
+        size=$(du -h "$DB_PATH" | cut -f1)
+        print_success "found ($size)"
+    else
+        print_warning "not created yet"
+    fi
+
+    # Key dependencies
+    echo -n "pytest... "
+    if $PYTHON -c "import pytest" 2>/dev/null; then
+        print_success "installed"
+    else
+        print_error "missing"
+        ((errors++))
+    fi
+
+    echo -n "synth module... "
+    if $PYTHON -c "from synth import EnvelopeConfig" 2>/dev/null; then
+        print_success "installed"
+    else
+        print_error "missing"
+        ((errors++))
+    fi
+
+    echo -n "TemplateLoader... "
+    if $PYTHON -c "from generation.templates.loader import TemplateLoader" 2>/dev/null; then
+        print_success "available"
+    else
+        print_error "missing"
+        ((errors++))
+    fi
+
+    # Summary
+    echo ""
+    if [[ $errors -eq 0 ]]; then
+        print_success "All checks passed!"
+    else
+        print_error "$errors issue(s) found"
+        exit 1
+    fi
+}
+
+# ============================================================================
+# COMMAND: INFO
+# ============================================================================
+
+cmd_info() {
+    print_header "Timepoint Daedalus Info"
+
+    echo "Version:     1.0.0 (SynthasAIzer)"
+    echo "Python:      $($PYTHON --version 2>&1)"
+    echo ""
+
+    # Template count
+    template_count=$($PYTHON -c "
+from generation.templates.loader import TemplateLoader
+loader = TemplateLoader()
+print(len(loader.list_templates()))
+" 2>/dev/null || echo "?")
+    echo "Templates:   $template_count"
+
+    # Test count
+    test_count=$(find tests -name "test_*.py" 2>/dev/null | wc -l | tr -d ' ')
+    echo "Test files:  $test_count"
+
+    # Synth module
+    synth_version=$($PYTHON -c "import synth; print(synth.__version__)" 2>/dev/null || echo "?")
+    echo "Synth:       v$synth_version"
+
+    # Database stats
+    if [[ -f "$DB_PATH" ]]; then
+        run_count=$($PYTHON -c "
+from metadata.run_tracker import MetadataManager
+mm = MetadataManager()
+print(len(mm.get_recent_runs(1000)))
+" 2>/dev/null || echo "?")
+        echo "Total runs:  $run_count"
+    fi
+
+    echo ""
+    echo "Key Paths:"
+    echo "  Templates:  generation/templates/"
+    echo "  Synth:      synth/"
+    echo "  Tests:      tests/"
+    echo "  Database:   $DB_PATH"
+}
+
+# ============================================================================
 # TEMPLATE SHORTCUTS - All 41 templates accessible by name
 # ============================================================================
 
@@ -1492,6 +1943,18 @@ main() {
             ;;
         convergence)
             cmd_convergence "$@"
+            ;;
+        test)
+            cmd_test "$@"
+            ;;
+        dashboard)
+            cmd_dashboard "$@"
+            ;;
+        doctor)
+            cmd_doctor
+            ;;
+        info)
+            cmd_info
             ;;
         # Shortcuts - direct presets
         quick|standard|comprehensive|stress|core|showcase|portal|all)
