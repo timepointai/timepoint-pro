@@ -109,6 +109,9 @@ FREE MODELS ($0 cost):
     ./run.sh run --free board_meeting
     ./run.sh run --free-fast quick
 
+GEMINI 3 FLASH (1M context, fast inference):
+    ./run.sh run --gemini-flash board_meeting
+
 QUICK EXAMPLES:
     ./run.sh board_meeting           Run single template
     ./run.sh run --tier quick        Run by tier
@@ -388,6 +391,9 @@ EXAMPLES
 ./run.sh run --free board_meeting         # Best free model
 ./run.sh run --free-fast quick            # Fastest free model
 
+# Gemini 3 Flash (1M context, fast inference)
+./run.sh run --gemini-flash board_meeting # Ultra-fast with huge context
+
 # Model override
 ./run.sh run --model deepseek/deepseek-chat board_meeting
 
@@ -491,6 +497,8 @@ cmd_run() {
     local list_free=false
     # Model override
     local model_override=""
+    # Gemini Flash option
+    local gemini_flash=false
     # Convergence options
     local convergence=false
     local convergence_runs=""
@@ -543,6 +551,8 @@ cmd_run() {
             --list-free-models) list_free=true; shift ;;
             # Model override
             --model) model_override="$2"; shift 2 ;;
+            # Gemini Flash (1M context, fast inference)
+            --gemini-flash|--gemini) gemini_flash=true; shift ;;
             # Convergence options
             --convergence) convergence=true; shift ;;
             --convergence-runs) convergence_runs="$2"; shift 2 ;;
@@ -638,6 +648,13 @@ cmd_run() {
     [[ "$free_mode" == "true" ]] && py_args+=(--free)
     [[ "$free_fast" == "true" ]] && py_args+=(--free-fast)
 
+    # Gemini Flash option (1M context, fast inference)
+    if [[ "$gemini_flash" == "true" ]]; then
+        model_override="google/gemini-3-flash-preview"
+        print_info "Using Gemini 3 Flash Preview (1M context, fast inference)"
+        print_warning "Note: Google TOS may restrict synthetic data generation"
+    fi
+
     # Model override
     [[ -n "$model_override" ]] && py_args+=(--model "$model_override")
 
@@ -727,10 +744,15 @@ FREE MODEL OPTIONS ($0 cost):
     --free-fast           Use fastest free model
     --list-free-models    Show available free models
 
+GEMINI 3 FLASH OPTIONS (1M context, fast inference):
+    --gemini-flash        Use google/gemini-3-flash-preview
+    --gemini              Alias for --gemini-flash
+
 MODEL OPTIONS:
     --model MODEL         Override LLM model for all calls
                           Examples: deepseek/deepseek-chat
                                     meta-llama/llama-3.1-70b-instruct
+                                    google/gemini-3-flash-preview
 
 PORTAL TESTING MODES:
     --portal-all                    All portal testing modes
@@ -772,6 +794,9 @@ EXAMPLES:
     # Free models ($0 cost)
     ./run.sh run --free board_meeting
     ./run.sh run --free-fast --parallel 4 quick
+
+    # Gemini 3 Flash (1M context, fast inference)
+    ./run.sh run --gemini-flash board_meeting
 
     # Portal testing
     ./run.sh run --portal-all
