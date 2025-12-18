@@ -12,10 +12,11 @@ Tests:
 """
 
 import os
+import pytest
 import tempfile
 from pathlib import Path
 
-from generation.config_schema import SimulationConfig, TemporalConfig, EntityConfig, TimepointConfig
+from generation.config_schema import SimulationConfig, TemporalConfig, EntityConfig, CompanyConfig
 from schemas import TemporalMode, ResolutionLevel
 from orchestrator import simulate_event
 from llm_v2 import LLMClient
@@ -24,6 +25,12 @@ from workflows import TemporalAgent, create_entity_training_workflow, synthesize
 from oxen_integration.data_formatters import EntityEvolutionFormatter
 
 
+@pytest.mark.integration
+@pytest.mark.llm
+@pytest.mark.skipif(
+    not os.getenv("OPENROUTER_API_KEY"),
+    reason="OPENROUTER_API_KEY not set"
+)
 def test_context_manager_integration():
     """Test full context manager integration with training data formatter"""
     print("\n" + "="*80)
@@ -32,9 +39,6 @@ def test_context_manager_integration():
 
     # Setup LLM and storage
     api_key = os.getenv("OPENROUTER_API_KEY")
-    if not api_key:
-        raise ValueError("OPENROUTER_API_KEY not set")
-
     llm = LLMClient(api_key=api_key)
     db_path = tempfile.mktemp(suffix=".db")
     store = GraphStore(f"sqlite:///{db_path}")
@@ -111,8 +115,7 @@ advocates for equal representation for all states regardless of size."""
     if formatter_with_context.context_manager:
         print("   ✓ Context manager initialized")
     else:
-        print("   ❌ Context manager NOT initialized!")
-        return
+        pytest.fail("Context manager NOT initialized!")
 
     formatted_result = {
         "specification": result["specification"],
@@ -146,18 +149,6 @@ advocates for equal representation for all states regardless of size."""
         print(f"   Enriched prompt: ~{tokens_with} words")
         print(f"   Context added: ~{tokens_with - tokens_without} words ({((tokens_with/tokens_without - 1) * 100):.1f}% increase)")
 
-        # Show sample sections
-        print("\n7. Sample enriched prompt sections:")
-        print("-" * 80)
-
-        # Show first 1500 chars of enriched prompt
-        sample_prompt = prompt_with[:1500]
-        print(sample_prompt)
-        if len(prompt_with) > 1500:
-            print(f"\n... [{len(prompt_with) - 1500} more characters]")
-
-        print("-" * 80)
-
         # Check for context sections
         context_indicators = [
             "=== CAUSAL HISTORY ===",
@@ -169,7 +160,7 @@ advocates for equal representation for all states regardless of size."""
             "=== CIRCADIAN CONTEXT ==="
         ]
 
-        print("\n8. Context sections detected:")
+        print("\n7. Context sections detected:")
         for indicator in context_indicators:
             if indicator in prompt_with:
                 print(f"   ✓ {indicator}")
@@ -177,7 +168,7 @@ advocates for equal representation for all states regardless of size."""
                 print(f"   - {indicator} (not included)")
 
     # Cleanup
-    print("\n9. Cleanup...")
+    print("\n8. Cleanup...")
     Path(db_path).unlink(missing_ok=True)
     print("   ✓ Removed temporary database")
 
@@ -187,4 +178,4 @@ advocates for equal representation for all states regardless of size."""
 
 
 if __name__ == "__main__":
-    test_context_manager_integration()
+    pytest.main([__file__, "-v"])

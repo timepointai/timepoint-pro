@@ -28,7 +28,7 @@ from workflows import (
 from storage import GraphStore
 from validation import Validator
 from ai_entity_service import AIEntityService, AIEntityRunner
-from test_utils import retry_on_llm_failure, assert_knowledge_state_populated
+from tests.unit.test_utils import retry_on_llm_failure, assert_knowledge_state_populated
 
 
 @pytest.mark.system

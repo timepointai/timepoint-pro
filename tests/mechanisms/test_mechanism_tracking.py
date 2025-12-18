@@ -2,28 +2,41 @@
 """
 Test mechanism tracking by running one template.
 """
-import sys
+import os
+import pytest
+
 from generation.config_schema import SimulationConfig
 from generation.templates.loader import TemplateLoader
 from generation.resilience_orchestrator import ResilientE2EWorkflowRunner
 from metadata.run_tracker import MetadataManager
 from metadata.coverage_matrix import CoverageMatrix
 
-# Initialize metadata manager
-metadata_manager = MetadataManager()
 
-# Initialize E2E runner
-runner = ResilientE2EWorkflowRunner(metadata_manager)
+@pytest.mark.mechanism
+@pytest.mark.llm
+@pytest.mark.e2e
+@pytest.mark.skipif(
+    not os.getenv("OPENROUTER_API_KEY"),
+    reason="OPENROUTER_API_KEY not set"
+)
+def test_mechanism_tracking_jefferson_dinner():
+    """Test that mechanisms are properly tracked during E2E workflow execution."""
 
-# Run jefferson_dinner template using TemplateLoader for SynthasAIzer compliance
-print("=" * 80)
-print("Testing Mechanism Tracking: jefferson_dinner")
-print("=" * 80)
-print()
+    # Initialize metadata manager
+    metadata_manager = MetadataManager()
 
-loader = TemplateLoader()
-config = loader.load_template("showcase/jefferson_dinner")
-try:
+    # Initialize E2E runner
+    runner = ResilientE2EWorkflowRunner(metadata_manager)
+
+    # Run jefferson_dinner template using TemplateLoader for SynthasAIzer compliance
+    print("=" * 80)
+    print("Testing Mechanism Tracking: jefferson_dinner")
+    print("=" * 80)
+    print()
+
+    loader = TemplateLoader()
+    config = loader.load_template("showcase/jefferson_dinner")
+
     result_metadata = runner.run(config)
 
     # Check if mechanisms were tracked
@@ -53,20 +66,16 @@ try:
     full_df = matrix_generator.generate_full_matrix(runs)
     print(full_df.to_string(index=False))
 
-    if len(result_metadata.mechanisms_used) > 0:
-        print()
-        print("✅ SUCCESS: Mechanism tracking is working!")
-        print(f"   Tracked mechanisms: {', '.join(sorted(result_metadata.mechanisms_used))}")
-        sys.exit(0)
-    else:
-        print()
-        print("❌ WARNING: No mechanisms were tracked")
-        print("   Check if decorators are properly applied and run_id is set")
-        sys.exit(1)
+    # Assert mechanisms were tracked
+    assert len(result_metadata.mechanisms_used) > 0, (
+        "No mechanisms were tracked. "
+        "Check if decorators are properly applied and run_id is set"
+    )
 
-except Exception as e:
     print()
-    print(f"❌ ERROR: Test failed: {e}")
-    import traceback
-    traceback.print_exc()
-    sys.exit(1)
+    print("✅ SUCCESS: Mechanism tracking is working!")
+    print(f"   Tracked mechanisms: {', '.join(sorted(result_metadata.mechanisms_used))}")
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

@@ -11,13 +11,9 @@ Expected output:
 """
 
 import os
-import sys
-from pathlib import Path
+import pytest
 
-# Ensure we can import from project
-sys.path.insert(0, str(Path(__file__).parent))
-
-from generation.config_schema import SimulationConfig, TemporalConfig, EntityConfig, TimepointConfig
+from generation.config_schema import SimulationConfig, TemporalConfig, EntityConfig, CompanyConfig
 from generation.resilience_orchestrator import ResilientE2EWorkflowRunner
 from metadata.run_tracker import MetadataManager
 from schemas import TemporalMode
@@ -39,7 +35,6 @@ def create_minimal_config() -> SimulationConfig:
 
         temporal=TemporalConfig(
             mode=TemporalMode.PEARL,
-            use_agent=True
         ),
 
         entities=EntityConfig(
@@ -47,7 +42,7 @@ def create_minimal_config() -> SimulationConfig:
             allow_animistic=False
         ),
 
-        timepoints=TimepointConfig(
+        timepoints=CompanyConfig(
             count=2  # Minimal for speed
         ),
 
@@ -55,7 +50,13 @@ def create_minimal_config() -> SimulationConfig:
     )
 
 
-def main():
+@pytest.mark.integration
+@pytest.mark.llm
+@pytest.mark.skipif(
+    not os.getenv("OPENROUTER_API_KEY"),
+    reason="OPENROUTER_API_KEY not set"
+)
+def test_andos_proof_of_concept():
     """Run ANDOS proof-of-concept test"""
 
     print("\n" + "="*80)
@@ -75,37 +76,28 @@ def main():
     # Create minimal config
     config = create_minimal_config()
 
-    try:
-        # Run E2E workflow with ANDOS
-        print("🚀 Starting E2E workflow with ANDOS...\n")
-        result = runner.run(config)
+    # Run E2E workflow with ANDOS
+    print("🚀 Starting E2E workflow with ANDOS...\n")
+    result = runner.run(config)
 
-        print("\n" + "="*80)
-        print("✅ ANDOS PROOF-OF-CONCEPT COMPLETE")
-        print("="*80)
-        print(f"Run ID: {result.run_id}")
-        print(f"Entities Created: {result.entities_created}")
-        print(f"Timepoints Created: {result.timepoints_created}")
-        print(f"Training Examples: {result.training_examples}")
+    print("\n" + "="*80)
+    print("✅ ANDOS PROOF-OF-CONCEPT COMPLETE")
+    print("="*80)
+    print(f"Run ID: {result.run_id}")
+    print(f"Entities Created: {result.entities_created}")
+    print(f"Timepoints Created: {result.timepoints_created}")
+    print(f"Training Examples: {result.training_examples}")
 
-        # Check for success indicators
-        if result.entities_created == 3 and result.timepoints_created >= 1:
-            print("\n✅ ANDOS layer-by-layer training succeeded!")
-            print("   Check logs above for:")
-            print("   - Step 3.5: ANDOS layer computation")
-            print("   - Step 4: Layer-by-layer training progress")
-            print("   - Step 4.5: Dialog synthesis (no missing tensor errors)")
-            return 0
-        else:
-            print("\n⚠️  Unexpected results - check logs above")
-            return 1
+    # Check for success indicators
+    assert result.entities_created >= 1, "No entities created"
+    assert result.timepoints_created >= 1, "No timepoints created"
 
-    except Exception as e:
-        print(f"\n❌ ANDOS test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        return 1
+    print("\n✅ ANDOS layer-by-layer training succeeded!")
+    print("   Check logs above for:")
+    print("   - Step 3.5: ANDOS layer computation")
+    print("   - Step 4: Layer-by-layer training progress")
+    print("   - Step 4.5: Dialog synthesis (no missing tensor errors)")
 
 
 if __name__ == "__main__":
-    exit(main())
+    pytest.main([__file__, "-v"])

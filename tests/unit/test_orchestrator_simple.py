@@ -1,116 +1,129 @@
 #!/usr/bin/env python
-# Simple test to verify orchestrator imports and basic functionality
+"""
+Simple test to verify orchestrator imports and basic functionality.
+"""
+import pytest
 
-import sys
-import os
-# Get the project root directory
-project_root = os.path.dirname(os.path.abspath(__file__))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
+from orchestrator import (
+    OrchestratorAgent,
+    SceneParser,
+    KnowledgeSeeder,
+    RelationshipExtractor,
+    ResolutionAssigner,
+    simulate_event
+)
+from llm import LLMClient
+from storage import GraphStore
 
-print("Testing orchestrator imports...")
 
-try:
-    from orchestrator import (
-        OrchestratorAgent,
-        SceneParser,
-        KnowledgeSeeder,
-        RelationshipExtractor,
-        ResolutionAssigner,
-        simulate_event
-    )
+@pytest.mark.unit
+def test_orchestrator_imports():
+    """Test that all orchestrator components can be imported."""
+    # If we get here, imports succeeded
+    assert OrchestratorAgent is not None
+    assert SceneParser is not None
+    assert KnowledgeSeeder is not None
+    assert RelationshipExtractor is not None
+    assert ResolutionAssigner is not None
+    assert simulate_event is not None
     print("✓ All imports successful")
-except Exception as e:
-    print(f"✗ Import failed: {e}")
-    sys.exit(1)
 
-try:
-    from llm import LLMClient
-    from storage import GraphStore
+
+@pytest.mark.unit
+def test_dependency_imports():
+    """Test that dependencies can be imported."""
+    assert LLMClient is not None
+    assert GraphStore is not None
     print("✓ Dependencies imported")
-except Exception as e:
-    print(f"✗ Dependency import failed: {e}")
-    sys.exit(1)
 
-# Test basic instantiation
-print("\nTesting basic instantiation...")
 
-try:
+@pytest.mark.unit
+def test_llm_client_dry_run():
+    """Test LLMClient can be created in dry_run mode."""
     llm_client = LLMClient(api_key="test", dry_run=True)
-    print(f"✓ LLMClient created (dry_run mode)")
-except Exception as e:
-    print(f"✗ LLMClient creation failed: {e}")
-    sys.exit(1)
+    assert llm_client is not None
+    print("✓ LLMClient created (dry_run mode)")
 
-try:
+
+@pytest.mark.unit
+def test_graph_store_memory():
+    """Test GraphStore can be created with in-memory database."""
     store = GraphStore("sqlite:///:memory:")
+    assert store is not None
     print("✓ GraphStore created")
-except Exception as e:
-    print(f"✗ GraphStore creation failed: {e}")
-    sys.exit(1)
 
-try:
+
+@pytest.mark.unit
+def test_orchestrator_agent_creation():
+    """Test OrchestratorAgent can be instantiated."""
+    llm_client = LLMClient(api_key="test", dry_run=True)
+    store = GraphStore("sqlite:///:memory:")
     orchestrator = OrchestratorAgent(llm_client, store)
+    assert orchestrator is not None
     print("✓ OrchestratorAgent created")
-except Exception as e:
-    print(f"✗ OrchestratorAgent creation failed: {e}")
-    sys.exit(1)
 
-# Test scene parsing
-print("\nTesting scene parsing...")
 
-try:
+@pytest.mark.unit
+@pytest.mark.llm
+def test_scene_parsing_dry_run():
+    """Test scene parsing in dry_run mode."""
+    llm_client = LLMClient(api_key="test", dry_run=True)
     parser = SceneParser(llm_client)
     spec = parser.parse("simulate a test event")
+
+    assert spec is not None
+    assert spec.scene_title is not None
     print(f"✓ Scene parsed: '{spec.scene_title}'")
     print(f"  - Entities: {len(spec.entities)}")
     print(f"  - Timepoints: {len(spec.timepoints)}")
     print(f"  - Temporal mode: {spec.temporal_mode}")
-except Exception as e:
-    print(f"✗ Scene parsing failed: {e}")
-    import traceback
-    traceback.print_exc()
-    sys.exit(1)
 
-# Test full orchestration
-print("\nTesting full orchestration...")
 
-try:
+@pytest.mark.unit
+@pytest.mark.llm
+def test_full_orchestration_dry_run():
+    """Test full orchestration in dry_run mode."""
+    llm_client = LLMClient(api_key="test", dry_run=True)
+    store = GraphStore("sqlite:///:memory:")
+    orchestrator = OrchestratorAgent(llm_client, store)
+
     result = orchestrator.orchestrate(
         "simulate a small historical meeting",
         context={"max_entities": 3, "max_timepoints": 2},
         save_to_db=False
     )
+
+    assert result is not None
+    assert 'entities' in result
+    assert 'timepoints' in result
+    assert 'graph' in result
+
     print("✓ Orchestration successful")
     print(f"  - Entities created: {len(result['entities'])}")
     print(f"  - Timepoints created: {len(result['timepoints'])}")
     print(f"  - Graph nodes: {result['graph'].number_of_nodes()}")
     print(f"  - Graph edges: {result['graph'].number_of_edges()}")
-    print(f"  - Temporal agent mode: {result['temporal_agent'].mode.value}")
-except Exception as e:
-    print(f"✗ Orchestration failed: {e}")
-    import traceback
-    traceback.print_exc()
-    sys.exit(1)
 
-# Test convenience function
-print("\nTesting convenience function...")
 
-try:
+@pytest.mark.unit
+@pytest.mark.llm
+def test_simulate_event_dry_run():
+    """Test convenience function simulate_event in dry_run mode."""
+    llm_client = LLMClient(api_key="test", dry_run=True)
+    store = GraphStore("sqlite:///:memory:")
+
     result = simulate_event(
         "simulate a brief gathering",
         llm_client,
         store,
         save_to_db=False
     )
+
+    assert result is not None
+    assert 'specification' in result
     print("✓ simulate_event() successful")
     print(f"  - Scene: {result['specification'].scene_title}")
-except Exception as e:
-    print(f"✗ simulate_event() failed: {e}")
-    import traceback
-    traceback.print_exc()
-    sys.exit(1)
 
-print("\n" + "="*60)
-print("ALL TESTS PASSED ✓")
-print("="*60)
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])
