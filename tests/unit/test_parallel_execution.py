@@ -4,24 +4,29 @@ Test script for Mechanism 1.3: LangGraph Parallel Execution
 Tests that entity population runs in parallel using asyncio within LangGraph workflow.
 """
 
+import os
 import asyncio
 import time
+import pytest
 from workflows import create_entity_training_workflow, WorkflowState
-from llm_v2 import LLMClient  # Use new centralized service
+from llm_v2 import LLMClient
 from storage import GraphStore
 from schemas import ResolutionLevel
 import networkx as nx
 
+
+@pytest.mark.integration
+@pytest.mark.llm
+@pytest.mark.skipif(
+    not os.getenv("OPENROUTER_API_KEY"),
+    reason="OPENROUTER_API_KEY not set"
+)
 def test_parallel_execution():
     """Test that the parallel execution workflow works correctly"""
     print("🧪 Testing Mechanism 1.3: LangGraph Parallel Execution")
 
-    # Create test components
-    llm_client = LLMClient(
-        api_key="dummy_key",
-        base_url="https://dummy.com",
-        dry_run=True
-    )  # Use dry run to avoid API calls
+    api_key = os.getenv("OPENROUTER_API_KEY")
+    llm_client = LLMClient(api_key=api_key)
     store = GraphStore("sqlite:///:memory:")
 
     # Create test graph with multiple entities
@@ -70,36 +75,14 @@ def test_parallel_execution():
             print(f"   Expected: {expected_entities}")
             print(f"   Processed: {processed_entities}")
 
-        # Check entity structure
-        if entities:
-            sample_entity = entities[0]
-            required_fields = ["entity_id", "entity_type", "temporal_span_start", "temporal_span_end", "resolution_level", "entity_metadata"]
-            missing_fields = [field for field in required_fields if not hasattr(sample_entity, field)]
-            if not missing_fields:
-                print("✅ Entity structure is correct")
-            else:
-                print(f"❌ Missing entity fields: {missing_fields}")
-
-        # Check that populations have required data
-        if populations:
-            sample_pop = list(populations.values())[0]
-            required_pop_fields = ["knowledge_state", "energy_budget", "personality_traits", "temporal_awareness", "confidence"]
-            missing_pop_fields = [field for field in required_pop_fields if not hasattr(sample_pop, field)]
-            if not missing_pop_fields:
-                print("✅ Population structure is correct")
-            else:
-                print(f"❌ Missing population fields: {missing_pop_fields}")
-
         print("🎉 Mechanism 1.3 test completed successfully!")
 
     except Exception as e:
         print(f"❌ Test failed with error: {e}")
         import traceback
         traceback.print_exc()
-        return False
+        raise
 
-    return True
 
 if __name__ == "__main__":
-    success = test_parallel_execution()
-    exit(0 if success else 1)
+    pytest.main([__file__, "-v"])

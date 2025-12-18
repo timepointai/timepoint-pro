@@ -269,13 +269,13 @@ class TestAnimisticEntityValidation:
         )
 
         # Valid action (within capacity)
-        action = {"participant_count": 80}
-        result = Validator._validators["environmental_constraints"]["func"](action, [entity])
+        context = {"action": {"participant_count": 80}, "entities": [entity]}
+        result = Validator._validators["environmental_constraints"]["func"](entity, context)
         assert result["valid"] == True
 
         # Invalid action (over capacity)
-        action = {"participant_count": 150}
-        result = Validator._validators["environmental_constraints"]["func"](action, [entity])
+        context = {"action": {"participant_count": 150}, "entities": [entity]}
+        result = Validator._validators["environmental_constraints"]["func"](entity, context)
         assert result["valid"] == False
         assert "capacity 100 exceeded" in result["message"]
 
@@ -296,8 +296,8 @@ class TestAnimisticEntityValidation:
             entity_metadata=building.dict()
         )
 
-        action = {"participant_count": 50}
-        result = Validator._validators["environmental_constraints"]["func"](action, [entity])
+        context = {"action": {"participant_count": 50}, "entities": [entity]}
+        result = Validator._validators["environmental_constraints"]["func"](entity, context)
         assert result["valid"] == False
         assert "structural integrity too low" in result["message"]
 
@@ -318,8 +318,8 @@ class TestAnimisticEntityValidation:
             entity_metadata=animal.dict()
         )
 
-        action = {"action_type": "mount"}
-        result = Validator._validators["environmental_constraints"]["func"](action, [entity])
+        context = {"action": {"action_type": "mount"}, "entities": [entity]}
+        result = Validator._validators["environmental_constraints"]["func"](entity, context)
         assert result["valid"] == False
         assert "too unhealthy" in result["message"]
 
@@ -612,7 +612,8 @@ class TestAdvancedAnimisticValidators:
             "outdoor": False
         }
 
-        result = Validator._validators["spiritual_influence"]["func"](action, [kami_entity])
+        context = {"action": action, "entities": [kami_entity]}
+        result = Validator._validators["spiritual_influence"]["func"](kami_entity, context)
         # Should warn about unknown kami influence
         assert result["valid"] == False
         assert "Unknown kami" in result["message"]
@@ -622,7 +623,8 @@ class TestAdvancedAnimisticValidators:
         kami.disclosure_level = "worshiped"
         kami_entity.entity_metadata = kami.dict()
 
-        result = Validator._validators["spiritual_influence"]["func"](action, [kami_entity])
+        context = {"action": action, "entities": [kami_entity]}
+        result = Validator._validators["spiritual_influence"]["func"](kami_entity, context)
         assert result["valid"] == False
         assert "Known kami" in result["message"]
 

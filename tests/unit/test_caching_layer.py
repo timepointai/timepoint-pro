@@ -4,6 +4,7 @@ Test script for Caching Layer (1.4: Caching Layer)
 Tests LRU cache for entities and TTL cache for query responses.
 """
 
+import os
 import time
 import pytest
 from datetime import datetime, timedelta
@@ -17,6 +18,10 @@ from llm_v2 import LLMClient  # Use new centralized service
 @pytest.mark.llm
 @pytest.mark.slow
 @pytest.mark.system
+@pytest.mark.skipif(
+    not os.getenv("OPENROUTER_API_KEY"),
+    reason="OPENROUTER_API_KEY not set"
+)
 class TestCachingLayer:
     """Test caching layer functionality"""
 
@@ -76,7 +81,8 @@ class TestCachingLayer:
         print("\n🧪 Testing Query Response TTL Caching")
 
         # Create components
-        llm_client = LLMClient(api_key="dummy_key", base_url="https://dummy.com", dry_run=True)
+        api_key = os.getenv("OPENROUTER_API_KEY")
+        llm_client = LLMClient(api_key=api_key)
         store = GraphStore("sqlite:///:memory:")
         query_interface = QueryInterface(store, llm_client)
 
@@ -147,7 +153,8 @@ class TestCachingLayer:
         """Test that different queries generate different cache keys"""
         print("\n🧪 Testing Cache Key Generation")
 
-        llm_client = LLMClient(api_key="dummy_key", base_url="https://dummy.com", dry_run=True)
+        api_key = os.getenv("OPENROUTER_API_KEY")
+        llm_client = LLMClient(api_key=api_key)
         store = GraphStore("sqlite:///:memory:")
         query_interface = QueryInterface(store, llm_client)
 

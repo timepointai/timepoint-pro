@@ -274,7 +274,7 @@ class TestTemporalAgentPortalIntegration:
             timestamp=datetime(2040, 1, 1),
             event_description="John Doe is President",
             entities_present=["entity_001"],
-            resolution_level=ResolutionLevel.YEAR
+            resolution_level=ResolutionLevel.SCENE
         )
 
         # Generate antecedent
@@ -305,7 +305,7 @@ class TestTemporalAgentPortalIntegration:
             timestamp=datetime(2040, 1, 1),
             event_description="Event",
             entities_present=[],
-            resolution_level=ResolutionLevel.YEAR
+            resolution_level=ResolutionLevel.SCENE
         )
 
         with pytest.raises(ValueError, match="generate_antecedent_timepoint.*requires mode=PORTAL"):
@@ -333,7 +333,7 @@ class TestValidation:
                 timestamp=datetime(2030, 1, 1),
                 event_description="Event",
                 entities_present=["entity_001"],
-                resolution_level=ResolutionLevel.YEAR
+                resolution_level=ResolutionLevel.SCENE
             ),
             "is_portal_antecedent": True
         }
@@ -362,7 +362,7 @@ class TestValidation:
                 timestamp=datetime(2030, 1, 1),
                 event_description="Event",
                 entities_present=["entity_001"],
-                resolution_level=ResolutionLevel.YEAR
+                resolution_level=ResolutionLevel.SCENE
             )
         }
 
