@@ -386,6 +386,37 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
         relative_quality=1.05,
         notes="Apache 2.0, strong general-purpose MoE"
     ),
+
+    # =========================================================================
+    # GOOGLE GEMINI (Preview) - Use with explicit --gemini-flash flag
+    # Note: Google TOS may restrict synthetic data generation. Use when:
+    # - Speed is critical (optimized for agentic workflows)
+    # - You need 1M context window
+    # - You explicitly accept TOS implications
+    # =========================================================================
+    "google/gemini-3-flash-preview": ModelProfile(
+        model_id="google/gemini-3-flash-preview",
+        display_name="Gemini 3 Flash Preview",
+        provider="google",
+        license="Google TOS",
+        capabilities={
+            ModelCapability.STRUCTURED_JSON,
+            ModelCapability.DIALOG_GENERATION,
+            ModelCapability.CODE_GENERATION,
+            ModelCapability.LOGICAL_REASONING,
+            ModelCapability.INSTRUCTION_FOLLOWING,
+            ModelCapability.LARGE_CONTEXT,
+            ModelCapability.VERY_LARGE_CONTEXT,
+            ModelCapability.FAST_INFERENCE,
+            ModelCapability.HIGH_QUALITY,
+        },
+        context_tokens=1048576,  # 1M tokens!
+        relative_speed=2.5,      # Optimized for low latency
+        relative_cost=0.5,       # $0.50/M input, $3.00/M output
+        relative_quality=1.2,    # High quality reasoning
+        allows_synthetic_data=False,  # TOS restriction - explicit opt-in only
+        notes="1M context, multimodal, fast inference. Use --gemini-flash flag for explicit selection."
+    ),
 }
 
 
