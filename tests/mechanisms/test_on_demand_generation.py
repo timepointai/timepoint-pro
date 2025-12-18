@@ -4,12 +4,15 @@ Test script for Phase 2.2: On-Demand Entity Generation (Mechanism 9)
 Tests that unknown entities are generated dynamically when queried.
 """
 
+import os
+import pytest
+import tempfile
 from query_interface import QueryInterface
 from storage import GraphStore
-from llm_v2 import LLMClient  # Use new centralized service
-import tempfile
-import os
+from llm_v2 import LLMClient
 
+
+@pytest.mark.unit
 def test_entity_gap_detection():
     """Test that entity gap detection identifies numbered attendees"""
     print("🕵️ Testing Entity Gap Detection")
@@ -43,11 +46,11 @@ def test_entity_gap_detection():
 
     # Test cases
     test_cases = [
-        ("What did attendee #47 think?", set(), "attendee_47"),  # attendee_47 not in existing, should detect gap
-        ("What did attendee 12 think?", set(), "attendee_12"),   # attendee_12 not in existing, should detect gap
-        ("What did person #5 think?", set(), "attendee_5"),       # person #5 -> attendee_5, not in existing
-        ("What did attendee #47 think?", {"attendee_47"}, None),  # attendee_47 already exists, no gap
-        ("What did Washington think?", set(), None),             # Washington not a numbered entity, no gap to detect
+        ("What did attendee #47 think?", set(), "attendee_47"),
+        ("What did attendee 12 think?", set(), "attendee_12"),
+        ("What did person #5 think?", set(), "attendee_5"),
+        ("What did attendee #47 think?", {"attendee_47"}, None),
+        ("What did Washington think?", set(), None),
     ]
 
     for query, existing, expected in test_cases:
@@ -56,11 +59,17 @@ def test_entity_gap_detection():
         assert result == expected, f"Expected {expected}, got {result}"
 
     print("  ✅ Entity gap detection test PASSED")
-    return True
 
+
+@pytest.mark.integration
+@pytest.mark.llm
+@pytest.mark.skipif(
+    not os.getenv("OPENROUTER_API_KEY"),
+    reason="OPENROUTER_API_KEY not set"
+)
 def test_on_demand_generation():
-    """Test the core logic of on-demand entity generation without full LLM integration"""
-    print("\n🎭 Testing On-Demand Entity Generation Logic")
+    """Test on-demand entity generation with real LLM"""
+    print("\n🎭 Testing On-Demand Entity Generation")
 
     # Create temporary database for testing
     with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as f:
@@ -69,7 +78,8 @@ def test_on_demand_generation():
     try:
         # Initialize components
         store = GraphStore(f"sqlite:///{test_db}")
-        llm_client = LLMClient(api_key="dummy_key", dry_run=True)
+        api_key = os.getenv("OPENROUTER_API_KEY")
+        llm_client = LLMClient(api_key=api_key)
         query_interface = QueryInterface(store, llm_client)
 
         # Create a test timepoint
@@ -101,32 +111,13 @@ def test_on_demand_generation():
         assert gap == "attendee_47"
         print(f"  ✅ Detected gap: {gap}")
 
-        # Test gap detection when entity exists
-        existing_with_47 = {"george_washington", "john_adams", "attendee_47"}
-        gap = query_interface.detect_entity_gap("What did attendee #47 think?", existing_with_47)
-        assert gap is None
-        print(f"  ✅ No gap when entity exists: {gap}")
-
-        print("  ✅ On-demand entity generation logic test PASSED")
-        return True
+        print("  ✅ On-demand entity generation test PASSED")
 
     finally:
         # Clean up
         if os.path.exists(test_db):
             os.unlink(test_db)
 
+
 if __name__ == "__main__":
-    print("🧪 Running On-Demand Entity Generation Tests (Phase 2.2)")
-    print("=" * 60)
-
-    try:
-        test_entity_gap_detection()
-        test_on_demand_generation()
-        print("\n🎉 All On-Demand Entity Generation tests PASSED!")
-        print("✅ Phase 2.2 implementation complete")
-
-    except Exception as e:
-        print(f"\n❌ Test FAILED: {e}")
-        import traceback
-        traceback.print_exc()
-        raise
+    pytest.main([__file__, "-v"])

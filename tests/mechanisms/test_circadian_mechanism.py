@@ -4,6 +4,8 @@ test_circadian_mechanism.py - Test Mechanism 14: Circadian Activity Patterns
 """
 
 import sys
+import os
+import pytest
 from datetime import datetime
 from pathlib import Path
 
@@ -19,12 +21,26 @@ from validation import (
 )
 import yaml
 
-def load_circadian_config():
+
+@pytest.fixture
+def circadian_config():
     """Load circadian configuration from config.yaml"""
-    with open("conf/config.yaml", 'r') as f:
+    config_path = Path(__file__).parent.parent.parent / "conf" / "config.yaml"
+    with open(config_path, 'r') as f:
         config = yaml.safe_load(f)
     return config.get("circadian", {})
 
+
+def load_circadian_config():
+    """Load circadian configuration from config.yaml (legacy helper)"""
+    config_path = Path(__file__).parent.parent.parent / "conf" / "config.yaml"
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+    return config.get("circadian", {})
+
+
+@pytest.mark.unit
+@pytest.mark.circadian
 def test_activity_probabilities():
     """Test activity probability calculations"""
     print("🧪 Testing activity probabilities...")
@@ -63,6 +79,9 @@ def test_activity_probabilities():
 
     print("✅ Activity probability tests passed!")
 
+
+@pytest.mark.unit
+@pytest.mark.circadian
 def test_energy_cost_adjustments():
     """Test energy cost calculations with circadian adjustments"""
     print("\n🧪 Testing energy cost adjustments...")
@@ -90,6 +109,9 @@ def test_energy_cost_adjustments():
 
     print("✅ Energy cost adjustment tests passed!")
 
+
+@pytest.mark.unit
+@pytest.mark.circadian
 def test_circadian_validation():
     """Test circadian activity validation"""
     print("\n🧪 Testing circadian validation...")
@@ -131,6 +153,9 @@ def test_circadian_validation():
 
     print("✅ Circadian validation tests passed!")
 
+
+@pytest.mark.unit
+@pytest.mark.circadian
 def test_circadian_context_creation():
     """Test circadian context creation"""
     print("\n🧪 Testing circadian context creation...")

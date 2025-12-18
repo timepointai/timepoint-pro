@@ -3,7 +3,7 @@
 ## Philosophy
 - Pythonic: type hints, dataclasses, protocols
 - SQLite persistence (metadata/runs.db), FastAPI backend
-- TDD: pytest with mechanism markers (M1-M18)
+- TDD: pytest with mechanism markers (M1-M19)
 - SynthasAIzer paradigm: templates as "patches", ADSR envelopes for entity lifecycle
 
 ## Stack
@@ -27,7 +27,7 @@ Python 3.10+, FastAPI, Pydantic, pytest, ruff, mypy
 ## Testing
 ```bash
 pytest -v -m synth               # SynthasAIzer tests
-pytest -v -m mechanism           # All M1-M18 tests
+pytest -v -m mechanism           # All M1-M19 tests
 pytest -v -m "m1 or m7"          # Specific mechanisms
 ```
 

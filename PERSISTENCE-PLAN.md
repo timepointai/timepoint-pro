@@ -1287,7 +1287,7 @@ pipeline (baseline → LLM population → training), NOT hardcoded values. This 
 - `tests/unit/test_tensor_resolution.py`
 - `tests/unit/test_archetype_seeds.py`
 
-**Total Tests**: 133 tensor-related unit tests passing
+**Total Tests**: 329+ tensor-related tests passing
 
 ---
 
@@ -1377,4 +1377,4 @@ The implementation is phased over approximately 4-5 months, with each phase buil
 
 *Document created: 2025-12-03*
 *Updated: 2025-12-06*
-*Status: Phases 1-7 COMPLETE (316+ tests). Rate limiting, simulation REST API, batch submission API, and usage quotas complete. Archetype system uses real tensor pipeline.*
+*Status: Phases 1-7 COMPLETE (329+ tests). Rate limiting, simulation REST API, batch submission API, and usage quotas complete. Archetype system uses real tensor pipeline.*

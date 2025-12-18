@@ -12,8 +12,9 @@
 
 ### Implemented
 
-- **18 simulation mechanisms** (M1-M18) — See [MECHANICS.md](MECHANICS.md)
+- **19 simulation mechanisms** (M1-M19) — See [MECHANICS.md](MECHANICS.md)
 - **M18: Intelligent Model Selection** — Capability-based per-action model selection
+- **M19: Knowledge Extraction** — LLM-based semantic knowledge extraction from entities
 - **12 Open-Source Models** — All via OpenRouter, all permit commercial synthetic data
 - **PORTAL mode** — Backward temporal reasoning from endpoints to origins
 - **Natural Language Interface** — `nl_interface/` integrated via `NLToProductionAdapter`
@@ -21,7 +22,7 @@
 - **Free model support** — `--free`, `--free-fast`, `--list-free-models` for $0 cost testing
 - **Ctrl+C protection** — Double-confirm handler prevents accidental abortion of expensive runs
 - **SQLite persistence** — `metadata/runs.db` for run tracking
-- **Mechanism metrics** — All 18 mechanisms tracked per run
+- **Mechanism metrics** — All 19 mechanisms tracked per run
 - **API backend** — FastAPI REST API
 - **Narrative exports** — Markdown, JSON, PDF generation
 - **41 simulation templates** — In `generation/templates/` (JSON-based with patch metadata, includes 3 convergence templates)
@@ -78,7 +79,7 @@ Current Architecture:
 | 4 | Parquet export, branching, conflicts | **COMPLETE** | 28 |
 | 5 | Permissions + audit logging | **COMPLETE** | 73 |
 | 6 | REST API (minimal) | **COMPLETE** | 49 |
-| **Total** | | | **260 tests** |
+| **Total** | | | **329+ tests** |
 
 ---
 
@@ -89,7 +90,7 @@ Before adding infrastructure, stabilize the core.
 
 ### 1.1 Code Architecture ✅ COMPLETE
 - [x] Break up `workflows/__init__.py` into focused modules (9 submodules, <800 lines each)
-- [x] Document all 18 mechanisms with examples (MECHANICS.md)
+- [x] Document all 19 mechanisms with examples (MECHANICS.md)
 - [x] Transaction support in storage layer
 - [ ] Increase test coverage to 90%+
 
@@ -362,7 +363,7 @@ Broad accessibility and ecosystem.
 
 ### Phase 1 (Stabilization)
 - Test coverage >90%
-- Documentation complete for all 18 mechanisms
+- Documentation complete for all 19 mechanisms
 - Docker deployment working
 
 ### Phase 2-3 (Batch + API)

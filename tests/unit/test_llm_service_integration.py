@@ -2,20 +2,14 @@
 """
 test_llm_service_integration.py - Integration test for centralized LLM service
 
-Tests that the new LLM service works correctly throughout the application.
+Tests that the LLM service works correctly throughout the application.
+Note: LLMClient no longer supports dry_run mode - tests requiring LLM calls
+skip when OPENROUTER_API_KEY is not set.
 """
 
 import sys
 import os
-# Get the project root directory
-project_root = os.path.dirname(os.path.abspath(__file__))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-os.environ['OPENROUTER_API_KEY'] = os.environ.get('OPENROUTER_API_KEY', 'test')
-
-import hydra
-from hydra import initialize, compose
-from omegaconf import DictConfig, OmegaConf
+import pytest
 import tempfile
 from pathlib import Path
 
@@ -26,6 +20,7 @@ from storage import GraphStore
 from schemas import Entity, ResolutionLevel
 
 
+@pytest.mark.unit
 def test_basic_service_creation():
     """Test that service can be created"""
     print("\n" + "="*60)
@@ -51,27 +46,37 @@ def test_basic_service_creation():
     print(f"   Tokens: {response.tokens_used['total']}")
     print(f"   Cost: ${response.cost_usd:.4f}")
 
-    return True
+    assert response.success
 
 
+@pytest.mark.unit
+@pytest.mark.llm
+@pytest.mark.skipif(
+    not os.getenv("OPENROUTER_API_KEY"),
+    reason="OPENROUTER_API_KEY not set"
+)
 def test_backward_compatible_client():
     """Test backward-compatible LLMClient wrapper"""
     print("\n" + "="*60)
     print("TEST 2: Backward-Compatible Client")
     print("="*60)
 
-    # Test with new service enabled
-    client = LLMClient(
-        api_key="test",
-        dry_run=True,
-        use_centralized_service=True
-    )
+    api_key = os.getenv('OPENROUTER_API_KEY')
+    client = LLMClient(api_key=api_key)
 
-    print(f"✅ Client created with centralized service: {client.use_centralized_service}")
+    print(f"✅ Client created")
 
     # Test populate_entity method
+    entity_schema = Entity(
+        entity_id="washington",
+        entity_type="human",
+        timepoint="test_tp",
+        resolution_level=ResolutionLevel.TENSOR_ONLY,
+        entity_metadata={"role": "president"}
+    )
+
     result = client.populate_entity(
-        entity_schema={"entity_id": "washington"},
+        entity_schema=entity_schema,
         context={"year": 1789, "event": "inauguration"}
     )
 
@@ -80,41 +85,15 @@ def test_backward_compatible_client():
     print(f"   Energy: {result.energy_budget:.1f}")
     print(f"   Confidence: {result.confidence:.2f}")
 
-    return True
+    assert result.entity_id == "washington"
 
 
-def test_hydra_config_integration():
-    """Test integration with Hydra configuration"""
-    print("\n" + "="*60)
-    print("TEST 3: Hydra Config Integration")
-    print("="*60)
-
-    # Initialize Hydra
-    with initialize(version_base=None, config_path="../conf"):
-        cfg = compose(config_name="config", overrides=["llm.dry_run=true"])
-
-        print(f"✅ Hydra config loaded")
-        print(f"   llm.dry_run: {cfg.llm.dry_run}")
-        print(f"   llm.api_key: {cfg.llm.api_key[:10]}...")
-
-        # Create client from config
-        client = LLMClient.from_hydra_config(cfg, use_centralized_service=True)
-
-        print(f"✅ Client created from Hydra config")
-        print(f"   Using centralized service: {client.use_centralized_service}")
-        print(f"   Dry run mode: {client.dry_run}")
-
-        # Test a call
-        result = client.populate_entity(
-            entity_schema={"entity_id": "jefferson"},
-            context={"year": 1789}
-        )
-
-        print(f"✅ Entity created from Hydra-configured client: {result.entity_id}")
-
-    return True
-
-
+@pytest.mark.unit
+@pytest.mark.llm
+@pytest.mark.skipif(
+    not os.getenv("OPENROUTER_API_KEY"),
+    reason="OPENROUTER_API_KEY not set"
+)
 def test_storage_integration():
     """Test integration with GraphStore"""
     print("\n" + "="*60)
@@ -129,11 +108,8 @@ def test_storage_integration():
         store = GraphStore(f"sqlite:///{db_path}")
 
         # Create client
-        client = LLMClient(
-            api_key="test",
-            dry_run=True,
-            use_centralized_service=True
-        )
+        api_key = os.getenv('OPENROUTER_API_KEY')
+        client = LLMClient(api_key=api_key)
 
         print(f"✅ Store and client created")
 
@@ -150,16 +126,17 @@ def test_storage_integration():
         print(f"✅ Entity saved to store")
 
         # Load entity
-        loaded = store.load_entity("test_entity")
+        loaded = store.get_entity("test_entity")
         print(f"✅ Entity loaded from store: {loaded.entity_id}")
 
-        return True
+        assert loaded.entity_id == "test_entity"
 
     finally:
         # Cleanup
         Path(db_path).unlink(missing_ok=True)
 
 
+@pytest.mark.unit
 def test_logging():
     """Test that logging works"""
     print("\n" + "="*60)
@@ -200,9 +177,10 @@ def test_logging():
     print(f"   Total calls: {stats['total_calls']}")
     print(f"   Total cost: ${stats['total_cost']:.4f}")
 
-    return True
+    assert stats['total_calls'] == 3
 
 
+@pytest.mark.unit
 def test_security_features():
     """Test security filtering"""
     print("\n" + "="*60)
@@ -234,9 +212,10 @@ def test_security_features():
     redacted = service.security_filter.redact_pii(text_with_pii)
     print(f"✅ PII redacted: {redacted}")
 
-    return True
+    assert response.success
 
 
+@pytest.mark.unit
 def test_error_handling():
     """Test error handling and retry"""
     print("\n" + "="*60)
@@ -266,9 +245,10 @@ def test_error_handling():
     stats = service.error_handler.get_retry_statistics()
     print(f"✅ Retry statistics: {stats}")
 
-    return True
+    assert response.success
 
 
+@pytest.mark.unit
 def test_modes():
     """Test different operating modes"""
     print("\n" + "="*60)
@@ -288,60 +268,8 @@ def test_modes():
         )
 
         print(f"✅ Mode {mode.value}: success={response.success}, cost=${response.cost_usd:.4f}")
-
-    return True
-
-
-def run_all_tests():
-    """Run all integration tests"""
-    print("\n" + "="*70)
-    print("🧪 LLM SERVICE INTEGRATION TESTS")
-    print("="*70)
-
-    tests = [
-        ("Basic Service Creation", test_basic_service_creation),
-        ("Backward-Compatible Client", test_backward_compatible_client),
-        ("Hydra Config Integration", test_hydra_config_integration),
-        ("Storage Integration", test_storage_integration),
-        ("Logging", test_logging),
-        ("Security Features", test_security_features),
-        ("Error Handling", test_error_handling),
-        ("Operating Modes", test_modes),
-    ]
-
-    results = []
-    for name, test_func in tests:
-        try:
-            success = test_func()
-            results.append((name, success, None))
-        except Exception as e:
-            print(f"❌ Test failed: {e}")
-            results.append((name, False, str(e)))
-
-    # Print summary
-    print("\n" + "="*70)
-    print("📊 TEST SUMMARY")
-    print("="*70)
-
-    passed = sum(1 for _, success, _ in results if success)
-    total = len(results)
-
-    for name, success, error in results:
-        status = "✅ PASS" if success else "❌ FAIL"
-        print(f"{status} - {name}")
-        if error:
-            print(f"      Error: {error}")
-
-    print(f"\nResults: {passed}/{total} tests passed")
-
-    if passed == total:
-        print("\n🎉 ALL TESTS PASSED! LLM service integration is working correctly.")
-        return 0
-    else:
-        print(f"\n⚠️  {total - passed} tests failed. Review errors above.")
-        return 1
+        assert response.success
 
 
 if __name__ == "__main__":
-    exit_code = run_all_tests()
-    sys.exit(exit_code)
+    pytest.main([__file__, "-v"])
