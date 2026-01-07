@@ -478,6 +478,10 @@ class TemporalConfig(BaseModel):
         ge=1, le=100, default=5,
         description="Number of complete paths to find and rank"
     )
+    preserve_all_paths: bool = Field(
+        default=True,
+        description="Keep ALL generated paths for exploration (not just top N). Enables divergence analysis."
+    )
     coherence_threshold: float = Field(
         ge=0.0, le=1.0, default=0.7,
         description="Minimum coherence score for valid path"

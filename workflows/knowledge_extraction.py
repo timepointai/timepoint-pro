@@ -28,7 +28,7 @@ import json
 import logging
 
 from schemas import KnowledgeItem, KnowledgeExtractionResult, DialogTurn, Entity
-from llm_service.model_selector import ActionType, select_model_for_action
+from llm_service.model_selector import ActionType, select_model_for_action, get_fallback_models
 from metadata.tracking import track_mechanism
 
 logger = logging.getLogger(__name__)
@@ -364,8 +364,10 @@ def extract_knowledge_from_dialog(
     Returns:
         KnowledgeExtractionResult with extracted items and metadata
     """
-    # Select model for knowledge extraction
-    model = select_model_for_action(ActionType.KNOWLEDGE_EXTRACTION)
+    # Get fallback chain for robust model selection
+    # This prevents failures when the primary model is unavailable
+    model_fallback_chain = get_fallback_models(ActionType.KNOWLEDGE_EXTRACTION, chain_length=3)
+    model = model_fallback_chain[0] if model_fallback_chain else "meta-llama/llama-3.1-70b-instruct"
 
     # Build causal context from existing knowledge
     causal_context = build_causal_context(entities, store)
@@ -436,13 +438,71 @@ def extract_knowledge_from_dialog(
         )
 
     except Exception as e:
-        logger.warning(f"[M19] Structured extraction failed: {e}, trying fallback parser...")
+        logger.warning(f"[M19] Structured extraction failed with model '{model}': {e}")
 
-        # Try fallback parsing with raw LLM call
+        # Try fallback models from the chain
+        for fallback_model in model_fallback_chain[1:]:  # Skip first model (already tried)
+            logger.info(f"[M19] Trying fallback model: {fallback_model}")
+            try:
+                response = llm.generate_structured(
+                    prompt=prompt,
+                    response_model=KnowledgeExtractionResponse,
+                    model=fallback_model,
+                    temperature=0.3,
+                    max_tokens=4000
+                )
+
+                # Convert to KnowledgeItem objects
+                entity_ids = [e.entity_id for e in entities]
+                knowledge_items = []
+                for item in response.items:
+                    listeners = [eid for eid in entity_ids if eid != item.speaker]
+                    knowledge_items.append(KnowledgeItem(
+                        content=item.content,
+                        speaker=item.speaker,
+                        listeners=listeners,
+                        category=item.category,
+                        confidence=item.confidence,
+                        context=item.context,
+                        source_turn_index=item.source_turn_index,
+                        causal_relevance=item.causal_relevance
+                    ))
+
+                if knowledge_items:
+                    logger.info(f"[M19] Fallback model '{fallback_model}' extracted {len(knowledge_items)} items")
+                    items_per_turn = len(knowledge_items) / max(1, len(dialog_turns))
+                    return KnowledgeExtractionResult(
+                        items=knowledge_items,
+                        dialog_id=dialog_id or f"dialog_{timepoint.timepoint_id}",
+                        timepoint_id=timepoint.timepoint_id,
+                        extraction_model=fallback_model,
+                        total_turns_analyzed=len(dialog_turns),
+                        items_per_turn=items_per_turn,
+                        extraction_timestamp=datetime.now()
+                    )
+                else:
+                    # Empty result is valid (casual dialog may have no knowledge)
+                    return KnowledgeExtractionResult(
+                        items=[],
+                        dialog_id=dialog_id or f"dialog_{timepoint.timepoint_id}",
+                        timepoint_id=timepoint.timepoint_id,
+                        extraction_model=fallback_model,
+                        total_turns_analyzed=len(dialog_turns),
+                        items_per_turn=0.0,
+                        extraction_timestamp=datetime.now()
+                    )
+
+            except Exception as fallback_error:
+                logger.warning(f"[M19] Fallback model '{fallback_model}' also failed: {fallback_error}")
+                continue  # Try next fallback
+
+        # All structured calls failed - try raw LLM call with manual parsing
+        logger.warning(f"[M19] All structured models failed, trying raw LLM call with manual parser...")
         try:
-            # Make a raw LLM call without structured output
+            # Use a safe default model for raw call
+            raw_model = "meta-llama/llama-3.1-70b-instruct"
             raw_response = llm.client.chat.completions.create(
-                model=model,
+                model=raw_model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.3,
                 max_tokens=4000
@@ -469,19 +529,19 @@ def extract_knowledge_from_dialog(
                 ))
 
             if knowledge_items:
-                logger.info(f"[M19] Fallback parser extracted {len(knowledge_items)} items")
+                logger.info(f"[M19] Raw LLM call + manual parser extracted {len(knowledge_items)} items")
                 items_per_turn = len(knowledge_items) / max(1, len(dialog_turns))
                 return KnowledgeExtractionResult(
                     items=knowledge_items,
                     dialog_id=dialog_id or f"dialog_{timepoint.timepoint_id}",
                     timepoint_id=timepoint.timepoint_id,
-                    extraction_model=model,
+                    extraction_model=raw_model,
                     total_turns_analyzed=len(dialog_turns),
                     items_per_turn=items_per_turn,
                     extraction_timestamp=datetime.now()
                 )
-        except Exception as fallback_error:
-            logger.error(f"[M19] Fallback parser also failed: {fallback_error}")
+        except Exception as raw_error:
+            logger.error(f"[M19] Raw LLM fallback also failed: {raw_error}")
 
         # Return empty result on total failure (graceful degradation)
         logger.error(f"[M19] Knowledge extraction completely failed")

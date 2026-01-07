@@ -98,6 +98,11 @@ class ActionType(Enum):
     # Knowledge operations (M19)
     KNOWLEDGE_EXTRACTION = auto()      # Extract knowledge items from dialog
 
+    # Portal mode operations (M17)
+    PORTAL_BACKWARD_REASONING = auto()  # Generate candidate antecedents (needs large output)
+    PORTAL_PATH_SCORING = auto()        # Judge LLM evaluation of path realism
+    PORTAL_FORWARD_SIMULATION = auto()  # Mini-simulation state generation
+
 
 @dataclass
 class ModelProfile:
@@ -417,6 +422,62 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
         allows_synthetic_data=False,  # TOS restriction - explicit opt-in only
         notes="1M context, multimodal, fast inference. Use --gemini-flash flag for explicit selection."
     ),
+
+    # =========================================================================
+    # GROQ - Ultra-fast inference via specialized LPU hardware
+    # Use with --groq or --fast flag for speed-critical workloads
+    # Free tier available (14K TPM), Llama license applies to outputs
+    # =========================================================================
+    "groq/llama-3.3-70b-versatile": ModelProfile(
+        model_id="groq/llama-3.3-70b-versatile",
+        display_name="Groq Llama 3.3 70B",
+        provider="groq",
+        license="llama3.3",
+        capabilities={
+            ModelCapability.STRUCTURED_JSON,
+            ModelCapability.DIALOG_GENERATION,
+            ModelCapability.LOGICAL_REASONING,
+            ModelCapability.INSTRUCTION_FOLLOWING,
+            ModelCapability.LARGE_CONTEXT,
+            ModelCapability.VERY_LARGE_CONTEXT,
+            ModelCapability.FAST_INFERENCE,
+            ModelCapability.HIGH_QUALITY,
+        },
+        context_tokens=128000,
+        relative_speed=5.0,      # ~300 tok/s vs ~60 tok/s baseline
+        relative_cost=0.7,       # $0.59/$0.79 per 1M tokens
+        relative_quality=1.0,    # Same as Llama 70B
+        notes="Ultra-fast inference via Groq LPU. Use --groq flag. Best quality on Groq."
+    ),
+
+    "groq/llama-3.1-70b-versatile": ModelProfile(
+        model_id="groq/llama-3.1-70b-versatile",
+        display_name="Groq Llama 3.1 70B",
+        provider="groq",
+        license="llama3.1",
+        capabilities={
+            ModelCapability.STRUCTURED_JSON,
+            ModelCapability.DIALOG_GENERATION,
+            ModelCapability.LOGICAL_REASONING,
+            ModelCapability.INSTRUCTION_FOLLOWING,
+            ModelCapability.LARGE_CONTEXT,
+            ModelCapability.VERY_LARGE_CONTEXT,
+            ModelCapability.FAST_INFERENCE,
+            ModelCapability.HIGH_QUALITY,
+        },
+        context_tokens=128000,
+        relative_speed=5.0,
+        relative_cost=0.7,
+        relative_quality=1.0,
+        notes="Ultra-fast 70B on Groq LPU. Use --groq flag."
+    ),
+
+    # NOTE: groq/llama-3.1-8b-instant was removed from OpenRouter (January 2026)
+    # Use groq/llama-3.3-70b-versatile or meta-llama/llama-3.1-8b-instruct instead
+
+    # NOTE: groq/mixtral-8x7b-32768 was removed from OpenRouter (January 2026)
+    # The model ID is no longer valid. Use mistralai/mixtral-8x7b-instruct via standard OpenRouter
+    # or groq/llama-3.3-70b-versatile for fast inference needs.
 }
 
 
@@ -534,6 +595,38 @@ ACTION_REQUIREMENTS: Dict[ActionType, Dict[str, Any]] = {
         "required": {ModelCapability.STRUCTURED_JSON, ModelCapability.INSTRUCTION_FOLLOWING},
         "preferred": {ModelCapability.HIGH_QUALITY, ModelCapability.LARGE_CONTEXT, ModelCapability.DIALOG_GENERATION},
         "min_context_tokens": 16384,  # Need context for causal graph + dialog
+    },
+
+    # Portal mode operations (M17)
+    # PORTAL_BACKWARD_REASONING: Generates multiple diverse antecedent candidates
+    # - Needs LARGE output tokens (complex structured JSON with multiple antecedents)
+    # - Base: 3000 tokens, scales with candidate count
+    ActionType.PORTAL_BACKWARD_REASONING: {
+        "required": {ModelCapability.STRUCTURED_JSON, ModelCapability.CAUSAL_REASONING, ModelCapability.TEMPORAL_REASONING},
+        "preferred": {ModelCapability.HIGH_QUALITY, ModelCapability.LARGE_CONTEXT, ModelCapability.LOGICAL_REASONING},
+        "min_context_tokens": 32768,
+        "min_output_tokens": 3000,  # Base for 3 antecedents
+        "tokens_per_unit": 800,     # Additional tokens per antecedent
+        "output_scaling_factor": "candidate_count",  # Scale output by this context key
+    },
+
+    # PORTAL_PATH_SCORING: Judge LLM evaluates path realism
+    # - Moderate output (structured evaluation)
+    # - Input can be large (multiple simulation narratives)
+    ActionType.PORTAL_PATH_SCORING: {
+        "required": {ModelCapability.STRUCTURED_JSON, ModelCapability.LOGICAL_REASONING},
+        "preferred": {ModelCapability.HIGH_QUALITY, ModelCapability.CAUSAL_REASONING},
+        "min_context_tokens": 65536,  # Large context for multiple simulations
+        "min_output_tokens": 1000,
+    },
+
+    # PORTAL_FORWARD_SIMULATION: Generate next state in mini-simulation
+    # - Compact output (single state description)
+    ActionType.PORTAL_FORWARD_SIMULATION: {
+        "required": {ModelCapability.TEMPORAL_REASONING},
+        "preferred": {ModelCapability.FAST_INFERENCE, ModelCapability.COST_EFFICIENT},
+        "min_context_tokens": 8192,
+        "min_output_tokens": 500,
     },
 }
 
@@ -878,3 +971,230 @@ def check_model_restrictions(model_id: str) -> bool:
         ...     print("Using restricted model - proceed with caution")
     """
     return get_default_selector()._check_restricted_model(model_id)
+
+
+# =============================================================================
+# TOKEN BUDGET ESTIMATOR - Intelligent output token allocation
+# =============================================================================
+
+@dataclass
+class TokenBudgetEstimate:
+    """Result of token budget estimation"""
+    recommended_tokens: int        # Recommended max_tokens for this call
+    min_tokens: int               # Absolute minimum needed
+    max_tokens: int               # Maximum useful tokens
+    scaling_factor: float         # Applied scaling multiplier
+    reasoning: str                # Explanation of calculation
+    retry_multiplier: float = 1.5 # Multiplier for retry on truncation
+
+
+class TokenBudgetEstimator:
+    """
+    Intelligent token budget estimation based on action type and context.
+
+    Prevents truncation by dynamically calculating appropriate max_tokens
+    based on:
+    - Action type requirements (from ACTION_REQUIREMENTS)
+    - Scaling factors (e.g., number of antecedents requested)
+    - Prompt length (estimated input tokens)
+    - Historical truncation patterns
+
+    Example:
+        estimator = TokenBudgetEstimator()
+
+        # For portal backward reasoning with 5 antecedents
+        estimate = estimator.estimate(
+            ActionType.PORTAL_BACKWARD_REASONING,
+            context={"candidate_count": 5}
+        )
+        print(estimate.recommended_tokens)  # -> 7000
+
+        # If truncation detected, get retry budget
+        retry_budget = estimator.get_retry_budget(estimate)
+        print(retry_budget)  # -> 10500
+    """
+
+    # Default token budgets by action type category
+    DEFAULT_BUDGETS = {
+        "structured_simple": 1000,    # Simple JSON output
+        "structured_complex": 3000,   # Complex multi-object JSON
+        "narrative": 2000,            # Text generation
+        "dialog": 1500,               # Conversation turns
+        "scoring": 800,               # Numeric scoring with reasoning
+    }
+
+    # Token estimation per common output units
+    TOKENS_PER_UNIT = {
+        "antecedent": 800,            # Per antecedent in portal mode
+        "entity": 200,                # Per entity description
+        "dialog_turn": 100,           # Per dialog turn
+        "knowledge_item": 150,        # Per knowledge item
+        "score_with_reasoning": 200,  # Per scored item with explanation
+    }
+
+    def __init__(self, action_requirements: Optional[Dict] = None):
+        """
+        Initialize estimator.
+
+        Args:
+            action_requirements: Custom requirements (uses default if None)
+        """
+        self.action_requirements = action_requirements or ACTION_REQUIREMENTS
+
+    def estimate(
+        self,
+        action: ActionType,
+        context: Optional[Dict[str, Any]] = None,
+        prompt_length: int = 0,
+        safety_margin: float = 1.3
+    ) -> TokenBudgetEstimate:
+        """
+        Estimate appropriate token budget for an action.
+
+        Args:
+            action: Type of action to perform
+            context: Context with scaling factors (e.g., candidate_count)
+            prompt_length: Estimated prompt length in characters (for scaling)
+            safety_margin: Multiplier for safety (default 1.3 = 30% buffer)
+
+        Returns:
+            TokenBudgetEstimate with recommended tokens
+        """
+        context = context or {}
+
+        # Get base requirements from action type
+        action_reqs = self.action_requirements.get(action, {})
+        base_tokens = action_reqs.get("min_output_tokens", self.DEFAULT_BUDGETS["structured_simple"])
+        tokens_per_unit = action_reqs.get("tokens_per_unit", 0)
+        scaling_key = action_reqs.get("output_scaling_factor", None)
+
+        # Calculate scaling
+        scaling_factor = 1.0
+        if scaling_key and scaling_key in context:
+            unit_count = context[scaling_key]
+            # Scale tokens: base + (units * tokens_per_unit)
+            base_tokens = base_tokens + (unit_count * tokens_per_unit)
+            scaling_factor = unit_count
+
+        # Apply prompt length adjustment (longer prompts may need more output)
+        if prompt_length > 2000:
+            # Add 10% for every 2000 chars over baseline
+            prompt_scaling = 1 + ((prompt_length - 2000) / 20000)
+            base_tokens = int(base_tokens * min(prompt_scaling, 1.5))
+
+        # Apply safety margin
+        recommended = int(base_tokens * safety_margin)
+
+        # Compute min/max bounds
+        min_tokens = int(base_tokens * 0.7)  # 70% of base is minimum
+        max_tokens = int(base_tokens * 2.0)  # 2x base is maximum useful
+
+        # Build reasoning string
+        reasoning_parts = [f"Base: {action_reqs.get('min_output_tokens', 'default')}"]
+        if scaling_key:
+            reasoning_parts.append(f"Scaling: {scaling_key}={context.get(scaling_key, 'N/A')}")
+        reasoning_parts.append(f"Safety margin: {safety_margin}x")
+
+        return TokenBudgetEstimate(
+            recommended_tokens=recommended,
+            min_tokens=min_tokens,
+            max_tokens=max_tokens,
+            scaling_factor=scaling_factor,
+            reasoning=" | ".join(reasoning_parts)
+        )
+
+    def get_retry_budget(
+        self,
+        previous_estimate: TokenBudgetEstimate,
+        retry_count: int = 1
+    ) -> int:
+        """
+        Get increased token budget for retry after truncation.
+
+        Args:
+            previous_estimate: The estimate that led to truncation
+            retry_count: Which retry attempt this is (1, 2, 3...)
+
+        Returns:
+            Increased token count for retry
+        """
+        # Exponential backoff on tokens: 1.5x, 2.25x, 3.375x...
+        multiplier = previous_estimate.retry_multiplier ** retry_count
+        retry_tokens = int(previous_estimate.recommended_tokens * multiplier)
+
+        # Cap at max_tokens * 2 to prevent runaway
+        return min(retry_tokens, previous_estimate.max_tokens * 2)
+
+    def detect_truncation(self, response: str, expected_structure: str = "json") -> bool:
+        """
+        Detect if a response appears to be truncated.
+
+        Args:
+            response: The LLM response text
+            expected_structure: Type of expected output ("json", "list", "narrative")
+
+        Returns:
+            True if truncation is likely detected
+        """
+        if not response:
+            return True
+
+        response = response.strip()
+
+        if expected_structure == "json":
+            # Check for incomplete JSON
+            if response.startswith("{") and not response.endswith("}"):
+                return True
+            if response.startswith("[") and not response.endswith("]"):
+                return True
+            # Check for truncated string
+            if response.count('"') % 2 != 0:
+                return True
+            # Check for common truncation patterns
+            if response.endswith(("...", "…", '", "', '": "')):
+                return True
+
+        elif expected_structure == "list":
+            # Check for incomplete list
+            if "[" in response and not response.rstrip().endswith("]"):
+                return True
+
+        elif expected_structure == "narrative":
+            # Narrative truncation is harder to detect
+            # Check for mid-sentence ending
+            if response and response[-1] not in ".!?\"'":
+                # Could be truncated mid-sentence
+                return len(response) > 100  # Only flag if substantial content
+
+        return False
+
+
+# Singleton estimator instance
+_default_estimator: Optional[TokenBudgetEstimator] = None
+
+
+def get_token_estimator() -> TokenBudgetEstimator:
+    """Get the default token budget estimator instance."""
+    global _default_estimator
+    if _default_estimator is None:
+        _default_estimator = TokenBudgetEstimator()
+    return _default_estimator
+
+
+def estimate_tokens_for_action(
+    action: ActionType,
+    context: Optional[Dict[str, Any]] = None,
+    **kwargs
+) -> TokenBudgetEstimate:
+    """
+    Convenience function to estimate tokens for an action.
+
+    Args:
+        action: Action type
+        context: Context with scaling factors
+        **kwargs: Additional arguments for estimate()
+
+    Returns:
+        TokenBudgetEstimate
+    """
+    return get_token_estimator().estimate(action, context, **kwargs)

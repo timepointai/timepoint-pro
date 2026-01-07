@@ -414,6 +414,184 @@ class FullE2EWorkflowRunner:
             traceback.print_exc()
             return 0
 
+    def _persist_entity_for_convergence(self, entity: Entity, run_id: str) -> None:
+        """
+        Persist an entity to the shared database for convergence analysis.
+
+        CRITICAL FIX: Previously entities were NOT being synced to metadata/runs.db,
+        only timepoints were. This caused entities_present to reference entity_ids
+        that didn't exist in the shared database.
+
+        This method copies entities from the temp DB session to the shared DB,
+        prefixing entity_id with run_id to avoid UNIQUE constraint violations.
+
+        Args:
+            entity: Entity to persist (from temp DB session)
+            run_id: Current run identifier
+        """
+        try:
+            shared_store = self._get_shared_store()
+
+            # Prefix entity_id with run_id for uniqueness across runs
+            unique_entity_id = f"{run_id}_{entity.entity_id}"
+
+            # Create fresh Entity copy to avoid session detachment issues
+            fresh_entity = Entity(
+                entity_id=unique_entity_id,
+                entity_type=entity.entity_type,
+                resolution_level=entity.resolution_level,
+                tensor=entity.tensor,
+                tensor_maturity=getattr(entity, 'tensor_maturity', 0.0),
+                tensor_training_cycles=getattr(entity, 'tensor_training_cycles', 0),
+                entity_metadata=dict(entity.entity_metadata) if entity.entity_metadata else {},
+                run_id=run_id  # Set run_id for convergence filtering
+            )
+
+            shared_store.save_entity(fresh_entity)
+
+        except Exception as e:
+            # Non-fatal - log but don't fail the run
+            print(f"  ⚠️  Failed to persist entity for convergence: {e}")
+
+    def _persist_all_entities_for_convergence(self, entities: List[Entity], run_id: str) -> int:
+        """
+        Persist all entities to the shared database for convergence analysis.
+
+        Args:
+            entities: List of entities to persist
+            run_id: Current run identifier
+
+        Returns:
+            Number of entities persisted
+        """
+        persisted = 0
+        for entity in entities:
+            try:
+                self._persist_entity_for_convergence(entity, run_id)
+                persisted += 1
+            except Exception as e:
+                print(f"  ⚠️  Failed to persist entity {entity.entity_id}: {e}")
+
+        if persisted > 0:
+            print(f"  📊 Persisted {persisted} entities for convergence")
+
+        return persisted
+
+    def _run_data_quality_check(
+        self,
+        timepoints: List[Timepoint],
+        entities: List[Entity],
+        run_id: str
+    ) -> Dict[str, Any]:
+        """
+        Run data quality validation on generated data.
+
+        CRITICAL FIX: This check catches issues like empty entities_present
+        that were previously silently passing through the pipeline.
+
+        Checks performed:
+        1. All timepoints have non-empty entities_present
+        2. All entity references in timepoints are valid
+        3. Entity count matches expectations
+        4. No duplicate entity IDs
+
+        Args:
+            timepoints: List of timepoints to validate
+            entities: List of entities to validate
+            run_id: Current run identifier
+
+        Returns:
+            Dict with validation results and any warnings/errors
+        """
+        print("\n  📊 Running data quality check...")
+
+        results = {
+            "passed": True,
+            "warnings": [],
+            "errors": [],
+            "stats": {}
+        }
+
+        # Build entity ID set for validation
+        entity_ids = {e.entity_id for e in entities}
+        results["stats"]["total_entities"] = len(entities)
+        results["stats"]["total_timepoints"] = len(timepoints)
+
+        # Check 1: Entities_present validation
+        empty_entities_count = 0
+        invalid_entity_refs = []
+        total_entity_refs = 0
+
+        for tp in timepoints:
+            if not tp.entities_present or len(tp.entities_present) == 0:
+                empty_entities_count += 1
+                results["warnings"].append(
+                    f"Timepoint '{tp.timepoint_id}' has empty entities_present"
+                )
+            else:
+                total_entity_refs += len(tp.entities_present)
+                # Check if referenced entities exist
+                for ent_id in tp.entities_present:
+                    if ent_id not in entity_ids:
+                        invalid_entity_refs.append((tp.timepoint_id, ent_id))
+
+        results["stats"]["empty_entities_timepoints"] = empty_entities_count
+        results["stats"]["total_entity_references"] = total_entity_refs
+        results["stats"]["invalid_entity_references"] = len(invalid_entity_refs)
+
+        if empty_entities_count > 0:
+            pct = (empty_entities_count / len(timepoints)) * 100 if timepoints else 0
+            if pct > 50:
+                results["errors"].append(
+                    f"CRITICAL: {empty_entities_count}/{len(timepoints)} ({pct:.1f}%) timepoints have empty entities_present"
+                )
+                results["passed"] = False
+            else:
+                results["warnings"].append(
+                    f"{empty_entities_count}/{len(timepoints)} ({pct:.1f}%) timepoints have empty entities_present"
+                )
+
+        if invalid_entity_refs:
+            results["warnings"].append(
+                f"{len(invalid_entity_refs)} entity references point to non-existent entities"
+            )
+            for tp_id, ent_id in invalid_entity_refs[:3]:  # Show first 3
+                results["warnings"].append(f"  - {tp_id} references missing entity '{ent_id}'")
+
+        # Check 2: Duplicate entity IDs
+        if len(entity_ids) != len(entities):
+            dup_count = len(entities) - len(entity_ids)
+            results["warnings"].append(f"Found {dup_count} duplicate entity IDs")
+
+        # Check 3: Entity tensor validation
+        entities_without_tensors = sum(1 for e in entities if not e.tensor)
+        if entities_without_tensors > 0:
+            results["warnings"].append(
+                f"{entities_without_tensors}/{len(entities)} entities have no tensor"
+            )
+
+        # Print summary
+        print(f"    Entities: {len(entities)}")
+        print(f"    Timepoints: {len(timepoints)}")
+        print(f"    Entity references: {total_entity_refs}")
+        print(f"    Empty entities_present: {empty_entities_count}")
+
+        if results["errors"]:
+            print(f"  ❌ Data quality check FAILED:")
+            for err in results["errors"]:
+                print(f"     ERROR: {err}")
+            results["passed"] = False
+        elif results["warnings"]:
+            print(f"  ⚠️  Data quality warnings ({len(results['warnings'])}):")
+            for warn in results["warnings"][:5]:  # Show first 5
+                print(f"     {warn}")
+            if len(results["warnings"]) > 5:
+                print(f"     ... and {len(results['warnings']) - 5} more")
+        else:
+            print(f"  ✓ Data quality check passed")
+
+        return results
+
     def run(self, config: SimulationConfig) -> RunMetadata:
         """
         Run complete E2E workflow.
@@ -439,14 +617,8 @@ class FullE2EWorkflowRunner:
         # Set thread-local run ID for tracking
         set_current_run_id(run_id)
 
-        # Phase 6: Check usage quota before starting
+        # Phase 6: Record simulation start for usage tracking (quota check removed - open source)
         if self._track_usage and self._usage_bridge:
-            if not self._usage_bridge.check_quota(simulation_count=1):
-                raise RuntimeError(
-                    f"Usage quota exceeded. Cannot start simulation. "
-                    f"Check your quota with --api-usage or contact support."
-                )
-            # Record simulation start for tracking
             self._usage_bridge.record_simulation_start(run_id)
 
         print(f"\n{'='*80}")
@@ -479,6 +651,11 @@ class FullE2EWorkflowRunner:
                     scene_result, all_timepoints, andos_layers, run_id
                 )
 
+                # Step 4.1: Persist entities to shared DB for convergence analysis
+                # CRITICAL FIX: Previously only timepoints were persisted, leaving
+                # entities_present references dangling. This syncs entities too.
+                self._persist_all_entities_for_convergence(trained_entities, run_id)
+
                 # Step 4.5: Synthesize dialogs (M11)
                 self._synthesize_dialogs(
                     trained_entities, all_timepoints, scene_result, run_id
@@ -492,6 +669,12 @@ class FullE2EWorkflowRunner:
                 # Step 4.7: Persist exposure events to shared DB for convergence analysis
                 # This must happen AFTER dialogs and queries which create exposure events
                 self._persist_exposure_events_for_convergence(scene_result, run_id)
+
+                # Step 4.8: Data quality validation
+                # CRITICAL: Catches issues like empty entities_present that were previously silent
+                quality_results = self._run_data_quality_check(
+                    all_timepoints, trained_entities, run_id
+                )
 
                 # Step 5: Format training data
                 training_data = self._format_training_data(

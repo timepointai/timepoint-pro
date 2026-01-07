@@ -122,9 +122,13 @@ At TENSOR_ONLY resolution, entities are represented as structured tensors:
 
 ```python
 TTMTensor:
-    context_vector: np.ndarray   # Knowledge state
-    biology_vector: np.ndarray   # Physical attributes
-    behavior_vector: np.ndarray  # Personality/decision patterns
+    context_vector: np.ndarray   # Knowledge state (8 dims)
+    biology_vector: np.ndarray   # Physical attributes (4 dims)
+    behavior_vector: np.ndarray  # Personality/decision patterns (8 dims)
+
+# Context vector layout:
+# [0]=knowledge, [1]=valence, [2]=arousal, [3]=energy,
+# [4]=confidence, [5]=patience, [6]=risk, [7]=social
 
 # Compression ratios:
 # Full entity: ~50k tokens
@@ -132,6 +136,31 @@ TTMTensor:
 ```
 
 Tensors preserve enough structure for causal validation and can be re-expanded when queries require higher fidelity.
+
+### Dual Tensor Architecture & Synchronization
+
+The system maintains two representations of cognitive/emotional state:
+
+1. **TTMTensor** (`entity.tensor`): Trained, compressed tensor with context_vector containing emotional values (0-1 scale)
+2. **CognitiveTensor** (`entity.entity_metadata["cognitive_tensor"]`): Runtime state used during dialog synthesis (-1 to 1 scale for valence, 0-100 for energy)
+
+**The Sync Problem**: Without synchronization, entities start dialog with default CognitiveTensor values (valence=0.0, arousal=0.0) regardless of their trained TTMTensor state, and emotional changes from dialog are lost when entities are reloaded.
+
+**The Solution**: Bidirectional sync with "pretraining" and "backprop" equivalents:
+
+```
+Entity Load → TTM→Cog Sync → Dialog Synthesis → Emotional Updates → Cog→TTM Sync → Persist
+              (pretraining)                                          (backprop)
+```
+
+**Scale conversions**:
+- TTM valence (0-1) ↔ Cog valence (-1 to 1): `cog = ttm * 2 - 1`
+- TTM energy (0-1) ↔ Cog energy (0-100): `cog = ttm * 100`
+- TTM arousal (0-1) ↔ Cog arousal (0-1): same scale
+
+**Implementation** (in `workflows/dialog_synthesis.py`):
+- `_sync_ttm_to_cognitive()`: Called before dialog, copies trained tensor values to runtime state
+- `_sync_cognitive_to_ttm()`: Called after dialog, writes emotional changes back to tensor
 
 ---
 
@@ -175,9 +204,64 @@ config = TemporalConfig(
 - **Oscillating**: 2040 → 2025 → 2039 → 2026 → ... (better for complex scenarios)
 - **Adaptive**: System chooses based on complexity
 
+**Entity Inference** (January 2026 fix): Portal mode now uses LLM-based entity inference to populate `entities_present` for each generated timepoint. Instead of blindly copying entities from the consequent (which produced empty lists), the system:
+
+1. Extracts available entities from context or the causal graph
+2. Prompts the LLM to identify which entities should be present based on the event description
+3. Falls back to regex-based name extraction if LLM is unavailable
+
+```python
+# In TemporalAgent._infer_entities_for_timepoint()
+inferred_entities = self._infer_entities_for_timepoint(
+    event_description="Heated debate at city council meeting",
+    available_entities=["jane_chen", "campaign_manager", "opponent"],
+    context=context
+)
+# Returns: ["jane_chen", "opponent"] based on event relevance
+```
+
 **Forward coherence validation**: Backward-generated paths must make sense when simulated forward. Paths below coherence threshold are pruned, backtracked, or marked with warnings.
 
 **Simulation-based judging** (optional enhancement): Instead of static scoring formulas, run mini forward simulations from each candidate antecedent and use a judge LLM to evaluate which simulation is most realistic. Captures emergent behaviors invisible to static scoring—2-5x cost increase for significantly better path plausibility.
+
+### Portal Enhancements (January 2026)
+
+**Preserve All Paths**: By default (`preserve_all_paths=True` in `TemporalConfig`), portal mode returns ALL generated paths, not just the top N. This enables:
+- Full analysis of exploration space
+- Path clustering by coherence score
+- Divergence point identification
+- Complete path metadata in output
+
+**Path Divergence Detection**: After path generation, the system analyzes where paths diverge:
+- Computes pairwise path similarity at each step
+- Identifies key divergence points (steps where paths split)
+- Clusters paths by coherence (high_coherence, medium, low)
+
+```python
+# Output includes divergence analysis
+Step 7: Computing path divergence...
+  Key divergence at steps: [4, 5]
+  Clusters: 1 (high_coherence)
+
+PORTAL SIMULATION COMPLETE
+Returning ALL 6 paths (preserve_all_paths=True)
+Key divergence points: [4, 5]
+```
+
+**Quick Mode**: `--portal-quick` reduces `backward_steps` from default (often 24) to 5 for fast demos (~15 min vs 1+ hour). Ideal for testing and demonstrations.
+
+```bash
+./run.sh run portal_startup_unicorn --portal-quick  # Fast 5-step demo
+```
+
+**Fidelity Template Scaling**: Templates now scale proportionally with `backward_steps` instead of using hardcoded sizes. This ensures the fidelity schedule matches the actual number of steps:
+
+| Template | Distribution |
+|----------|-------------|
+| `minimalist` | 70% TENSOR, 21% SCENE, 7% DIALOG |
+| `balanced` | 33% TENSOR, 33% SCENE, 20% GRAPH, 13% DIALOG |
+| `portal_pivots` | 2 TRAINED endpoints + scaled middle |
+| `max_quality` | 66% DIALOG, 33% TRAINED |
 
 ## M7: Causal Temporal Chains
 
@@ -478,6 +562,16 @@ DialogTurn:
 ```
 
 **Validation**: Dialog is checked for knowledge consistency (can speaker know this?), relationship consistency (would they say this to this person?), and realism (physical/emotional constraints on speech).
+
+### Tensor Synchronization in Dialog
+
+Before dialog synthesis, the system syncs TTMTensor → CognitiveTensor to ensure trained emotional values are used (see M6: Dual Tensor Architecture). After dialog:
+
+1. **Emotional Impact Analysis**: Dialog content is analyzed for emotional keywords (positive/negative valence, high/low arousal)
+2. **State Persistence**: Updated emotional states are written to `entity_metadata["cognitive_tensor"]`
+3. **Backprop to Tensor**: Changes are synced back to TTMTensor context_vector via `_sync_cognitive_to_ttm()`
+
+This enables emotional evolution across dialogs—entities accumulate emotional state changes throughout the simulation rather than resetting to defaults.
 
 ## M13: Multi-Entity Synthesis
 
@@ -1083,6 +1177,16 @@ E2E mode is useful for validating that a specific template produces consistent c
 
 ---
 
-**Implementation Status**: All 19 mechanisms implemented and verified. M19 (Knowledge Extraction Agent) added December 2025 to replace naive capitalization-based extraction with LLM-based semantic understanding. Convergence evaluation implemented with E2E testing mode and 3 convergence-optimized templates. Parallel execution (`--parallel N`) and free model support (`--free`, `--free-fast`) added December 2025.
+**Implementation Status**: All 19 mechanisms implemented and verified. M19 (Knowledge Extraction Agent) added December 2025 to replace naive capitalization-based extraction with LLM-based semantic understanding. Convergence evaluation implemented with E2E testing mode and 3 convergence-optimized templates. Parallel execution (`--parallel N`) and free model support (`--free`, `--free-fast`) added December 2025. **Portal enhancements** added January 2026: `preserve_all_paths` (returns ALL paths), path divergence detection, `--portal-quick` mode (5 backward steps), and fidelity template scaling.
+
+**January 2026 Data Integrity Fixes**:
+- **Portal Entity Inference**: M17 PORTAL mode now uses LLM-based entity inference (`temporal_agent.py:_infer_entities_for_timepoint()`) instead of blind copying from consequent timepoints. This fixes the bug where all portal-generated timepoints had empty `entities_present`.
+- **Entity Persistence**: Entities now sync to `metadata/runs.db` alongside timepoints (`e2e_runner.py:_persist_entity_for_convergence()`), enabling proper cross-run convergence analysis.
+- **Data Quality Validation**: Added `e2e_runner.py:_run_data_quality_check()` that validates entity references and detects empty `entities_present` before run completion.
+- **Timepoint Validation Warning**: `schemas.py:Timepoint.__init__()` now emits `UserWarning` when `entities_present` is empty to surface data quality issues early.
+- **TTM↔Cog Tensor Sync**: Fixed dual-storage issue where TTMTensor and CognitiveTensor had independent emotional values that never synchronized. Added bidirectional sync in `dialog_synthesis.py`: `_sync_ttm_to_cognitive()` (pretraining equivalent) and `_sync_cognitive_to_ttm()` (backprop equivalent). Entities now use trained tensor values during dialog and persist emotional changes back to tensors.
+- **Voice Differentiation**: Added `_derive_speaking_style()` function mapping personality traits to speaking patterns (verbosity, formality, tone, vocabulary, speech_pattern) to fix generic dialog where all entities sounded identical.
+- **Entity Hallucination Prevention**: Added `ENTITY_BLACKLIST` and `_validate_entity_id()` in `portal_strategy.py` to filter out phantom entity IDs like "arr", "series_c" generated by LLMs.
+
 **Platform Status**: Infrastructure vision; see [MILESTONES.md](MILESTONES.md) for roadmap.
 **See also**: [README.md](README.md) for quick start, [QUICKSTART.md](QUICKSTART.md) for natural language usage.

@@ -6,9 +6,9 @@
 
 ---
 
-## Phase 0: Current State (December 2025)
+## Phase 0: Current State (January 2026)
 
-**What we have: A working research prototype with intelligent model selection.**
+**What we have: A working research prototype with intelligent model selection and improved data integrity.**
 
 ### Implemented
 
@@ -21,12 +21,15 @@
 - **Parallel execution** — `--parallel N` for N concurrent workers with thread-safe rate limiting
 - **Free model support** — `--free`, `--free-fast`, `--list-free-models` for $0 cost testing
 - **Ctrl+C protection** — Double-confirm handler prevents accidental abortion of expensive runs
-- **SQLite persistence** — `metadata/runs.db` for run tracking
+- **SQLite persistence** — `metadata/runs.db` for run tracking, `timepoint.db` for temp per-run data
 - **Mechanism metrics** — All 19 mechanisms tracked per run
 - **API backend** — FastAPI REST API
 - **Narrative exports** — Markdown, JSON, PDF generation
 - **41 simulation templates** — In `generation/templates/` (JSON-based with patch metadata, includes 3 convergence templates)
 - **Convergence evaluation** — Causal graph consistency analysis with E2E testing mode, side-by-side comparison, and robustness grading (A-F)
+- **Entity inference in Portal mode** — LLM-based `entities_present` inference instead of blind copying
+- **Data quality validation** — Validates entity references, empty entities_present detection
+- **Entity sync to shared DB** — Entities now persist to metadata/runs.db for convergence
 
 ### Model Stack (All Open Source)
 
@@ -430,12 +433,19 @@ Broad accessibility and ecosystem.
 | Batch submission API | **COMPLETE** | `api/routes/batch.py`, `api/batch_runner.py` - 22 tests |
 | Usage quotas | **COMPLETE** | `api/middleware/usage_quota.py`, `api/usage_storage.py` - 34 tests |
 | CLI-API integration | **COMPLETE** | `api/client.py` (SDK), `api/usage_bridge.py`, `--api` flag - 21 tests |
+| Portal entity inference | **COMPLETE** | `temporal_agent.py:_infer_entities_for_timepoint()`, `portal_strategy.py:_infer_entities_from_description()` |
+| Data quality validation | **COMPLETE** | `e2e_runner.py:_run_data_quality_check()` |
+| Entity persistence sync | **COMPLETE** | `e2e_runner.py:_persist_entity_for_convergence()` |
+| Portal preserve_all_paths | **COMPLETE** | `TemporalConfig.preserve_all_paths`, `portal_strategy.py` |
+| Portal divergence detection | **COMPLETE** | `portal_strategy.py:_compute_path_divergence()` |
+| Portal quick mode | **COMPLETE** | `--portal-quick` flag, `run_all_mechanism_tests.py` |
+| Fidelity template scaling | **COMPLETE** | `temporal_agent.py:_apply_fidelity_template()` |
 
 ---
 
 ## Reality Check
 
-**Where we are:** Working research prototype with 18 novel mechanisms, intelligent model selection, parallel execution, and **complete tensor persistence system** (329+ tests).
+**Where we are:** Working research prototype with 19 mechanisms, intelligent model selection, parallel execution, **complete tensor persistence system** (329+ tests), and **improved data integrity** (January 2026 fixes).
 
 **What works:**
 - Single-run and parallel simulations with full temporal reasoning
@@ -448,6 +458,10 @@ Broad accessibility and ecosystem.
 - Batch submission API (2-100 jobs per batch, budget caps, fail-fast)
 - Usage quotas (monthly limits for API calls, simulations, cost)
 - CLI-API integration (`./run.sh --api`, Python SDK, usage bridge)
+- **Portal mode entity inference** (LLM-based, not blind copy)
+- **Portal mode enhancements** (preserve all paths, divergence detection, quick mode, fidelity scaling)
+- **Data quality validation** (empty entities_present detection, entity reference validation)
+- **Entity persistence to shared DB** (enables cross-run convergence analysis)
 
 **What's missing:** External integrations, containerization, distributed execution.
 

@@ -1179,7 +1179,7 @@ def run_nl_simulation(
         return False
 
 
-def run_single_template(template_name: str, skip_summaries: bool = False) -> bool:
+def run_single_template(template_name: str, skip_summaries: bool = False, portal_quick: bool = False) -> bool:
     """Run a single template by name.
 
     Args:
@@ -1325,6 +1325,14 @@ def run_single_template(template_name: str, skip_summaries: bool = False) -> boo
         return False
 
     config, mechanisms = template_lookup[template_name]
+
+    # Apply portal-quick mode: reduce backward_steps to 5 for fast demo
+    if portal_quick:
+        from generation.config_schema import TemporalMode
+        if hasattr(config, 'temporal') and config.temporal.mode == TemporalMode.PORTAL:
+            original_steps = config.temporal.backward_steps
+            config.temporal.backward_steps = 5
+            print(f"⚡ PORTAL QUICK MODE: backward_steps {original_steps} → 5")
 
     # Run it
     print("=" * 80)
@@ -1681,6 +1689,21 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, paralle
         print("   Estimated cost: $4.00-$8.00, Runtime: 120-180 minutes")
         print("   Complete validation of all 17 mechanisms + ANDOS scripts")
         print()
+
+    # Apply portal-quick mode: reduce backward_steps to 5 for fast demo
+    if args.portal_quick:
+        from generation.config_schema import TemporalMode
+        portal_count = 0
+        for name, config, expected in templates_to_run:
+            if hasattr(config, 'temporal') and config.temporal.mode == TemporalMode.PORTAL:
+                original_steps = config.temporal.backward_steps
+                config.temporal.backward_steps = 5
+                portal_count += 1
+                print(f"  ⚡ {name}: backward_steps {original_steps} → 5")
+        if portal_count > 0:
+            print(f"\n🚀 PORTAL QUICK MODE: Reduced {portal_count} templates to 5 backward steps (~2 min each)\n")
+        else:
+            print("\n⚠️  No PORTAL templates found in selected mode\n")
 
     results = {}
     total_cost = 0.0
@@ -2368,6 +2391,11 @@ if __name__ == "__main__":
         help="Run ALL PORTAL Timepoint tests (standard + all 3 simulation-judged variants = 20 templates total)"
     )
     parser.add_argument(
+        "--portal-quick",
+        action="store_true",
+        help="Quick demo mode for PORTAL simulations (5 timepoints instead of 16, ~2 min runtime)"
+    )
+    parser.add_argument(
         "--ultra-all",
         action="store_true",
         help="Run EVERYTHING: all 64 templates across ALL categories (quick + full + timepoint + portal + portal-timepoint = complete system validation)"
@@ -2651,7 +2679,7 @@ if __name__ == "__main__":
 
     # Handle --template mode (single template execution)
     if args.template and not args.convergence_e2e:
-        success = run_single_template(args.template, skip_summaries=args.skip_summaries)
+        success = run_single_template(args.template, skip_summaries=args.skip_summaries, portal_quick=args.portal_quick)
         sys.exit(0 if success else 1)
 
     # Handle --convergence-e2e mode (run template N times, compute convergence)

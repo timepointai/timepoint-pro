@@ -279,6 +279,19 @@ class Timepoint(SQLModel, table=True):
     resolution_level: ResolutionLevel = Field(default=ResolutionLevel.SCENE)
     run_id: Optional[str] = Field(default=None, index=True)  # link to simulation run for convergence
 
+    def __init__(self, **data):
+        """Validate entities_present on construction and warn if empty."""
+        super().__init__(**data)
+        # DATA QUALITY WARNING: Empty entities_present indicates potential data integrity issue
+        if not self.entities_present or len(self.entities_present) == 0:
+            import warnings
+            warnings.warn(
+                f"Timepoint '{self.timepoint_id}' created with empty entities_present. "
+                f"Event: '{self.event_description[:50]}...' - This may indicate entity inference is not working.",
+                UserWarning,
+                stacklevel=2
+            )
+
 
 # ============================================================================
 # Dialog Synthesis (Mechanism 11)

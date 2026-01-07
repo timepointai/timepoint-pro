@@ -112,6 +112,10 @@ FREE MODELS ($0 cost):
 GEMINI 3 FLASH (1M context, fast inference):
     ./run.sh run --gemini-flash board_meeting
 
+GROQ ULTRA-FAST INFERENCE (~5x faster):
+    ./run.sh run --groq board_meeting       # Llama 3.3 70B (~300 tok/s)
+    ./run.sh run --fast board_meeting       # Llama 8B Instant (~750 tok/s)
+
 QUICK EXAMPLES:
     ./run.sh board_meeting           Run single template
     ./run.sh run --tier quick        Run by tier
@@ -488,6 +492,7 @@ cmd_run() {
     local portal_simjudged_thorough=false
     local portal_timepoint_only=false
     local portal_timepoint_all=false
+    local portal_quick_demo=false  # NEW: 5 timepoints quick demo mode
     # Timepoint testing modes
     local timepoint_forward=false
     local timepoint_all=false
@@ -499,6 +504,9 @@ cmd_run() {
     local model_override=""
     # Gemini Flash option
     local gemini_flash=false
+    # Groq fast inference option
+    local groq_mode=false
+    local groq_fast=false
     # Convergence options
     local convergence=false
     local convergence_runs=""
@@ -542,6 +550,7 @@ cmd_run() {
             --portal-simjudged-thorough|--portal-simjudged-thorough-only) portal_simjudged_thorough=true; shift ;;
             --portal-timepoint-only) portal_timepoint_only=true; shift ;;
             --portal-timepoint-all) portal_timepoint_all=true; shift ;;
+            --portal-quick|--portal-demo) portal_quick_demo=true; shift ;;
             # Timepoint testing modes
             --timepoint-forward) timepoint_forward=true; shift ;;
             --timepoint-all) timepoint_all=true; shift ;;
@@ -553,6 +562,9 @@ cmd_run() {
             --model) model_override="$2"; shift 2 ;;
             # Gemini Flash (1M context, fast inference)
             --gemini-flash|--gemini) gemini_flash=true; shift ;;
+            # Groq ultra-fast inference
+            --groq) groq_mode=true; shift ;;
+            --groq-fast|--fast) groq_fast=true; shift ;;
             # Convergence options
             --convergence) convergence=true; shift ;;
             --convergence-runs) convergence_runs="$2"; shift 2 ;;
@@ -615,6 +627,10 @@ cmd_run() {
     elif [[ "$portal_timepoint_all" == "true" ]]; then
         py_args+=(--portal-timepoint-all)
         print_header "Running Portal Timepoint All"
+    elif [[ "$portal_quick_demo" == "true" && -z "$template" ]]; then
+        # Standalone --portal-quick: run all portal templates with quick mode
+        py_args+=(--category portal)
+        print_header "Running Portal Quick Demo (5 timepoints)"
     # Timepoint testing modes
     elif [[ "$timepoint_forward" == "true" ]]; then
         py_args+=(--timepoint-forward)
@@ -644,6 +660,9 @@ cmd_run() {
     [[ -n "$parallel" ]] && py_args+=(--parallel "$parallel")
     [[ "$skip_summaries" == "true" ]] && py_args+=(--skip-summaries)
 
+    # Portal quick mode - ADDITIVE flag (works with any template selection)
+    [[ "$portal_quick_demo" == "true" ]] && py_args+=(--portal-quick)
+
     # Free model options
     [[ "$free_mode" == "true" ]] && py_args+=(--free)
     [[ "$free_fast" == "true" ]] && py_args+=(--free-fast)
@@ -653,6 +672,21 @@ cmd_run() {
         model_override="google/gemini-3-flash-preview"
         print_info "Using Gemini 3 Flash Preview (1M context, fast inference)"
         print_warning "Note: Google TOS may restrict synthetic data generation"
+    fi
+
+    # Groq ultra-fast inference (via LPU hardware)
+    if [[ "$groq_mode" == "true" ]]; then
+        model_override="groq/llama-3.3-70b-versatile"
+        print_info "Using Groq Llama 3.3 70B (~300 tok/s, 128K context)"
+        print_info "Requires GROQ_API_KEY in .env - get free key at https://console.groq.com"
+    fi
+
+    # Fast mode (fastest available model on OpenRouter)
+    # NOTE: groq/mixtral-8x7b-32768 was deprecated on OpenRouter (January 2026)
+    # Using standard Mixtral via OpenRouter instead
+    if [[ "$groq_fast" == "true" ]]; then
+        model_override="mistralai/mixtral-8x7b-instruct"
+        print_info "Using Mixtral 8x7B (~200 tok/s, 32K context - fast inference)"
     fi
 
     # Model override
@@ -748,13 +782,22 @@ GEMINI 3 FLASH OPTIONS (1M context, fast inference):
     --gemini-flash        Use google/gemini-3-flash-preview
     --gemini              Alias for --gemini-flash
 
+GROQ OPTIONS (ultra-fast inference via LPU hardware):
+    --groq                Use Groq Llama 3.3 70B (~300 tok/s, best quality)
+    --fast                Use Groq Llama 8B Instant (~750 tok/s, fastest)
+    --groq-fast           Alias for --fast
+    Note: Requires GROQ_API_KEY in .env (free at console.groq.com)
+
 MODEL OPTIONS:
     --model MODEL         Override LLM model for all calls
                           Examples: deepseek/deepseek-chat
                                     meta-llama/llama-3.1-70b-instruct
                                     google/gemini-3-flash-preview
+                                    groq/llama-3.3-70b-versatile
 
 PORTAL TESTING MODES:
+    --portal-quick                  Quick demo mode (5 timepoints, ~2 min)
+    --portal-demo                   Alias for --portal-quick
     --portal-all                    All portal testing modes
     --portal-test-only              Basic portal test
     --portal-simjudged-quick        Quick simjudged portal
@@ -797,6 +840,10 @@ EXAMPLES:
 
     # Gemini 3 Flash (1M context, fast inference)
     ./run.sh run --gemini-flash board_meeting
+
+    # Groq ultra-fast inference
+    ./run.sh run --groq board_meeting         # 5x faster, best quality
+    ./run.sh run --fast quick                 # 10x faster, fastest model
 
     # Portal testing
     ./run.sh run --portal-all

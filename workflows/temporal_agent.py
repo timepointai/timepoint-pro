@@ -235,44 +235,72 @@ class TemporalAgent:
         # For now, provide basic templates
 
         if template_name == "minimalist":
-            # 10 TENSOR checkpoints, 3 SCENE bridges, 1 DIALOG endpoint
-            fidelity_schedule = [ResolutionLevel.TENSOR_ONLY] * 10 + \
-                               [ResolutionLevel.SCENE] * 3 + \
-                               [ResolutionLevel.DIALOG]
+            # SCALED: 70% TENSOR, 21% SCENE, 7% DIALOG
+            n = max(3, suggested_steps)
+            tensor_count = max(1, int(n * 0.70))
+            scene_count = max(1, int(n * 0.21))
+            dialog_count = max(1, n - tensor_count - scene_count)
+
+            fidelity_schedule = ([ResolutionLevel.TENSOR_ONLY] * tensor_count +
+                               [ResolutionLevel.SCENE] * scene_count +
+                               [ResolutionLevel.DIALOG] * dialog_count)
             # Even temporal distribution
-            month_step = total_months // len(fidelity_schedule)
+            month_step = total_months // len(fidelity_schedule) if fidelity_schedule else 1
             temporal_steps = [month_step] * len(fidelity_schedule)
-            estimated_tokens = 10 * 200 + 3 * 1000 + 1 * 10000  # Rough estimate
+            estimated_tokens = tensor_count * 200 + scene_count * 1000 + dialog_count * 10000
 
         elif template_name == "balanced":
-            # 5 TENSOR, 5 SCENE, 3 GRAPH, 2 DIALOG
-            fidelity_schedule = [ResolutionLevel.TENSOR_ONLY] * 5 + \
-                               [ResolutionLevel.SCENE] * 5 + \
-                               [ResolutionLevel.GRAPH] * 3 + \
-                               [ResolutionLevel.DIALOG] * 2
-            month_step = total_months // len(fidelity_schedule)
+            # SCALED: 33% TENSOR, 33% SCENE, 20% GRAPH, 13% DIALOG
+            # Scale based on suggested_steps, respecting the ratio
+            n = max(4, suggested_steps)  # Minimum 4 steps for distribution
+            tensor_count = max(1, int(n * 0.33))
+            scene_count = max(1, int(n * 0.33))
+            graph_count = max(1, int(n * 0.20))
+            dialog_count = max(1, n - tensor_count - scene_count - graph_count)
+
+            fidelity_schedule = ([ResolutionLevel.TENSOR_ONLY] * tensor_count +
+                               [ResolutionLevel.SCENE] * scene_count +
+                               [ResolutionLevel.GRAPH] * graph_count +
+                               [ResolutionLevel.DIALOG] * dialog_count)
+            month_step = total_months // len(fidelity_schedule) if fidelity_schedule else 1
             temporal_steps = [month_step] * len(fidelity_schedule)
-            estimated_tokens = 5 * 200 + 5 * 1000 + 3 * 5000 + 2 * 10000
+            estimated_tokens = tensor_count * 200 + scene_count * 1000 + graph_count * 5000 + dialog_count * 10000
 
         elif template_name == "portal_pivots":
-            # Blended: Endpoint + Origin = TRAINED, middle = adaptive
-            # For now, use balanced as starting point
-            fidelity_schedule = [ResolutionLevel.TRAINED] + \
-                               [ResolutionLevel.TENSOR_ONLY] * 8 + \
-                               [ResolutionLevel.SCENE] * 4 + \
-                               [ResolutionLevel.DIALOG] * 2 + \
-                               [ResolutionLevel.TRAINED]
-            month_step = total_months // len(fidelity_schedule)
+            # SCALED: Endpoint + Origin = TRAINED, middle = balanced distribution
+            # 2 endpoints TRAINED, middle: 50% TENSOR, 25% SCENE, 13% DIALOG
+            n = max(4, suggested_steps)
+            middle_count = n - 2  # Reserve 2 for TRAINED endpoints
+
+            if middle_count <= 0:
+                # Very short simulation - all TRAINED
+                fidelity_schedule = [ResolutionLevel.TRAINED] * n
+            else:
+                tensor_count = max(1, int(middle_count * 0.50))
+                scene_count = max(1, int(middle_count * 0.25))
+                dialog_count = max(0, middle_count - tensor_count - scene_count)
+
+                fidelity_schedule = ([ResolutionLevel.TRAINED] +
+                                   [ResolutionLevel.TENSOR_ONLY] * tensor_count +
+                                   [ResolutionLevel.SCENE] * scene_count +
+                                   [ResolutionLevel.DIALOG] * dialog_count +
+                                   [ResolutionLevel.TRAINED])
+
+            month_step = total_months // len(fidelity_schedule) if fidelity_schedule else 1
             temporal_steps = [month_step] * len(fidelity_schedule)
-            estimated_tokens = 2 * 50000 + 8 * 200 + 4 * 1000 + 2 * 10000
+            estimated_tokens = 2 * 50000 + (len(fidelity_schedule) - 2) * 1000
 
         elif template_name == "max_quality":
-            # 10 DIALOG, 5 TRAINED
-            fidelity_schedule = [ResolutionLevel.DIALOG] * 10 + \
-                               [ResolutionLevel.TRAINED] * 5
-            month_step = total_months // len(fidelity_schedule)
+            # SCALED: 66% DIALOG, 33% TRAINED (maximum detail throughout)
+            n = max(3, suggested_steps)
+            dialog_count = max(1, int(n * 0.66))
+            trained_count = max(1, n - dialog_count)
+
+            fidelity_schedule = ([ResolutionLevel.DIALOG] * dialog_count +
+                               [ResolutionLevel.TRAINED] * trained_count)
+            month_step = total_months // len(fidelity_schedule) if fidelity_schedule else 1
             temporal_steps = [month_step] * len(fidelity_schedule)
-            estimated_tokens = 10 * 10000 + 5 * 50000
+            estimated_tokens = dialog_count * 10000 + trained_count * 50000
 
         else:
             # Default to balanced
@@ -609,12 +637,26 @@ class TemporalAgent:
         context["entity_token_budgets"] = entity_token_budgets
         context["timepoint_resolution"] = next_resolution
 
+        # ENTITY INFERENCE FIX: Instead of blindly copying entities from parent,
+        # infer which entities should be present based on the event description
+        available_entities = context.get("available_entities", [])
+        if not available_entities:
+            # Fall back to entities from current timepoint as available pool
+            available_entities = list(current_timepoint.entities_present) if current_timepoint.entities_present else []
+
+        # Infer entities for this new timepoint
+        inferred_entities = self._infer_entities_for_timepoint(
+            event_description=event_description,
+            available_entities=available_entities,
+            context=context
+        )
+
         # Create next timepoint
         next_timepoint = Timepoint(
             timepoint_id=next_id,
             timestamp=next_timestamp,
             event_description=event_description,
-            entities_present=current_timepoint.entities_present.copy(),
+            entities_present=inferred_entities,  # Use inferred entities, not blind copy
             causal_parent=current_timepoint.timepoint_id,
             resolution_level=next_resolution  # M1 → M17: Use fidelity-determined resolution
         )
@@ -628,6 +670,121 @@ class TemporalAgent:
             self._create_exposure_events_for_timepoint(next_timepoint)
 
         return next_timepoint
+
+    def _infer_entities_for_timepoint(
+        self,
+        event_description: str,
+        available_entities: List[str],
+        context: Dict = None
+    ) -> List[str]:
+        """
+        Infer which entities should be present at a timepoint based on event description.
+
+        Uses LLM to identify relevant entities from the available list, or generates
+        placeholder entity IDs if no LLM is available or no entities are provided.
+
+        Args:
+            event_description: Description of the event at this timepoint
+            available_entities: List of entity IDs that could be present
+            context: Optional context dict with additional information
+
+        Returns:
+            List of entity IDs that should be present at this timepoint
+        """
+        context = context or {}
+
+        # If we have available entities and an LLM client, use LLM to select relevant ones
+        if available_entities and self.llm_client:
+            try:
+                # Build selection prompt
+                system_prompt = "You are an expert at identifying which entities are relevant to events."
+
+                user_prompt = f"""Given this event description, identify which entities from the available list should be present.
+
+EVENT DESCRIPTION:
+{event_description[:500]}
+
+AVAILABLE ENTITIES:
+{', '.join(available_entities[:50])}
+
+INSTRUCTIONS:
+1. Select 3-15 entities that would logically be present at or involved in this event
+2. Consider: direct participants, witnesses, affected parties, decision makers
+3. Don't include entities that wouldn't plausibly be involved
+
+Return ONLY a JSON object with format:
+{{"entities_present": ["entity_id_1", "entity_id_2", ...]}}"""
+
+                # Call LLM for entity selection
+                response = self.llm_client.client.chat.completions.create(
+                    model=self.llm_client.default_model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    temperature=0.3,  # Lower temp for more consistent selection
+                    max_tokens=500
+                )
+
+                # Parse response - handle both OpenAI-style objects and raw dicts
+                # Some providers return dict, others return response objects
+                if isinstance(response, dict):
+                    # Raw dict response (e.g., some OpenRouter providers)
+                    choices = response.get('choices', [])
+                    if choices:
+                        message = choices[0].get('message', {})
+                        content = message.get('content', '')
+                    else:
+                        content = ''
+                else:
+                    # OpenAI-style response object
+                    content = response.choices[0].message.content
+
+                # Try to extract JSON
+                import json
+                import re
+
+                # Look for JSON in response
+                json_match = re.search(r'\{[^}]+\}', content)
+                if json_match:
+                    result = json.loads(json_match.group())
+                    selected = result.get('entities_present', [])
+
+                    # Filter to only include valid entity IDs
+                    valid_entities = [e for e in selected if e in available_entities]
+
+                    if valid_entities:
+                        return valid_entities
+
+            except Exception as e:
+                # Log but don't fail - fall through to alternatives
+                print(f"    ⚠️  Entity inference failed: {e}")
+
+        # Fallback 1: Return available entities if we have them (limited to reasonable count)
+        if available_entities:
+            return available_entities[:10]
+
+        # Fallback 2: Extract potential entity names from event description
+        # This provides some data rather than empty list
+        import re
+
+        # Look for capitalized words/phrases that might be entity names
+        potential_entities = []
+
+        # Find capitalized words (potential proper nouns)
+        words = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', event_description)
+        for word in words[:5]:
+            entity_id = word.lower().replace(' ', '_')
+            if len(entity_id) > 2:  # Skip very short matches
+                potential_entities.append(entity_id)
+
+        # If we found potential entities, return them
+        if potential_entities:
+            return list(set(potential_entities))[:10]
+
+        # Final fallback: Return empty list with warning
+        print(f"    ⚠️  No entities could be inferred for timepoint")
+        return []
 
     def _create_exposure_events_for_timepoint(self, timepoint):
         """
@@ -712,12 +869,26 @@ class TemporalAgent:
             # Placeholder - in real implementation, LLM would generate this
             event_description = f"Antecedent state preceding: {current_timepoint.event_description[:100]}"
 
+        # ENTITY INFERENCE FIX: Instead of blindly copying entities from consequent,
+        # infer which entities should be present based on the event description
+        available_entities = context.get("available_entities", [])
+        if not available_entities:
+            # Fall back to entities from current timepoint as available pool
+            available_entities = list(current_timepoint.entities_present) if current_timepoint.entities_present else []
+
+        # Infer entities for this antecedent event
+        inferred_entities = self._infer_entities_for_timepoint(
+            event_description=event_description,
+            available_entities=available_entities,
+            context=context
+        )
+
         # Create antecedent timepoint
         antecedent_timepoint = Timepoint(
             timepoint_id=antecedent_id,
             timestamp=antecedent_timestamp,
             event_description=event_description,
-            entities_present=current_timepoint.entities_present.copy(),
+            entities_present=inferred_entities,  # Use inferred entities, not blind copy
             causal_parent=None,  # Will be set during path reconstruction
             resolution_level=current_timepoint.resolution_level
         )

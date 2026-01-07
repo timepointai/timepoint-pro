@@ -63,6 +63,9 @@ python run_all_mechanism_tests.py --nl "detective interrogates 3 witnesses about
 ./run.sh run --category showcase      # 10 production-ready scenarios
 ./run.sh run --category portal        # 4 backward reasoning scenarios
 
+# Portal quick mode - 5 backward steps for fast demos (~15 min vs 1+ hour)
+./run.sh run portal_startup_unicorn --portal-quick
+
 # Run templates by tier (complexity)
 ./run.sh quick                    # Fast tests (~2-3 min each)
 ./run.sh standard                 # Moderate tests (~5-10 min)
@@ -116,7 +119,7 @@ Typical runs cost **$0.02-0.10** depending on:
 - Number of timepoints (1-10)
 - Temporal mode complexity
 
-*Updated December 2025: Costs are ~10x lower than previous estimates due to efficient Llama 4 Scout pricing.*
+*Updated January 2026: Costs are ~10x lower than previous estimates due to efficient Llama 4 Scout pricing.*
 
 ### Free Mode ($0 cost)
 

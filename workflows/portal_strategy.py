@@ -28,6 +28,11 @@ import uuid
 
 from schemas import Entity, Timepoint, TemporalMode, ResolutionLevel
 from generation.config_schema import TemporalConfig
+from llm_service.model_selector import (
+    ActionType,
+    TokenBudgetEstimator,
+    get_token_estimator
+)
 
 
 class ExplorationMode(str, Enum):
@@ -36,6 +41,116 @@ class ExplorationMode(str, Enum):
     OSCILLATING = "oscillating"  # 100→1→99→2→98→3→...
     RANDOM = "random"  # Random step order
     ADAPTIVE = "adaptive"  # System decides based on complexity
+
+
+# Entity names that should be rejected (common false positives from regex extraction)
+ENTITY_BLACKLIST = {
+    # Common words that get falsely extracted as entities
+    "arr", "series", "series_c", "series_a", "series_b", "revenue", "company",
+    "market", "product", "customer", "team", "meeting", "board", "investor",
+    "growth", "funding", "round", "deal", "startup", "business", "year",
+    "quarter", "month", "week", "day", "time", "we", "they", "the", "this",
+    "that", "what", "when", "where", "how", "why", "who", "i", "you",
+    # Common business abbreviations that aren't entities
+    "arr", "mrr", "saas", "b2b", "b2c", "cac", "ltv", "roi", "kpi",
+}
+
+
+def _validate_entity_id(entity_id: str) -> bool:
+    """
+    Validate whether an entity ID is legitimate.
+
+    Args:
+        entity_id: The entity ID to validate
+
+    Returns:
+        True if the entity ID appears valid, False if it should be rejected
+    """
+    if not entity_id:
+        return False
+
+    entity_lower = entity_id.lower().replace("_", "").replace("-", "")
+
+    # Reject blacklisted names
+    if entity_lower in ENTITY_BLACKLIST:
+        return False
+
+    # Reject very short IDs (likely abbreviations or fragments)
+    if len(entity_id) < 3:
+        return False
+
+    # Reject purely numeric IDs
+    if entity_id.replace("_", "").replace("-", "").isdigit():
+        return False
+
+    # Reject IDs that are just repeated characters
+    if len(set(entity_lower)) <= 2 and len(entity_lower) > 2:
+        return False
+
+    return True
+
+
+def _filter_entities_by_relevance(
+    entities: List[Entity],
+    event_description: str,
+    known_entity_ids: Optional[set] = None
+) -> List[Entity]:
+    """
+    Filter entities to only include those relevant to an event description.
+
+    This prevents entity hallucination by:
+    1. Checking if entity name appears in the description (or known registry)
+    2. Validating entity IDs against blacklist
+    3. Prioritizing entities with established metadata
+
+    Args:
+        entities: List of entities to filter
+        event_description: Description of the event/state
+        known_entity_ids: Optional set of known valid entity IDs from registry
+
+    Returns:
+        Filtered list of relevant entities
+    """
+    if not entities:
+        return []
+
+    description_lower = event_description.lower() if event_description else ""
+    filtered = []
+
+    for entity in entities:
+        # Validate entity ID
+        if not _validate_entity_id(entity.entity_id):
+            continue
+
+        # Check if entity is in known registry (if provided)
+        if known_entity_ids and entity.entity_id in known_entity_ids:
+            filtered.append(entity)
+            continue
+
+        # Check if entity name/id appears in description
+        entity_name = entity.entity_metadata.get("name", entity.entity_id)
+        entity_name_lower = entity_name.lower() if entity_name else ""
+        entity_id_lower = entity.entity_id.lower()
+
+        # Check for presence in description
+        name_in_desc = entity_name_lower and entity_name_lower in description_lower
+        id_in_desc = entity_id_lower in description_lower
+
+        # Check for partial name match (first name, last name)
+        name_parts = entity_name_lower.split() if entity_name_lower else []
+        partial_match = any(part in description_lower for part in name_parts if len(part) > 3)
+
+        # Include if explicitly mentioned or has strong metadata
+        has_role = entity.entity_metadata.get("role")
+        has_traits = entity.entity_metadata.get("personality_traits")
+
+        if name_in_desc or id_in_desc or partial_match:
+            filtered.append(entity)
+        elif has_role or has_traits:
+            # Include entities with established metadata (likely important)
+            filtered.append(entity)
+
+    return filtered
 
 
 class FailureResolution(str, Enum):
@@ -143,7 +258,8 @@ class PortalStrategy:
         self.config = config
         self.llm = llm_client
         self.store = store
-        self.paths: List[PortalPath] = []
+        self.paths: List[PortalPath] = []  # Top-ranked paths (backward compatible)
+        self.all_paths: List[PortalPath] = []  # ALL generated paths for exploration
 
         # Validate configuration
         if not config.portal_description:
@@ -189,32 +305,158 @@ class PortalStrategy:
         print("\nStep 5: Ranking paths by plausibility...")
         ranked_paths = self._rank_paths(valid_paths)
 
-        # Step 6: Detect pivot points
+        # Step 6: Detect pivot points for ALL paths (not just top N)
         print("\nStep 6: Detecting pivot points...")
-        for i, path in enumerate(ranked_paths[:self.config.path_count]):
+        for i, path in enumerate(ranked_paths):
             path.pivot_points = self._detect_pivot_points(path)
-            print(f"  Path {i+1}: {len(path.pivot_points)} pivot points detected")
+            if i < 5:  # Only log first 5 to avoid spam
+                print(f"  Path {i+1}: {len(path.pivot_points)} pivot points detected")
+        if len(ranked_paths) > 5:
+            print(f"  ... and {len(ranked_paths) - 5} more paths analyzed")
 
+        # Step 7: Compute path divergence analysis
+        print("\nStep 7: Computing path divergence...")
+        divergence_analysis = self._compute_path_divergence(ranked_paths)
+
+        # Store ALL paths for exploration (the key feature!)
+        self.all_paths = ranked_paths
+
+        # Keep top N for backward compatibility
         self.paths = ranked_paths[:self.config.path_count]
+
+        # Attach divergence metadata to all paths
+        for path in self.all_paths:
+            path.validation_details['divergence'] = divergence_analysis.get(path.path_id, {})
+
+        # Determine what to return based on preserve_all_paths config
+        preserve_all = getattr(self.config, 'preserve_all_paths', True)
+        return_paths = self.all_paths if preserve_all else self.paths
 
         print(f"\n{'='*80}")
         print(f"PORTAL SIMULATION COMPLETE")
-        print(f"Top {len(self.paths)} paths returned")
+        print(f"Total paths generated: {len(self.all_paths)}")
+        if preserve_all:
+            print(f"Returning ALL {len(return_paths)} paths (preserve_all_paths=True)")
+        else:
+            print(f"Returning top {len(return_paths)} paths (use .all_paths for full list)")
+        if divergence_analysis:
+            key_divergences = divergence_analysis.get('key_divergence_points', [])
+            if key_divergences:
+                print(f"Key divergence points: {key_divergences[:3]}")
         print(f"{'='*80}\n")
 
-        return self.paths
+        return return_paths
 
     def _generate_portal_state(self) -> PortalState:
-        """Generate the endpoint state from description"""
-        # TODO: Use LLM to populate full state from description
-        # For now, create a placeholder state
+        """Generate the endpoint state from description, including entity inference."""
+        # Extract entities from portal description using LLM
+        entities = self._infer_entities_from_description(self.config.portal_description)
+
         return PortalState(
             year=self.config.portal_year,
             description=self.config.portal_description,
-            entities=[],  # Will be populated by LLM
+            entities=entities,
             world_state={"placeholder": True},
             plausibility_score=1.0  # Portal is given, score is 1.0
         )
+
+    def _infer_entities_from_description(self, description: str) -> List[Entity]:
+        """
+        Infer entities that should exist from a state description.
+
+        Uses LLM to identify entity names and creates placeholder Entity objects.
+        Validates entity IDs against blacklist to prevent hallucination.
+
+        Args:
+            description: State description text
+
+        Returns:
+            List of Entity objects inferred from description (validated)
+        """
+        if not self.llm:
+            # Fallback: extract capitalized names from description
+            import re
+            potential_names = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', description)
+            entities = []
+            seen = set()
+            for name in potential_names[:10]:
+                entity_id = name.lower().replace(' ', '_')
+                # Validate entity ID before adding
+                if entity_id not in seen and _validate_entity_id(entity_id):
+                    seen.add(entity_id)
+                    entities.append(Entity(
+                        entity_id=entity_id,
+                        entity_type="person",  # Default type
+                        entity_metadata={"name": name, "source": "inferred_from_description"}
+                    ))
+            return entities
+
+        # Use LLM to infer entities
+        try:
+            system_prompt = "You are an expert at identifying key entities in narrative descriptions."
+            user_prompt = f"""Identify the key entities (people, organizations, places) mentioned or implied in this description.
+
+DESCRIPTION:
+{description[:500]}
+
+Return a JSON object with format:
+{{"entities": [
+  {{"name": "Entity Name", "type": "person|organization|place|concept", "role": "brief role description"}}
+]}}
+
+Include 3-10 relevant entities."""
+
+            from pydantic import BaseModel
+            from typing import List as TypingList
+
+            class EntityInfo(BaseModel):
+                name: str
+                type: str
+                role: str
+
+            class EntityList(BaseModel):
+                entities: TypingList[EntityInfo]
+
+            result = self.llm.generate_structured(
+                prompt=user_prompt,
+                response_model=EntityList,
+                system_prompt=system_prompt,
+                temperature=0.3,
+                max_tokens=500
+            )
+
+            # Convert to Entity objects
+            entities = []
+            for info in result.entities[:10]:
+                entity_id = info.name.lower().replace(' ', '_').replace("'", "")
+                entities.append(Entity(
+                    entity_id=entity_id,
+                    entity_type=info.type,
+                    entity_metadata={
+                        "name": info.name,
+                        "role": info.role,
+                        "source": "inferred_from_portal"
+                    }
+                ))
+            return entities
+
+        except Exception as e:
+            print(f"    ⚠️  Entity inference from description failed: {e}")
+            # Fallback to regex extraction
+            import re
+            potential_names = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', description)
+            entities = []
+            seen = set()
+            for name in potential_names[:10]:
+                entity_id = name.lower().replace(' ', '_')
+                if entity_id not in seen and len(entity_id) > 2:
+                    seen.add(entity_id)
+                    entities.append(Entity(
+                        entity_id=entity_id,
+                        entity_type="person",
+                        entity_metadata={"name": name, "source": "fallback_regex"}
+                    ))
+            return entities
 
     def _select_exploration_strategy(self) -> ExplorationMode:
         """Adaptively choose exploration strategy based on complexity"""
@@ -481,28 +723,74 @@ Return as JSON with an "antecedents" array containing {count} antecedent objects
                 """Wrapper for list of antecedents"""
                 antecedents: List[AntecedentSchema]
 
-            # Call LLM with structured generation
-            result = self.llm.generate_structured(
-                prompt=user_prompt,
-                response_model=AntecedentList,
-                system_prompt=system_prompt,
-                temperature=0.8,  # Higher temp for diversity
-                max_tokens=2000
+            # Get adaptive token budget based on action type and context
+            token_estimator = get_token_estimator()
+            token_estimate = token_estimator.estimate(
+                ActionType.PORTAL_BACKWARD_REASONING,
+                context={"candidate_count": count},
+                prompt_length=len(user_prompt)
             )
 
+            # Retry loop for truncation handling
+            max_retries = 2
+            current_max_tokens = token_estimate.recommended_tokens
+            result = None
+
+            for attempt in range(max_retries + 1):
+                try:
+                    # Call LLM with adaptive token budget
+                    result = self.llm.generate_structured(
+                        prompt=user_prompt,
+                        response_model=AntecedentList,
+                        system_prompt=system_prompt,
+                        temperature=0.8,  # Higher temp for diversity
+                        max_tokens=current_max_tokens
+                    )
+
+                    # Check if we got enough antecedents
+                    antecedent_data = result.antecedents if hasattr(result, 'antecedents') else []
+                    if len(antecedent_data) >= count:
+                        # Success - got all requested antecedents
+                        if attempt > 0:
+                            print(f"    ✓ Retry {attempt} succeeded with {current_max_tokens} tokens")
+                        break
+
+                    # Got fewer than expected - might be truncation
+                    if attempt < max_retries:
+                        current_max_tokens = token_estimator.get_retry_budget(token_estimate, attempt + 1)
+                        print(f"    ⚠️  Only got {len(antecedent_data)}/{count} antecedents, retrying with {current_max_tokens} tokens...")
+                    else:
+                        # Final attempt, use what we got
+                        break
+
+                except Exception as e:
+                    if attempt < max_retries:
+                        # Retry with more tokens on parse errors (likely truncation)
+                        current_max_tokens = token_estimator.get_retry_budget(token_estimate, attempt + 1)
+                        print(f"    ⚠️  LLM call failed ({e}), retrying with {current_max_tokens} tokens...")
+                    else:
+                        raise  # Re-raise on final attempt
+
             # Extract list from wrapper
-            antecedent_data = result.antecedents if hasattr(result, 'antecedents') else []
+            antecedent_data = result.antecedents if (result and hasattr(result, 'antecedents')) else []
 
             # Convert to PortalState objects
             antecedents = []
             for i, data in enumerate(antecedent_data[:count]):  # Limit to requested count
-                # Create antecedent state
+                # Create antecedent state with filtered entities (prevent hallucination)
+                # Filter entities to those relevant to this specific antecedent description
+                filtered_entities = _filter_entities_by_relevance(
+                    current_state.entities,
+                    data.description,
+                    known_entity_ids=None  # Let validation rules apply
+                )
+
                 state = PortalState(
                     year=target_year,
                     month=target_month,
                     resolution_level=target_resolution or ResolutionLevel.SCENE,  # NEW
                     description=data.description,
-                    entities=current_state.entities.copy(),  # Start with same entities
+                    entities=filtered_entities,  # Use filtered entities, not blind copy
                     world_state=data.world_context,
                     plausibility_score=0.0,  # Will be scored later
                     parent_state=current_state
@@ -541,12 +829,19 @@ Return as JSON with an "antecedents" array containing {count} antecedent objects
         """Generate placeholder antecedents when LLM is unavailable"""
         antecedents = []
         for i in range(count):
+            placeholder_desc = f"Antecedent {i+1} for {current_state.description}"
+            # Filter entities even for placeholders to prevent hallucination propagation
+            filtered_entities = _filter_entities_by_relevance(
+                current_state.entities,
+                placeholder_desc,
+                known_entity_ids=None
+            )
             antecedent = PortalState(
                 year=target_year,
                 month=target_month,
                 resolution_level=target_resolution or ResolutionLevel.SCENE,  # NEW
-                description=f"Antecedent {i+1} for {current_state.description}",
-                entities=current_state.entities.copy(),
+                description=placeholder_desc,
+                entities=filtered_entities,  # Use filtered entities
                 world_state=current_state.world_state.copy(),
                 plausibility_score=0.0,
                 parent_state=current_state
@@ -1277,3 +1572,91 @@ Focus on: forward coherence, dialog realism, causal necessity, internal consiste
             if len(state.children_states) > 5:  # High branching = pivot
                 pivot_points.append(i)
         return pivot_points
+
+    def _compute_path_divergence(self, paths: List[PortalPath]) -> Dict[str, Any]:
+        """
+        Compute divergence analysis between all paths.
+
+        Identifies:
+        - Key divergence points (where paths differ most)
+        - Path clusters (similar vs different paths)
+        - Narrative theme differences
+
+        Args:
+            paths: List of all ranked paths
+
+        Returns:
+            Dict with divergence analysis metadata
+        """
+        if len(paths) < 2:
+            return {'key_divergence_points': [], 'path_clusters': [], 'total_paths': len(paths)}
+
+        # Find divergence points by comparing state descriptions at each timepoint
+        divergence_scores = []
+        max_states = max(len(p.states) for p in paths)
+
+        for step_idx in range(max_states):
+            descriptions_at_step = []
+            for path in paths:
+                if step_idx < len(path.states):
+                    descriptions_at_step.append(path.states[step_idx].description[:100])
+
+            # Simple divergence: count unique descriptions
+            unique_count = len(set(descriptions_at_step))
+            divergence_ratio = unique_count / max(len(descriptions_at_step), 1)
+            divergence_scores.append({
+                'step': step_idx,
+                'divergence': divergence_ratio,
+                'unique_narratives': unique_count,
+                'total_paths': len(descriptions_at_step)
+            })
+
+        # Find key divergence points (high divergence ratio)
+        key_divergence_points = [
+            d['step'] for d in divergence_scores
+            if d['divergence'] > 0.5  # More than 50% unique narratives = key divergence
+        ]
+
+        # Simple path clustering by coherence score ranges
+        high_coherence = [p.path_id for p in paths if p.coherence_score >= 0.8]
+        medium_coherence = [p.path_id for p in paths if 0.5 <= p.coherence_score < 0.8]
+        low_coherence = [p.path_id for p in paths if p.coherence_score < 0.5]
+
+        path_clusters = []
+        if high_coherence:
+            path_clusters.append({'label': 'high_coherence', 'paths': high_coherence})
+        if medium_coherence:
+            path_clusters.append({'label': 'medium_coherence', 'paths': medium_coherence})
+        if low_coherence:
+            path_clusters.append({'label': 'low_coherence', 'paths': low_coherence})
+
+        # Build per-path divergence info
+        per_path_divergence = {}
+        for path in paths:
+            per_path_divergence[path.path_id] = {
+                'rank': paths.index(path) + 1,
+                'coherence': path.coherence_score,
+                'pivot_count': len(path.pivot_points),
+                'state_count': len(path.states)
+            }
+
+        result = {
+            'key_divergence_points': key_divergence_points,
+            'path_clusters': path_clusters,
+            'total_paths': len(paths),
+            'divergence_by_step': divergence_scores,
+            'best_path_id': paths[0].path_id if paths else None,
+            'score_range': {
+                'min': paths[-1].coherence_score if paths else 0,
+                'max': paths[0].coherence_score if paths else 0
+            }
+        }
+
+        # Merge per-path info
+        result.update(per_path_divergence)
+
+        print(f"  ✓ Analyzed {len(paths)} paths")
+        print(f"  Key divergence at steps: {key_divergence_points[:5]}")
+        print(f"  Clusters: {len(path_clusters)} ({', '.join(c['label'] for c in path_clusters)})")
+
+        return result

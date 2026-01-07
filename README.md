@@ -260,13 +260,13 @@ chen_evolution = engine.query(
 | 10 entities, 5 timepoints | ~$3.00 | $0.08-0.15 | 95-97% |
 | 20 entities, 10 timepoints | ~$10.00 | $0.30-0.60 | 94-97% |
 
-*Updated December 2025 based on actual run costs with Llama 4 Scout via OpenRouter.*
+*Updated January 2026 based on actual run costs with Llama 4 Scout via OpenRouter.*
 
 Cost reduction comes from query-driven fidelity, not lossy compression—temporal consistency is preserved.
 
 ---
 
-## Current State (December 2025)
+## Current State (January 2026)
 
 **What works today:**
 
@@ -286,6 +286,13 @@ export OPENROUTER_API_KEY=your_key_here
 ./run.sh list                               # List all 41 templates
 ./run.sh list --category core               # List by category
 ./run.sh status                             # Show recent runs
+
+# Portal mode with simulation judging
+./run.sh run presidential_election --portal-simjudged-quick  # Quick simjudged
+./run.sh run presidential_election --portal-simjudged        # Standard simjudged
+
+# Portal quick demo mode (5 backward steps instead of 24)
+./run.sh run portal_startup_unicorn --portal-quick           # Fast demo (~15 min)
 
 # Parallel execution (4-6 workers recommended)
 ./run.sh run --parallel 6 quick
@@ -311,12 +318,13 @@ export OPENROUTER_API_KEY=your_key_here
 **Implemented:**
 - 19 simulation mechanisms (M1-M19)
 - M18: Intelligent per-action model selection (12 open-source models)
-- PORTAL mode (backward temporal reasoning)
+- PORTAL mode (backward temporal reasoning) with **LLM-based entity inference**
+- **Portal enhancements**: `--portal-quick` (5-step demos), preserve all paths, divergence detection
 - Natural language interface integration
 - **Parallel execution** (`--parallel N` for N concurrent workers)
 - **Free model support** (`--free`, `--free-fast`, `--list-free-models`)
 - **Ctrl+C protection** (double-confirm to prevent accidental abortion)
-- SQLite persistence (metadata/runs.db)
+- SQLite persistence (metadata/runs.db for runs, timepoint.db for temp)
 - API backend (FastAPI REST API)
 - Narrative exports (Markdown, JSON, PDF)
 - **Convergence evaluation** (causal graph consistency analysis across runs, E2E testing mode, 3 convergence-optimized templates)
@@ -324,6 +332,8 @@ export OPENROUTER_API_KEY=your_key_here
 - **Usage quotas** (per-tier monthly limits: free/basic/pro/enterprise)
 - **Python SDK** (`api/client.py` for programmatic access)
 - **CLI-API integration** (`--api` flag for remote execution)
+- **Data quality validation** (entity reference checks, empty entities_present detection)
+- **Entity persistence to shared DB** (enables cross-run convergence analysis)
 
 **License-Compliant Model Stack:**
 All models via OpenRouter, all open-source with commercial synthetic data rights:
