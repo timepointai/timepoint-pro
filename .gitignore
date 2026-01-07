@@ -203,6 +203,8 @@ cython_debug/
 # Database files
 *.db
 *.db-journal
+*.db-shm
+*.db-wal
 *.sqlite
 *.sqlite3
 
@@ -213,3 +215,10 @@ _site/
 # Backup files
 *.backup
 *.bak
+
+# Numbered file copies (macOS duplicates)
+*\ [0-9].py
+*\ [0-9].sh
+*\ [0-9].md
+*\ [0-9].json
+*\ [0-9].db*
