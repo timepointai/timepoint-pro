@@ -74,8 +74,8 @@ python run_all_mechanism_tests.py --nl "detective interrogates 3 witnesses about
 
 ### Test Without Cost
 ```bash
-# Dry run mode - no API calls, uses mock data
-python run_all_mechanism_tests.py --dry-run --template board_meeting
+# Free model mode - uses OpenRouter free tier ($0 cost)
+python run_all_mechanism_tests.py --free --template board_meeting
 ```
 
 ## What You Get
@@ -143,6 +143,7 @@ Note: Free models have more restrictive rate limits and availability may rotate.
 | Mode | Description | Use Case |
 |------|-------------|----------|
 | `pearl` | Standard causality, no time paradoxes | Default, most realistic |
+| `portal` | Backward reasoning from known outcomes | "How did we get here?" scenarios |
 | `directorial` | Narrative-focused with dramatic tension | Stories, character arcs |
 | `cyclical` | Allows prophecy and time loops | Sci-fi, mystical scenarios |
 | `branching` | Counterfactual what-if scenarios | Decision analysis, alternate history |
