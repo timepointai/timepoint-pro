@@ -187,7 +187,7 @@ entity = service.structured_call_with_action(
 ## Quick Start
 
 ```bash
-git clone https://github.com/yourusername/timepoint-daedalus.git
+git clone https://github.com/realityinspector/timepoint-daedalus.git
 cd timepoint-daedalus
 pip install -r requirements.txt
 
@@ -272,7 +272,7 @@ Cost reduction comes from query-driven fidelity, not lossy compression—tempora
 
 ```bash
 # Clone and install
-git clone https://github.com/yourusername/timepoint-daedalus.git
+git clone https://github.com/realityinspector/timepoint-daedalus.git
 cd timepoint-daedalus
 pip install -r requirements.txt
 
