@@ -1193,6 +1193,9 @@ def run_single_template(template_name: str, skip_summaries: bool = False, portal
     from generation.resilience_orchestrator import ResilientE2EWorkflowRunner
     from metadata.run_tracker import MetadataManager
 
+    # Normalize template name: convert "portal/startup_unicorn" to "portal_startup_unicorn"
+    template_name = template_name.replace("/", "_")
+
     # Build template lookup from all available templates
     template_lookup: Dict[str, Tuple] = {}
 

@@ -62,5 +62,12 @@ Entities now sync to metadata/runs.db alongside timepoints for convergence analy
 ### Timepoint Validation Warning
 `schemas.py:Timepoint.__init__()` now emits `UserWarning` when `entities_present` is empty.
 
+### Template Name Normalization
+Template names now accept both slash and underscore formats interchangeably:
+- `./run.sh run portal/startup_unicorn` works the same as
+- `./run.sh run portal_startup_unicorn`
+
+**Files:** `run_all_mechanism_tests.py:run_single_template()`
+
 ## Commits
 `type(scope): description` - types: feat, fix, refactor, test, docs, chore
