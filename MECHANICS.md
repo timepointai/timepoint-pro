@@ -1181,6 +1181,7 @@ E2E mode is useful for validating that a specific template produces consistent c
 
 **January 2026 Data Integrity Fixes**:
 - **Portal Entity Inference**: M17 PORTAL mode now uses LLM-based entity inference (`temporal_agent.py:_infer_entities_for_timepoint()`) instead of blind copying from consequent timepoints. This fixes the bug where all portal-generated timepoints had empty `entities_present`.
+- **Portal Entity Fallback**: Added fallback logic in `portal_strategy.py` when `_filter_entities_by_relevance()` returns empty (LLM descriptions don't mention entity names). The fix inherits all parent entities instead of leaving `entities_present` empty. Applied in `_generate_antecedents()` and `_generate_placeholder_antecedents()`.
 - **Entity Persistence**: Entities now sync to `metadata/runs.db` alongside timepoints (`e2e_runner.py:_persist_entity_for_convergence()`), enabling proper cross-run convergence analysis.
 - **Data Quality Validation**: Added `e2e_runner.py:_run_data_quality_check()` that validates entity references and detects empty `entities_present` before run completion.
 - **Timepoint Validation Warning**: `schemas.py:Timepoint.__init__()` now emits `UserWarning` when `entities_present` is empty to surface data quality issues early.

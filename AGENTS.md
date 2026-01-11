@@ -48,6 +48,11 @@ Portal mode now infers `entities_present` for each timepoint using LLM-based ent
 
 **Files:** `workflows/temporal_agent.py:_infer_entities_for_timepoint()`, `workflows/portal_strategy.py:_infer_entities_from_description()`
 
+### Entity Fallback in Portal Mode
+Added fallback logic when `_filter_entities_by_relevance()` returns an empty list (because LLM-generated antecedent descriptions don't explicitly mention entity names). The fix inherits all parent entities instead of leaving `entities_present` empty.
+
+**Files:** `workflows/portal_strategy.py:_generate_antecedents()` (lines 788-791), `workflows/portal_strategy.py:_generate_placeholder_antecedents()` (lines 844-847)
+
 ### Data Quality Validation
 Added `_run_data_quality_check()` in e2e_runner.py that validates:
 - All timepoints have non-empty `entities_present`

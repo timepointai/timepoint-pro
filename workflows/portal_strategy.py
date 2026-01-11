@@ -785,6 +785,11 @@ Return as JSON with an "antecedents" array containing {count} antecedent objects
                     known_entity_ids=None  # Let validation rules apply
                 )
 
+                # FALLBACK: If filtering returned empty, inherit all parent entities
+                # This prevents empty entities_present warnings on backward-generated timepoints
+                if not filtered_entities and current_state.entities:
+                    filtered_entities = current_state.entities
+
                 state = PortalState(
                     year=target_year,
                     month=target_month,
@@ -836,6 +841,10 @@ Return as JSON with an "antecedents" array containing {count} antecedent objects
                 placeholder_desc,
                 known_entity_ids=None
             )
+            # FALLBACK: If filtering returned empty, inherit all parent entities
+            # This prevents empty entities_present warnings on backward-generated timepoints
+            if not filtered_entities and current_state.entities:
+                filtered_entities = current_state.entities
             antecedent = PortalState(
                 year=target_year,
                 month=target_month,

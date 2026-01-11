@@ -98,20 +98,20 @@ Every N seconds:
 Console output shows:
 ```
 ================================================================================
-TIMEPOINT MONITOR | 2025-11-01 14:35:00 | Mode: BOTH
+TIMEPOINT MONITOR | 2026-01-11 14:35:00 | Mode: BOTH
 Chat Mode: ENABLED (type messages and press Enter to ask questions)
 ================================================================================
 
 [RAW] Running: portal_timepoint_unicorn [3/15]
-[RAW] Run ID: run_20251101_143500_abc123
+[RAW] Run ID: run_20260111_143500_abc123
 [RAW] Entities: 6, Timepoints: 12
 [RAW] Mechanisms: M1, M2, M3, M6, M7, M8, M11, M17
 [RAW] Cost: $0.08
 
 --- LLM SUMMARY (llama-3.1-8b @ 14:35:00) ---
 Portal simulation 3/15 complete. Currently running portal_timepoint_unicorn
-(run_20251101_143500_abc123), which traces Timepoint's path from $1.2B
-valuation in March 2030 backward to founding in October 2024 using M17 modal
+(run_20260111_143500_abc123), which traces Timepoint's path from $1.2B
+valuation in March 2030 backward to founding in April 2024 using M17 modal
 temporal causality. The simulation has generated 12 timepoints across 6 entities
 at $0.08 cost.
 
@@ -124,7 +124,7 @@ When `--enable-chat` is enabled, you can type questions anytime:
 ```
 what are the errors?
 
---- CHAT (14:36:15) ---
+--- CHAT (14:36:15 2026-01-11) ---
 Q: what are the errors?
 A: The simulation encountered LLM generation failures when trying to create
 dialog for some characters. It fell back to placeholder antecedents (generic
@@ -134,7 +134,7 @@ context. The simulation continues but with reduced dialog quality.
 
 explain the current mechanisms
 
---- CHAT (14:37:22) ---
+--- CHAT (14:37:22 2026-01-11) ---
 Q: explain the current mechanisms
 A: The current simulation is using 8 mechanisms: M1 (Entity Tracking), M2
 (Temporal Sequencing), M3 (Causal Attribution), M6 (Natural Language Knowledge),

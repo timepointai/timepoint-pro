@@ -174,11 +174,11 @@ Stores validation results for each run.
 - Check run has data: `./run.sh status`
 - Test API directly: `curl http://localhost:8000/api/runs`
 
-## Statistics (December 2025)
+## Statistics (January 2026)
 
 - **Total Runs**: 600+
 - **Templates**: 41 (organized by category with patch metadata)
-- **Mechanisms**: 18 (M1-M18)
+- **Mechanisms**: 19 (M1-M19)
 - **SynthasAIzer**: Phase 1-3 implemented
 
 ## Frontend Note
