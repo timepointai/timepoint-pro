@@ -434,6 +434,7 @@ Broad accessibility and ecosystem.
 | Usage quotas | **COMPLETE** | `api/middleware/usage_quota.py`, `api/usage_storage.py` - 34 tests |
 | CLI-API integration | **COMPLETE** | `api/client.py` (SDK), `api/usage_bridge.py`, `--api` flag - 21 tests |
 | Portal entity inference | **COMPLETE** | `temporal_agent.py:_infer_entities_for_timepoint()`, `portal_strategy.py:_infer_entities_from_description()` |
+| Portal entity fallback | **COMPLETE** | `portal_strategy.py:_generate_antecedents()`, `_generate_placeholder_antecedents()` - inherits parent entities when filtering returns empty |
 | Data quality validation | **COMPLETE** | `e2e_runner.py:_run_data_quality_check()` |
 | Entity persistence sync | **COMPLETE** | `e2e_runner.py:_persist_entity_for_convergence()` |
 | Portal preserve_all_paths | **COMPLETE** | `TemporalConfig.preserve_all_paths`, `portal_strategy.py` |
