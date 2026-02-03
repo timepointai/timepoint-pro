@@ -2522,6 +2522,11 @@ if __name__ == "__main__":
         action="store_true",
         help="List all available templates with their tier/category/mechanisms and exit"
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would run without making LLM calls: entities, timepoints, mechanisms, and cost estimates"
+    )
     # API mode options (Phase 6 integration)
     parser.add_argument(
         "--api",
@@ -2605,6 +2610,180 @@ if __name__ == "__main__":
         print("-" * 80)
         print(f"Total: {len(templates)} templates")
         print()
+        sys.exit(0)
+
+    # Handle --dry-run (show what would run without LLM calls)
+    if args.dry_run:
+        from generation.templates.loader import TemplateLoader
+        from generation.config_schema import SimulationConfig
+
+        loader = TemplateLoader()
+
+        # Determine which templates would run
+        if args.template:
+            # Single template mode
+            template_id = args.template.replace("_", "/")
+            try:
+                config = loader.load_template(template_id)
+                templates_to_run = [loader.get_template_info(template_id)]
+                configs = {template_id: config}
+            except FileNotFoundError:
+                # Try finding by short name
+                found = False
+                for info in loader.list_templates():
+                    if info.id.split("/")[-1] == args.template or info.id.replace("/", "_") == args.template:
+                        config = loader.load_template(info.id)
+                        templates_to_run = [info]
+                        configs = {info.id: config}
+                        found = True
+                        break
+                if not found:
+                    print(f"❌ ERROR: Template '{args.template}' not found")
+                    sys.exit(1)
+        elif args.nl:
+            # Natural language mode - show NL params
+            print("\n" + "=" * 80)
+            print("DRY RUN - Natural Language Simulation")
+            print("=" * 80)
+            print(f"\n📝 Prompt: \"{args.nl}\"")
+            print(f"\n🎯 Configuration:")
+            print(f"   Entities:    {args.nl_entities or 4} (default: 4)")
+            print(f"   Timepoints:  {args.nl_timepoints or 3} (default: 3)")
+            print(f"\n💡 This will generate a custom scenario based on your prompt.")
+            print("   Cost depends on the complexity of the generated scene.")
+            print("\n⚠️  To run this simulation, remove --dry-run")
+            sys.exit(0)
+        else:
+            # Filter by tier/category/mechanism
+            templates_to_run = loader.list_templates(
+                tier=args.tier,
+                category=args.category,
+                mechanism=args.mechanism
+            )
+            configs = {}
+            for info in templates_to_run:
+                try:
+                    configs[info.id] = loader.load_template(info.id)
+                except Exception:
+                    pass  # Skip templates that can't be loaded
+
+        if not templates_to_run:
+            print("❌ No templates match the specified filters")
+            sys.exit(1)
+
+        # Calculate totals
+        total_entities = 0
+        total_timepoints = 0
+        total_cost_low = 0.0
+        total_cost_high = 0.0
+
+        print("\n" + "=" * 80)
+        print("DRY RUN - Simulation Preview (No LLM calls)")
+        print("=" * 80)
+
+        # Show model info if specified
+        model_info = "Default (Llama 4 Scout)"
+        if args.free:
+            model_info = "Free model (best quality, $0)"
+        elif args.free_fast:
+            model_info = "Free model (fastest, $0)"
+        elif args.model:
+            model_info = args.model
+        print(f"\n🤖 Model: {model_info}")
+
+        if len(templates_to_run) == 1:
+            # Detailed view for single template
+            info = templates_to_run[0]
+            config = configs.get(info.id)
+
+            print(f"\n📋 Template: {info.id.replace('/', '_')}")
+            print(f"   Name: {info.name}")
+            print(f"   Description: {info.description}")
+            print(f"   Tier: {info.tier.value}")
+            print(f"   Category: {info.category.value}")
+            print(f"   Mechanisms: {', '.join(info.mechanisms)}")
+
+            if config:
+                print(f"\n🎭 Entities:")
+                print(f"   Count: {config.entities.count}")
+                print(f"   Types: {', '.join(config.entities.types)}")
+                print(f"   Initial Resolution: {config.entities.initial_resolution}")
+                if config.entities.animism_level > 0:
+                    print(f"   Animism Level: {config.entities.animism_level}")
+
+                print(f"\n⏱️  Timepoints:")
+                print(f"   Count: {config.timepoints.count}")
+                print(f"   Resolution: {config.timepoints.resolution}")
+                if config.timepoints.before_count:
+                    print(f"   Before Count: {config.timepoints.before_count}")
+                if config.timepoints.after_count:
+                    print(f"   After Count: {config.timepoints.after_count}")
+
+                print(f"\n🔀 Temporal Mode:")
+                print(f"   Mode: {config.temporal.mode}")
+                if config.temporal.mode == "portal":
+                    print(f"   Backward Steps: {config.temporal.backward_steps}")
+                    print(f"   Path Count: {config.temporal.path_count}")
+                    if config.temporal.portal_description:
+                        print(f"   Portal: {config.temporal.portal_description}")
+
+                print(f"\n📊 Fidelity:")
+                print(f"   Template: {config.temporal.fidelity_template}")
+                print(f"   Token Budget: {config.temporal.token_budget:,.0f}")
+
+            print(f"\n💰 Estimated Cost: {info.cost_estimate}")
+            print(f"   Estimated Duration: {info.duration_estimate}")
+
+        else:
+            # Summary view for multiple templates
+            print(f"\n📋 Templates to run: {len(templates_to_run)}")
+            print("-" * 80)
+            print(f"{'TEMPLATE':<35} {'ENTITIES':<10} {'TIMEPOINTS':<12} {'COST':<15}")
+            print("-" * 80)
+
+            for info in sorted(templates_to_run, key=lambda x: (x.category.value, x.tier.value, x.id)):
+                config = configs.get(info.id)
+                display_id = info.id.replace("/", "_")[:33]
+
+                if config:
+                    entities = config.entities.count
+                    timepoints = config.timepoints.count
+                    total_entities += entities
+                    total_timepoints += timepoints
+                else:
+                    entities = "?"
+                    timepoints = "?"
+
+                # Parse cost estimate
+                cost = info.cost_estimate
+                cost_str = cost if cost else "unknown"
+
+                # Try to extract numeric range for totals
+                import re
+                cost_match = re.search(r'\$?([\d.]+)(?:-([\d.]+))?', cost or "")
+                if cost_match:
+                    low = float(cost_match.group(1))
+                    high = float(cost_match.group(2)) if cost_match.group(2) else low
+                    total_cost_low += low
+                    total_cost_high += high
+
+                print(f"{display_id:<35} {entities:<10} {timepoints:<12} {cost_str:<15}")
+
+            print("-" * 80)
+            print(f"\n📊 Totals:")
+            print(f"   Templates:   {len(templates_to_run)}")
+            print(f"   Entities:    {total_entities}")
+            print(f"   Timepoints:  {total_timepoints}")
+
+            if total_cost_low > 0:
+                if total_cost_low == total_cost_high:
+                    print(f"   Est. Cost:   ${total_cost_low:.2f}")
+                else:
+                    print(f"   Est. Cost:   ${total_cost_low:.2f} - ${total_cost_high:.2f}")
+
+        print("\n" + "=" * 80)
+        print("⚠️  To run this simulation, remove --dry-run")
+        print("=" * 80 + "\n")
         sys.exit(0)
 
     # Handle --api-usage first (requires API key from env or arg)
