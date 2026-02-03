@@ -11,7 +11,7 @@ Timepoint is a tool to use LLMs to render accurate past and future moments. When
 
 ---
 
-Editorial note, written entirely by a human, x.com/seanmcdonaldxyz: 
+Editorial note, written entirely by a human, x.com/timepointai: 
 
 This is both a context engineering and artistic steering tool, designed and built by one person, with choices representing both technical requirements and artistic experience testing the tool and attempting to utilize the results in my own life. My goal is to make "synthetic time travel" kind of like the movies of my childhood. One day soon I will be able to put on a VR headset and use Timepoint to zap to any moment past or present with high fidelity. As a technology, for now, my inspiration is to make something close to a modular synthesizer, or a sequencer...like a drum machine. Something tooled to how I envision simulating social networks, as much as an artist or storyteller as engineer or data wrangler. 
 
