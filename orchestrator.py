@@ -440,7 +440,7 @@ Schema:
                     with open(profile_file) as f:
                         profile_data = json.load(f)
 
-                    # Extract name from filename (e.g., "profile.json" → "sean")
+                    # Extract name from filename (e.g., "profile.json" → "founder")
                     name = profile_file.stem
 
                     # Get full name from profile if available, otherwise use filename
