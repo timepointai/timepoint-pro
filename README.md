@@ -1,6 +1,6 @@
 # Timepoint v0 (Daedalus)
-## PRE RELEASE 
-### A.K.A. Built and tested entirely by one person and his AIs. 
+#### PRE RELEASE 
+##### A.K.A. Built and tested entirely by one person and his AIs. 
 
 **Temporal simulation where detail follows attention, not allocation. Heading towards queryable temporal knowledge graphs of complex, large-scale social network simulations.**
 
