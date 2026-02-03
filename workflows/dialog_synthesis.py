@@ -704,7 +704,8 @@ def synthesize_dialog(
     timepoint: 'Timepoint',
     timeline: List[Dict],
     llm: 'LLMClient',
-    store: Optional['GraphStore'] = None
+    store: Optional['GraphStore'] = None,
+    run_id: Optional[str] = None  # January 2026: Added for dialog persistence/convergence
 ) -> Dialog:
     """Generate conversation with full physical/emotional/temporal context"""
 
@@ -927,13 +928,29 @@ CRITICAL INSTRUCTIONS:
    - Verbose + casual + warm: "Look, I really think we've got something special here, and if we just take a moment to consider all the possibilities..."
    - Commanding + business + passionate: "This is our moment! I need everyone focused on the Q4 targets. No excuses."
 
+7. SPECIFICITY IN DECISIONS (CRITICAL - Make dialog concrete, not generic):
+   When characters discuss decisions, plans, or situations, they MUST use SPECIFIC details:
+   - NUMBERS: "$2.3M runway", "47 customers", "18-month timeline", "3 board seats"
+   - NAMES: Specific people, companies, products, locations (make them up if needed)
+   - TRADE-OFFS: Explicitly state what was sacrificed for what was gained
+   - ALTERNATIVES: Reference other options considered and why they were rejected
+   - CONSEQUENCES: Concrete outcomes, not vague "it worked out"
+
+   BAD (generic): "We need more funding to grow."
+   GOOD (specific): "We need $4M by March to hit 50 enterprise customers before Acme launches their competing product."
+
+   BAD (generic): "The partnership didn't work out."
+   GOOD (specific): "DataCorp backed out when they saw our 23% churn rate. We've got 60 days to fix retention or lose the Sequoia term sheet."
+
 Generate 8-12 dialog turns showing realistic interaction given these constraints.
 """
 
     # Generate dialog with structured output
+    # January 2026: Increased from 2000 to 6000 tokens to prevent dialog truncation
+    # 8-12 turn dialogs need ~4000-5000 tokens; 2000 was causing JSON parsing failures
     dialog_data = llm.generate_dialog(
         prompt=prompt,
-        max_tokens=2000
+        max_tokens=6000
     )
 
     # Create ExposureEvents using M19 Knowledge Extraction Agent (LLM-based)
@@ -1030,5 +1047,6 @@ Generate 8-12 dialog turns showing realistic interaction given these constraints
             "relationship_context_applied": True
         }),
         duration_seconds=dialog_data.total_duration,
-        information_transfer_count=len(dialog_data.information_exchanged)
+        information_transfer_count=len(dialog_data.information_exchanged),
+        run_id=run_id  # January 2026: Link to simulation run for convergence analysis
     )

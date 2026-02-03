@@ -305,18 +305,18 @@ class PortalStrategy:
         print("\nStep 5: Ranking paths by plausibility...")
         ranked_paths = self._rank_paths(valid_paths)
 
-        # Step 6: Detect pivot points for ALL paths (not just top N)
-        print("\nStep 6: Detecting pivot points...")
+        # Step 6: Compute path divergence analysis FIRST (needed for pivot detection)
+        print("\nStep 6: Computing path divergence...")
+        divergence_analysis = self._compute_path_divergence(ranked_paths)
+
+        # Step 7: Detect pivot points for ALL paths using divergence data
+        print("\nStep 7: Detecting pivot points...")
         for i, path in enumerate(ranked_paths):
-            path.pivot_points = self._detect_pivot_points(path)
+            path.pivot_points = self._detect_pivot_points(path, divergence_analysis)
             if i < 5:  # Only log first 5 to avoid spam
                 print(f"  Path {i+1}: {len(path.pivot_points)} pivot points detected")
         if len(ranked_paths) > 5:
             print(f"  ... and {len(ranked_paths) - 5} more paths analyzed")
-
-        # Step 7: Compute path divergence analysis
-        print("\nStep 7: Computing path divergence...")
-        divergence_analysis = self._compute_path_divergence(ranked_paths)
 
         # Store ALL paths for exploration (the key feature!)
         self.all_paths = ranked_paths
@@ -342,7 +342,11 @@ class PortalStrategy:
         if divergence_analysis:
             key_divergences = divergence_analysis.get('key_divergence_points', [])
             if key_divergences:
-                print(f"Key divergence points: {key_divergences[:3]}")
+                print(f"Key divergence points: {key_divergences[:5]}")
+        # Summarize pivot points across paths
+        total_pivots = sum(len(p.pivot_points) for p in return_paths)
+        if total_pivots > 0:
+            print(f"Total pivot points detected: {total_pivots} across {len(return_paths)} paths")
         print(f"{'='*80}\n")
 
         return return_paths
@@ -699,12 +703,20 @@ INSTRUCTIONS:
 4. Ensure each is historically/causally plausible
 5. Consider: entity capabilities, resource constraints, time requirements, external events
 
+SPECIFICITY REQUIREMENTS (CRITICAL):
+- Use CONCRETE numbers: "$5M Series A" not "raised funding", "42 employees" not "grew team"
+- Name SPECIFIC people/companies when plausible: "partnered with Acme Corp" not "found a partner"
+- Include TRADE-OFFS: "chose rapid growth over profitability" not just "grew quickly"
+- State METRICS: "20% month-over-month growth", "NPS score of 65", "3-month runway"
+- Mention ALTERNATIVES rejected: "turned down acquisition offer to pursue IPO path"
+- Reference EXTERNAL factors: "benefited from competitor's security breach", "timed launch with industry conference"
+
 For EACH antecedent, provide:
-- description: Detailed narrative of what's happening in {target_time_str} (2-3 sentences)
-- key_events: Array of 2-4 specific events that occurred at this time
-- entity_changes: Dict mapping entity names to how they changed (skills, relationships, resources)
-- world_context: Dict of contextual factors (economy, politics, technology, culture)
-- causal_link: 1-2 sentence explanation of how this leads to the consequent
+- description: Detailed narrative of what's happening in {target_time_str} (3-4 sentences with specific details)
+- key_events: Array of 3-5 SPECIFIC events with concrete details (dates, names, numbers when applicable)
+- entity_changes: Dict mapping entity names to QUANTIFIED changes (skills gained, relationships formed, resources +/-)
+- world_context: Dict of contextual factors with SPECIFIC references (market conditions, competitor moves, regulatory changes)
+- causal_link: 2-3 sentence explanation connecting this state to the consequent with SPECIFIC causal mechanisms
 
 Return as JSON with an "antecedents" array containing {count} antecedent objects."""
 
@@ -1572,15 +1584,112 @@ Focus on: forward coherence, dialog realism, causal necessity, internal consiste
         """Final ranking by coherence score"""
         return sorted(paths, key=lambda p: p.coherence_score, reverse=True)
 
-    def _detect_pivot_points(self, path: PortalPath) -> List[int]:
-        """Identify critical decision moments where paths diverge most"""
-        # TODO: Analyze variance in antecedent generation at each step
-        # For now, return placeholder pivot points
-        pivot_points = []
+    def _detect_pivot_points(
+        self,
+        path: PortalPath,
+        divergence_analysis: Dict[str, Any] = None
+    ) -> List[int]:
+        """
+        Identify critical decision moments (pivot points) in a path.
+
+        Detection strategies:
+        1. Divergence-based: Steps where paths diverge significantly (from divergence_analysis)
+        2. Keyword-based: State descriptions containing pivot-related language
+        3. Event-based: States with key_events indicating inflection points
+        4. Score-variance: States with unusually high or low plausibility scores
+
+        Args:
+            path: The PortalPath to analyze
+            divergence_analysis: Optional pre-computed divergence data from _compute_path_divergence()
+
+        Returns:
+            List of state indices that represent pivot points
+        """
+        pivot_points = set()  # Use set to avoid duplicates
+
+        # --- Strategy 1: Divergence-based detection ---
+        # Use key_divergence_points if available (steps where >50% of paths have unique narratives)
+        if divergence_analysis:
+            key_divergence_steps = divergence_analysis.get('key_divergence_points', [])
+            for step_idx in key_divergence_steps:
+                if step_idx < len(path.states):
+                    pivot_points.add(step_idx)
+
+            # Also check per-step divergence scores for high divergence
+            divergence_by_step = divergence_analysis.get('divergence_by_step', [])
+            for step_data in divergence_by_step:
+                step_idx = step_data.get('step', -1)
+                divergence = step_data.get('divergence', 0)
+                # Lower threshold: flag steps with >30% unique narratives as potential pivots
+                if divergence > 0.3 and step_idx < len(path.states):
+                    pivot_points.add(step_idx)
+
+        # --- Strategy 2: Keyword-based detection ---
+        # Look for pivot-related language in state descriptions
+        pivot_keywords = {
+            # Decision language
+            'decision', 'decided', 'chose', 'choose', 'choice', 'pivotal', 'pivot',
+            'turning point', 'inflection', 'crossroads', 'fork',
+            # Strategic actions
+            'launched', 'founded', 'acquired', 'merged', 'raised', 'funding', 'series a',
+            'series b', 'ipo', 'went public', 'exit',
+            # Major changes
+            'breakthrough', 'breakthrough', 'transformed', 'revolutionized', 'disrupted',
+            'scaled', 'expanded', 'pivoted', 'repositioned',
+            # Challenges
+            'crisis', 'failed', 'survived', 'recovered', 'overcame',
+        }
+
         for i, state in enumerate(path.states):
-            if len(state.children_states) > 5:  # High branching = pivot
-                pivot_points.append(i)
-        return pivot_points
+            desc_lower = state.description.lower() if state.description else ""
+
+            # Check for keyword matches
+            for keyword in pivot_keywords:
+                if keyword in desc_lower:
+                    pivot_points.add(i)
+                    break  # One keyword match is enough per state
+
+        # --- Strategy 3: Event-based detection ---
+        # Look for key_events in world_state that indicate inflection points
+        for i, state in enumerate(path.states):
+            key_events = state.world_state.get('key_events', [])
+            if key_events:
+                # Check if any key event sounds like a pivot
+                for event in key_events:
+                    event_lower = str(event).lower() if event else ""
+                    # Major event indicators
+                    if any(kw in event_lower for kw in ['launch', 'fund', 'acquire', 'hire', 'scale', 'pivot', 'decision']):
+                        pivot_points.add(i)
+                        break
+
+            # Check entity_changes for significant shifts
+            entity_changes = state.world_state.get('entity_changes', {})
+            if entity_changes and len(entity_changes) > 2:  # Multiple entity changes = potential pivot
+                pivot_points.add(i)
+
+        # --- Strategy 4: Score variance detection ---
+        # Flag states with unusually high or low plausibility relative to neighbors
+        if len(path.states) >= 3:
+            scores = [s.plausibility_score for s in path.states]
+            avg_score = sum(scores) / len(scores) if scores else 0.5
+
+            for i, state in enumerate(path.states):
+                # Skip edge states for neighbor comparison
+                if 0 < i < len(path.states) - 1:
+                    prev_score = path.states[i - 1].plausibility_score
+                    next_score = path.states[i + 1].plausibility_score
+                    curr_score = state.plausibility_score
+
+                    # Large score drop from neighbors suggests uncertainty/pivotal moment
+                    if abs(curr_score - prev_score) > 0.2 or abs(curr_score - next_score) > 0.2:
+                        pivot_points.add(i)
+
+                # States significantly below average may represent risky/pivotal decisions
+                if state.plausibility_score < avg_score - 0.15:
+                    pivot_points.add(i)
+
+        # Convert to sorted list
+        return sorted(list(pivot_points))
 
     def _compute_path_divergence(self, paths: List[PortalPath]) -> Dict[str, Any]:
         """
