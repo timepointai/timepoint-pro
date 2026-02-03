@@ -369,6 +369,15 @@ class GraphStore:
 
             return matching_dialogs
 
+    def load_all_dialogs(self) -> list[Dialog]:
+        """Load all dialogs from the database.
+
+        Used by narrative exporter to retrieve all synthesized dialogs for export.
+        """
+        with Session(self.engine) as session:
+            statement = select(Dialog)
+            return list(session.exec(statement).all())
+
     # ============================================================================
     # Relationship Trajectory Storage (Mechanism 13)
     # ============================================================================

@@ -241,16 +241,28 @@ Schema:
             # For very large scenarios (100+ entities, 100+ timepoints), use Llama 405B with 100k tokens
             # For medium scenarios (20-100 entities, 20-100 timepoints), use Llama 70B with 16k tokens
             # Estimate: ~50 tokens per entity + ~100 tokens per timepoint + ~1000 overhead
-            estimated_tokens = (max_entities * 50) + (max_timepoints * 100) + 1000
+            # January 2026: Increased per-entity and per-timepoint estimates for complex scenes
+            estimated_tokens = (max_entities * 150) + (max_timepoints * 200) + 2000
 
-            if estimated_tokens > 50000:
-                # Ultra-large scenario - use Llama 405B with extended token limit
+            # January 2026: Minimum 8000 tokens for any scene (complex schemas need space)
+            estimated_tokens = max(estimated_tokens, 8000)
+
+            # Check if user specified a model override (--free, --model flags)
+            model_override = os.getenv("TIMEPOINT_MODEL_OVERRIDE")
+
+            if model_override:
+                # User specified a model - respect it, don't hardcode
+                model = None  # Let LLMClient use its configured default_model
+                max_output_tokens = min(int(estimated_tokens * 2.0), 42000)
+                print(f"   ✅ Using override model: {model_override} with {max_output_tokens:,} token limit")
+            elif estimated_tokens > 50000:
+                # No override + ultra-large scenario - use Llama 405B with extended token limit
                 model = "meta-llama/llama-3.1-405b-instruct"
                 max_output_tokens = min(int(estimated_tokens * 1.5), 100000)  # 1.5x safety margin, cap at 100k
                 print(f"   🚀 Ultra-large scenario detected: Using Llama 405B with {max_output_tokens:,} token limit")
                 print(f"   📊 Estimated: {max_entities} entities × {max_timepoints} timepoints = ~{estimated_tokens:,} tokens")
             else:
-                # Standard/large scenario - use Llama 4 Scout (327K context)
+                # No override + standard/large scenario - use Llama 4 Scout (327K context)
                 model = None  # Use default (Scout)
                 max_output_tokens = min(int(estimated_tokens * 2.0), 42000)  # 2x safety margin, cap at 42k
                 print(f"   ✅ Standard scenario: Using Llama 4 Scout with {max_output_tokens:,} token limit")

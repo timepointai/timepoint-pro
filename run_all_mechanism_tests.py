@@ -2599,7 +2599,9 @@ if __name__ == "__main__":
             mechs = ", ".join(t.mechanisms[:3])
             if len(t.mechanisms) > 3:
                 mechs += f" +{len(t.mechanisms)-3}"
-            print(f"{t.id:<40} {t.tier.value:<12} {t.category.value:<12} {mechs:<20}")
+            # Display template ID with underscores for consistency with --template flag
+            display_id = t.id.replace("/", "_")
+            print(f"{display_id:<40} {t.tier.value:<12} {t.category.value:<12} {mechs:<20}")
         print("-" * 80)
         print(f"Total: {len(templates)} templates")
         print()
