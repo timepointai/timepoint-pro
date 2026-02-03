@@ -4805,7 +4805,7 @@ class SimulationConfig(BaseModel):
 
     # ============================================================================
     # Timepoint Corporate Portal Templates (M17 - Backward Temporal Reasoning)
-    # Using Real Founders: Sean McDonald + Ken Cavanagh
+    # Using Real Founders: Alex Chen + Jordan Rivera
     # ============================================================================
 
     @classmethod
@@ -4814,10 +4814,10 @@ class SimulationConfig(BaseModel):
         PORTAL mode: Timepoint achieves $1.2B unicorn valuation - work backward to founding.
 
         Portal: March 2030 - Timepoint valued at $1.2B Series C
-        Origin: October 2024 - Sean + Ken found company with vision but no funding
+        Origin: October 2024 - Alex + Jordan found company with vision but no funding
         Goal: Find plausible growth paths to unicorn status leveraging their complementary skills
 
-        Features real founders: Sean McDonald (philosophical/technical) + Ken Cavanagh (psychology/operations)
+        Features real founders: Alex Chen (philosophical/technical) + Jordan Rivera (psychology/operations)
         """
         return cls(
             scenario_description=(
@@ -4825,32 +4825,32 @@ class SimulationConfig(BaseModel):
                 "$120M ARR, 450 employees, 95+ Fortune 500 customers. Wall Street analysts call it 'the Bloomberg Terminal "
                 "of temporal simulation.' But how did two philosophers get here? "
                 "\n\n"
-                "**The Founders**: Sean McDonald (Philosophical Technical Polymath) brings exceptional conceptual innovation, "
-                "philosophical depth, and AI/IoT technical chops. Three-time founder (Jute Networks, Bitwater Farms, Sundial). "
+                "**The Founders**: Alex Chen (Philosophical Technical Polymath) brings exceptional conceptual innovation, "
+                "philosophical depth, and AI/IoT technical chops. Three-time founder (NexGen Labs, GreenTech Ag, ChronoSync). "
                 "Published author on consciousness and AI. Strength: First-principles thinking, unconventional products. "
                 "Weakness: Limited operational scaling experience, needs strong business partner. "
                 "\n\n"
-                "Ken Cavanagh (Psychology-Tech Bridge Builder) brings industrial-organizational psychology + AI systems expertise. "
-                "Former SpaceX People Analytics, Agency42 founder. Rare combination: understands neural networks AND team dynamics. "
+                "Jordan Rivera (Psychology-Tech Bridge Builder) brings industrial-organizational psychology + AI systems expertise. "
+                "Former TechCorp People Analytics, Insight Analytics founder. Rare combination: understands neural networks AND team dynamics. "
                 "Strength: Human-centered AI, people analytics, practical execution. Weakness: Needs complementary visionary for "
                 "product positioning. "
                 "\n\n"
-                "**This is a complementary founding team**: Sean's conceptual innovation + Ken's operational/psychological depth. "
+                "**This is a complementary founding team**: Alex's conceptual innovation + Jordan's operational/psychological depth. "
                 "Work backward from $1.2B to October 2024 founding moment. System explores multiple paths: "
                 "\n\n"
                 "(A) **Enterprise-First Strategy**: Land Fortune 500 early (pharma, finance), slow but steady $500K-$2M ACVs, "
                 "focus on mission-critical use cases (regulatory compliance, scenario planning). Requires strong enterprise "
-                "sales team + customer success. Ken's I-O psych background helps positioning for workforce planning use cases. "
+                "sales team + customer success. Jordan's I-O psych background helps positioning for workforce planning use cases. "
                 "\n\n"
                 "(B) **Developer-Led Growth**: Open-source core temporal engine, build community, freemium → paid enterprise. "
-                "Sean's open-source advocacy (Sundial, Jute) aligns here. Start with academic/research users, expand to commercial. "
+                "Alex's open-source advocacy (ChronoSync, NexGen) aligns here. Start with academic/research users, expand to commercial. "
                 "Lower burn but slower revenue ramp. "
                 "\n\n"
                 "(C) **Vertical Domination**: Own one vertical completely (healthcare simulation, financial stress testing), "
-                "then expand. Ken's healthcare/org behavior expertise + Sean's AI/simulation depth = credible healthcare play. "
+                "then expand. Jordan's healthcare/org behavior expertise + Alex's AI/simulation depth = credible healthcare play. "
                 "\n\n"
-                "**Validation checks**: Given Sean's philosophical focus and Ken's practical execution, do growth strategies "
-                "play to their strengths? Does Sean stay engaged through operational scaling (historical risk)? Does Ken get "
+                "**Validation checks**: Given Alex's philosophical focus and Jordan's practical execution, do growth strategies "
+                "play to their strengths? Does Alex stay engaged through operational scaling (historical risk)? Does Jordan get "
                 "enough strategic input (his need for visionary complement)? Forward coherence ensures founding team dynamics "
                 "→ PMF discovery → scaling execution makes sense. "
                 "\n\n"
@@ -4859,7 +4859,7 @@ class SimulationConfig(BaseModel):
             ),
             world_id="portal_timepoint_unicorn",
             entities=EntityConfig(
-                count=6,  # Sean + Ken + lead investor + key hire + customer champion + advisor
+                count=6,  # Alex + Jordan + lead investor + key hire + customer champion + advisor
                 types=["human"],
                 initial_resolution=ResolutionLevel.DIALOG
             ),
@@ -4890,7 +4890,7 @@ class SimulationConfig(BaseModel):
             ),
             metadata={
                 "portal_type": "timepoint_unicorn",
-                "founder_profiles": ["sean_mcdonald", "ken_cavanagh"],
+                "founder_profiles": ["alex_chen", "jordan_rivera"],
                 "profile_source": "generation/profiles/founder_archetypes/*.json",
                 "mechanisms_featured": [
                     "M17_modal_causality_portal",
@@ -4903,9 +4903,9 @@ class SimulationConfig(BaseModel):
                 "expected_paths": 3,
                 "growth_strategies": ["enterprise_first", "developer_led", "vertical_healthcare"],
                 "key_questions": [
-                    "How do Sean's philosophical depth + Ken's operational pragmatism enable unicorn trajectory?",
+                    "How do Alex's philosophical depth + Jordan's operational pragmatism enable unicorn trajectory?",
                     "What GTM strategy leverages their unique skill combination?",
-                    "Does Sean stay engaged through operational scaling?",
+                    "Does Alex stay engaged through operational scaling?",
                     "How do founder roles evolve as company grows?"
                 ]
             }
@@ -4938,20 +4938,20 @@ class SimulationConfig(BaseModel):
                 "- Customer #1-5 signed (Q2-Q3 2025): How did initial sales motion develop? "
                 "- Post-seed execution (Q1 2025): What did they build first? Who did they hire? "
                 "\n\n"
-                "**Founder dynamics to trace**: Did Sean's philosophical positioning help or hurt enterprise sales? "
-                "Did Ken's I-O psych background unlock workforce use cases? How did they divide CEO/President/CTO roles? "
+                "**Founder dynamics to trace**: Did Alex's philosophical positioning help or hurt enterprise sales? "
+                "Did Jordan's I-O psych background unlock workforce use cases? How did they divide CEO/President/CTO roles? "
                 "What tensions emerged as company professionalized? "
                 "\n\n"
                 "**Three candidate paths backward**: "
-                "(A) Workforce Planning Path: Ken's I-O psych expertise → HR tech positioning → sell to CHROs. "
-                "(B) Scenario Planning Path: Sean's philosophical depth → strategic planning positioning → sell to strategy teams. "
+                "(A) Workforce Planning Path: Jordan's I-O psych expertise → HR tech positioning → sell to CHROs. "
+                "(B) Scenario Planning Path: Alex's philosophical depth → strategic planning positioning → sell to strategy teams. "
                 "(C) Compliance/Risk Path: Both founders' rigor → regulatory/risk use cases → sell to compliance officers. "
                 "\n\n"
                 "Each path has different customer profiles, sales cycles, ACV patterns, and founder engagement levels."
             ),
             world_id="portal_timepoint_series_a",
             entities=EntityConfig(
-                count=6,  # Sean + Ken + seed investor + Series A investor + early customer + first hire
+                count=6,  # Alex + Jordan + seed investor + Series A investor + early customer + first hire
                 types=["human"],
                 initial_resolution=ResolutionLevel.DIALOG
             ),
@@ -4982,7 +4982,7 @@ class SimulationConfig(BaseModel):
             ),
             metadata={
                 "portal_type": "timepoint_series_a",
-                "founder_profiles": ["sean_mcdonald", "ken_cavanagh"],
+                "founder_profiles": ["alex_chen", "jordan_rivera"],
                 "profile_source": "generation/profiles/founder_archetypes/*.json",
                 "mechanisms_featured": [
                     "M17_modal_causality_portal",
@@ -5026,25 +5026,25 @@ class SimulationConfig(BaseModel):
                 "- What product iteration mattered most? (when did automation → self-service happen?) "
                 "- What customer discovery process worked? (how did they find the ICP?) "
                 "- What pricing/packaging resonated? (per-seat? per-scenario? enterprise license?) "
-                "- What founder behaviors enabled learning? (Sean's philosophical depth → customer convos? Ken's psych training → user research?) "
+                "- What founder behaviors enabled learning? (Alex's philosophical depth → customer convos? Jordan's psych training → user research?) "
                 "\n\n"
                 "**Three candidate PMF paths**: "
                 "(A) Executive Scenario Planning: Positioned as 'what-if analysis for C-suite,' sold to strategy/CEO office, "
-                "premium pricing ($50K-$200K/year), requires high-touch onboarding. Sean's philosophical framing helps here. "
+                "premium pricing ($50K-$200K/year), requires high-touch onboarding. Alex's philosophical framing helps here. "
                 "\n"
                 "(B) Workforce Planning & Org Design: Positioned as 'simulate org changes before executing,' sold to HR/CHRO, "
-                "mid-market pricing ($20K-$80K/year), Ken's I-O psych credibility unlocks category. "
+                "mid-market pricing ($20K-$80K/year), Jordan's I-O psych credibility unlocks category. "
                 "\n"
                 "(C) Compliance & Risk Simulation: Positioned as 'test regulatory scenarios,' sold to compliance/risk officers, "
                 "high-value pricing ($100K-$500K/year), both founders' rigor + transparency ethos builds trust. "
                 "\n\n"
-                "**Founder skill utilization**: Does Sean's 'questions fundamental assumptions' trait → deeper customer discovery? "
-                "Does Ken's 'bridges technical and human perspectives' trait → clearer product positioning? How do they divide product "
+                "**Founder skill utilization**: Does Alex's 'questions fundamental assumptions' trait → deeper customer discovery? "
+                "Does Jordan's 'bridges technical and human perspectives' trait → clearer product positioning? How do they divide product "
                 "vs GTM responsibilities?"
             ),
             world_id="portal_timepoint_pmf",
             entities=EntityConfig(
-                count=6,  # Sean + Ken + early customer + design partner + product advisor + first PM hire
+                count=6,  # Alex + Jordan + early customer + design partner + product advisor + first PM hire
                 types=["human"],
                 initial_resolution=ResolutionLevel.DIALOG
             ),
@@ -5075,7 +5075,7 @@ class SimulationConfig(BaseModel):
             ),
             metadata={
                 "portal_type": "timepoint_pmf",
-                "founder_profiles": ["sean_mcdonald", "ken_cavanagh"],
+                "founder_profiles": ["alex_chen", "jordan_rivera"],
                 "profile_source": "generation/profiles/founder_archetypes/*.json",
                 "mechanisms_featured": [
                     "M17_modal_causality_portal",
@@ -5114,7 +5114,7 @@ class SimulationConfig(BaseModel):
                 "\n\n"
                 "**Work backward to first pilot**: November 2024, first enterprise pilot signed with pharmaceutical company "
                 "(clinical trial scenario planning). $50K pilot, 3-month commitment, 5 users. Customer champion: Head of Clinical Operations "
-                "who resonated with Sean's philosophical depth + Ken's healthcare/org expertise. Pilot scope: test 10 trial design scenarios, "
+                "who resonated with Alex's philosophical depth + Jordan's healthcare/org expertise. Pilot scope: test 10 trial design scenarios, "
                 "compare outcomes, validate assumptions. Risk: If pilot fails, enterprise motion dies. "
                 "\n\n"
                 "**Critical milestones to trace backward**: "
@@ -5127,21 +5127,21 @@ class SimulationConfig(BaseModel):
                 "\n\n"
                 "**Three enterprise paths to explore**: "
                 "(A) Vertical Beachhead: Win pharma → leverage references in healthcare → expand to other regulated industries. "
-                "Ken's healthcare expertise + Sean's philosophical rigor = credibility in risk-averse sectors. "
+                "Jordan's healthcare expertise + Alex's philosophical rigor = credibility in risk-averse sectors. "
                 "\n"
                 "(B) Horizontal Champions: Win individual champions across industries → build champion network → scale via word-of-mouth. "
-                "Sean's thought leadership (Davos, writings) + Ken's HBR credibility = executive-level relationships. "
+                "Alex's thought leadership (Davos, writings) + Jordan's HBR credibility = executive-level relationships. "
                 "\n"
                 "(C) Strategic Partnership: Partner with big consulting firm (McKinsey, BCG) → co-sell into their enterprise accounts. "
                 "Both founders' intellectual depth = consulting credibility. "
                 "\n\n"
-                "**Founder role evolution**: As company grows 1 → 25 customers, how do Sean and Ken's roles change? Does Sean stay "
-                "engaged in customer conversations (his historical pattern)? Does Ken build the CS/account management function (his I-O "
+                "**Founder role evolution**: As company grows 1 → 25 customers, how do Sean and Jordan's roles change? Does Alex stay "
+                "engaged in customer conversations (his historical pattern)? Does Jordan build the CS/account management function (his I-O "
                 "psych + people expertise)? What operational tensions emerge?"
             ),
             world_id="portal_timepoint_enterprise",
             entities=EntityConfig(
-                count=6,  # Sean + Ken + first customer champion + VP Sales hire + CS leader + consulting partner
+                count=6,  # Alex + Jordan + first customer champion + VP Sales hire + CS leader + consulting partner
                 types=["human"],
                 initial_resolution=ResolutionLevel.DIALOG
             ),
@@ -5172,7 +5172,7 @@ class SimulationConfig(BaseModel):
             ),
             metadata={
                 "portal_type": "timepoint_enterprise_adoption",
-                "founder_profiles": ["sean_mcdonald", "ken_cavanagh"],
+                "founder_profiles": ["alex_chen", "jordan_rivera"],
                 "profile_source": "generation/profiles/founder_archetypes/*.json",
                 "mechanisms_featured": [
                     "M17_modal_causality_portal",
@@ -5198,17 +5198,17 @@ class SimulationConfig(BaseModel):
         """
         PORTAL mode: One founder departs after Series B - work backward to partnership formation.
 
-        Portal: September 2027 - Ken Cavanagh departs as President after Series B
+        Portal: September 2027 - Jordan Rivera departs as President after Series B
         Origin: October 2024 - Partnership formation & equity agreements
         Goal: Identify early partnership dynamics that predicted transition
         """
         return cls(
             scenario_description=(
-                "**September 2027: Ken Cavanagh Departs Timepoint** - After successful $100M Series B ($500M valuation), "
-                "Ken Cavanagh (President/COO) announces departure to 'pursue new opportunities.' Sean McDonald (CEO) remains. "
+                "**September 2027: Jordan Rivera Departs Timepoint** - After successful $100M Series B ($500M valuation), "
+                "Jordan Rivera (President/COO) announces departure to 'pursue new opportunities.' Alex Chen (CEO) remains. "
                 "Public statement: 'amicable transition,' 'different visions for next phase,' 'grateful for partnership.' Private reality: "
                 "18 months of growing tension over strategic direction, role clarity, and decision authority. Ken owns 28% (post-dilution), "
-                "Sean owns 42%. Board thanks Ken for 'operational excellence' but sides with Sean's vision. "
+                "Sean owns 42%. Board thanks Ken for 'operational excellence' but sides with Alex's vision. "
                 "\n\n"
                 "**Work backward to founding moment**: October 2024, Sean and Ken negotiate partnership. Initial split: Sean 55% (CEO, "
                 "product vision, fundraising), Ken 35% (President, operations, GTM), ESOP/advisors 10%. Vesting: 4 years, 1-year cliff. "
@@ -5225,22 +5225,22 @@ class SimulationConfig(BaseModel):
                 "- Formation negotiation (Oct 2024): Were role boundaries truly clear? Red flags missed? "
                 "\n\n"
                 "**Three breakup paths to explore**: "
-                "(A) Product Vision Conflict: Sean's philosophical/long-term vision conflicts with Ken's practical/near-term execution needs. "
+                "(A) Product Vision Conflict: Alex's philosophical/long-term vision conflicts with Jordan's practical/near-term execution needs. "
                 "Sean wants to build 'AI consciousness framework,' Ken wants to ship features customers are buying. Irreconcilable. "
                 "\n"
                 "(B) Authority Ambiguity: Despite clear initial roles, gray areas emerge (who decides pricing? hiring? product priorities?). "
-                "Sean's philosophical nature → questions everything. Ken's operational nature → wants clear authority. Friction builds. "
+                "Alex's philosophical nature → questions everything. Jordan's operational nature → wants clear authority. Friction builds. "
                 "\n"
                 "(C) Board Alignment Shift: Post-Series B, board wants aggressive growth → prefers operational CEO. Pressures Sean to "
                 "delegate more → Sean resists → board sides with Sean (founder primacy) → Ken feels undermined → exits. "
                 "\n\n"
-                "**Founder dynamics analysis**: Given Sean's 'needs strong operational partner' weakness + Ken's 'needs complementary "
+                "**Founder dynamics analysis**: Given Alex's 'needs strong operational partner' weakness + Jordan's 'needs complementary "
                 "visionary' weakness, was this partnership structurally sound? Did initial equity split (55/35) create implicit hierarchy "
                 "that undermined partnership? Did their complementary strengths become conflicting priorities under growth pressure?"
             ),
             world_id="portal_timepoint_founder_transition",
             entities=EntityConfig(
-                count=6,  # Sean + Ken + lead board member + VP Engineering + VP Sales + mediator/advisor
+                count=6,  # Alex + Jordan + lead board member + VP Engineering + VP Sales + mediator/advisor
                 types=["human"],
                 initial_resolution=ResolutionLevel.DIALOG
             ),
@@ -5250,7 +5250,7 @@ class SimulationConfig(BaseModel):
             ),
             temporal=TemporalConfig(
                 mode=TemporalMode.PORTAL,
-                portal_description="Ken Cavanagh departs as President after Series B, partnership dissolves",
+                portal_description="Jordan Rivera departs as President after Series B, partnership dissolves",
                 portal_year=2027,
                 origin_year=2024,
                 backward_steps=12,  # 3 years × 4 quarters
@@ -5271,7 +5271,7 @@ class SimulationConfig(BaseModel):
             ),
             metadata={
                 "portal_type": "timepoint_founder_transition",
-                "founder_profiles": ["sean_mcdonald", "ken_cavanagh"],
+                "founder_profiles": ["alex_chen", "jordan_rivera"],
                 "profile_source": "generation/profiles/founder_archetypes/*.json",
                 "mechanisms_featured": [
                     "M17_modal_causality_portal",
