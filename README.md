@@ -43,7 +43,7 @@ A minor character exists as a 200-token tensor embedding until someone asks abou
 ```
 ┌──────────────────┬────────────┬───────────┬─────────┬─────────┐
 │     TENSOR       │   SCENE    │   GRAPH   │ DIALOG  │ TRAINED │
-│   (embedding)    │ (context)  │ (relations)│ (speech)│ (full)  │
+│   (embedding)    │ (context)  │ (relations)│ (speech)│ (full) │
 │     $0.02        │   $0.05    │   $0.10   │  $0.25  │  $0.50  │
 ├──────────────────┴────────────┴───────────┴─────────┴─────────┤
 │████████████████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░│
