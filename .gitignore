@@ -224,3 +224,16 @@ _site/
 *\ [0-9].db*
 metadata/runs.db
 timepoint.db
+
+# Test output and artifacts
+results.json
+.pytest_summary.txt
+test_registry.json
+*.storyboard
+
+# Demo artifacts
+demo_finetune_*.json
+
+# Training data at root
+timepoint_training_*.jsonl
+analysis_data.json
