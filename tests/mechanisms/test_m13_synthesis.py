@@ -41,15 +41,15 @@ def main():
     # Create E2E runner
     runner = ResilientE2EWorkflowRunner(metadata_manager)
 
-    # Use empty_house_flashback template which explicitly demonstrates M13
-    # This template has multiple entities and relationship evolution
+    # Use board_meeting template which demonstrates M13 (relationship evolution)
+    # This template has multiple entities and relationship tracking
     # Using TemplateLoader for SynthasAIzer compliance
     loader = TemplateLoader()
-    config = loader.load_template("stress/empty_house_flashback")
+    config = loader.load_template("showcase/board_meeting")
 
     try:
         # Step 1: Run E2E workflow (creates entities via ANDOS)
-        print("🚀 Step 1: Running empty_house_flashback with ANDOS...\n")
+        print("🚀 Step 1: Running board_meeting with ANDOS...\n")
         result = runner.run(config)
 
         print(f"\n✅ E2E Complete:")
@@ -62,7 +62,7 @@ def main():
             run_id=result.run_id,
             mechanism="M13",
             function_name="test_m13_synthesis",
-            context={"source": "explicit_andos_test", "test_type": "multi_entity_synthesis", "template": "empty_house_flashback"}
+            context={"source": "explicit_andos_test", "test_type": "multi_entity_synthesis", "template": "board_meeting"}
         )
         print(f"   ✓ Recorded M13 mechanism usage")
 

@@ -685,7 +685,7 @@ def sample_simulation_config(template_loader):
 
     Uses board_meeting as a reliable, well-configured template.
     """
-    return template_loader.load_template("core/board_meeting")
+    return template_loader.load_template("showcase/board_meeting")
 
 
 @pytest.fixture(scope="function")

@@ -23,6 +23,9 @@ from generation import (
     FaultHandler,
     CheckpointManager
 )
+from generation.templates.loader import TemplateLoader
+
+_loader = TemplateLoader()
 
 
 class TestSprint1Integration:
@@ -50,7 +53,7 @@ class TestSprint1Integration:
     def test_horizontal_generation_integration(self):
         """Test horizontal generator creates variations"""
         generator = HorizontalGenerator()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         # Generate 5 variations (small number for fast test)
         variations = generator.generate_variations(
@@ -72,7 +75,7 @@ class TestSprint1Integration:
     def test_vertical_generation_integration(self):
         """Test vertical generator expands temporal depth"""
         generator = VerticalGenerator()
-        base_config = SimulationConfig.example_jefferson_dinner()
+        base_config = _loader.load_template("showcase/jefferson_dinner")
 
         # Expand temporal depth
         expanded = generator.generate_temporal_depth(
@@ -173,7 +176,7 @@ class TestSprint1Integration:
 
             # Step 2: Generate horizontal variations
             h_generator = HorizontalGenerator()
-            base_config = SimulationConfig.example_board_meeting()
+            base_config = _loader.load_template("showcase/board_meeting")
 
             variations = h_generator.generate_variations(
                 base_config=base_config,
@@ -185,7 +188,7 @@ class TestSprint1Integration:
 
             # Step 3: Generate vertical expansion
             v_generator = VerticalGenerator()
-            base_config_v = SimulationConfig.example_jefferson_dinner()
+            base_config_v = _loader.load_template("showcase/jefferson_dinner")
 
             expanded = v_generator.generate_temporal_depth(
                 base_config=base_config_v,
@@ -234,7 +237,7 @@ class TestComponentInteraction:
     def test_horizontal_with_progress_tracking(self):
         """Test horizontal generation with progress tracking"""
         generator = HorizontalGenerator()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         tracker = ProgressTracker(total_entities=5)
         tracker.start()
@@ -266,7 +269,7 @@ class TestComponentInteraction:
         handler = FaultHandler(max_retries=2, initial_backoff=0.01)
 
         def generate_with_retry():
-            base_config = SimulationConfig.example_jefferson_dinner()
+            base_config = _loader.load_template("showcase/jefferson_dinner")
             return generator.generate_temporal_depth(
                 base_config=base_config,
                 before_count=2,
@@ -293,7 +296,7 @@ class TestComponentInteraction:
 
             # Simulate generation with checkpoints
             generator = HorizontalGenerator()
-            base_config = SimulationConfig.example_board_meeting()
+            base_config = _loader.load_template("showcase/board_meeting")
 
             variations = []
             for i in range(6):
@@ -342,7 +345,7 @@ class TestSprint1Acceptance:
     def test_can_generate_variations(self):
         """Acceptance: Can generate 10+ variations reliably"""
         generator = HorizontalGenerator()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         variations = generator.generate_variations(
             base_config=base_config,
@@ -359,7 +362,7 @@ class TestSprint1Acceptance:
     def test_can_expand_temporal_depth(self):
         """Acceptance: Can generate deep temporal context"""
         generator = VerticalGenerator()
-        base_config = SimulationConfig.example_jefferson_dinner()
+        base_config = _loader.load_template("showcase/jefferson_dinner")
 
         expanded = generator.generate_temporal_depth(
             base_config=base_config,

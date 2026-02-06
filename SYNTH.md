@@ -12,7 +12,7 @@
 |-------|---------|--------|-------|
 | **Phase 1** | ADSR Envelopes | **COMPLETE** | 53 unit tests |
 | **Phase 2** | Voice Controls | **COMPLETE** | Integrated |
-| **Phase 3** | Patch System | **COMPLETE** | 41 templates with patch metadata |
+| **Phase 3** | Patch System | **COMPLETE** | 13 verified templates with patch metadata |
 | **Phase 4** | Event Monitoring | Specification | - |
 
 ### What's Implemented
@@ -36,14 +36,11 @@ emitter.emit(SynthEvent.RUN_START, "run_123", {"template": "board_meeting"})
 **Patch System** (`generation/templates/loader.py`):
 - `TemplateLoader` with `get_all_patches()`, `list_patch_categories()`
 - `PatchInfo` dataclass with name, category, tags, author, version, description
-- 9 patch categories: corporate, historical, crisis, mystical, mystery, mechanism, portal, stress, convergence
-- 41 JSON templates with patch metadata in `generation/templates/`
+- 7 patch categories: corporate, historical, crisis, mystical, mystery, directorial, convergence
+- 13 verified JSON templates with patch metadata in `generation/templates/`
 
 **Template Organization**:
-- `generation/templates/showcase/` - 10 production-ready scenarios
-- `generation/templates/core/` - 18 mechanism isolation tests (M1-M18)
-- `generation/templates/portal/` - 4 backward temporal reasoning
-- `generation/templates/stress/` - 6 stress test scenarios
+- `generation/templates/showcase/` - 10 verified showcase scenarios
 - `generation/templates/convergence/` - 3 convergence-optimized templates
 
 ---

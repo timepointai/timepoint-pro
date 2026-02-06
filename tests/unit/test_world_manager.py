@@ -9,7 +9,18 @@ import tempfile
 import shutil
 from pathlib import Path
 from generation.world_manager import WorldManager, IsolationMode, WorldMetadata
-from generation.config_schema import SimulationConfig
+from generation.config_schema import (
+    SimulationConfig,
+    EntityConfig,
+    CompanyConfig,
+    TemporalConfig,
+    TemporalMode,
+    OutputConfig,
+    VariationConfig,
+)
+from generation.templates.loader import TemplateLoader
+
+_loader = TemplateLoader()
 
 
 class TestWorldManager:
@@ -316,7 +327,7 @@ class TestSimulationConfig:
 
     def test_config_example_board_meeting(self):
         """Test example board meeting configuration"""
-        config = SimulationConfig.example_board_meeting()
+        config = _loader.load_template("showcase/board_meeting")
 
         assert config.world_id == "board_meeting_example"
         assert config.entities.count == 5
@@ -324,7 +335,7 @@ class TestSimulationConfig:
 
     def test_config_example_jefferson_dinner(self):
         """Test example Jefferson dinner configuration"""
-        config = SimulationConfig.example_jefferson_dinner()
+        config = _loader.load_template("showcase/jefferson_dinner")
 
         assert config.world_id == "jefferson_dinner"
         assert config.entities.count == 3
@@ -333,7 +344,22 @@ class TestSimulationConfig:
 
     def test_config_example_variations(self):
         """Test example variations configuration"""
-        config = SimulationConfig.example_variations()
+        config = SimulationConfig(
+            scenario_description="Generate variations of a negotiation scenario",
+            world_id="negotiation_variations",
+            entities=EntityConfig(count=4, types=["human"]),
+            timepoints=CompanyConfig(count=2, resolution="hour"),
+            temporal=TemporalConfig(mode=TemporalMode.PEARL),
+            outputs=OutputConfig(
+                formats=["jsonl"],
+                export_ml_dataset=True
+            ),
+            variations=VariationConfig(
+                enabled=True,
+                count=100,
+                strategies=["vary_personalities", "vary_outcomes"]
+            )
+        )
 
         assert config.variations.enabled is True
         assert config.variations.count == 100
@@ -368,7 +394,7 @@ class TestSimulationConfig:
 
     def test_config_cost_estimation(self):
         """Test cost estimation"""
-        config = SimulationConfig.example_board_meeting()
+        config = _loader.load_template("showcase/board_meeting")
         estimate = config.estimate_cost()
 
         assert "min_usd" in estimate
@@ -379,7 +405,7 @@ class TestSimulationConfig:
 
     def test_config_serialization(self):
         """Test configuration serialization"""
-        config = SimulationConfig.example_board_meeting()
+        config = _loader.load_template("showcase/board_meeting")
         data = config.to_dict()
 
         assert isinstance(data, dict)

@@ -27,7 +27,10 @@ load_env()
 
 from generation.config_schema import SimulationConfig
 from generation.resilience_orchestrator import ResilientE2EWorkflowRunner
+from generation.templates.loader import TemplateLoader
 from metadata.run_tracker import MetadataManager
+
+_loader = TemplateLoader()
 
 def test_summary_generation():
     """Test summary generation on a small template"""
@@ -57,7 +60,7 @@ def test_summary_generation():
     print("Expected: ~5 entities, 2-3 timepoints, <$1 cost")
     print()
 
-    config = SimulationConfig.example_board_meeting()
+    config = _loader.load_template("showcase/board_meeting")
 
     try:
         result = runner.run(config)

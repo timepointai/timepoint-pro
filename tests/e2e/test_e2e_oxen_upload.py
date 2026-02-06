@@ -50,14 +50,32 @@ class TestOxenUploadE2E:
         # Import dependencies
         sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-        from generation.config_schema import SimulationConfig
+        from generation.config_schema import (
+            SimulationConfig, EntityConfig, CompanyConfig,
+            TemporalConfig, TemporalMode, OutputConfig, VariationConfig,
+        )
         from generation.horizontal_generator import HorizontalGenerator
         from oxen_integration import OxenClient
 
         # Step 1: Generate variations
         print("\n📊 Step 1: Generating variations...")
         generator = HorizontalGenerator()
-        base_config = SimulationConfig.example_variations()
+        base_config = SimulationConfig(
+            scenario_description="Generate variations of a negotiation scenario",
+            world_id="negotiation_variations",
+            entities=EntityConfig(count=4, types=["human"]),
+            timepoints=CompanyConfig(count=2, resolution="hour"),
+            temporal=TemporalConfig(mode=TemporalMode.PEARL),
+            outputs=OutputConfig(
+                formats=["jsonl"],
+                export_ml_dataset=True
+            ),
+            variations=VariationConfig(
+                enabled=True,
+                count=100,
+                strategies=["vary_personalities", "vary_outcomes"]
+            )
+        )
 
         variations = generator.generate_variations(
             base_config=base_config,
@@ -125,6 +143,7 @@ class TestOxenUploadE2E:
 
         from generation.config_schema import SimulationConfig
         from generation.vertical_generator import VerticalGenerator
+        from generation.templates.loader import TemplateLoader
         from oxen_integration import OxenClient
 
         # Use different repo name for vertical test
@@ -133,7 +152,7 @@ class TestOxenUploadE2E:
         # Step 1: Generate temporal expansion
         print("\n⏱️  Step 1: Generating temporal expansion...")
         generator = VerticalGenerator()
-        base_config = SimulationConfig.example_jefferson_dinner()
+        base_config = TemplateLoader().load_template("showcase/jefferson_dinner")
 
         expanded = generator.generate_temporal_depth(
             base_config=base_config,

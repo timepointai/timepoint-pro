@@ -444,19 +444,20 @@ def run_convergence_e2e(
 
     # Get the template configuration
     try:
-        # Try to get the template method dynamically
-        template_method = getattr(SimulationConfig, f"example_{template_name}", None)
-        if not template_method:
-            template_method = getattr(SimulationConfig, template_name, None)
-        if not template_method:
-            template_method = getattr(SimulationConfig, f"convergence_test_{template_name}", None)
-
-        if not template_method:
-            print(f"❌ Template not found: {template_name}")
-            print("   Available templates: board_meeting, hospital_crisis, kami_shrine, etc.")
-            return False
-
-        config = template_method()
+        from generation.templates.loader import TemplateLoader
+        loader = TemplateLoader()
+        try:
+            config = loader.load_template(template_name)
+        except FileNotFoundError:
+            try:
+                config = loader.load_template(f"showcase/{template_name}")
+            except FileNotFoundError:
+                try:
+                    config = loader.load_template(f"convergence/{template_name}")
+                except FileNotFoundError:
+                    print(f"❌ Template not found: {template_name}")
+                    print(f"   Available templates: {[t.id for t in loader.list_templates()]}")
+                    return False
         print(f"✓ Loaded template: {template_name}")
         print(f"  World ID: {config.world_id}")
         print(f"  Entities: {config.entities.count}")
@@ -1189,145 +1190,45 @@ def run_single_template(template_name: str, skip_summaries: bool = False, portal
     Returns:
         True if successful, False otherwise
     """
-    from generation.config_schema import SimulationConfig
+    from generation.templates.loader import TemplateLoader
     from generation.resilience_orchestrator import ResilientE2EWorkflowRunner
     from metadata.run_tracker import MetadataManager
 
-    # Normalize template name: convert "portal/startup_unicorn" to "portal_startup_unicorn"
-    template_name = template_name.replace("/", "_")
+    # Normalize template name
+    normalized = template_name.replace("/", "_")
 
-    # Build template lookup from all available templates
-    template_lookup: Dict[str, Tuple] = {}
+    # Load template via TemplateLoader
+    loader = TemplateLoader()
 
-    # Quick templates
-    quick_templates = [
-        ("board_meeting", SimulationConfig.example_board_meeting(), {"M7"}),
-        ("jefferson_dinner", SimulationConfig.example_jefferson_dinner(), {"M3", "M7"}),
-        ("hospital_crisis", SimulationConfig.example_hospital_crisis(), {"M8", "M14"}),
-        ("kami_shrine", SimulationConfig.example_kami_shrine(), {"M16"}),
-        ("detective_prospection", SimulationConfig.example_detective_prospection(), {"M15"}),
-        ("vc_pitch_pearl", SimulationConfig.example_vc_pitch_pearl(), {"M7", "M11", "M15"}),
-        ("vc_pitch_roadshow", SimulationConfig.example_vc_pitch_roadshow(), {"M3", "M7", "M10", "M13"}),
-    ]
+    # Try multiple path patterns
+    config = None
+    template_info = None
+    for candidate in [template_name, f"showcase/{normalized}", f"convergence/{normalized}"]:
+        template_info = loader.get_template_info(candidate)
+        if template_info:
+            try:
+                config = loader.load_template(candidate)
+                break
+            except FileNotFoundError:
+                continue
 
-    # Full templates
-    full_templates = [
-        ("empty_house_flashback", SimulationConfig.example_empty_house_flashback(), {"M17", "M13", "M8"}),
-        ("final_problem_branching", SimulationConfig.example_final_problem_branching(), {"M12", "M17", "M15"}),
-        ("hound_shadow_directorial", SimulationConfig.example_hound_shadow_directorial(), {"M17", "M10", "M14"}),
-        ("sign_loops_cyclical", SimulationConfig.example_sign_loops_cyclical(), {"M17", "M15", "M3"}),
-        ("vc_pitch_branching", SimulationConfig.example_vc_pitch_branching(), {"M12", "M15", "M8", "M17"}),
-        ("vc_pitch_strategies", SimulationConfig.example_vc_pitch_strategies(), {"M12", "M10", "M15", "M17"}),
-    ]
+    # Also try by normalized name against all templates
+    if config is None:
+        for info in loader.list_templates():
+            if info.id.split("/")[-1] == normalized or info.id.replace("/", "_") == normalized:
+                try:
+                    config = loader.load_template(info.id)
+                    template_info = info
+                    break
+                except FileNotFoundError:
+                    continue
 
-    # Timepoint corporate templates
-    timepoint_corporate_templates = [
-        ("timepoint_ipo_reverse", SimulationConfig.timepoint_ipo_reverse_engineering(), {"M12", "M15", "M7", "M13", "M11"}),
-        ("timepoint_acquisition_scenarios", SimulationConfig.timepoint_acquisition_scenarios(), {"M12", "M15", "M11", "M8", "M7", "M13"}),
-        ("timepoint_cofounder_configs", SimulationConfig.timepoint_cofounder_configurations(), {"M12", "M13", "M8", "M7", "M11"}),
-        ("timepoint_equity_incentives", SimulationConfig.timepoint_equity_performance_incentives(), {"M12", "M13", "M7", "M15", "M11", "M8"}),
-        ("timepoint_formation_decisions", SimulationConfig.timepoint_critical_formation_decisions(), {"M12", "M7", "M15", "M11"}),
-        ("timepoint_success_vs_failure", SimulationConfig.timepoint_success_vs_failure_paths(), {"M12", "M7", "M13", "M8", "M11", "M15"}),
-        ("timepoint_launch_marketing", SimulationConfig.timepoint_launch_marketing_campaigns(), {"M3", "M10", "M14"}),
-        ("timepoint_staffing_growth", SimulationConfig.timepoint_staffing_and_growth(), {"M3", "M10", "M14", "M15"}),
-        ("timepoint_personality_archetypes", SimulationConfig.timepoint_founder_personality_archetypes(), {"M12", "M13", "M8", "M7", "M11"}),
-        ("timepoint_charismatic_founder", SimulationConfig.timepoint_charismatic_founder_archetype(), {"M12", "M13", "M8", "M11", "M7"}),
-        ("timepoint_demanding_genius", SimulationConfig.timepoint_demanding_genius_archetype(), {"M12", "M13", "M8", "M7", "M15", "M11"}),
-        ("timepoint_ai_pricing_war", SimulationConfig.timepoint_ai_pricing_war(), {"M12", "M7", "M13", "M15", "M8"}),
-        ("timepoint_ai_capability_leapfrog", SimulationConfig.timepoint_ai_capability_leapfrog(), {"M12", "M9", "M10", "M13"}),
-        ("timepoint_ai_business_model_evolution", SimulationConfig.timepoint_ai_business_model_evolution(), {"M12", "M7", "M13", "M15", "M8"}),
-        ("timepoint_ai_regulatory_divergence", SimulationConfig.timepoint_ai_regulatory_divergence(), {"M12", "M7", "M13", "M14"}),
-    ]
-
-    # Portal templates
-    portal_templates = [
-        ("portal_presidential_election", SimulationConfig.portal_presidential_election(), {"M17", "M15", "M12", "M7", "M13"}),
-        ("portal_startup_unicorn", SimulationConfig.portal_startup_unicorn(), {"M17", "M13", "M8", "M11", "M15", "M7"}),
-        ("portal_academic_tenure", SimulationConfig.portal_academic_tenure(), {"M17", "M15", "M3", "M14", "M13"}),
-        ("portal_startup_failure", SimulationConfig.portal_startup_failure(), {"M17", "M12", "M8", "M13", "M15", "M11"}),
-    ]
-
-    # Portal simjudged variants
-    portal_templates_simjudged_quick = [
-        ("portal_presidential_election_simjudged_quick", SimulationConfig.portal_presidential_election_simjudged_quick(), {"M17", "M15", "M12", "M7", "M13"}),
-        ("portal_startup_unicorn_simjudged_quick", SimulationConfig.portal_startup_unicorn_simjudged_quick(), {"M17", "M13", "M8", "M11", "M15", "M7"}),
-        ("portal_academic_tenure_simjudged_quick", SimulationConfig.portal_academic_tenure_simjudged_quick(), {"M17", "M15", "M3", "M14", "M13"}),
-        ("portal_startup_failure_simjudged_quick", SimulationConfig.portal_startup_failure_simjudged_quick(), {"M17", "M12", "M8", "M13", "M15", "M11"}),
-    ]
-
-    portal_templates_simjudged = [
-        ("portal_presidential_election_simjudged", SimulationConfig.portal_presidential_election_simjudged(), {"M17", "M15", "M12", "M7", "M13"}),
-        ("portal_startup_unicorn_simjudged", SimulationConfig.portal_startup_unicorn_simjudged(), {"M17", "M13", "M8", "M11", "M15", "M7"}),
-        ("portal_academic_tenure_simjudged", SimulationConfig.portal_academic_tenure_simjudged(), {"M17", "M15", "M3", "M14", "M13"}),
-        ("portal_startup_failure_simjudged", SimulationConfig.portal_startup_failure_simjudged(), {"M17", "M12", "M8", "M13", "M15", "M11"}),
-    ]
-
-    portal_templates_simjudged_thorough = [
-        ("portal_presidential_election_simjudged_thorough", SimulationConfig.portal_presidential_election_simjudged_thorough(), {"M17", "M15", "M12", "M7", "M13"}),
-        ("portal_startup_unicorn_simjudged_thorough", SimulationConfig.portal_startup_unicorn_simjudged_thorough(), {"M17", "M13", "M8", "M11", "M15", "M7"}),
-        ("portal_academic_tenure_simjudged_thorough", SimulationConfig.portal_academic_tenure_simjudged_thorough(), {"M17", "M15", "M3", "M14", "M13"}),
-        ("portal_startup_failure_simjudged_thorough", SimulationConfig.portal_startup_failure_simjudged_thorough(), {"M17", "M12", "M8", "M13", "M15", "M11"}),
-    ]
-
-    # Portal timepoint templates
-    portal_timepoint_templates = [
-        ("portal_timepoint_unicorn", SimulationConfig.portal_timepoint_unicorn(), {"M17", "M13", "M7", "M15", "M8", "M11"}),
-        ("portal_timepoint_series_a_success", SimulationConfig.portal_timepoint_series_a_success(), {"M17", "M13", "M7", "M15", "M11"}),
-        ("portal_timepoint_product_market_fit", SimulationConfig.portal_timepoint_product_market_fit(), {"M17", "M13", "M10", "M7", "M15"}),
-        ("portal_timepoint_enterprise_adoption", SimulationConfig.portal_timepoint_enterprise_adoption(), {"M17", "M13", "M7", "M15", "M11", "M8"}),
-        ("portal_timepoint_founder_transition", SimulationConfig.portal_timepoint_founder_transition(), {"M17", "M13", "M8", "M7", "M15"}),
-    ]
-
-    portal_timepoint_templates_simjudged_quick = [
-        ("portal_timepoint_unicorn_simjudged_quick", SimulationConfig.portal_timepoint_unicorn_simjudged_quick(), {"M17", "M13", "M7", "M15", "M8", "M11"}),
-        ("portal_timepoint_series_a_success_simjudged_quick", SimulationConfig.portal_timepoint_series_a_success_simjudged_quick(), {"M17", "M13", "M7", "M15", "M11"}),
-        ("portal_timepoint_product_market_fit_simjudged_quick", SimulationConfig.portal_timepoint_product_market_fit_simjudged_quick(), {"M17", "M13", "M10", "M7", "M15"}),
-        ("portal_timepoint_enterprise_adoption_simjudged_quick", SimulationConfig.portal_timepoint_enterprise_adoption_simjudged_quick(), {"M17", "M13", "M7", "M15", "M11", "M8"}),
-        ("portal_timepoint_founder_transition_simjudged_quick", SimulationConfig.portal_timepoint_founder_transition_simjudged_quick(), {"M17", "M13", "M8", "M7", "M15"}),
-    ]
-
-    portal_timepoint_templates_simjudged = [
-        ("portal_timepoint_unicorn_simjudged", SimulationConfig.portal_timepoint_unicorn_simjudged(), {"M17", "M13", "M7", "M15", "M8", "M11"}),
-        ("portal_timepoint_series_a_success_simjudged", SimulationConfig.portal_timepoint_series_a_success_simjudged(), {"M17", "M13", "M7", "M15", "M11"}),
-        ("portal_timepoint_product_market_fit_simjudged", SimulationConfig.portal_timepoint_product_market_fit_simjudged(), {"M17", "M13", "M10", "M7", "M15"}),
-        ("portal_timepoint_enterprise_adoption_simjudged", SimulationConfig.portal_timepoint_enterprise_adoption_simjudged(), {"M17", "M13", "M7", "M15", "M11", "M8"}),
-        ("portal_timepoint_founder_transition_simjudged", SimulationConfig.portal_timepoint_founder_transition_simjudged(), {"M17", "M13", "M8", "M7", "M15"}),
-    ]
-
-    portal_timepoint_templates_simjudged_thorough = [
-        ("portal_timepoint_unicorn_simjudged_thorough", SimulationConfig.portal_timepoint_unicorn_simjudged_thorough(), {"M17", "M13", "M7", "M15", "M8", "M11"}),
-        ("portal_timepoint_series_a_success_simjudged_thorough", SimulationConfig.portal_timepoint_series_a_success_simjudged_thorough(), {"M17", "M13", "M7", "M15", "M11"}),
-        ("portal_timepoint_product_market_fit_simjudged_thorough", SimulationConfig.portal_timepoint_product_market_fit_simjudged_thorough(), {"M17", "M13", "M10", "M7", "M15"}),
-        ("portal_timepoint_enterprise_adoption_simjudged_thorough", SimulationConfig.portal_timepoint_enterprise_adoption_simjudged_thorough(), {"M17", "M13", "M7", "M15", "M11", "M8"}),
-        ("portal_timepoint_founder_transition_simjudged_thorough", SimulationConfig.portal_timepoint_founder_transition_simjudged_thorough(), {"M17", "M13", "M8", "M7", "M15"}),
-    ]
-
-    # Build the lookup dictionary
-    all_template_lists = [
-        quick_templates,
-        full_templates,
-        timepoint_corporate_templates,
-        portal_templates,
-        portal_templates_simjudged_quick,
-        portal_templates_simjudged,
-        portal_templates_simjudged_thorough,
-        portal_timepoint_templates,
-        portal_timepoint_templates_simjudged_quick,
-        portal_timepoint_templates_simjudged,
-        portal_timepoint_templates_simjudged_thorough,
-    ]
-
-    for template_list in all_template_lists:
-        for name, config, mechanisms in template_list:
-            template_lookup[name] = (config, mechanisms)
-
-    # Look up the template
-    if template_name not in template_lookup:
+    if config is None:
         print(f"Unknown template: {template_name}")
-        print(f"Available templates: {sorted(template_lookup.keys())}")
+        print(f"Available templates: {sorted(t.id for t in loader.list_templates())}")
         return False
 
-    config, mechanisms = template_lookup[template_name]
+    mechanisms = set(template_info.mechanisms) if template_info else set()
 
     # Apply portal-quick mode: reduce backward_steps to 5 for fast demo
     if portal_quick:
@@ -1411,123 +1312,36 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, paralle
     metadata_manager = MetadataManager(db_path="metadata/runs.db")
     runner = ResilientE2EWorkflowRunner(metadata_manager, generate_summary=not skip_summaries)
 
-    # Define templates
-    # Quick mode: safe, fast templates
-    quick_templates = [
-        ("board_meeting", SimulationConfig.example_board_meeting(), {"M7"}),
-        ("jefferson_dinner", SimulationConfig.example_jefferson_dinner(), {"M3", "M7"}),
-        ("hospital_crisis", SimulationConfig.example_hospital_crisis(), {"M8", "M14"}),
-        ("kami_shrine", SimulationConfig.example_kami_shrine(), {"M16"}),
-        ("detective_prospection", SimulationConfig.example_detective_prospection(), {"M15"}),
-        ("vc_pitch_pearl", SimulationConfig.example_vc_pitch_pearl(), {"M7", "M11", "M15"}),
-        ("vc_pitch_roadshow", SimulationConfig.example_vc_pitch_roadshow(), {"M3", "M7", "M10", "M13"}),
-    ]
+    # Load templates from catalog via TemplateLoader
+    from generation.templates.loader import TemplateLoader
+    loader = TemplateLoader()
 
-    # Full mode: expensive, comprehensive templates
-    full_templates = [
-        ("empty_house_flashback", SimulationConfig.example_empty_house_flashback(), {"M17", "M13", "M8"}),
-        ("final_problem_branching", SimulationConfig.example_final_problem_branching(), {"M12", "M17", "M15"}),
-        ("hound_shadow_directorial", SimulationConfig.example_hound_shadow_directorial(), {"M17", "M10", "M14"}),
-        ("sign_loops_cyclical", SimulationConfig.example_sign_loops_cyclical(), {"M17", "M15", "M3"}),
-        ("vc_pitch_branching", SimulationConfig.example_vc_pitch_branching(), {"M12", "M15", "M8", "M17"}),
-        ("vc_pitch_strategies", SimulationConfig.example_vc_pitch_strategies(), {"M12", "M10", "M15", "M17"}),
-        # WARNING: These are VERY expensive!
-        # ("variations", SimulationConfig.example_variations(), {"M1", "M2"}),  # 100 variations
-        # ("scarlet_study_deep", SimulationConfig.example_scarlet_study_deep(), {"M1-M19"}),  # 101 timepoints
-    ]
+    def _load_templates(category=None, tier=None):
+        """Load templates as (name, config, mechanisms) tuples."""
+        templates = []
+        for info in loader.list_templates(category=category, tier=tier, status="verified"):
+            try:
+                config = loader.load_template(info.id)
+                name = info.id.replace("/", "_")
+                templates.append((name, config, set(info.mechanisms)))
+            except FileNotFoundError:
+                print(f"Warning: Template {info.id} in catalog but file not found")
+        return templates
 
-    # Timepoint Corporate Formation Analysis (new category)
-    timepoint_corporate_templates = [
-        # Corporate formation reverse-engineering (medium cost)
-        ("timepoint_ipo_reverse", SimulationConfig.timepoint_ipo_reverse_engineering(), {"M12", "M15", "M7", "M13", "M11"}),
-        ("timepoint_acquisition_scenarios", SimulationConfig.timepoint_acquisition_scenarios(), {"M12", "M15", "M11", "M8", "M7", "M13"}),
-        ("timepoint_cofounder_configs", SimulationConfig.timepoint_cofounder_configurations(), {"M12", "M13", "M8", "M7", "M11"}),
-        ("timepoint_equity_incentives", SimulationConfig.timepoint_equity_performance_incentives(), {"M12", "M13", "M7", "M15", "M11", "M8"}),
-        ("timepoint_formation_decisions", SimulationConfig.timepoint_critical_formation_decisions(), {"M12", "M7", "M15", "M11"}),
-        ("timepoint_success_vs_failure", SimulationConfig.timepoint_success_vs_failure_paths(), {"M12", "M7", "M13", "M8", "M11", "M15"}),
-        # Emergent growth strategy templates (Phase 5 - new!)
-        ("timepoint_launch_marketing", SimulationConfig.timepoint_launch_marketing_campaigns(), {"M3", "M10", "M14"}),
-        ("timepoint_staffing_growth", SimulationConfig.timepoint_staffing_and_growth(), {"M3", "M10", "M14", "M15"}),
-        # Founder personality × governance structure (expensive, comprehensive)
-        ("timepoint_personality_archetypes", SimulationConfig.timepoint_founder_personality_archetypes(), {"M12", "M13", "M8", "M7", "M11"}),
-        ("timepoint_charismatic_founder", SimulationConfig.timepoint_charismatic_founder_archetype(), {"M12", "M13", "M8", "M11", "M7"}),
-        ("timepoint_demanding_genius", SimulationConfig.timepoint_demanding_genius_archetype(), {"M12", "M13", "M8", "M7", "M15", "M11"}),
-        # AI marketplace competitive dynamics (NEW - Phase 11)
-        ("timepoint_ai_pricing_war", SimulationConfig.timepoint_ai_pricing_war(), {"M12", "M7", "M13", "M15", "M8"}),
-        ("timepoint_ai_capability_leapfrog", SimulationConfig.timepoint_ai_capability_leapfrog(), {"M12", "M9", "M10", "M13"}),
-        ("timepoint_ai_business_model_evolution", SimulationConfig.timepoint_ai_business_model_evolution(), {"M12", "M7", "M13", "M15", "M8"}),
-        ("timepoint_ai_regulatory_divergence", SimulationConfig.timepoint_ai_regulatory_divergence(), {"M12", "M7", "M13", "M14"}),
-    ]
-
-    # PORTAL mode templates (backward temporal reasoning)
-    portal_templates = [
-        ("portal_presidential_election", SimulationConfig.portal_presidential_election(), {"M17", "M15", "M12", "M7", "M13"}),
-        ("portal_startup_unicorn", SimulationConfig.portal_startup_unicorn(), {"M17", "M13", "M8", "M11", "M15", "M7"}),
-        ("portal_academic_tenure", SimulationConfig.portal_academic_tenure(), {"M17", "M15", "M3", "M14", "M13"}),
-        ("portal_startup_failure", SimulationConfig.portal_startup_failure(), {"M17", "M12", "M8", "M13", "M15", "M11"}),
-    ]
-
-    # PORTAL mode with SIMULATION-BASED JUDGING (enhanced quality)
-    # Quick variants: 1 forward step, no dialog (~2x cost)
-    portal_templates_simjudged_quick = [
-        ("portal_presidential_election_simjudged_quick", SimulationConfig.portal_presidential_election_simjudged_quick(), {"M17", "M15", "M12", "M7", "M13"}),
-        ("portal_startup_unicorn_simjudged_quick", SimulationConfig.portal_startup_unicorn_simjudged_quick(), {"M17", "M13", "M8", "M11", "M15", "M7"}),
-        ("portal_academic_tenure_simjudged_quick", SimulationConfig.portal_academic_tenure_simjudged_quick(), {"M17", "M15", "M3", "M14", "M13"}),
-        ("portal_startup_failure_simjudged_quick", SimulationConfig.portal_startup_failure_simjudged_quick(), {"M17", "M12", "M8", "M13", "M15", "M11"}),
-    ]
-
-    # Standard variants: 2 forward steps, dialog enabled (~3x cost)
-    portal_templates_simjudged = [
-        ("portal_presidential_election_simjudged", SimulationConfig.portal_presidential_election_simjudged(), {"M17", "M15", "M12", "M7", "M13"}),
-        ("portal_startup_unicorn_simjudged", SimulationConfig.portal_startup_unicorn_simjudged(), {"M17", "M13", "M8", "M11", "M15", "M7"}),
-        ("portal_academic_tenure_simjudged", SimulationConfig.portal_academic_tenure_simjudged(), {"M17", "M15", "M3", "M14", "M13"}),
-        ("portal_startup_failure_simjudged", SimulationConfig.portal_startup_failure_simjudged(), {"M17", "M12", "M8", "M13", "M15", "M11"}),
-    ]
-
-    # Thorough variants: 3 forward steps, extra analysis (~4-5x cost)
-    portal_templates_simjudged_thorough = [
-        ("portal_presidential_election_simjudged_thorough", SimulationConfig.portal_presidential_election_simjudged_thorough(), {"M17", "M15", "M12", "M7", "M13"}),
-        ("portal_startup_unicorn_simjudged_thorough", SimulationConfig.portal_startup_unicorn_simjudged_thorough(), {"M17", "M13", "M8", "M11", "M15", "M7"}),
-        ("portal_academic_tenure_simjudged_thorough", SimulationConfig.portal_academic_tenure_simjudged_thorough(), {"M17", "M15", "M3", "M14", "M13"}),
-        ("portal_startup_failure_simjudged_thorough", SimulationConfig.portal_startup_failure_simjudged_thorough(), {"M17", "M12", "M8", "M13", "M15", "M11"}),
-    ]
-
-    # PORTAL mode templates - Timepoint Corporate (real founder profiles)
-    portal_timepoint_templates = [
-        ("portal_timepoint_unicorn", SimulationConfig.portal_timepoint_unicorn(), {"M17", "M13", "M7", "M15", "M8", "M11"}),
-        ("portal_timepoint_series_a_success", SimulationConfig.portal_timepoint_series_a_success(), {"M17", "M13", "M7", "M15", "M11"}),
-        ("portal_timepoint_product_market_fit", SimulationConfig.portal_timepoint_product_market_fit(), {"M17", "M13", "M10", "M7", "M15"}),
-        ("portal_timepoint_enterprise_adoption", SimulationConfig.portal_timepoint_enterprise_adoption(), {"M17", "M13", "M7", "M15", "M11", "M8"}),
-        ("portal_timepoint_founder_transition", SimulationConfig.portal_timepoint_founder_transition(), {"M17", "M13", "M8", "M7", "M15"}),
-    ]
-
-    # PORTAL Timepoint with SIMULATION-BASED JUDGING
-    # Quick variants: 1 forward step, no dialog (~2x cost)
-    portal_timepoint_templates_simjudged_quick = [
-        ("portal_timepoint_unicorn_simjudged_quick", SimulationConfig.portal_timepoint_unicorn_simjudged_quick(), {"M17", "M13", "M7", "M15", "M8", "M11"}),
-        ("portal_timepoint_series_a_success_simjudged_quick", SimulationConfig.portal_timepoint_series_a_success_simjudged_quick(), {"M17", "M13", "M7", "M15", "M11"}),
-        ("portal_timepoint_product_market_fit_simjudged_quick", SimulationConfig.portal_timepoint_product_market_fit_simjudged_quick(), {"M17", "M13", "M10", "M7", "M15"}),
-        ("portal_timepoint_enterprise_adoption_simjudged_quick", SimulationConfig.portal_timepoint_enterprise_adoption_simjudged_quick(), {"M17", "M13", "M7", "M15", "M11", "M8"}),
-        ("portal_timepoint_founder_transition_simjudged_quick", SimulationConfig.portal_timepoint_founder_transition_simjudged_quick(), {"M17", "M13", "M8", "M7", "M15"}),
-    ]
-
-    # Standard variants: 2 forward steps, dialog enabled (~3x cost)
-    portal_timepoint_templates_simjudged = [
-        ("portal_timepoint_unicorn_simjudged", SimulationConfig.portal_timepoint_unicorn_simjudged(), {"M17", "M13", "M7", "M15", "M8", "M11"}),
-        ("portal_timepoint_series_a_success_simjudged", SimulationConfig.portal_timepoint_series_a_success_simjudged(), {"M17", "M13", "M7", "M15", "M11"}),
-        ("portal_timepoint_product_market_fit_simjudged", SimulationConfig.portal_timepoint_product_market_fit_simjudged(), {"M17", "M13", "M10", "M7", "M15"}),
-        ("portal_timepoint_enterprise_adoption_simjudged", SimulationConfig.portal_timepoint_enterprise_adoption_simjudged(), {"M17", "M13", "M7", "M15", "M11", "M8"}),
-        ("portal_timepoint_founder_transition_simjudged", SimulationConfig.portal_timepoint_founder_transition_simjudged(), {"M17", "M13", "M8", "M7", "M15"}),
-    ]
-
-    # Thorough variants: 3 forward steps, extra analysis (~4-5x cost)
-    portal_timepoint_templates_simjudged_thorough = [
-        ("portal_timepoint_unicorn_simjudged_thorough", SimulationConfig.portal_timepoint_unicorn_simjudged_thorough(), {"M17", "M13", "M7", "M15", "M8", "M11"}),
-        ("portal_timepoint_series_a_success_simjudged_thorough", SimulationConfig.portal_timepoint_series_a_success_simjudged_thorough(), {"M17", "M13", "M7", "M15", "M11"}),
-        ("portal_timepoint_product_market_fit_simjudged_thorough", SimulationConfig.portal_timepoint_product_market_fit_simjudged_thorough(), {"M17", "M13", "M10", "M7", "M15"}),
-        ("portal_timepoint_enterprise_adoption_simjudged_thorough", SimulationConfig.portal_timepoint_enterprise_adoption_simjudged_thorough(), {"M17", "M13", "M7", "M15", "M11", "M8"}),
-        ("portal_timepoint_founder_transition_simjudged_thorough", SimulationConfig.portal_timepoint_founder_transition_simjudged_thorough(), {"M17", "M13", "M8", "M7", "M15"}),
-    ]
+    # Build template lists from verified catalog entries
+    showcase_templates = _load_templates(category="showcase")
+    convergence_templates = _load_templates(category="convergence")
+    quick_templates = showcase_templates  # All verified showcase templates
+    full_templates = []  # No separate full category needed - all verified templates are in showcase
+    timepoint_corporate_templates = []  # Deleted: no longer in catalog
+    portal_templates = []  # Deleted: no longer in catalog
+    portal_templates_simjudged_quick = []
+    portal_templates_simjudged = []
+    portal_templates_simjudged_thorough = []
+    portal_timepoint_templates = []
+    portal_timepoint_templates_simjudged_quick = []
+    portal_timepoint_templates_simjudged = []
+    portal_timepoint_templates_simjudged_thorough = []
 
     # ANDOS test scripts (always run)
     andos_scripts = [
@@ -2948,34 +2762,24 @@ if __name__ == "__main__":
             print("   Set TIMEPOINT_API_KEY env var or use --api-key")
             sys.exit(1)
 
-        # Build template list for the selected mode (same logic as run_all_templates)
-        from generation.config_schema import SimulationConfig
+        # Build template list for the selected mode via TemplateLoader
+        from generation.templates.loader import TemplateLoader
+        loader = TemplateLoader()
 
-        quick_templates = [
-            ("board_meeting", SimulationConfig.example_board_meeting(), {"M7"}),
-            ("jefferson_dinner", SimulationConfig.example_jefferson_dinner(), {"M3", "M7"}),
-            ("hospital_crisis", SimulationConfig.example_hospital_crisis(), {"M8", "M14"}),
-            ("kami_shrine", SimulationConfig.example_kami_shrine(), {"M16"}),
-            ("detective_prospection", SimulationConfig.example_detective_prospection(), {"M15"}),
-            ("vc_pitch_pearl", SimulationConfig.example_vc_pitch_pearl(), {"M7", "M11", "M15"}),
-            ("vc_pitch_roadshow", SimulationConfig.example_vc_pitch_roadshow(), {"M3", "M7", "M10", "M13"}),
-        ]
+        def _load_api_templates(category=None):
+            templates = []
+            for info in loader.list_templates(category=category, status="verified"):
+                try:
+                    config = loader.load_template(info.id)
+                    name = info.id.replace("/", "_")
+                    templates.append((name, config, set(info.mechanisms)))
+                except FileNotFoundError:
+                    pass
+            return templates
 
-        full_templates = [
-            ("empty_house_flashback", SimulationConfig.example_empty_house_flashback(), {"M17", "M13", "M8"}),
-            ("final_problem_branching", SimulationConfig.example_final_problem_branching(), {"M12", "M17", "M15"}),
-            ("hound_shadow_directorial", SimulationConfig.example_hound_shadow_directorial(), {"M17", "M10", "M14"}),
-            ("sign_loops_cyclical", SimulationConfig.example_sign_loops_cyclical(), {"M17", "M15", "M3"}),
-            ("vc_pitch_branching", SimulationConfig.example_vc_pitch_branching(), {"M12", "M15", "M8", "M17"}),
-            ("vc_pitch_strategies", SimulationConfig.example_vc_pitch_strategies(), {"M12", "M10", "M15", "M17"}),
-        ]
-
-        portal_templates = [
-            ("portal_presidential_election", SimulationConfig.portal_presidential_election(), {"M17", "M15", "M12", "M7", "M13"}),
-            ("portal_startup_unicorn", SimulationConfig.portal_startup_unicorn(), {"M17", "M13", "M8", "M11", "M15", "M7"}),
-            ("portal_academic_tenure", SimulationConfig.portal_academic_tenure(), {"M17", "M15", "M3", "M14", "M13"}),
-            ("portal_startup_failure", SimulationConfig.portal_startup_failure(), {"M17", "M12", "M8", "M13", "M15", "M11"}),
-        ]
+        quick_templates = _load_api_templates(category="showcase")
+        full_templates = []
+        portal_templates = []
 
         # Select templates based on mode
         if mode == 'quick':
