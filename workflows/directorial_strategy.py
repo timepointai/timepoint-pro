@@ -29,6 +29,10 @@ from generation.config_schema import TemporalConfig
 from llm_service.model_selector import ActionType, get_token_estimator
 from pydantic import BaseModel
 
+# Directorial mode requires a model with reliable structured JSON output.
+# Llama 4 Scout frequently returns malformed JSON for complex schemas.
+DIRECTORIAL_MODEL = "qwen/qwen-2.5-72b-instruct"
+
 
 # ============================================================================
 # Pydantic Response Models
@@ -362,6 +366,7 @@ Return structured JSON matching the schema."""
             result = self.llm.generate_structured(
                 prompt=user_prompt,
                 response_model=NarrativePlan,
+                model=DIRECTORIAL_MODEL,
                 system_prompt=system_prompt,
                 temperature=0.5,
                 max_tokens=2000
@@ -544,6 +549,7 @@ Adjust the tension score based on:
             result = self.llm.generate_structured(
                 prompt=user_prompt,
                 response_model=TensionAdjustment,
+                model=DIRECTORIAL_MODEL,
                 system_prompt=system_prompt,
                 temperature=0.3,
                 max_tokens=300
@@ -586,6 +592,7 @@ Identify:
             result = self.llm.generate_structured(
                 prompt=user_prompt,
                 response_model=IronyDetection,
+                model=DIRECTORIAL_MODEL,
                 system_prompt=system_prompt,
                 temperature=0.4,
                 max_tokens=500
@@ -640,6 +647,7 @@ For each POV entry, provide:
             result = self.llm.generate_structured(
                 prompt=user_prompt,
                 response_model=CameraPlan,
+                model=DIRECTORIAL_MODEL,
                 system_prompt=system_prompt,
                 temperature=0.5,
                 max_tokens=1500
@@ -788,6 +796,7 @@ Provide:
             result = self.llm.generate_structured(
                 prompt=user_prompt,
                 response_model=DirectorialStateSchema,
+                model=DIRECTORIAL_MODEL,
                 system_prompt=system_prompt,
                 temperature=temperature,
                 max_tokens=1000
@@ -966,6 +975,7 @@ Provide:
             result = self.llm.generate_structured(
                 prompt=f"Identify key entities in: {description[:500]}",
                 response_model=EntityList,
+                model=DIRECTORIAL_MODEL,
                 system_prompt="Identify entities (people, places, things) in the description.",
                 temperature=0.3,
                 max_tokens=500
@@ -1172,6 +1182,7 @@ Evaluate:
         result = self.llm.generate_structured(
             prompt=user_prompt,
             response_model=NarrativeValidation,
+            model=DIRECTORIAL_MODEL,
             system_prompt=system_prompt,
             temperature=0.3,
             max_tokens=500

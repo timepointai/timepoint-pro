@@ -193,7 +193,8 @@ class NarrativeExporter:
                 timestamp=str(tp.timestamp) if hasattr(tp, 'timestamp') else None,
                 event_description=tp.event_description if hasattr(tp, 'event_description') else "Event",
                 entities_present=tp.entities_present if hasattr(tp, 'entities_present') else [],
-                causal_parent=tp.causal_parent if hasattr(tp, 'causal_parent') else None
+                causal_parent=tp.causal_parent if hasattr(tp, 'causal_parent') else None,
+                importance=tp.dramatic_importance if hasattr(tp, 'dramatic_importance') else 0.5
             )
             timeline.append(entry)
 
@@ -219,6 +220,13 @@ class NarrativeExporter:
                         dialogs.append(excerpt)
             except Exception as e:
                 print(f"    ⚠️  Could not load dialogs: {e}")
+
+        # Backfill dialog turn counts into timeline entries
+        dialog_counts = {}
+        for d in dialogs:
+            dialog_counts[d.timepoint_id] = len(d.turns)
+        for entry in timeline:
+            entry.dialog_turn_count = dialog_counts.get(entry.timepoint_id, 0)
 
         # Build training insights
         training_insights = TrainingInsights()

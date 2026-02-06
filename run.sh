@@ -908,11 +908,12 @@ cmd_list() {
             $PYTHON -c "
 from metadata.run_tracker import MetadataManager
 mm = MetadataManager()
-runs = mm.get_recent_runs($limit)
+all_runs = mm.get_all_runs()
+runs = sorted(all_runs, key=lambda r: r.started_at or '', reverse=True)[:$limit]
 if not runs:
     print('No runs found')
 else:
-    print(f'{'ID':<40} {'STATUS':<12} {'TEMPLATE':<25} {'COST':<10}')
+    print(f"{'ID':<40} {'STATUS':<12} {'TEMPLATE':<25} {'COST':<10}")
     print('-' * 90)
     for r in runs:
         cost = f'\${r.cost_usd:.2f}' if r.cost_usd else '-'
@@ -1072,7 +1073,8 @@ full = $([[ "$full" == "true" ]] && echo "True" || echo "False")
 if run_id:
     run = mm.get_run(run_id)
 else:
-    runs = mm.get_recent_runs(1)
+    all_runs = mm.get_all_runs()
+    runs = sorted(all_runs, key=lambda r: r.started_at or '', reverse=True)[:1]
     run = runs[0] if runs else None
 
 if not run:

@@ -894,6 +894,7 @@ Return only valid JSON matching this schema exactly, no other text."""
         prompt: str,
         response_model: type,
         model: Optional[str] = None,
+        system_prompt: Optional[str] = None,
         temperature: float = 0.7,
         max_tokens: int = 24000,  # Increased from 4000 for Llama 4 Scout
         timeout: float = 120.0
@@ -905,6 +906,7 @@ Return only valid JSON matching this schema exactly, no other text."""
             prompt: The prompt to send to the LLM
             response_model: Pydantic BaseModel class to validate response against
             model: Model identifier (defaults to instance default_model)
+            system_prompt: Optional system prompt for context/instructions
             temperature: Sampling temperature
             max_tokens: Maximum tokens to generate
             timeout: Request timeout in seconds
@@ -931,9 +933,14 @@ Return only valid JSON matching this schema exactly, no other text."""
             )
 
             try:
+                messages = []
+                if system_prompt:
+                    messages.append({"role": "system", "content": system_prompt})
+                messages.append({"role": "user", "content": enhanced_prompt})
+
                 response = self.client.chat.completions.create(
                     model=selected_model,
-                    messages=[{"role": "user", "content": enhanced_prompt}],
+                    messages=messages,
                     temperature=temperature,
                     max_tokens=max_tokens,
                     response_format={"type": "json_object"}  # Force JSON mode
@@ -954,6 +961,12 @@ Return only valid JSON matching this schema exactly, no other text."""
                 # Parse JSON and validate against model
                 try:
                     data = json.loads(content)
+                    if isinstance(data, list):
+                        # LLM returned array; try first element if it's a dict
+                        if data and isinstance(data[0], dict):
+                            data = data[0]
+                        else:
+                            raise ValueError(f"Expected JSON object, got array: {content[:200]}")
                     return response_model(**data)
                 except (json.JSONDecodeError, ValueError) as e:
                     raise Exception(f"Failed to parse LLM response as JSON: {e}. Content preview: {content[:500]}")

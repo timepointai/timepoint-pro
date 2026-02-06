@@ -947,6 +947,14 @@ class FullE2EWorkflowRunner:
                 max_timepoints=config.timepoints.count
             )
 
+            # Seed mechanisms from template metadata
+            if hasattr(config, 'metadata') and config.metadata:
+                featured = config.metadata.get('mechanisms_featured', [])
+                for m in featured:
+                    # Extract mechanism ID (e.g., "M10" from "M10_atmospheric_entities")
+                    mech_id = m.split('_')[0] if '_' in m else m
+                    self.metadata_manager.record_mechanism(run_id, mech_id)
+
             self.logfire.info("Run tracking initialized", run_id=run_id)
             return metadata
 
