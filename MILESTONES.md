@@ -6,30 +6,50 @@
 
 ---
 
-## Phase 0: Current State (January 2026)
+## Phase 0: Current State (February 2026)
 
-**What we have: A working research prototype with intelligent model selection and improved data integrity.**
+**What we have: A working research prototype with intelligent model selection, full temporal mode coverage, and improved data integrity.**
+
+### The Key Insight We've Learned
+
+Temporal simulation isn't one problem—it's five different problems depending on what "time" means in your domain:
+
+1. **Forward causality** (PEARL): History unfolds, causes precede effects. Standard simulation.
+2. **Backward inference** (PORTAL): Given a known outcome, what paths lead there? Strategic planning.
+3. **Counterfactuals** (BRANCHING): What if X had happened instead? Parallel timelines.
+4. **Cycles and prophecy** (CYCLICAL): Time loops, generational patterns, self-fulfilling predictions.
+5. **Narrative structure** (DIRECTORIAL): Story-driven causality where drama shapes events.
+
+Each mode has its own validation rules, fidelity allocation strategy, and generation semantics. The architecture now treats temporal mode as a first-class dimension, not an afterthought.
 
 ### Implemented
 
+**Core Infrastructure:**
 - **19 simulation mechanisms** (M1-M19) — See [MECHANICS.md](MECHANICS.md)
 - **M18: Intelligent Model Selection** — Capability-based per-action model selection
 - **M19: Knowledge Extraction** — LLM-based semantic knowledge extraction from entities
 - **12 Open-Source Models** — All via OpenRouter, all permit commercial synthetic data
-- **PORTAL mode** — Backward temporal reasoning from endpoints to origins
 - **Natural Language Interface** — `nl_interface/` integrated via `NLToProductionAdapter`
 - **Parallel execution** — `--parallel N` for N concurrent workers with thread-safe rate limiting
 - **Free model support** — `--free`, `--free-fast`, `--list-free-models` for $0 cost testing
-- **Ctrl+C protection** — Double-confirm handler prevents accidental abortion of expensive runs
+
+**Full Temporal Mode Coverage (February 2026):**
+- **PEARL mode** — Standard forward simulation with strict causality
+- **PORTAL mode** — Backward temporal reasoning with pivot detection and path divergence analysis
+- **BRANCHING mode** — Counterfactual timeline generation with branch point allocation
+- **CYCLICAL mode** — Prophecy system, causal loops, cycle semantics interpretation (repeating/spiral/oscillating)
+- **DIRECTORIAL mode** — Five-act arc engine, camera system, dramatic irony detection
+
+**Data Integrity:**
 - **SQLite persistence** — `metadata/runs.db` for run tracking, `timepoint.db` for temp per-run data
-- **Mechanism metrics** — All 19 mechanisms tracked per run
-- **API backend** — FastAPI REST API
-- **Narrative exports** — Markdown, JSON, PDF generation
-- **41 simulation templates** — In `generation/templates/` (JSON-based with patch metadata, includes 3 convergence templates)
-- **Convergence evaluation** — Causal graph consistency analysis with E2E testing mode, side-by-side comparison, and robustness grading (A-F)
-- **Entity inference in Portal mode** — LLM-based `entities_present` inference instead of blind copying
+- **Convergence evaluation** — Causal graph consistency analysis with E2E testing mode
+- **Entity inference in Portal mode** — LLM-based `entities_present` inference
 - **Data quality validation** — Validates entity references, empty entities_present detection
-- **Entity sync to shared DB** — Entities now persist to metadata/runs.db for convergence
+
+**Output:**
+- **47+ simulation templates** — Including 6 new directorial/cyclical showcase templates
+- **Narrative exports** — Markdown, JSON, PDF generation
+- **API backend** — FastAPI REST API
 
 ### Model Stack (All Open Source)
 

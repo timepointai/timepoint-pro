@@ -290,22 +290,34 @@ Total pivot points detected: 84 across 6 paths
 
 **Architecture** (February 2026): Full strategy implementation in `workflows/directorial_strategy.py` with:
 
-**Arc Engine** — Five-act dramatic structure:
-- SETUP: Establish world, characters, stakes (tension 0.2-0.4)
-- RISING: Complications, challenges, escalation (tension 0.4-0.7)
-- CLIMAX: Peak conflict, maximum tension (tension 0.8-1.0)
-- FALLING: Consequences unfold, revelations (tension 0.5-0.3)
-- RESOLUTION: New equilibrium, denouement (tension 0.1-0.2)
+**The Core Insight**: In DIRECTORIAL mode, causality serves narrative rather than the reverse. Events don't just happen—they happen *because the story needs them*. The system treats dramatic structure as a first-class constraint, allocating computational resources where the story demands attention.
 
-**Camera System** — POV and framing controls:
-- POV rotation across characters per act
-- Framing options: WIDE, CLOSE, OVERHEAD, SUBJECTIVE, ENSEMBLE
-- Parallel storyline merging (A/B plot interleaving)
+**Arc Engine** — Five-act dramatic structure with emergent pacing:
 
-**Fidelity Allocation** — Driven by dramatic importance:
-- Climax states → TRAINED (full detail)
-- Rising action with high tension → DIALOG
-- Setup/resolution → SCENE/TENSOR_ONLY
+| Act | Tension Range | Temporal Density | Fidelity Allocation |
+|-----|---------------|------------------|---------------------|
+| SETUP | 0.2-0.4 | Sparse (establishing beats) | SCENE/TENSOR_ONLY |
+| RISING | 0.4-0.7 | Increasing (complications accumulate) | DIALOG |
+| CLIMAX | 0.8-1.0 | Dense (every moment matters) | TRAINED |
+| FALLING | 0.5-0.3 | Decreasing (consequences unfold) | DIALOG |
+| RESOLUTION | 0.1-0.2 | Sparse (denouement) | SCENE |
+
+The arc engine doesn't just track which act you're in—it shapes generation. Rising action prompts include conflict keywords. Climax generation uses higher temperature (0.7 + tension×0.2) for dramatic unpredictability. Resolution prompts emphasize closure and consequence.
+
+**Camera System** — The "invisible director" controls:
+
+- **POV Rotation**: Main character for climax scenes, ensemble for setup, antagonist perspective for dramatic irony
+- **Framing Vocabulary**:
+  - WIDE: Establish scope, show relationships in space
+  - CLOSE: Internal conflict, decision moments, emotional beats
+  - OVERHEAD: God's-eye omniscience, fate bearing down
+  - SUBJECTIVE: Character's limited perception, unreliable narration
+  - ENSEMBLE: Multiple simultaneous perspectives, group dynamics
+- **Parallel Storyline Merging**: A-plot and B-plot interleave at configurable ratios (useful for heist structures where planning intercuts with execution)
+
+**Dramatic Irony Detection**: The system identifies moments where the audience knows something characters don't. When detected, generation emphasizes the gap—characters make choices that are tragic or comic *because* of what they don't know. This transforms information asymmetry from a bug into a feature.
+
+**Fidelity as Dramatic Investment**: Resources concentrate where drama concentrates. A 20-timepoint tragedy might allocate 40% of its token budget to 3 climax timepoints. Background setup exists at TENSOR_ONLY because the story hasn't asked us to look closely yet.
 
 ```python
 config = TemporalConfig(
@@ -315,36 +327,59 @@ config = TemporalConfig(
 )
 ```
 
+**Affordances**:
+- Classical dramatic structures (tragedy, comedy, heist, courtroom)
+- Character-driven vs. plot-driven emphasis via POV weighting
+- Multiple timeline interleaving for complex narrative structures
+- Natural training data for story-aware language models
+
 **Templates**: `macbeth_directorial`, `heist_directorial`, `courtroom_directorial`
 
 ### CYCLICAL Mode: Prophecy and Time Loops
 
 **Architecture** (February 2026): Full strategy implementation in `workflows/cyclical_strategy.py` with:
 
-**Cycle Semantics Interpretation** — LLM determines what "cyclical" means for each scenario:
+**The Core Insight**: "Cyclical time" means different things in different contexts. A time loop is structurally different from generational repetition, which is different from economic oscillation. Rather than hardcoding one interpretation, the system asks the LLM to interpret what "cyclical" means for *this specific scenario*, then enforces that interpretation consistently.
 
-| Cycle Type | Behavior | Example |
-|------------|----------|---------|
-| `repeating` | Same events with minor variations | Groundhog Day loops |
-| `spiral` | Same structure, escalating stakes | Generational dynasties |
-| `causal_loop` | Cycle N causes conditions of cycle M | Bootstrap paradoxes |
-| `oscillating` | Alternating between two poles | Boom/bust economics |
-| `composite` | LLM-directed combination | Mixed patterns |
+**Cycle Semantics Interpretation** — The key innovation: cycle type is *discovered*, not prescribed:
 
-**Prophecy System**:
-- `_generate_prophecy()` — Creates prophecies at cycle boundaries
-- `_check_prophecy_fulfillment()` — LLM rates fulfillment confidence
-- `_resolve_prophecies()` — Tracks fulfillment rates across paths
+| Cycle Type | Variation Mode | What Repeats | What Changes | Example |
+|------------|---------------|--------------|--------------|---------|
+| `repeating` | Mutation | Events, structure | Details, awareness | Groundhog Day—same day, growing protagonist knowledge |
+| `spiral` | Amplification | Structural beats | Stakes, intensity | Dynasty saga—each generation faces same conflict, higher consequences |
+| `causal_loop` | Retroactive | Causal structure | Nothing (bootstrap) | Predestination—event causes its own preconditions |
+| `oscillating` | Inversion | Poles | Magnitude, timing | Boom/bust—expansion then contraction, but when and how hard varies |
+| `composite` | Mixed | LLM-directed | LLM-directed | Complex patterns combining multiple cycle types |
 
-**Causal Loop System**:
-- `_detect_causal_loop_opportunity()` — Identifies potential loop closures
-- `_enforce_causal_loop()` — Rewrites states to close loops
-- `_resolve_causal_loops()` — Verifies all loops are closed
+The system generates a `CycleSemantics` object that includes: cycle_type, variation_mode, escalation_rule, prophecy_mechanism, key_recurring_elements, and variation_seeds. All subsequent generation respects these semantics.
 
-**Fidelity Allocation**:
-- Prophecy states → TRAINED
-- Cycle boundaries → DIALOG
-- Mid-cycle → SCENE
+**Prophecy System** — Not just predictions, but narrative engines:
+
+Prophecies in CYCLICAL mode aren't decorative—they're structural. A prophecy creates *narrative obligation*: either fulfill it (destiny) or subvert it (tragedy/comedy). The system tracks:
+
+- **prophecy_accuracy** (0.0-1.0): How often prophecies come true
+- **fulfillment_confidence**: LLM-rated confidence that a prophecy was fulfilled
+- **prophecy_source_cycle**: Which cycle generated the prophecy (enables "ancient prophecies")
+
+Prophecy mechanisms vary by scenario: witches' riddles (Macbeth), deja vu sensations (time loop), analyst forecasts (economics), ancestral curses (dynasty).
+
+**Causal Loop System** — For bootstrap paradoxes and self-causing events:
+
+Some cyclical narratives require events that cause themselves. The causal loop system:
+1. Detects opportunities for loop closure ("this event could be what caused X in cycle 1")
+2. Enforces closure by rewriting states to create explicit causal links
+3. Validates that all opened loops eventually close
+
+This enables legitimate bootstrap paradoxes where effect precedes cause—but only within the CYCLICAL mode's relaxed causality constraints.
+
+**Fidelity as Cycle-Awareness**: Resources concentrate at cycle boundaries where repetition becomes visible:
+
+| Position | Fidelity | Why |
+|----------|----------|-----|
+| Cycle boundaries | DIALOG | The "seam" where patterns become visible |
+| Prophecy moments | TRAINED | High-stakes narrative pivots |
+| Mid-cycle events | SCENE | The repeating "texture" |
+| Variation points | DIALOG | Where this cycle diverges from archetype |
 
 ```python
 config = TemporalConfig(
@@ -353,6 +388,13 @@ config = TemporalConfig(
     prophecy_accuracy=0.7,
 )
 ```
+
+**Affordances**:
+- Time loop narratives with protagonist evolution across resets
+- Generational sagas where patterns echo but escalate
+- Economic/ecological cycles with feedback and self-fulfilling prophecy
+- Mythic/religious narratives with destiny and fate
+- Training data for temporal reasoning about non-linear causality
 
 **Templates**: `groundhog_loop_cyclical`, `dynasty_cycles_cyclical`, `seasons_market_cyclical`
 

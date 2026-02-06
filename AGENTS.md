@@ -1,6 +1,16 @@
 # Project Configuration (AI Agent Reference)
 
 ## Philosophy
+
+**Core Insight**: Temporal simulation isn't one problem—it's at least five different problems depending on what "time" means. This codebase treats temporal mode as a first-class architectural dimension.
+
+**Design Principles**:
+- **Fidelity follows attention**: Resolution is heterogeneous and query-driven. Most entities stay at TENSOR_ONLY (~200 tokens). Detail concentrates where queries land.
+- **Knowledge has provenance**: Entities can't magically know things. Every fact has a tracked exposure event (who learned what, from whom, when).
+- **Modes change semantics**: PEARL mode forbids anachronisms. CYCLICAL mode permits bootstrap paradoxes. DIRECTORIAL mode allows dramatic coincidences. Each mode has its own validation rules.
+- **Templates are patches**: Like a synthesizer, scenarios are saved configurations. JSON templates capture reproducible "sounds" (scenario shapes).
+
+**Code Philosophy**:
 - Pythonic: type hints, dataclasses, protocols
 - SQLite persistence (metadata/runs.db for runs, timepoint.db for temp), FastAPI backend
 - TDD: pytest with mechanism markers (M1-M19)
@@ -15,6 +25,20 @@ Python 3.10+, FastAPI, Pydantic, pytest, ruff, mypy
 - Line length: 100
 - Logging not print
 - Use `TemplateLoader` for template access (not deprecated `SimulationConfig.example_*()`)
+
+## Temporal Mode Architecture
+
+Each mode has a dedicated strategy class in `workflows/`:
+
+| Mode | Strategy Class | Key Affordance |
+|------|---------------|----------------|
+| PEARL | (default forward) | Strict causality, knowledge provenance |
+| PORTAL | `PortalStrategy` | Backward inference, pivot detection |
+| BRANCHING | `BranchingStrategy` | Counterfactual timelines |
+| DIRECTORIAL | `DirectorialStrategy` | Five-act arcs, camera system, dramatic irony |
+| CYCLICAL | `CyclicalStrategy` | Prophecy system, causal loops, cycle semantics |
+
+Strategies share a common interface: `run(config) -> List[Path]`. Each path contains states with mode-specific metadata (tension scores for DIRECTORIAL, cycle positions for CYCLICAL, etc.).
 
 ## Key Commands
 ```bash
