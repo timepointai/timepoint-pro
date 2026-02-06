@@ -47,7 +47,7 @@ Each mode has its own validation rules, fidelity allocation strategy, and genera
 - **Data quality validation** — Validates entity references, empty entities_present detection
 
 **Output:**
-- **47+ simulation templates** — Including 6 new directorial/cyclical showcase templates
+- **13 verified simulation templates** — Showcase and convergence categories
 - **Narrative exports** — Markdown, JSON, PDF generation
 - **API backend** — FastAPI REST API
 
@@ -463,8 +463,8 @@ Broad accessibility and ecosystem.
 | Fidelity template scaling | **COMPLETE** | `temporal_agent.py:_apply_fidelity_template()` |
 | Directorial mode strategy | **COMPLETE** | `workflows/directorial_strategy.py` (~800 lines), arc engine, camera system |
 | Cyclical mode strategy | **COMPLETE** | `workflows/cyclical_strategy.py` (~900 lines), prophecy system, causal loops |
-| Directorial templates | **COMPLETE** | `macbeth_directorial`, `heist_directorial`, `courtroom_directorial` |
-| Cyclical templates | **COMPLETE** | `groundhog_loop_cyclical`, `dynasty_cycles_cyclical`, `seasons_market_cyclical` |
+| Directorial templates | **COMPLETE** | `hound_shadow_directorial` (verified); macbeth/heist/courtroom removed as pending |
+| Cyclical templates | **REMOVED** | Pending templates removed; mode strategies remain implemented |
 | Portal scoring stubs | **COMPLETE** | 5 methods now use real LLM-based evaluation |
 | NONLINEAR mode removal | **COMPLETE** | Removed from codebase, now 5 modes |
 

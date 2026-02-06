@@ -68,7 +68,7 @@ export OPENROUTER_API_KEY=your_key_here
 # See it work
 ./run.sh quick                    # Quick-tier templates (~$0.15)
 ./run.sh run board_meeting        # Single scenario
-./run.sh list                     # List all 41 templates
+./run.sh list                     # List all 13 verified templates
 ```
 
 ---
@@ -78,8 +78,8 @@ export OPENROUTER_API_KEY=your_key_here
 The flagship feature. Given a future endpoint, discover plausible paths from the present.
 
 ```bash
-./run.sh run portal_startup_unicorn --portal-quick   # Fast demo (~15 min)
-./run.sh run presidential_election --portal-simjudged
+./run.sh run hound_shadow_directorial   # Directorial mode with M17
+./run.sh run vc_pitch_branching         # Counterfactual branching
 ```
 
 **How it works:**
@@ -124,10 +124,10 @@ Time isn't one thing. Timepoint supports five distinct temporal ontologies, each
 | Mode | Description | Use When | Example Template |
 |------|-------------|----------|------------------|
 | **PEARL** | Standard causal DAG—causes precede effects | Default forward simulation | `board_meeting` |
-| **PORTAL** | Backward from endpoints to present | Strategic planning, path discovery | `portal_startup_unicorn` |
-| **BRANCHING** | Counterfactual timelines from decision points | "What if" analysis | `final_problem_branching` |
-| **CYCLICAL** | Prophetic/mythic time, future constrains past | Time loops, generational sagas | `groundhog_loop_cyclical` |
-| **DIRECTORIAL** | Five-act narrative with tension arcs | Story-driven simulations | `macbeth_directorial` |
+| **PORTAL** | Backward from endpoints to present | Strategic planning, path discovery | (no verified templates) |
+| **BRANCHING** | Counterfactual timelines from decision points | "What if" analysis | `vc_pitch_branching` |
+| **CYCLICAL** | Prophetic/mythic time, future constrains past | Time loops, generational sagas | (no verified templates) |
+| **DIRECTORIAL** | Five-act narrative with tension arcs | Story-driven simulations | `hound_shadow_directorial` |
 
 **Why modes matter**: Each mode changes what "consistency" means:
 - In PEARL, knowledge must flow forward—no anachronisms allowed

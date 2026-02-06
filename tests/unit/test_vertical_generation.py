@@ -17,6 +17,9 @@ from generation.temporal_expansion import (
     CausalChainExpansion
 )
 from generation.config_schema import SimulationConfig
+from generation.templates.loader import TemplateLoader
+
+_loader = TemplateLoader()
 
 
 class TestTemporalExpansionStrategies:
@@ -25,7 +28,7 @@ class TestTemporalExpansionStrategies:
     def test_narrative_arc_expansion_before(self):
         """Test narrative arc expansion before critical moment"""
         strategy = NarrativeArcExpansion()
-        base_config = SimulationConfig.example_board_meeting().to_dict()
+        base_config = _loader.load_template("showcase/board_meeting").to_dict()
 
         expanded = strategy.expand(base_config, "before", 5)
 
@@ -36,7 +39,7 @@ class TestTemporalExpansionStrategies:
     def test_narrative_arc_expansion_after(self):
         """Test narrative arc expansion after critical moment"""
         strategy = NarrativeArcExpansion()
-        base_config = SimulationConfig.example_board_meeting().to_dict()
+        base_config = _loader.load_template("showcase/board_meeting").to_dict()
 
         expanded = strategy.expand(base_config, "after", 3)
 
@@ -46,7 +49,7 @@ class TestTemporalExpansionStrategies:
     def test_narrative_arc_expansion_around(self):
         """Test narrative arc expansion in both directions"""
         strategy = NarrativeArcExpansion()
-        base_config = SimulationConfig.example_board_meeting().to_dict()
+        base_config = _loader.load_template("showcase/board_meeting").to_dict()
 
         expanded = strategy.expand(base_config, "around", 10)
 
@@ -57,7 +60,7 @@ class TestTemporalExpansionStrategies:
     def test_progressive_training_expansion_before(self):
         """Test progressive training expansion before"""
         strategy = ProgressiveTrainingExpansion(peak_resolution="full_detail")
-        base_config = SimulationConfig.example_board_meeting().to_dict()
+        base_config = _loader.load_template("showcase/board_meeting").to_dict()
 
         expanded = strategy.expand(base_config, "before", 5)
 
@@ -72,7 +75,7 @@ class TestTemporalExpansionStrategies:
     def test_progressive_training_expansion_after(self):
         """Test progressive training expansion after"""
         strategy = ProgressiveTrainingExpansion(peak_resolution="full_detail")
-        base_config = SimulationConfig.example_board_meeting().to_dict()
+        base_config = _loader.load_template("showcase/board_meeting").to_dict()
 
         expanded = strategy.expand(base_config, "after", 5)
 
@@ -86,7 +89,7 @@ class TestTemporalExpansionStrategies:
     def test_progressive_training_expansion_around(self):
         """Test progressive training in both directions"""
         strategy = ProgressiveTrainingExpansion()
-        base_config = SimulationConfig.example_board_meeting().to_dict()
+        base_config = _loader.load_template("showcase/board_meeting").to_dict()
 
         expanded = strategy.expand(base_config, "around", 10)
 
@@ -96,7 +99,7 @@ class TestTemporalExpansionStrategies:
     def test_causal_chain_expansion_before(self):
         """Test causal chain expansion before"""
         strategy = CausalChainExpansion()
-        base_config = SimulationConfig.example_board_meeting().to_dict()
+        base_config = _loader.load_template("showcase/board_meeting").to_dict()
 
         expanded = strategy.expand(base_config, "before", 5)
 
@@ -108,7 +111,7 @@ class TestTemporalExpansionStrategies:
     def test_causal_chain_expansion_after(self):
         """Test causal chain expansion after"""
         strategy = CausalChainExpansion()
-        base_config = SimulationConfig.example_board_meeting().to_dict()
+        base_config = _loader.load_template("showcase/board_meeting").to_dict()
 
         expanded = strategy.expand(base_config, "after", 3)
 
@@ -122,7 +125,7 @@ class TestTemporalExpander:
     def test_expander_basic(self):
         """Test basic temporal expansion"""
         expander = TemporalExpander()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         expanded = expander.expand_temporal_depth(
             base_config,
@@ -137,7 +140,7 @@ class TestTemporalExpander:
     def test_expander_before_only(self):
         """Test expansion before only"""
         expander = TemporalExpander()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         expanded = expander.expand_before(base_config, count=5)
 
@@ -147,7 +150,7 @@ class TestTemporalExpander:
     def test_expander_after_only(self):
         """Test expansion after only"""
         expander = TemporalExpander()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         expanded = expander.expand_after(base_config, count=4)
 
@@ -157,7 +160,7 @@ class TestTemporalExpander:
     def test_expander_around(self):
         """Test expansion in both directions"""
         expander = TemporalExpander()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         expanded = expander.expand_around(base_config, before_count=3, after_count=2)
 
@@ -167,7 +170,7 @@ class TestTemporalExpander:
     def test_expander_no_expansion(self):
         """Test that no expansion returns unchanged config"""
         expander = TemporalExpander()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         expanded = expander.expand_temporal_depth(
             base_config,
@@ -181,7 +184,7 @@ class TestTemporalExpander:
     def test_expander_invalid_strategy(self):
         """Test expander with invalid strategy"""
         expander = TemporalExpander()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         with pytest.raises(ValueError, match="Unknown strategy"):
             expander.expand_temporal_depth(
@@ -207,7 +210,7 @@ class TestVerticalGenerator:
     def test_generator_basic(self):
         """Test basic vertical generation"""
         generator = VerticalGenerator()
-        base_config = SimulationConfig.example_jefferson_dinner()
+        base_config = _loader.load_template("showcase/jefferson_dinner")
 
         expanded = generator.generate_temporal_depth(
             base_config,
@@ -223,7 +226,7 @@ class TestVerticalGenerator:
     def test_generator_before_only(self):
         """Test generating before timepoints only"""
         generator = VerticalGenerator()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         expanded = generator.generate_before(base_config, count=5)
 
@@ -233,7 +236,7 @@ class TestVerticalGenerator:
     def test_generator_after_only(self):
         """Test generating after timepoints only"""
         generator = VerticalGenerator()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         expanded = generator.generate_after(base_config, count=4)
 
@@ -243,7 +246,7 @@ class TestVerticalGenerator:
     def test_generator_around(self):
         """Test generating in both directions"""
         generator = VerticalGenerator()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         expanded = generator.generate_around(base_config, before_count=3, after_count=2)
 
@@ -253,7 +256,7 @@ class TestVerticalGenerator:
     def test_generator_stats(self):
         """Test generation statistics"""
         generator = VerticalGenerator()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         generator.generate_temporal_depth(
             base_config,
@@ -270,7 +273,7 @@ class TestVerticalGenerator:
     def test_generator_cost_savings_estimation(self):
         """Test cost savings estimation"""
         generator = VerticalGenerator()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         generator.generate_temporal_depth(
             base_config,
@@ -286,7 +289,7 @@ class TestVerticalGenerator:
     def test_generator_negative_counts(self):
         """Test that negative counts raise error"""
         generator = VerticalGenerator()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         with pytest.raises(ValueError, match="non-negative"):
             generator.generate_temporal_depth(base_config, before_count=-1)
@@ -294,7 +297,7 @@ class TestVerticalGenerator:
     def test_generator_validate_causal_chain(self):
         """Test causal chain validation"""
         generator = VerticalGenerator()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         # Expand with causal chain strategy
         expanded = generator.generate_temporal_depth(
@@ -313,7 +316,7 @@ class TestVerticalGenerator:
     def test_generator_analyze_resolution_schedule(self):
         """Test resolution schedule analysis"""
         generator = VerticalGenerator()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         expanded = generator.generate_temporal_depth(
             base_config,
@@ -332,7 +335,7 @@ class TestVerticalGenerator:
     def test_generator_compare_strategies(self):
         """Test strategy comparison"""
         generator = VerticalGenerator()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         comparison = generator.compare_strategies(
             base_config,
@@ -352,7 +355,7 @@ class TestVerticalGenerator:
     def test_generator_export_temporal_structure(self):
         """Test exporting temporal structure"""
         generator = VerticalGenerator()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         expanded = generator.generate_temporal_depth(
             base_config,
@@ -385,7 +388,7 @@ class TestVerticalGenerationIntegration:
     def test_full_vertical_expansion(self):
         """Test complete vertical expansion workflow"""
         generator = VerticalGenerator()
-        base_config = SimulationConfig.example_jefferson_dinner()
+        base_config = _loader.load_template("showcase/jefferson_dinner")
 
         # Expand with progressive training
         expanded = generator.generate_temporal_depth(
@@ -414,7 +417,7 @@ class TestVerticalGenerationIntegration:
     def test_multiple_expansion_strategies(self):
         """Test using different expansion strategies"""
         generator = VerticalGenerator()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         strategies = ["narrative_arc", "progressive_training", "causal_chain"]
 
@@ -433,7 +436,7 @@ class TestVerticalGenerationIntegration:
     def test_deep_temporal_expansion(self):
         """Test deep temporal expansion (many timepoints)"""
         generator = VerticalGenerator()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         expanded = generator.generate_temporal_depth(
             base_config,

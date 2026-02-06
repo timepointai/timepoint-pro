@@ -250,7 +250,7 @@ Key divergence points: [4, 5]
 **Quick Mode**: `--portal-quick` reduces `backward_steps` from default (often 24) to 5 for fast demos (~15 min vs 1+ hour). Ideal for testing and demonstrations.
 
 ```bash
-./run.sh run portal_startup_unicorn --portal-quick  # Fast 5-step demo
+./run.sh run hound_shadow_directorial  # Directorial mode with M17
 ```
 
 **Pivot Point Detection** (January 2026 fix): The original `_detect_pivot_points()` function checked `children_states` which was never populated during backward simulation, causing zero pivot points to be detected. Fixed with multi-strategy detection:
@@ -333,7 +333,7 @@ config = TemporalConfig(
 - Multiple timeline interleaving for complex narrative structures
 - Natural training data for story-aware language models
 
-**Templates**: `macbeth_directorial`, `heist_directorial`, `courtroom_directorial`
+**Templates**: `hound_shadow_directorial`
 
 ### CYCLICAL Mode: Prophecy and Time Loops
 
@@ -396,7 +396,7 @@ config = TemporalConfig(
 - Mythic/religious narratives with destiny and fate
 - Training data for temporal reasoning about non-linear causality
 
-**Templates**: `groundhog_loop_cyclical`, `dynasty_cycles_cyclical`, `seasons_market_cyclical`
+**Templates**: (no verified cyclical templates currently)
 
 ## M7: Causal Temporal Chains
 

@@ -18,7 +18,18 @@ from generation.variation_strategies import (
     OutcomeVariation,
     StartingConditionVariation
 )
-from generation.config_schema import SimulationConfig
+from generation.config_schema import (
+    SimulationConfig,
+    EntityConfig,
+    CompanyConfig,
+    TemporalConfig,
+    TemporalMode,
+    OutputConfig,
+    VariationConfig,
+)
+from generation.templates.loader import TemplateLoader
+
+_loader = TemplateLoader()
 
 
 class TestVariationStrategies:
@@ -27,7 +38,7 @@ class TestVariationStrategies:
     def test_personality_variation(self):
         """Test personality trait variation"""
         strategy = PersonalityVariation(magnitude=0.3)
-        base_config = SimulationConfig.example_board_meeting().to_dict()
+        base_config = _loader.load_template("showcase/board_meeting").to_dict()
 
         variation = strategy.apply(base_config, variation_index=0)
 
@@ -46,7 +57,7 @@ class TestVariationStrategies:
     def test_knowledge_variation(self):
         """Test knowledge distribution variation"""
         strategy = KnowledgeVariation(knowledge_pool_size=10)
-        base_config = SimulationConfig.example_board_meeting().to_dict()
+        base_config = _loader.load_template("showcase/board_meeting").to_dict()
 
         variation = strategy.apply(base_config, variation_index=1)
 
@@ -61,7 +72,7 @@ class TestVariationStrategies:
     def test_relationship_variation(self):
         """Test relationship state variation"""
         strategy = RelationshipVariation(magnitude=0.4)
-        base_config = SimulationConfig.example_board_meeting().to_dict()
+        base_config = _loader.load_template("showcase/board_meeting").to_dict()
 
         variation = strategy.apply(base_config, variation_index=2)
 
@@ -78,7 +89,7 @@ class TestVariationStrategies:
     def test_outcome_variation(self):
         """Test decision parameter variation"""
         strategy = OutcomeVariation(magnitude=0.3)
-        base_config = SimulationConfig.example_board_meeting().to_dict()
+        base_config = _loader.load_template("showcase/board_meeting").to_dict()
 
         variation = strategy.apply(base_config, variation_index=3)
 
@@ -95,7 +106,7 @@ class TestVariationStrategies:
     def test_starting_condition_variation(self):
         """Test starting state variation"""
         strategy = StartingConditionVariation(magnitude=0.25)
-        base_config = SimulationConfig.example_board_meeting().to_dict()
+        base_config = _loader.load_template("showcase/board_meeting").to_dict()
 
         variation = strategy.apply(base_config, variation_index=4)
 
@@ -145,7 +156,7 @@ class TestVariationStrategies:
     def test_variation_reproducibility(self):
         """Test that same seed produces same variation"""
         strategy = PersonalityVariation()
-        base_config = SimulationConfig.example_board_meeting().to_dict()
+        base_config = _loader.load_template("showcase/board_meeting").to_dict()
 
         var1 = strategy.apply(base_config, variation_index=0, random_seed=42)
         var2 = strategy.apply(base_config, variation_index=0, random_seed=42)
@@ -156,7 +167,7 @@ class TestVariationStrategies:
     def test_variation_diversity(self):
         """Test that different indices produce different variations"""
         strategy = PersonalityVariation()
-        base_config = SimulationConfig.example_board_meeting().to_dict()
+        base_config = _loader.load_template("showcase/board_meeting").to_dict()
 
         var1 = strategy.apply(base_config, variation_index=0, random_seed=42)
         var2 = strategy.apply(base_config, variation_index=1, random_seed=42)
@@ -172,7 +183,7 @@ class TestVariationDeduplicator:
         """Test basic deduplication"""
         dedup = VariationDeduplicator()
 
-        config = SimulationConfig.example_board_meeting().to_dict()
+        config = _loader.load_template("showcase/board_meeting").to_dict()
         config["metadata"] = {"variation_index": 0}
 
         # First time: not a duplicate
@@ -188,10 +199,10 @@ class TestVariationDeduplicator:
         """Test that different variations are not duplicates"""
         dedup = VariationDeduplicator()
 
-        config1 = SimulationConfig.example_board_meeting().to_dict()
+        config1 = _loader.load_template("showcase/board_meeting").to_dict()
         config1["metadata"] = {"variation_index": 0, "variation_strategy": "personality"}
 
-        config2 = SimulationConfig.example_board_meeting().to_dict()
+        config2 = _loader.load_template("showcase/board_meeting").to_dict()
         config2["metadata"] = {"variation_index": 1, "variation_strategy": "personality"}
 
         dedup.register_variation(config1)
@@ -201,7 +212,7 @@ class TestVariationDeduplicator:
         """Test deduplicator reset"""
         dedup = VariationDeduplicator()
 
-        config = SimulationConfig.example_board_meeting().to_dict()
+        config = _loader.load_template("showcase/board_meeting").to_dict()
         config["metadata"] = {"variation_index": 0}
 
         dedup.register_variation(config)
@@ -218,7 +229,7 @@ class TestHorizontalGenerator:
     def test_generator_basic(self):
         """Test basic variation generation"""
         generator = HorizontalGenerator()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         variations = generator.generate_variations(
             base_config=base_config,
@@ -233,7 +244,7 @@ class TestHorizontalGenerator:
     def test_generator_multiple_strategies(self):
         """Test generation with multiple strategies"""
         generator = HorizontalGenerator()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         variations = generator.generate_variations(
             base_config=base_config,
@@ -246,7 +257,7 @@ class TestHorizontalGenerator:
     def test_generator_sequential(self):
         """Test sequential generation"""
         generator = HorizontalGenerator()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         variations = generator.generate_variations(
             base_config=base_config,
@@ -260,7 +271,7 @@ class TestHorizontalGenerator:
     def test_generator_parallel(self):
         """Test parallel generation"""
         generator = HorizontalGenerator()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         variations = generator.generate_variations(
             base_config=base_config,
@@ -275,7 +286,7 @@ class TestHorizontalGenerator:
     def test_generator_stats(self):
         """Test generation statistics"""
         generator = HorizontalGenerator()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         generator.generate_variations(
             base_config=base_config,
@@ -292,7 +303,7 @@ class TestHorizontalGenerator:
     def test_generator_progress_callback(self):
         """Test progress callback"""
         generator = HorizontalGenerator()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         progress_updates = []
 
@@ -314,7 +325,7 @@ class TestHorizontalGenerator:
         generator1 = HorizontalGenerator()
         generator2 = HorizontalGenerator()
 
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         vars1 = generator1.generate_variations(
             base_config=base_config,
@@ -337,7 +348,7 @@ class TestHorizontalGenerator:
     def test_generator_quality_estimation(self):
         """Test variation quality estimation"""
         generator = HorizontalGenerator()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         variations = generator.generate_variations(
             base_config=base_config,
@@ -356,8 +367,8 @@ class TestHorizontalGenerator:
         generator = HorizontalGenerator()
 
         configs = [
-            SimulationConfig.example_board_meeting(),
-            SimulationConfig.example_jefferson_dinner()
+            _loader.load_template("showcase/board_meeting"),
+            _loader.load_template("showcase/jefferson_dinner")
         ]
 
         results = generator.batch_generate(
@@ -375,7 +386,7 @@ class TestHorizontalGenerator:
     def test_generator_export_json(self):
         """Test export to JSON format"""
         generator = HorizontalGenerator()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         variations = generator.generate_variations(
             base_config=base_config,
@@ -399,7 +410,7 @@ class TestHorizontalGenerator:
     def test_generator_export_jsonl(self):
         """Test export to JSONL format"""
         generator = HorizontalGenerator()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         variations = generator.generate_variations(
             base_config=base_config,
@@ -426,7 +437,7 @@ class TestHorizontalGenerator:
     def test_generator_invalid_strategy(self):
         """Test generator with invalid strategy"""
         generator = HorizontalGenerator()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         with pytest.raises(ValueError):
             generator.generate_variations(
@@ -438,7 +449,7 @@ class TestHorizontalGenerator:
     def test_generator_no_strategies(self):
         """Test generator with no strategies"""
         generator = HorizontalGenerator()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         with pytest.raises(ValueError, match="Must provide at least one"):
             generator.generate_variations(
@@ -450,7 +461,7 @@ class TestHorizontalGenerator:
     def test_generator_invalid_count(self):
         """Test generator with invalid count"""
         generator = HorizontalGenerator()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         with pytest.raises(ValueError, match="Count must be at least 1"):
             generator.generate_variations(
@@ -467,7 +478,22 @@ class TestHorizontalGenerationIntegration:
     def test_full_generation_workflow(self):
         """Test complete generation workflow"""
         generator = HorizontalGenerator()
-        base_config = SimulationConfig.example_variations()
+        base_config = SimulationConfig(
+            scenario_description="Generate variations of a negotiation scenario",
+            world_id="negotiation_variations",
+            entities=EntityConfig(count=4, types=["human"]),
+            timepoints=CompanyConfig(count=2, resolution="hour"),
+            temporal=TemporalConfig(mode=TemporalMode.PEARL),
+            outputs=OutputConfig(
+                formats=["jsonl"],
+                export_ml_dataset=True
+            ),
+            variations=VariationConfig(
+                enabled=True,
+                count=100,
+                strategies=["vary_personalities", "vary_outcomes"]
+            )
+        )
 
         # Generate variations
         variations = generator.generate_variations(
@@ -490,7 +516,7 @@ class TestHorizontalGenerationIntegration:
     def test_large_batch_generation(self):
         """Test generating large batch of variations"""
         generator = HorizontalGenerator()
-        base_config = SimulationConfig.example_board_meeting()
+        base_config = _loader.load_template("showcase/board_meeting")
 
         variations = generator.generate_variations(
             base_config=base_config,
