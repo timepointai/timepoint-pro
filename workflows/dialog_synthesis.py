@@ -166,21 +166,21 @@ def _analyze_dialog_emotional_impact(
             if kw in content_lower:
                 valence_delta -= 0.02
 
-        # Arousal impact
+        # Arousal impact (symmetric: +0.03 high, -0.03 low)
         for kw in high_arousal_keywords:
             if kw in content_lower:
                 arousal_delta += 0.03
         for kw in low_arousal_keywords:
             if kw in content_lower:
-                arousal_delta -= 0.01
+                arousal_delta -= 0.03
 
     # Interaction dynamics: more turns = more engagement = higher arousal
-    interaction_factor = min(len(speaker_turns) / 10.0, 0.15)  # Cap at 0.15
+    interaction_factor = min(len(speaker_turns) / 10.0, 0.08)  # Cap at 0.08
     arousal_delta += interaction_factor
 
-    # Clamp deltas to reasonable ranges
+    # Clamp deltas to symmetric ranges
     valence_delta = max(-0.3, min(0.3, valence_delta))
-    arousal_delta = max(-0.2, min(0.3, arousal_delta))
+    arousal_delta = max(-0.25, min(0.25, arousal_delta))
 
     return {
         "valence_delta": valence_delta,
@@ -225,10 +225,21 @@ def _persist_emotional_state_updates(
         # Analyze dialog for emotional impact
         dialog_impact = _analyze_dialog_emotional_impact(dialog_turns, entity_id)
 
+        # Apply arousal decay toward baseline before adding new impact.
+        # Without decay, arousal only accumulates and saturates at 1.0
+        # within a few dialog rounds. Exponential relaxation toward baseline
+        # models natural stress recovery between interactions.
+        arousal_baseline = 0.3
+        arousal_decay_rate = 0.15  # 15% relaxation per dialog round
+        decayed_arousal = (
+            arousal_baseline
+            + (coupled.emotional_arousal - arousal_baseline) * (1 - arousal_decay_rate)
+        )
+
         # Compute new emotional values
         # Start from coupled cognitive (has body-mind coupling applied)
         new_valence = coupled.emotional_valence + dialog_impact["valence_delta"]
-        new_arousal = coupled.emotional_arousal + dialog_impact["arousal_delta"]
+        new_arousal = decayed_arousal + dialog_impact["arousal_delta"]
 
         # Clamp to valid ranges (-1 to 1 for valence, 0 to 1 for arousal)
         new_valence = max(-1.0, min(1.0, new_valence))
