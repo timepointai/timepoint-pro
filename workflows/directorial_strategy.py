@@ -360,7 +360,17 @@ Each act should have:
 - end_pct: End percentage of the narrative (0.0-1.0)
 - description: What happens in this act
 
-Return structured JSON matching the schema."""
+Each beat should be a SHORT STRING describing the moment, e.g.:
+  "Holmes discovers the cipher", "Villagers confront the hound"
+Do NOT use objects for beats — return a flat list of strings.
+
+Each character_arc should have these exact fields:
+- entity_id: The entity name from the ENTITIES list above (e.g. "{entity_names[0] if entity_names else 'protagonist'}")
+- arc_type: One of "protagonist", "antagonist", "supporting", "catalyst"
+- arc_description: A sentence describing this character's journey
+- key_moments: A list of strings naming key moments (e.g. ["introduction", "crisis", "resolution"])
+
+Return structured JSON matching this exact schema."""
 
         try:
             result = self.llm.generate_structured(
