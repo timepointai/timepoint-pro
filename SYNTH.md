@@ -87,6 +87,22 @@ Moog synthesizers succeeded because they made complex signal routing **tangible*
 - **Composable**: Small controls combine into complex behaviors
 - **Reversible**: Easy to undo, experiment, iterate
 
+### Why This Metaphor Works
+
+The synthesizer analogy isn't just aesthetic—it captures something structural about temporal simulation:
+
+1. **Time as a sequencer grid**: Timepoints are discrete steps, exactly like a 16-step sequencer. Each step has state, each transition has rules.
+
+2. **Entities as polyphonic voices**: Multiple entities running simultaneously, each with their own presence envelope, each contributing to the overall "mix" of the scene.
+
+3. **Resolution as gain staging**: Just as audio gain determines how loud a signal is in the mix, entity resolution determines how much computational attention they receive. A muted entity still exists—it just doesn't dominate the output.
+
+4. **Templates as patches**: A patch on a Moog is a saved configuration of knobs and cables. Our JSON templates are exactly this—reproducible configurations that capture a specific "sound" (scenario shape).
+
+5. **Temporal modes as synthesis algorithms**: FM, subtractive, additive, granular—each synthesis method produces characteristically different sounds from the same oscillator. Similarly, PEARL, DIRECTORIAL, CYCLICAL produce characteristically different narratives from the same entities.
+
+The metaphor helps users who already understand sound synthesis apply that intuition to temporal simulation. It also provides a vocabulary for discussing otherwise-abstract concepts: "What's the attack on Jefferson's presence?" is more graspable than "What's the entity introduction latency coefficient?"
+
 ---
 
 ## Implementation Phases

@@ -140,13 +140,41 @@ Note: Free models have more restrictive rate limits and availability may rotate.
 
 ## Temporal Modes
 
-| Mode | Description | Use Case |
-|------|-------------|----------|
-| `pearl` | Standard causality, no time paradoxes | Default, most realistic |
-| `portal` | Backward reasoning from known outcomes | "How did we get here?" scenarios |
-| `directorial` | Narrative-focused with dramatic tension | Stories, character arcs |
-| `cyclical` | Allows prophecy and time loops | Sci-fi, mystical scenarios |
-| `branching` | Counterfactual what-if scenarios | Decision analysis, alternate history |
+Each mode changes what "time" means and how the simulation validates consistency:
+
+| Mode | Description | Use Case | Example Template |
+|------|-------------|----------|------------------|
+| `pearl` | Standard causality, no time paradoxes | Default, most realistic | `board_meeting` |
+| `portal` | Backward reasoning from known outcomes | "How did we get here?" scenarios | `portal_startup_unicorn` |
+| `directorial` | Narrative-focused with dramatic tension | Stories, character arcs | `macbeth_directorial` |
+| `cyclical` | Allows prophecy and time loops | Sci-fi, mystical, generational | `groundhog_loop_cyclical` |
+| `branching` | Counterfactual what-if scenarios | Decision analysis, alternate history | `final_problem_branching` |
+
+### Choosing a Mode
+
+**Use PEARL when:** You want realistic forward simulation. Causes precede effects. Knowledge flows forward. No magic, no paradoxes. This is the default for business scenarios, historical reconstruction, training data generation.
+
+**Use PORTAL when:** You know the endpoint and want to discover paths there. "What decisions lead to a $1B exit?" "What events preceded this crisis?" Works backward from a fixed future, finding plausible routes from the present.
+
+**Use DIRECTORIAL when:** Story matters more than strict realism. The system will organize events into dramatic structure (setup → rising action → climax → falling action → resolution), allocate more detail to dramatic moments, and permit narrative coincidences that strict causality would forbid.
+
+**Use CYCLICAL when:** Time loops, generational patterns, or prophecy are structurally important. The system interprets what "cyclical" means for your scenario—Groundhog Day loops, dynasty sagas, economic boom-bust cycles. Prophecies become structural (must be fulfilled or subverted), not decorative.
+
+**Use BRANCHING when:** You want parallel "what if" timelines. A single decision point spawns multiple futures, each internally consistent but diverging from the branch point. Good for strategy analysis and counterfactual reasoning.
+
+### Mode-Specific Templates
+
+```bash
+# Directorial templates (narrative structure)
+./run.sh run macbeth_directorial      # Classical tragedy, 5-act structure
+./run.sh run heist_directorial        # Ensemble thriller, parallel timelines
+./run.sh run courtroom_directorial    # Legal drama, dual POV
+
+# Cyclical templates (prophecy and loops)
+./run.sh run groundhog_loop_cyclical  # Time loop, deja vu mechanism
+./run.sh run dynasty_cycles_cyclical  # Generational saga, spiral escalation
+./run.sh run seasons_market_cyclical  # Economic oscillation, analyst prophecy
+```
 
 ## Advanced Options
 

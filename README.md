@@ -119,7 +119,7 @@ PORTAL doesn't predict the future—it maps the decision landscape backward:
 
 ## Temporal Modes
 
-Time isn't one thing. Timepoint supports five distinct temporal ontologies:
+Time isn't one thing. Timepoint supports five distinct temporal ontologies, each with its own notion of causality, validation rules, and fidelity allocation strategy:
 
 | Mode | Description | Use When | Example Template |
 |------|-------------|----------|------------------|
@@ -129,7 +129,16 @@ Time isn't one thing. Timepoint supports five distinct temporal ontologies:
 | **CYCLICAL** | Prophetic/mythic time, future constrains past | Time loops, generational sagas | `groundhog_loop_cyclical` |
 | **DIRECTORIAL** | Five-act narrative with tension arcs | Story-driven simulations | `macbeth_directorial` |
 
-Each mode has a dedicated strategy implementation with mode-specific fidelity allocation. See MECHANICS.md for details.
+**Why modes matter**: Each mode changes what "consistency" means:
+- In PEARL, knowledge must flow forward—no anachronisms allowed
+- In PORTAL, we work backward from a known future, so paths must converge
+- In BRANCHING, parallel timelines can diverge but each timeline is internally consistent
+- In CYCLICAL, events can cause their own preconditions—prophecies are structural, not decorative
+- In DIRECTORIAL, dramatic needs drive causality—coincidences are permitted if the story demands them
+
+**Fidelity follows mode semantics**: DIRECTORIAL concentrates tokens at climax moments. CYCLICAL allocates fidelity at cycle boundaries where patterns become visible. PORTAL invests heavily at pivot points where paths diverge.
+
+See [MECHANICS.md](MECHANICS.md) for full implementation details.
 
 ---
 
