@@ -18,7 +18,6 @@ class TemporalMode(str, Enum):
     """Different causal regimes for temporal reasoning"""
     PEARL = "pearl"  # Standard causality (no anachronisms, forward flow)
     DIRECTORIAL = "directorial"  # Narrative structure with dramatic tension
-    NONLINEAR = "nonlinear"  # Presentation ≠ causality (flashbacks, foreshadowing)
     BRANCHING = "branching"  # Many-worlds interpretation
     CYCLICAL = "cyclical"  # Time loops and prophecy
     PORTAL = "portal"  # Backward inference from fixed endpoint to origin
@@ -402,6 +401,7 @@ class Dialog(SQLModel, table=True):
     duration_seconds: Optional[int] = None
     information_transfer_count: int = Field(default=0)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    run_id: Optional[str] = Field(default=None, index=True)  # Link to simulation run for convergence (January 2026)
 
 
 # ============================================================================

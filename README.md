@@ -119,17 +119,17 @@ PORTAL doesn't predict the future—it maps the decision landscape backward:
 
 ## Temporal Modes
 
-Time isn't one thing. Timepoint supports distinct temporal ontologies:
+Time isn't one thing. Timepoint supports five distinct temporal ontologies:
 
-| Mode | Description | Use When |
-|------|-------------|----------|
-| **PEARL** | Standard causal DAG—causes precede effects | Default forward simulation |
-| **PORTAL** | Backward from endpoints to present | Strategic planning, path discovery |
-| **BRANCHING** | Counterfactual timelines from decision points | "What if" analysis |
-| **CYCLICAL** | Prophetic/mythic time, future constrains past | Narrative, ritual scenarios |
-| **DIRECTORIAL** | Flashbacks, foreshadowing, ellipsis | Story-driven simulations |
+| Mode | Description | Use When | Example Template |
+|------|-------------|----------|------------------|
+| **PEARL** | Standard causal DAG—causes precede effects | Default forward simulation | `board_meeting` |
+| **PORTAL** | Backward from endpoints to present | Strategic planning, path discovery | `portal_startup_unicorn` |
+| **BRANCHING** | Counterfactual timelines from decision points | "What if" analysis | `final_problem_branching` |
+| **CYCLICAL** | Prophetic/mythic time, future constrains past | Time loops, generational sagas | `groundhog_loop_cyclical` |
+| **DIRECTORIAL** | Five-act narrative with tension arcs | Story-driven simulations | `macbeth_directorial` |
 
-Each mode changes what "temporal consistency" means and how validators operate.
+Each mode has a dedicated strategy implementation with mode-specific fidelity allocation. See MECHANICS.md for details.
 
 ---
 

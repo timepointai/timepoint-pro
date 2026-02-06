@@ -20,9 +20,13 @@ class ErrorType(str, Enum):
     INVALID_JSON = "invalid_json"
     API_ERROR = "api_error"
     NETWORK_ERROR = "network_error"
+    CONNECTION_RESET = "connection_reset"  # Connection dropped mid-request (January 2026)
+    DNS_ERROR = "dns_error"  # DNS resolution failed
+    SSL_ERROR = "ssl_error"  # TLS/SSL handshake or verification error
     VALIDATION_ERROR = "validation_error"
     INSUFFICIENT_CREDITS = "insufficient_credits"  # 402 error - non-retryable
     THINKING_BLOCKS_ERROR = "thinking_blocks"  # Anthropic extended thinking state error - non-retryable
+    SERVER_OVERLOAD = "server_overload"  # 503/502 server errors
     UNKNOWN = "unknown"
 
 
@@ -41,11 +45,17 @@ class RetryConfig:
             # NOT in this list - they are non-retryable errors:
             # - INSUFFICIENT_CREDITS: Payment/quota issue, retrying won't help
             # - THINKING_BLOCKS_ERROR: Anthropic session state issue, requires new session
+            # January 2026: Added CONNECTION_RESET, DNS_ERROR, SSL_ERROR, SERVER_OVERLOAD
             self.retry_on_types = [
                 ErrorType.RATE_LIMIT,
                 ErrorType.TIMEOUT,
                 ErrorType.NETWORK_ERROR,
+                ErrorType.CONNECTION_RESET,
+                ErrorType.DNS_ERROR,
+                ErrorType.SSL_ERROR,
+                ErrorType.SERVER_OVERLOAD,
                 ErrorType.INVALID_JSON,
+                ErrorType.API_ERROR,  # 500 errors are often transient
             ]
 
 
@@ -144,6 +154,9 @@ class ErrorHandler:
         """
         Classify error into category for appropriate handling.
 
+        January 2026: Enhanced with more specific connection error detection
+        for better retry decisions in long-running BRANCHING/PORTAL simulations.
+
         Args:
             error: Exception to classify
 
@@ -162,28 +175,54 @@ class ErrorHandler:
         if any(term in error_str for term in ['insufficient credits', '402', 'payment required']):
             return ErrorType.INSUFFICIENT_CREDITS
 
-        # Rate limiting
-        if any(term in error_str for term in ['rate limit', '429', 'too many requests']):
+        # Rate limiting - check first as it's most common in high-throughput scenarios
+        if any(term in error_str for term in ['rate limit', '429', 'too many requests', 'throttl']):
             return ErrorType.RATE_LIMIT
 
-        # Timeout
-        if any(term in error_str for term in ['timeout', 'timed out', 'deadline']):
+        # Server overload (502/503/504) - retryable with longer backoff
+        if any(term in error_str for term in ['502', '503', '504', 'bad gateway', 'service unavailable', 'gateway timeout', 'overload']):
+            return ErrorType.SERVER_OVERLOAD
+
+        # Connection reset - happens when connection drops mid-request (common in long LLM calls)
+        if any(term in error_str for term in ['connection reset', 'reset by peer', 'broken pipe', 'connection aborted', 'connection closed']):
+            return ErrorType.CONNECTION_RESET
+        if any(term in error_type_name for term in ['connectionreset', 'brokenpipe', 'connectionaborted']):
+            return ErrorType.CONNECTION_RESET
+
+        # DNS errors - network name resolution issues
+        if any(term in error_str for term in ['dns', 'name resolution', 'getaddrinfo', 'nodename', 'hostname']):
+            return ErrorType.DNS_ERROR
+
+        # SSL/TLS errors - certificate or handshake issues
+        if any(term in error_str for term in ['ssl', 'tls', 'certificate', 'handshake']):
+            return ErrorType.SSL_ERROR
+        if any(term in error_type_name for term in ['ssl', 'tls']):
+            return ErrorType.SSL_ERROR
+
+        # Timeout - various timeout scenarios
+        if any(term in error_str for term in ['timeout', 'timed out', 'deadline', 'read timeout', 'connect timeout']):
+            return ErrorType.TIMEOUT
+        if any(term in error_type_name for term in ['timeout', 'readtimeout', 'connecttimeout']):
             return ErrorType.TIMEOUT
 
-        # JSON parsing
+        # JSON parsing - response couldn't be parsed
         if any(term in error_type_name for term in ['json', 'parse', 'decode']):
             return ErrorType.INVALID_JSON
+        if any(term in error_str for term in ['json', 'expecting value', 'unterminated string']):
+            return ErrorType.INVALID_JSON
 
-        # Network errors
-        if any(term in error_type_name for term in ['connection', 'network', 'socket']):
+        # General network errors - catch-all for connection issues
+        if any(term in error_type_name for term in ['connection', 'network', 'socket', 'httpx', 'http']):
+            return ErrorType.NETWORK_ERROR
+        if any(term in error_str for term in ['connection', 'network', 'socket error', 'unreachable']):
             return ErrorType.NETWORK_ERROR
 
         # Validation errors
         if any(term in error_type_name for term in ['validation', 'schema']):
             return ErrorType.VALIDATION_ERROR
 
-        # API errors
-        if any(term in error_str for term in ['api error', '500', '502', '503']):
+        # API errors (500 class)
+        if any(term in error_str for term in ['api error', '500', 'internal server error', 'internal error']):
             return ErrorType.API_ERROR
 
         return ErrorType.UNKNOWN
@@ -191,6 +230,9 @@ class ErrorHandler:
     def _calculate_backoff(self, attempt: int, error_type: ErrorType) -> float:
         """
         Calculate backoff delay for retry attempt.
+
+        January 2026: Enhanced with error-type-specific backoff strategies
+        optimized for long-running BRANCHING/PORTAL simulations.
 
         Args:
             attempt: Attempt number (0-indexed)
@@ -204,17 +246,31 @@ class ErrorHandler:
 
         # Apply error-type-specific multipliers
         if error_type == ErrorType.RATE_LIMIT:
-            delay *= 2.0  # Longer backoff for rate limits
+            delay *= 2.5  # Longer backoff for rate limits - server needs time
+        elif error_type == ErrorType.SERVER_OVERLOAD:
+            delay *= 3.0  # Longest backoff for server overload (502/503)
+        elif error_type == ErrorType.CONNECTION_RESET:
+            delay *= 1.5  # Moderate backoff for connection resets
+        elif error_type == ErrorType.DNS_ERROR:
+            delay *= 2.0  # DNS issues may take time to resolve
+        elif error_type == ErrorType.SSL_ERROR:
+            delay *= 1.5  # SSL issues often transient
+        elif error_type == ErrorType.TIMEOUT:
+            delay *= 1.2  # Slight increase for timeouts
         elif error_type == ErrorType.INVALID_JSON:
-            delay *= 0.5  # Shorter backoff for JSON issues
+            delay *= 0.5  # Shorter backoff for JSON issues - retry quickly
+        elif error_type == ErrorType.API_ERROR:
+            delay *= 2.0  # 500 errors need moderate wait
+        # Network errors use base delay
 
         # Cap at max backoff
         delay = min(delay, self.config.max_backoff)
 
-        # Add jitter to avoid thundering herd
+        # Add jitter to avoid thundering herd (10-20% variation)
         import random
-        jitter = random.uniform(0, delay * 0.1)
-        delay += jitter
+        jitter_range = 0.1 + (0.1 * random.random())  # 10-20%
+        jitter = random.uniform(-delay * jitter_range, delay * jitter_range)
+        delay = max(0.5, delay + jitter)  # Ensure minimum 0.5s delay
 
         return delay
 

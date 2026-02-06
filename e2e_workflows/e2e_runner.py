@@ -414,6 +414,80 @@ class FullE2EWorkflowRunner:
             traceback.print_exc()
             return 0
 
+    def _persist_dialogs_for_convergence(self, scene_result: Dict, run_id: str) -> int:
+        """
+        Persist all dialogs from temp store to shared database for convergence.
+
+        January 2026: This copies dialogs from the temp DB to the shared DB so that
+        dialog quality can be tracked for convergence analysis.
+
+        IMPORTANT: Creates FRESH Dialog objects to avoid SQLAlchemy session
+        detachment issues when copying between temp DB and shared DB.
+
+        Args:
+            scene_result: Scene result containing the temp store
+            run_id: Current run identifier
+
+        Returns:
+            Number of dialogs persisted
+        """
+        from schemas import Dialog
+
+        temp_store = scene_result.get("store")
+        if not temp_store:
+            print("  ⚠️  No temp store available for dialog persistence")
+            return 0
+
+        try:
+            shared_store = self._get_shared_store()
+            dialogs_persisted = 0
+            dialogs_skipped = 0
+
+            # Get all dialogs from temp store
+            from sqlmodel import Session, select
+            with Session(temp_store.engine) as session:
+                all_dialogs = session.exec(select(Dialog)).all()
+
+                print(f"  📊 Found {len(all_dialogs)} dialogs in temp store")
+
+                for dialog in all_dialogs:
+                    try:
+                        # Create a FRESH Dialog copy to avoid session detachment issues
+                        fresh_dialog = Dialog(
+                            dialog_id=f"{run_id}_{dialog.dialog_id}",  # Prefix with run_id for uniqueness
+                            timepoint_id=dialog.timepoint_id,
+                            participants=dialog.participants,
+                            turns=dialog.turns,
+                            context_used=dialog.context_used,
+                            duration_seconds=dialog.duration_seconds,
+                            information_transfer_count=dialog.information_transfer_count,
+                            created_at=dialog.created_at,
+                            run_id=run_id  # Set run_id for convergence filtering
+                        )
+                        shared_store.save_dialog(fresh_dialog)
+                        dialogs_persisted += 1
+                    except Exception as e:
+                        # Skip duplicates or errors but log them
+                        dialogs_skipped += 1
+                        if dialogs_skipped <= 3:  # Only log first few
+                            print(f"    ⚠️  Skipped dialog: {e}")
+
+            if dialogs_persisted > 0:
+                print(f"  📊 Persisted {dialogs_persisted} dialogs for convergence")
+            else:
+                print(f"  ⚠️  No dialogs to persist (0 found in temp store)")
+
+            if dialogs_skipped > 0:
+                print(f"  ⚠️  Skipped {dialogs_skipped} dialogs (duplicates/errors)")
+
+            return dialogs_persisted
+
+        except Exception as e:
+            print(f"  ⚠️  Failed to persist dialogs for convergence: {e}")
+            import traceback
+            traceback.print_exc()
+            return 0
+
     def _persist_entity_for_convergence(self, entity: Entity, run_id: str) -> None:
         """
         Persist an entity to the shared database for convergence analysis.
@@ -592,6 +666,70 @@ class FullE2EWorkflowRunner:
 
         return results
 
+    def _populate_fallback_entities(
+        self,
+        timepoints: List[Timepoint],
+        entities: List[Entity]
+    ) -> int:
+        """
+        Populate empty entities_present with fallback entities.
+
+        January 2026 fix: When LLM-based entity inference fails (e.g., in BRANCHING
+        or PORTAL modes where antecedent descriptions may not explicitly mention
+        entity names), this method provides a fallback by assigning entities to
+        timepoints that have empty entities_present.
+
+        Strategy:
+        1. First try: use parent timepoint's entities (if causal_parent exists)
+        2. Fallback: use all human/character entities from the entity list
+        3. Last resort: use first 5 entities from the entity list
+
+        Args:
+            timepoints: List of timepoints to check and update
+            entities: List of available entities
+
+        Returns:
+            Number of timepoints that were populated with fallback entities
+        """
+        if not timepoints or not entities:
+            return 0
+
+        # Build lookup for parent timepoints
+        timepoint_map = {tp.timepoint_id: tp for tp in timepoints}
+
+        # Build fallback entity lists
+        human_entities = [
+            e.entity_id for e in entities
+            if e.entity_type in ('human', 'person', 'character')
+        ]
+        all_entity_ids = [e.entity_id for e in entities[:10]]  # Limit to 10
+
+        fallback_entities = human_entities if human_entities else all_entity_ids
+
+        populated_count = 0
+
+        for tp in timepoints:
+            if tp.entities_present and len(tp.entities_present) > 0:
+                continue  # Already has entities
+
+            # Strategy 1: Try parent timepoint's entities
+            if tp.causal_parent and tp.causal_parent in timepoint_map:
+                parent_tp = timepoint_map[tp.causal_parent]
+                if parent_tp.entities_present:
+                    tp.entities_present = parent_tp.entities_present.copy()
+                    populated_count += 1
+                    continue
+
+            # Strategy 2/3: Use fallback entities
+            if fallback_entities:
+                tp.entities_present = fallback_entities.copy()
+                populated_count += 1
+
+        if populated_count > 0:
+            print(f"  ℹ️  Populated {populated_count} timepoints with fallback entities")
+
+        return populated_count
+
     def run(self, config: SimulationConfig) -> RunMetadata:
         """
         Run complete E2E workflow.
@@ -670,7 +808,14 @@ class FullE2EWorkflowRunner:
                 # This must happen AFTER dialogs and queries which create exposure events
                 self._persist_exposure_events_for_convergence(scene_result, run_id)
 
-                # Step 4.8: Data quality validation
+                # Step 4.7b: Persist dialogs to shared DB for convergence analysis (January 2026)
+                self._persist_dialogs_for_convergence(scene_result, run_id)
+
+                # Step 4.8: Fallback entity population (January 2026 fix)
+                # Populate empty entities_present with available entities to prevent warnings
+                self._populate_fallback_entities(all_timepoints, trained_entities)
+
+                # Step 4.9: Data quality validation
                 # CRITICAL: Catches issues like empty entities_present that were previously silent
                 quality_results = self._run_data_quality_check(
                     all_timepoints, trained_entities, run_id
@@ -1262,6 +1407,112 @@ class FullE2EWorkflowRunner:
 
                 return all_timepoints
 
+            # MODE DETECTION: Check if branching simulation
+            if config.temporal.mode == TemporalMode.BRANCHING:
+                print(f"\n{'='*80}")
+                print(f"BRANCHING MODE DETECTED")
+                print(f"Running forward simulation with counterfactual branches")
+                print(f"Steps: {config.temporal.backward_steps}")  # BRANCHING uses backward_steps as step count
+                print(f"{'='*80}\n")
+
+                # Run branching simulation
+                branching_paths = temporal_agent.run_branching_simulation(config.temporal)
+
+                # Convert branching paths to timepoints
+                all_timepoints = self._convert_branching_paths_to_timepoints(
+                    branching_paths, initial_timepoint, store, run_id
+                )
+
+                # Store branching metadata for downstream processing
+                scene_result["branching_paths"] = branching_paths
+                scene_result["is_branching_mode"] = True
+
+                print(f"✓ Branching simulation complete:")
+                print(f"  - Paths generated: {len(branching_paths)}")
+                print(f"  - Timepoints created: {len(all_timepoints)}")
+                print(f"  - Best coherence: {branching_paths[0].coherence_score:.3f}" if branching_paths else "  - No paths")
+
+                self.logfire.info(
+                    "Branching temporal generation complete",
+                    timepoints=len(all_timepoints),
+                    paths=len(branching_paths),
+                    is_branching_mode=True
+                )
+
+                return all_timepoints
+
+            # MODE DETECTION: Check if directorial simulation
+            if config.temporal.mode == TemporalMode.DIRECTORIAL:
+                print(f"\n{'='*80}")
+                print(f"DIRECTORIAL MODE DETECTED")
+                print(f"Running narrative-driven simulation with dramatic arc")
+                print(f"Steps: {config.temporal.backward_steps}")
+                print(f"{'='*80}\n")
+
+                # Run directorial simulation
+                directorial_paths = temporal_agent.run_directorial_simulation(config.temporal)
+
+                # Convert directorial paths to timepoints
+                all_timepoints = self._convert_directorial_paths_to_timepoints(
+                    directorial_paths, initial_timepoint, store, run_id
+                )
+
+                # Store directorial metadata
+                scene_result["directorial_paths"] = directorial_paths
+                scene_result["is_directorial_mode"] = True
+
+                print(f"✓ Directorial simulation complete:")
+                print(f"  - Paths generated: {len(directorial_paths)}")
+                print(f"  - Timepoints created: {len(all_timepoints)}")
+                if directorial_paths:
+                    print(f"  - Best coherence: {directorial_paths[0].coherence_score:.3f}")
+                    print(f"  - Arc completion: {directorial_paths[0].arc_completion_score:.3f}")
+
+                self.logfire.info(
+                    "Directorial temporal generation complete",
+                    timepoints=len(all_timepoints),
+                    paths=len(directorial_paths),
+                    is_directorial_mode=True
+                )
+
+                return all_timepoints
+
+            # MODE DETECTION: Check if cyclical simulation
+            if config.temporal.mode == TemporalMode.CYCLICAL:
+                print(f"\n{'='*80}")
+                print(f"CYCLICAL MODE DETECTED")
+                print(f"Running cyclical simulation with prophecy tracking")
+                print(f"Cycle length: {getattr(config.temporal, 'cycle_length', 4)}")
+                print(f"{'='*80}\n")
+
+                # Run cyclical simulation
+                cyclical_paths = temporal_agent.run_cyclical_simulation(config.temporal)
+
+                # Convert cyclical paths to timepoints
+                all_timepoints = self._convert_cyclical_paths_to_timepoints(
+                    cyclical_paths, initial_timepoint, store, run_id
+                )
+
+                # Store cyclical metadata
+                scene_result["cyclical_paths"] = cyclical_paths
+                scene_result["is_cyclical_mode"] = True
+
+                print(f"✓ Cyclical simulation complete:")
+                print(f"  - Paths generated: {len(cyclical_paths)}")
+                print(f"  - Timepoints created: {len(all_timepoints)}")
+                if cyclical_paths:
+                    print(f"  - Best coherence: {cyclical_paths[0].coherence_score:.3f}")
+                    print(f"  - Prophecy fulfillment: {cyclical_paths[0].prophecy_fulfillment_rate:.2f}")
+
+                self.logfire.info(
+                    "Cyclical temporal generation complete",
+                    timepoints=len(all_timepoints),
+                    paths=len(cyclical_paths),
+                    is_cyclical_mode=True
+                )
+
+                return all_timepoints
+
             # FORWARD MODE: Original forward generation logic
             all_timepoints = [initial_timepoint]
             current_timepoint = initial_timepoint
@@ -1269,15 +1520,39 @@ class FullE2EWorkflowRunner:
             # CONVERGENCE FIX: Persist initial timepoint to shared DB
             self._persist_timepoint_for_convergence(initial_timepoint, run_id)
 
+            # January 2026: Extract directorial mode info for rich event descriptions
+            is_directorial = config.temporal.mode == TemporalMode.DIRECTORIAL
+            narrative_arc = getattr(config.temporal, 'narrative_arc', None)
+            dramatic_tension = getattr(config.temporal, 'dramatic_tension', 0.7)
+            scenario_desc = config.scenario_description
+            narrative_beats = config.metadata.get('narrative_beats', []) if config.metadata else []
+
             # Generate remaining timepoints
             target_count = config.timepoints.count
             for i in range(1, target_count):
                 print(f"  Generating timepoint {i+1}/{target_count}...")
 
                 try:
+                    # January 2026: Generate rich event descriptions for DIRECTORIAL mode
+                    context = {"iteration": i, "total": target_count}
+
+                    if is_directorial:
+                        event_desc = self._generate_directorial_event_description(
+                            llm=llm,
+                            iteration=i,
+                            total=target_count,
+                            scenario_desc=scenario_desc,
+                            narrative_arc=narrative_arc,
+                            narrative_beats=narrative_beats,
+                            dramatic_tension=dramatic_tension,
+                            previous_event=current_timepoint.event_description,
+                            entities=[e.entity_id for e in scene_result["entities"]]
+                        )
+                        context["next_event"] = event_desc
+
                     next_timepoint = temporal_agent.generate_next_timepoint(
                         current_timepoint,
-                        context={"iteration": i, "total": target_count}
+                        context=context
                     )
 
                     # Save to database (temp DB for workflow)
@@ -1302,6 +1577,142 @@ class FullE2EWorkflowRunner:
             )
 
             return all_timepoints
+
+    def _generate_directorial_event_description(
+        self,
+        llm,
+        iteration: int,
+        total: int,
+        scenario_desc: str,
+        narrative_arc: str,
+        narrative_beats: List[str],
+        dramatic_tension: float,
+        previous_event: str,
+        entities: List[str]
+    ) -> str:
+        """
+        Generate rich event descriptions for DIRECTORIAL mode using LLM.
+
+        January 2026: Fixes generic placeholder issue where all timepoints
+        had descriptions like "Events continue to unfold".
+
+        In DIRECTORIAL mode (M17), events serve narrative beats rather than
+        following strict causality. This method generates dramatic, contextual
+        descriptions that:
+        - Progress the narrative arc (rising_action → climax → resolution)
+        - Reference key narrative beats at appropriate times
+        - Maintain dramatic tension
+        - Include relevant entities
+
+        Args:
+            llm: LLM client for generation
+            iteration: Current timepoint number (1-indexed)
+            total: Total number of timepoints
+            scenario_desc: Full scenario description for context
+            narrative_arc: Current narrative arc (e.g., "rising_action")
+            narrative_beats: List of key moments (e.g., ["t01_arrival", "t05_discovery"])
+            dramatic_tension: Tension level 0.0-1.0
+            previous_event: Description of the previous timepoint
+            entities: List of entity IDs in the scene
+
+        Returns:
+            Rich event description string
+        """
+        # Calculate narrative position (0.0 = beginning, 1.0 = end)
+        narrative_position = iteration / total if total > 0 else 0.5
+
+        # Determine narrative phase based on position
+        if narrative_position < 0.25:
+            phase = "SETUP"
+            phase_guidance = "Establish the scene, introduce tensions, build atmosphere"
+        elif narrative_position < 0.5:
+            phase = "RISING ACTION"
+            phase_guidance = "Escalate tensions, reveal information, increase stakes"
+        elif narrative_position < 0.75:
+            phase = "CLIMAX APPROACH"
+            phase_guidance = "Peak tension, confrontations, critical decisions"
+        elif narrative_position < 0.9:
+            phase = "CLIMAX/FALLING ACTION"
+            phase_guidance = "Resolution of main tension, consequences revealed"
+        else:
+            phase = "RESOLUTION"
+            phase_guidance = "Aftermath, new equilibrium, closure"
+
+        # Find relevant narrative beat for this position
+        relevant_beat = None
+        if narrative_beats:
+            # Map beats to approximate positions
+            beat_positions = {beat: i / len(narrative_beats) for i, beat in enumerate(narrative_beats)}
+            # Find closest beat to current position
+            closest_beat = min(narrative_beats, key=lambda b: abs(beat_positions[b] - narrative_position))
+            if abs(beat_positions[closest_beat] - narrative_position) < 0.15:
+                relevant_beat = closest_beat
+
+        # Build prompt for LLM
+        system_prompt = """You are a narrative director for dramatic temporal simulations.
+Generate vivid, specific event descriptions that serve the story's dramatic needs.
+Events should feel meaningful and connected to the narrative arc."""
+
+        user_prompt = f"""Generate a SINGLE event description for timepoint {iteration}/{total}.
+
+SCENARIO CONTEXT:
+{scenario_desc[:500]}
+
+NARRATIVE PHASE: {phase}
+Phase guidance: {phase_guidance}
+Dramatic tension level: {dramatic_tension:.1f}/1.0
+Narrative position: {narrative_position:.1%} through story
+
+PREVIOUS EVENT:
+{previous_event[:200] if previous_event else "Story beginning"}
+
+{"CURRENT NARRATIVE BEAT: " + relevant_beat.replace('_', ' ') if relevant_beat else ""}
+
+ENTITIES PRESENT: {', '.join(entities[:8])}
+
+INSTRUCTIONS:
+1. Write a 2-3 sentence event description
+2. Be SPECIFIC - mention characters, locations, actions by name
+3. Serve the current narrative phase ({phase})
+4. Build on the previous event naturally
+5. Match the dramatic tension level
+6. Do NOT use generic phrases like "events unfold" or "things continue"
+
+RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
+
+        try:
+            response = llm.client.chat.completions.create(
+                model=llm.default_model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.7 + (dramatic_tension * 0.2),  # Higher tension = more creative
+                max_tokens=300
+            )
+
+            # Extract response content
+            if isinstance(response, dict):
+                content = response.get('choices', [{}])[0].get('message', {}).get('content', '')
+            else:
+                content = response.choices[0].message.content
+
+            if content and len(content.strip()) > 20:
+                return content.strip()
+
+        except Exception as e:
+            print(f"    ⚠️  Directorial event generation failed: {e}")
+
+        # Fallback: Generate contextual description without LLM
+        fallback_descriptions = {
+            "SETUP": f"The investigation begins as {entities[0] if entities else 'the protagonist'} surveys the scene, noting the unsettling atmosphere that pervades the area.",
+            "RISING ACTION": f"Tensions mount as new evidence comes to light. {entities[0] if entities else 'The detective'} pieces together disturbing connections.",
+            "CLIMAX APPROACH": f"The confrontation draws near. {entities[0] if entities else 'Our hero'} must act decisively as danger closes in.",
+            "CLIMAX/FALLING ACTION": f"The critical moment arrives. Actions have consequences as the truth is finally revealed.",
+            "RESOLUTION": f"In the aftermath, {entities[0] if entities else 'the survivors'} reflect on what transpired and what it means for the future."
+        }
+
+        return fallback_descriptions.get(phase, f"Timepoint {iteration}: The narrative continues with dramatic developments.")
 
     def _convert_portal_paths_to_timepoints(
         self,
@@ -1384,6 +1795,287 @@ class FullE2EWorkflowRunner:
         print(f"    All paths available: {len(portal_paths)}")
         for i, path in enumerate(portal_paths[:3], 1):  # Show top 3
             print(f"      Path {i}: Coherence {path.coherence_score:.3f}")
+
+        return timepoints
+
+    def _convert_branching_paths_to_timepoints(
+        self,
+        branching_paths: List,
+        initial_timepoint: Timepoint,
+        store,
+        run_id: str
+    ) -> List[Timepoint]:
+        """
+        Convert BranchingPath objects to Timepoint objects for E2E pipeline.
+
+        Strategy:
+        - Take best path (highest coherence_score)
+        - Convert each BranchingState → Timepoint
+        - Preserve branching metadata in timepoint.metadata
+        - Link timepoints causally (parent→child)
+
+        Args:
+            branching_paths: List of BranchingPath from BranchingStrategy
+            initial_timepoint: Origin timepoint (founding moment)
+            store: GraphStore for saving timepoints
+            run_id: Current run identifier
+
+        Returns:
+            List of Timepoint objects ordered origin→future
+        """
+        if not branching_paths:
+            print("  ⚠️  No branching paths returned, using initial timepoint only")
+            return [initial_timepoint]
+
+        # Take best path (first in list, already sorted by coherence)
+        best_path = branching_paths[0]
+
+        print(f"\n  Converting best branching path to timepoints:")
+        print(f"    Path ID: {best_path.path_id}")
+        print(f"    Coherence: {best_path.coherence_score:.3f}")
+        print(f"    States: {len(best_path.states)}")
+        print(f"    Branch Points: {best_path.branch_points}")
+
+        timepoints = []
+        previous_timepoint_id = None
+
+        # January 2026: Get fallback entities from initial_timepoint (from scene orchestration)
+        # This ensures we always have entities even if LLM inference fails
+        fallback_entity_ids = initial_timepoint.entities_present if initial_timepoint.entities_present else []
+        if not fallback_entity_ids:
+            # Secondary fallback: try to get from store if available
+            try:
+                all_entities = store.list_entities() if hasattr(store, 'list_entities') else []
+                fallback_entity_ids = [e.entity_id for e in all_entities[:10]]
+            except Exception:
+                pass
+
+        if fallback_entity_ids:
+            print(f"    Fallback entities available: {len(fallback_entity_ids)}")
+
+        for idx, state in enumerate(best_path.states):
+            # Generate timepoint ID
+            tp_id = f"tp_{idx:03d}_{state.year}"
+
+            # January 2026: Get entities from state, with fallback to initial_timepoint entities
+            state_entity_ids = [e.entity_id for e in state.entities] if state.entities else []
+            if not state_entity_ids and fallback_entity_ids:
+                state_entity_ids = fallback_entity_ids.copy()
+                # Don't spam the console, just note once if needed
+
+            # Create Timepoint from BranchingState
+            timepoint = Timepoint(
+                timepoint_id=tp_id,
+                timestamp=datetime(state.year, state.month, 1),  # Use year/month from state
+                event_description=state.description,
+                entities_present=state_entity_ids,
+                causal_parent=previous_timepoint_id,
+                metadata={
+                    "branching_mode": True,
+                    "path_id": best_path.path_id,
+                    "path_position": idx,
+                    "plausibility_score": state.plausibility_score,
+                    "coherence_score": best_path.coherence_score,
+                    "is_branch_point": idx in best_path.branch_points,
+                    "world_state": state.world_state,
+                    "year": state.year,
+                    "month": state.month
+                }
+            )
+
+            # Save to database (temp DB for workflow)
+            store.save_timepoint(timepoint)
+
+            # CONVERGENCE FIX: Also persist to shared DB with run_id
+            self._persist_timepoint_for_convergence(timepoint, run_id)
+
+            timepoints.append(timepoint)
+            previous_timepoint_id = tp_id
+
+            if idx in best_path.branch_points:
+                print(f"    ✓ Timepoint {idx}: {state.year}-{state.month:02d} [BRANCH POINT]")
+            else:
+                print(f"    ✓ Timepoint {idx}: {state.year}-{state.month:02d}")
+
+        print(f"\n  Branching path metadata:")
+        print(f"    All paths available: {len(branching_paths)}")
+        for i, path in enumerate(branching_paths[:3], 1):  # Show top 3
+            print(f"      Path {i}: Coherence {path.coherence_score:.3f}")
+
+        return timepoints
+
+    def _convert_directorial_paths_to_timepoints(
+        self,
+        directorial_paths: List,
+        initial_timepoint: Timepoint,
+        store,
+        run_id: str
+    ) -> List[Timepoint]:
+        """
+        Convert DirectorialPath objects to Timepoint objects for E2E pipeline.
+
+        Preserves act, tension_score, pov_entity, framing in timepoint metadata.
+
+        Args:
+            directorial_paths: List of DirectorialPath from DirectorialStrategy
+            initial_timepoint: Origin timepoint
+            store: GraphStore for saving timepoints
+            run_id: Current run identifier
+
+        Returns:
+            List of Timepoint objects ordered by narrative progression
+        """
+        if not directorial_paths:
+            print("  ⚠️  No directorial paths returned, using initial timepoint only")
+            return [initial_timepoint]
+
+        best_path = directorial_paths[0]
+
+        print(f"\n  Converting best directorial path to timepoints:")
+        print(f"    Path ID: {best_path.path_id}")
+        print(f"    Coherence: {best_path.coherence_score:.3f}")
+        print(f"    States: {len(best_path.states)}")
+        print(f"    Act boundaries: {best_path.act_boundaries}")
+
+        timepoints = []
+        previous_timepoint_id = None
+
+        fallback_entity_ids = initial_timepoint.entities_present if initial_timepoint.entities_present else []
+
+        for idx, state in enumerate(best_path.states):
+            tp_id = f"tp_{idx:03d}_{state.year}"
+
+            state_entity_ids = [e.entity_id for e in state.entities] if state.entities else []
+            if not state_entity_ids and fallback_entity_ids:
+                state_entity_ids = fallback_entity_ids.copy()
+
+            timepoint = Timepoint(
+                timepoint_id=tp_id,
+                timestamp=datetime(state.year, state.month, 1),
+                event_description=state.description,
+                entities_present=state_entity_ids,
+                causal_parent=previous_timepoint_id,
+                metadata={
+                    "directorial_mode": True,
+                    "path_id": best_path.path_id,
+                    "path_position": idx,
+                    "plausibility_score": state.plausibility_score,
+                    "coherence_score": best_path.coherence_score,
+                    "act": state.act.value if hasattr(state.act, 'value') else str(state.act),
+                    "tension_score": state.tension_score,
+                    "pov_entity": state.pov_entity,
+                    "framing": state.framing.value if hasattr(state.framing, 'value') else str(state.framing),
+                    "dramatic_irony": state.dramatic_irony,
+                    "narrative_beat": state.narrative_beat,
+                    "dramatic_importance": state.dramatic_importance,
+                    "world_state": state.world_state,
+                    "year": state.year,
+                    "month": state.month
+                }
+            )
+
+            store.save_timepoint(timepoint)
+            self._persist_timepoint_for_convergence(timepoint, run_id)
+
+            timepoints.append(timepoint)
+            previous_timepoint_id = tp_id
+
+            act_label = state.act.value if hasattr(state.act, 'value') else str(state.act)
+            print(f"    ✓ Timepoint {idx}: {state.year}-{state.month:02d} [{act_label.upper()}] tension={state.tension_score:.2f}")
+
+        print(f"\n  Directorial path metadata:")
+        print(f"    All paths available: {len(directorial_paths)}")
+        for i, path in enumerate(directorial_paths[:3], 1):
+            print(f"      Path {i}: Coherence {path.coherence_score:.3f}, Arc {path.arc_completion_score:.3f}")
+
+        return timepoints
+
+    def _convert_cyclical_paths_to_timepoints(
+        self,
+        cyclical_paths: List,
+        initial_timepoint: Timepoint,
+        store,
+        run_id: str
+    ) -> List[Timepoint]:
+        """
+        Convert CyclicalPath objects to Timepoint objects for E2E pipeline.
+
+        Preserves cycle_index, position_in_cycle, fulfilled_prophecies in timepoint metadata.
+
+        Args:
+            cyclical_paths: List of CyclicalPath from CyclicalStrategy
+            initial_timepoint: Origin timepoint
+            store: GraphStore for saving timepoints
+            run_id: Current run identifier
+
+        Returns:
+            List of Timepoint objects ordered by cycle progression
+        """
+        if not cyclical_paths:
+            print("  ⚠️  No cyclical paths returned, using initial timepoint only")
+            return [initial_timepoint]
+
+        best_path = cyclical_paths[0]
+
+        print(f"\n  Converting best cyclical path to timepoints:")
+        print(f"    Path ID: {best_path.path_id}")
+        print(f"    Coherence: {best_path.coherence_score:.3f}")
+        print(f"    States: {len(best_path.states)}")
+        print(f"    Cycle boundaries: {best_path.cycle_boundaries}")
+        print(f"    Prophecy fulfillment: {best_path.prophecy_fulfillment_rate:.2f}")
+
+        timepoints = []
+        previous_timepoint_id = None
+
+        fallback_entity_ids = initial_timepoint.entities_present if initial_timepoint.entities_present else []
+
+        for idx, state in enumerate(best_path.states):
+            tp_id = f"tp_{idx:03d}_{state.year}"
+
+            state_entity_ids = [e.entity_id for e in state.entities] if state.entities else []
+            if not state_entity_ids and fallback_entity_ids:
+                state_entity_ids = fallback_entity_ids.copy()
+
+            timepoint = Timepoint(
+                timepoint_id=tp_id,
+                timestamp=datetime(state.year, state.month, 1),
+                event_description=state.description,
+                entities_present=state_entity_ids,
+                causal_parent=previous_timepoint_id,
+                metadata={
+                    "cyclical_mode": True,
+                    "path_id": best_path.path_id,
+                    "path_position": idx,
+                    "plausibility_score": state.plausibility_score,
+                    "coherence_score": best_path.coherence_score,
+                    "cycle_index": state.cycle_index,
+                    "position_in_cycle": state.position_in_cycle,
+                    "cycle_type": state.cycle_type,
+                    "escalation_level": state.escalation_level,
+                    "prophecy": state.prophecy,
+                    "fulfilled_prophecies": state.fulfilled_prophecies,
+                    "echo_of": state.echo_of,
+                    "causal_loop_tag": state.causal_loop_tag,
+                    "world_state": state.world_state,
+                    "year": state.year,
+                    "month": state.month
+                }
+            )
+
+            store.save_timepoint(timepoint)
+            self._persist_timepoint_for_convergence(timepoint, run_id)
+
+            timepoints.append(timepoint)
+            previous_timepoint_id = tp_id
+
+            is_boundary = idx in best_path.cycle_boundaries
+            boundary_label = " [CYCLE BOUNDARY]" if is_boundary else ""
+            print(f"    ✓ Timepoint {idx}: {state.year}-{state.month:02d} C{state.cycle_index}P{state.position_in_cycle}{boundary_label}")
+
+        print(f"\n  Cyclical path metadata:")
+        print(f"    All paths available: {len(cyclical_paths)}")
+        for i, path in enumerate(cyclical_paths[:3], 1):
+            print(f"      Path {i}: Coherence {path.coherence_score:.3f}, Prophecy {path.prophecy_fulfillment_rate:.2f}")
 
         return timepoints
 
@@ -1697,7 +2389,8 @@ class FullE2EWorkflowRunner:
                         timepoint,
                         timeline,
                         llm,
-                        store
+                        store,
+                        run_id=run_id  # January 2026: Pass run_id for dialog persistence
                     )
 
                     # Save dialog to store

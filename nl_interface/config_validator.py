@@ -29,7 +29,7 @@ class SimulationConfig(BaseModel):
     temporal_mode: str = Field(
         ...,
         description="Temporal causality mode",
-        pattern="^(pearl|directorial|nonlinear|branching|cyclical)$"
+        pattern="^(pearl|directorial|branching|cyclical|portal)$"
     )
     focus: List[str] = Field(..., description="Simulation focus areas")
     outputs: List[str] = Field(..., description="Desired outputs")

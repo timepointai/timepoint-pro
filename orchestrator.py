@@ -169,7 +169,7 @@ Generate a complete scene specification with these components:
 
 1. **Scene Title**: Short descriptive title
 2. **Scene Description**: 2-3 sentence overview
-3. **Temporal Mode**: Choose from: pearl (standard causality), directorial (narrative focus), nonlinear (flashbacks), branching (what-if), cyclical (prophecy/loops)
+3. **Temporal Mode**: Choose from: pearl (standard causality), directorial (narrative focus), branching (what-if), cyclical (prophecy/loops), portal (backward from endpoint)
    Preferred mode: {preferred_mode}
 4. **Temporal Scope**:
    - start_date: ISO datetime when events begin
@@ -199,7 +199,7 @@ Schema:
 {{
   "scene_title": "string",
   "scene_description": "string",
-  "temporal_mode": "pearl|directorial|nonlinear|branching|cyclical",
+  "temporal_mode": "pearl|directorial|branching|cyclical|portal",
   "temporal_scope": {{"start_date": "ISO datetime", "end_date": "ISO datetime", "location": "string"}},
   "entities": [
     {{

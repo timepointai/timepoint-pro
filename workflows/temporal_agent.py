@@ -316,67 +316,197 @@ class TemporalAgent:
         }
 
     def _strategy_for_directorial_mode(self, config, context) -> "FidelityTemporalStrategy":
-        """DIRECTORIAL mode: Allocate fidelity based on narrative arc"""
+        """
+        DIRECTORIAL mode: Allocate fidelity based on narrative arc.
+
+        Fidelity allocation follows five-act dramatic structure:
+        - Climax states → TRAINED (maximum detail for peak moments)
+        - Rising action → DIALOG (detailed buildup)
+        - Setup/Resolution → SCENE (establish/resolve)
+        - Bridge states → TENSOR_ONLY (minimal transitions)
+        """
         from schemas import FidelityTemporalStrategy, FidelityPlanningMode, TokenBudgetMode, ResolutionLevel
 
-        # TODO: Implement directorial-specific strategy
-        # For now, return basic strategy
+        backward_steps = getattr(config, 'backward_steps', 15)
+        token_budget = getattr(config, 'token_budget', 15000)
+        dramatic_tension = getattr(config, 'dramatic_tension', 0.7)
+
+        # Build fidelity schedule based on five-act narrative arc
+        fidelity_schedule = []
+        for step in range(backward_steps):
+            position = step / max(1, backward_steps)
+
+            if 0.5 <= position < 0.7:
+                # Climax: maximum detail
+                fidelity_schedule.append(ResolutionLevel.TRAINED)
+            elif 0.2 <= position < 0.5:
+                # Rising action: detailed buildup
+                if dramatic_tension > 0.6:
+                    fidelity_schedule.append(ResolutionLevel.DIALOG)
+                else:
+                    fidelity_schedule.append(ResolutionLevel.SCENE)
+            elif position < 0.2:
+                # Setup: establish scene
+                fidelity_schedule.append(ResolutionLevel.SCENE)
+            elif 0.7 <= position < 0.85:
+                # Falling action: consequences
+                fidelity_schedule.append(ResolutionLevel.SCENE)
+            else:
+                # Resolution: wrap up
+                fidelity_schedule.append(ResolutionLevel.TENSOR_ONLY)
+
+        # Temporal steps: denser around climax, sparser at edges
+        temporal_steps = []
+        for step in range(backward_steps):
+            position = step / max(1, backward_steps)
+            if 0.4 <= position < 0.7:
+                temporal_steps.append(6)  # Monthly around climax
+            elif 0.2 <= position < 0.4 or 0.7 <= position < 0.85:
+                temporal_steps.append(12)  # Quarterly for buildup/fallout
+            else:
+                temporal_steps.append(24)  # Semi-annual for bookends
+
+        # Estimate tokens
+        token_map = {
+            ResolutionLevel.TENSOR_ONLY: 200,
+            ResolutionLevel.SCENE: 1000,
+            ResolutionLevel.DIALOG: 3000,
+            ResolutionLevel.TRAINED: 5000,
+        }
+        estimated_tokens = sum(token_map.get(r, 1000) for r in fidelity_schedule)
+
         return FidelityTemporalStrategy(
             mode=self.mode,
             planning_mode=FidelityPlanningMode.PROGRAMMATIC,
             budget_mode=TokenBudgetMode.SOFT_GUIDANCE,
-            token_budget=15000,
-            timepoint_count=15,
-            fidelity_schedule=[ResolutionLevel.SCENE] * 15,
-            temporal_steps=[24] * 15,  # 2 years between each
+            token_budget=token_budget,
+            timepoint_count=backward_steps,
+            fidelity_schedule=fidelity_schedule,
+            temporal_steps=temporal_steps,
             adaptive_threshold=0.7,
             min_resolution=ResolutionLevel.TENSOR_ONLY,
             max_resolution=ResolutionLevel.TRAINED,
-            allocation_rationale="DIRECTORIAL mode: TODO - implement narrative arc allocation",
-            estimated_tokens=15000,
-            estimated_cost_usd=0.03
+            allocation_rationale=f"DIRECTORIAL mode: five-act arc allocation (tension={dramatic_tension}). Climax=TRAINED, rising=DIALOG, setup/resolution=SCENE/TENSOR_ONLY",
+            estimated_tokens=estimated_tokens,
+            estimated_cost_usd=estimated_tokens * 0.000002
         )
 
     def _strategy_for_cyclical_mode(self, config, context) -> "FidelityTemporalStrategy":
-        """CYCLICAL mode: Allocate based on cycle periods and prophecy fulfillment"""
+        """
+        CYCLICAL mode: Allocate based on cycle periods and prophecy fulfillment.
+
+        Fidelity allocation maps cycle boundaries to higher fidelity:
+        - Cycle start/end → DIALOG (transition moments)
+        - Mid-cycle → SCENE (standard progression)
+        - Prophecy states → TRAINED (high-detail prophecy moments)
+        """
         from schemas import FidelityTemporalStrategy, FidelityPlanningMode, TokenBudgetMode, ResolutionLevel
 
-        # TODO: Implement cyclical-specific strategy
+        cycle_length = getattr(config, 'cycle_length', None) or 4
+        loop_count = getattr(config, 'path_count', 3)
+        token_budget = getattr(config, 'token_budget', 10000)
+        prophecy_accuracy = getattr(config, 'prophecy_accuracy', 0.5)
+
+        total_steps = cycle_length * loop_count
+        fidelity_schedule = []
+
+        for step in range(total_steps):
+            position_in_cycle = step % cycle_length
+            cycle_index = step // cycle_length
+            is_boundary = position_in_cycle == 0 or position_in_cycle == cycle_length - 1
+            is_prophecy = is_boundary and prophecy_accuracy > 0.3
+
+            if is_prophecy:
+                fidelity_schedule.append(ResolutionLevel.TRAINED)
+            elif is_boundary:
+                fidelity_schedule.append(ResolutionLevel.DIALOG)
+            else:
+                fidelity_schedule.append(ResolutionLevel.SCENE)
+
+        # Temporal steps: consistent within cycles
+        temporal_steps = [1] * total_steps  # Monthly by default
+
+        # Estimate tokens
+        token_map = {
+            ResolutionLevel.TENSOR_ONLY: 200,
+            ResolutionLevel.SCENE: 1000,
+            ResolutionLevel.DIALOG: 3000,
+            ResolutionLevel.TRAINED: 5000,
+        }
+        estimated_tokens = sum(token_map.get(r, 1000) for r in fidelity_schedule)
+
         return FidelityTemporalStrategy(
             mode=self.mode,
             planning_mode=FidelityPlanningMode.PROGRAMMATIC,
             budget_mode=TokenBudgetMode.SOFT_GUIDANCE,
-            token_budget=10000,
-            timepoint_count=10,
-            fidelity_schedule=[ResolutionLevel.SCENE] * 10,
-            temporal_steps=[84] * 10,  # 7 days each (weekly cycle)
+            token_budget=token_budget,
+            timepoint_count=total_steps,
+            fidelity_schedule=fidelity_schedule,
+            temporal_steps=temporal_steps,
             adaptive_threshold=0.7,
             min_resolution=ResolutionLevel.TENSOR_ONLY,
             max_resolution=ResolutionLevel.TRAINED,
-            allocation_rationale="CYCLICAL mode: TODO - implement cycle-based allocation",
-            estimated_tokens=10000,
-            estimated_cost_usd=0.02
+            allocation_rationale=f"CYCLICAL mode: {loop_count} cycles x {cycle_length} steps. Boundaries=DIALOG, prophecy=TRAINED, mid-cycle=SCENE",
+            estimated_tokens=estimated_tokens,
+            estimated_cost_usd=estimated_tokens * 0.000002
         )
 
     def _strategy_for_branching_mode(self, config, context) -> "FidelityTemporalStrategy":
-        """BRANCHING mode: Allocate based on branch points"""
+        """
+        BRANCHING mode: Allocate fidelity based on branch points.
+
+        Fidelity allocation:
+        - Branch points → DIALOG/TRAINED (critical decision moments)
+        - Continuations → SCENE (standard forward progression)
+        - Origin/endpoint → DIALOG (establishing context)
+        """
         from schemas import FidelityTemporalStrategy, FidelityPlanningMode, TokenBudgetMode, ResolutionLevel
 
-        # TODO: Implement branching-specific strategy
+        backward_steps = getattr(config, 'backward_steps', 15)
+        path_count = getattr(config, 'path_count', 4)
+        token_budget = getattr(config, 'token_budget', 20000)
+
+        # Calculate branch point intervals
+        branch_interval = max(1, backward_steps // path_count)
+
+        fidelity_schedule = []
+        for step in range(backward_steps):
+            if step == 0 or step == backward_steps - 1:
+                # Origin and endpoint
+                fidelity_schedule.append(ResolutionLevel.DIALOG)
+            elif step > 0 and step % branch_interval == 0:
+                # Branch point: high detail for decision moments
+                fidelity_schedule.append(ResolutionLevel.TRAINED)
+            else:
+                # Continuation
+                fidelity_schedule.append(ResolutionLevel.SCENE)
+
+        # Temporal steps: even distribution
+        temporal_steps = [12] * backward_steps
+
+        # Estimate tokens
+        token_map = {
+            ResolutionLevel.TENSOR_ONLY: 200,
+            ResolutionLevel.SCENE: 1000,
+            ResolutionLevel.DIALOG: 3000,
+            ResolutionLevel.TRAINED: 5000,
+        }
+        estimated_tokens = sum(token_map.get(r, 1000) for r in fidelity_schedule)
+
         return FidelityTemporalStrategy(
             mode=self.mode,
             planning_mode=FidelityPlanningMode.PROGRAMMATIC,
             budget_mode=TokenBudgetMode.SOFT_GUIDANCE,
-            token_budget=20000,
-            timepoint_count=15,
-            fidelity_schedule=[ResolutionLevel.SCENE] * 15,
-            temporal_steps=[12] * 15,
+            token_budget=token_budget,
+            timepoint_count=backward_steps,
+            fidelity_schedule=fidelity_schedule,
+            temporal_steps=temporal_steps,
             adaptive_threshold=0.7,
             min_resolution=ResolutionLevel.TENSOR_ONLY,
             max_resolution=ResolutionLevel.TRAINED,
-            allocation_rationale="BRANCHING mode: TODO - implement branch-based allocation",
-            estimated_tokens=20000,
-            estimated_cost_usd=0.04
+            allocation_rationale=f"BRANCHING mode: branch points every {branch_interval} steps get TRAINED, endpoints=DIALOG, continuations=SCENE",
+            estimated_tokens=estimated_tokens,
+            estimated_cost_usd=estimated_tokens * 0.000002
         )
 
     def _strategy_for_default_mode(self, config, context) -> "FidelityTemporalStrategy":
@@ -505,14 +635,6 @@ class TemporalAgent:
             # Apply destiny weighting (always modifies probability)
             modification = 1 + destiny_weight * 0.3  # 1.18 with default weight
             return base_prob * modification
-
-        elif self.mode == TemporalMode.NONLINEAR:
-            config = context.get("nonlinear_config", {})
-            flashback_prob = config.get("flashback_probability", 0.2)
-
-            # Allow presentation != occurrence ordering
-            if np.random.random() < flashback_prob:
-                return min(1.0, base_prob * 1.3)  # Slight boost for nonlinear presentation
 
         elif self.mode == TemporalMode.BRANCHING:
             # In branching mode, slightly increase chaos/randomness
@@ -938,5 +1060,114 @@ Return ONLY a JSON object with format:
 
         # Execute backward simulation
         paths = portal_strategy.run()
+
+        return paths
+
+    def run_branching_simulation(self, config) -> List:
+        """
+        Execute BRANCHING mode forward simulation with counterfactual branches.
+
+        This delegates to BranchingStrategy to perform forward exploration from
+        a known origin, generating multiple possible futures at decision points.
+
+        Args:
+            config: TemporalConfig with mode=BRANCHING and branching settings
+
+        Returns:
+            List of BranchingPath objects ranked by coherence score
+
+        Raises:
+            ValueError: If mode is not BRANCHING or required config is missing
+        """
+        from generation.config_schema import TemporalConfig
+        from workflows.branching_strategy import BranchingStrategy
+
+        if self.mode != TemporalMode.BRANCHING:
+            raise ValueError(f"run_branching_simulation() requires mode=BRANCHING, got {self.mode}")
+
+        # Validate config type
+        if not isinstance(config, TemporalConfig):
+            raise ValueError(f"config must be TemporalConfig, got {type(config)}")
+
+        # Create and run BranchingStrategy
+        branching_strategy = BranchingStrategy(
+            config=config,
+            llm_client=self.llm_client,
+            store=self.store
+        )
+
+        # Execute forward simulation with branching
+        paths = branching_strategy.run()
+
+        return paths
+
+    def run_directorial_simulation(self, config) -> List:
+        """
+        Execute DIRECTORIAL mode narrative-driven simulation.
+
+        This delegates to DirectorialStrategy to perform narrative-structured
+        forward simulation with five-act dramatic arc, camera/POV systems,
+        and tension curves.
+
+        Args:
+            config: TemporalConfig with mode=DIRECTORIAL
+
+        Returns:
+            List of DirectorialPath objects ranked by coherence score
+
+        Raises:
+            ValueError: If mode is not DIRECTORIAL or required config is missing
+        """
+        from generation.config_schema import TemporalConfig
+        from workflows.directorial_strategy import DirectorialStrategy
+
+        if self.mode != TemporalMode.DIRECTORIAL:
+            raise ValueError(f"run_directorial_simulation() requires mode=DIRECTORIAL, got {self.mode}")
+
+        if not isinstance(config, TemporalConfig):
+            raise ValueError(f"config must be TemporalConfig, got {type(config)}")
+
+        directorial_strategy = DirectorialStrategy(
+            config=config,
+            llm_client=self.llm_client,
+            store=self.store
+        )
+
+        paths = directorial_strategy.run()
+
+        return paths
+
+    def run_cyclical_simulation(self, config) -> List:
+        """
+        Execute CYCLICAL mode temporal simulation with cycles, prophecies, and causal loops.
+
+        This delegates to CyclicalStrategy to perform cyclical forward simulation
+        with repeating patterns, escalation, prophecy tracking, and loop closure.
+
+        Args:
+            config: TemporalConfig with mode=CYCLICAL
+
+        Returns:
+            List of CyclicalPath objects ranked by coherence score
+
+        Raises:
+            ValueError: If mode is not CYCLICAL or required config is missing
+        """
+        from generation.config_schema import TemporalConfig
+        from workflows.cyclical_strategy import CyclicalStrategy
+
+        if self.mode != TemporalMode.CYCLICAL:
+            raise ValueError(f"run_cyclical_simulation() requires mode=CYCLICAL, got {self.mode}")
+
+        if not isinstance(config, TemporalConfig):
+            raise ValueError(f"config must be TemporalConfig, got {type(config)}")
+
+        cyclical_strategy = CyclicalStrategy(
+            config=config,
+            llm_client=self.llm_client,
+            store=self.store
+        )
+
+        paths = cyclical_strategy.run()
 
         return paths

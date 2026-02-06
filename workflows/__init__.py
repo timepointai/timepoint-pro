@@ -99,6 +99,21 @@ from workflows.portal_strategy import (
     PortalStrategy,
 )
 
+# Branching Strategy (M12)
+from workflows.branching_strategy import (
+    BranchingStrategy,
+)
+
+# Directorial Strategy (M17 - Narrative-driven)
+from workflows.directorial_strategy import (
+    DirectorialStrategy,
+)
+
+# Cyclical Strategy (M17 - Cycles and prophecy)
+from workflows.cyclical_strategy import (
+    CyclicalStrategy,
+)
+
 # __all__ for explicit exports
 __all__ = [
     # Entity Training
@@ -154,4 +169,10 @@ __all__ = [
     "TemporalAgent",
     # Portal Strategy
     "PortalStrategy",
+    # Branching Strategy
+    "BranchingStrategy",
+    # Directorial Strategy
+    "DirectorialStrategy",
+    # Cyclical Strategy
+    "CyclicalStrategy",
 ]

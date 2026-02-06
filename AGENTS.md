@@ -74,5 +74,75 @@ Template names now accept both slash and underscore formats interchangeably:
 
 **Files:** `run_all_mechanism_tests.py:run_single_template()`
 
+### Pivot Point Detection Fix
+Rewrote `_detect_pivot_points()` in portal_strategy.py. The original checked `children_states` which was never populated during backward simulation (always returned 0 pivot points).
+
+**New 4-strategy detection:**
+1. **Divergence-based**: Uses `key_divergence_points` from path divergence analysis
+2. **Keyword-based**: Detects pivot language ("decision", "pivoted", "funding", "launched", etc.)
+3. **Event-based**: Checks `key_events` and `entity_changes` in world_state
+4. **Score-variance**: Flags states with unusual plausibility scores
+
+**Also reordered** `PortalStrategy.run()` so divergence analysis (Step 6) runs BEFORE pivot detection (Step 7).
+
+**Result:** 84 pivot points detected (vs 0 before) spanning the full 2024-2030 timeline.
+
+**Files:** `workflows/portal_strategy.py:_detect_pivot_points()` (lines 1575-1680), `workflows/portal_strategy.py:run()` (lines 308-319)
+
+## Recent Fixes (February 2026)
+
+### DIRECTORIAL and CYCLICAL Mode Full Implementation
+
+Implemented complete strategy classes for DIRECTORIAL and CYCLICAL temporal modes, replacing the previous stub implementations.
+
+**New Files:**
+- `workflows/directorial_strategy.py` (~800 lines) - Narrative-driven temporal simulation with:
+  - Five-act arc engine (SETUP → RISING → CLIMAX → FALLING → RESOLUTION)
+  - Camera system with POV rotation and framing controls
+  - Tension curve planning with act-aware prompting
+  - Dramatic irony detection
+  - Fidelity allocation: climax states get TRAINED, rising action gets DIALOG
+
+- `workflows/cyclical_strategy.py` (~900 lines) - Cycle-based temporal simulation with:
+  - LLM-driven cycle semantics interpretation (repeating, spiral, causal_loop, oscillating, composite)
+  - Prophecy system with fulfillment tracking across cycles
+  - Causal loop detection and enforcement
+  - Escalation rules per cycle type
+  - Fidelity allocation: prophecy states get TRAINED, cycle boundaries get DIALOG
+
+**Modified Files:**
+- `workflows/temporal_agent.py`: Added `run_directorial_simulation()` and `run_cyclical_simulation()` methods; replaced fidelity stub methods with real implementations
+- `e2e_workflows/e2e_runner.py`: Added DIRECTORIAL and CYCLICAL mode detection and path converter methods
+- `workflows/__init__.py`: Added exports for DirectorialStrategy and CyclicalStrategy
+- `llm_service/model_selector.py`: Added 4 new ActionType entries for mode-specific LLM calls
+
+### New Templates (6 total)
+
+**Directorial Templates:**
+- `macbeth_directorial.json` - Classical five-act Shakespearean tragedy
+- `heist_directorial.json` - Ensemble heist with parallel timeline interleaving
+- `courtroom_directorial.json` - Legal drama with two-POV adversarial structure
+
+**Cyclical Templates:**
+- `groundhog_loop_cyclical.json` - Time loop with deja vu prophecy mechanism
+- `dynasty_cycles_cyclical.json` - Generational saga with spiral escalation
+- `seasons_market_cyclical.json` - Economic boom-bust with quarterly oscillation
+
+### Portal Scoring Stubs Replaced
+
+All 5 portal scoring methods now use real LLM-based evaluation instead of hardcoded/random values:
+- `_llm_score()` - Plausibility rating with Pydantic response model
+- `_historical_precedent_score()` - Historical precedent check with examples
+- `_causal_necessity_score()` - Causal necessity evaluation with alternatives
+- `_entity_capability_score()` - Entity capability validation
+- `_dynamic_context_score()` - Contextual plausibility by era
+
+### Bug Fixes
+- `metadata/narrative_exporter.py`: Added `json.loads()` deserialization for dialog data
+- `metadata/run_summarizer.py`: Fixed dialog turn parsing for narrative summaries
+
+### NONLINEAR Mode Removed
+Removed the NONLINEAR temporal mode from codebase (was never fully implemented). Now 5 modes: PEARL, DIRECTORIAL, BRANCHING, CYCLICAL, PORTAL.
+
 ## Commits
 `type(scope): description` - types: feat, fix, refactor, test, docs, chore

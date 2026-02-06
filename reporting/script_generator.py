@@ -128,7 +128,7 @@ class ScriptGenerator:
         Args:
             world_id: World/simulation identifier (typically first timepoint_id)
             title: Script title (auto-generated if None)
-            temporal_mode: Temporal mode (pearl, nonlinear, directorial, etc.)
+            temporal_mode: Temporal mode (pearl, directorial, branching, etc.)
 
         Returns:
             ScriptData with scenes, characters, dialog
@@ -203,7 +203,7 @@ class ScriptGenerator:
             entities: List of Entity objects
             world_id: World/simulation identifier
             title: Script title (auto-generated if None)
-            temporal_mode: Temporal mode (pearl, nonlinear, directorial, etc.)
+            temporal_mode: Temporal mode (pearl, directorial, branching, etc.)
 
         Returns:
             ScriptData with scenes, characters, dialog
@@ -290,14 +290,10 @@ class ScriptGenerator:
         Order timepoints based on temporal mode and causal relationships.
 
         - Pearl: Chronological order following causal_parent
-        - Nonlinear: May include flashbacks/flash-forwards
         - Directorial: Order by dramatic tension
         """
         if temporal_mode == "pearl":
             # Standard chronological order
-            return self._order_chronologically(timepoints)
-        elif temporal_mode == "nonlinear":
-            # TODO: Implement flashback detection
             return self._order_chronologically(timepoints)
         elif temporal_mode == "directorial":
             # TODO: Order by dramatic tension
