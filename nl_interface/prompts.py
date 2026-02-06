@@ -16,7 +16,7 @@ The configuration must match this schema:
 - scenario: string (descriptive title)
 - entities: list of objects with {name, role, optional: personality_traits}
 - timepoint_count: integer (1-100)
-- temporal_mode: one of ["pearl", "directorial", "nonlinear", "branching", "cyclical"]
+- temporal_mode: one of ["pearl", "directorial", "branching", "cyclical", "portal"]
 - focus: list of strings (e.g., ["dialog", "decision_making", "relationships"])
 - outputs: list of strings (e.g., ["dialog", "decisions", "relationships", "knowledge_flow"])
 - optional: start_time (ISO datetime), animism_level (0-3), resolution_mode
@@ -24,9 +24,9 @@ The configuration must match this schema:
 Temporal modes explained:
 - pearl: Standard causal DAG (historical realism)
 - directorial: Narrative-driven (dramatic coherence)
-- nonlinear: Flashbacks/non-linear presentation
 - branching: Many-worlds counterfactuals
 - cyclical: Time loops and prophecy
+- portal: Backward inference from fixed endpoint to origin
 
 Focus areas:
 - dialog: Generate conversations between entities
@@ -185,7 +185,7 @@ All configurations must include:
 - scenario (string)
 - entities (list of objects with name and role)
 - timepoint_count (integer 1-100)
-- temporal_mode (one of: pearl, directorial, nonlinear, branching, cyclical)
+- temporal_mode (one of: pearl, directorial, branching, cyclical, portal)
 - focus (list of strings)
 - outputs (list of strings)
 
@@ -194,9 +194,9 @@ Try again with this description: {description}""",
     "invalid_temporal_mode": """The temporal_mode "{mode}" is invalid. Must be one of:
 - pearl (standard causal, for historical realism)
 - directorial (narrative-driven, for dramatic coherence)
-- nonlinear (flashbacks, non-linear presentation)
 - branching (many-worlds counterfactuals)
 - cyclical (time loops, prophecy)
+- portal (backward inference from fixed endpoint to origin)
 
 Try again with this description: {description}""",
 

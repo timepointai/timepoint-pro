@@ -170,13 +170,12 @@ Time isn't one thing. The framework supports multiple temporal ontologies, each 
 
 ## M17: Modal Temporal Causality
 
-Six temporal modes, each defining what "consistency" means:
+Five temporal modes, each defining what "consistency" means:
 
 ```python
 class TemporalMode(Enum):
     PEARL = "pearl"           # Standard causal DAG—causes precede effects
     DIRECTORIAL = "directorial"  # Narrative time with flashbacks, ellipsis
-    NONLINEAR = "nonlinear"      # Presentation order ≠ causal order
     BRANCHING = "branching"      # Counterfactual timelines diverge from decision points
     CYCLICAL = "cyclical"        # Prophetic/mythic time—future constrains past
     PORTAL = "portal"            # Backward inference from known endpoints
@@ -286,6 +285,76 @@ Total pivot points detected: 84 across 6 paths
 | `balanced` | 33% TENSOR, 33% SCENE, 20% GRAPH, 13% DIALOG |
 | `portal_pivots` | 2 TRAINED endpoints + scaled middle |
 | `max_quality` | 66% DIALOG, 33% TRAINED |
+
+### DIRECTORIAL Mode: Narrative-Driven Temporal Reasoning
+
+**Architecture** (February 2026): Full strategy implementation in `workflows/directorial_strategy.py` with:
+
+**Arc Engine** — Five-act dramatic structure:
+- SETUP: Establish world, characters, stakes (tension 0.2-0.4)
+- RISING: Complications, challenges, escalation (tension 0.4-0.7)
+- CLIMAX: Peak conflict, maximum tension (tension 0.8-1.0)
+- FALLING: Consequences unfold, revelations (tension 0.5-0.3)
+- RESOLUTION: New equilibrium, denouement (tension 0.1-0.2)
+
+**Camera System** — POV and framing controls:
+- POV rotation across characters per act
+- Framing options: WIDE, CLOSE, OVERHEAD, SUBJECTIVE, ENSEMBLE
+- Parallel storyline merging (A/B plot interleaving)
+
+**Fidelity Allocation** — Driven by dramatic importance:
+- Climax states → TRAINED (full detail)
+- Rising action with high tension → DIALOG
+- Setup/resolution → SCENE/TENSOR_ONLY
+
+```python
+config = TemporalConfig(
+    mode=TemporalMode.DIRECTORIAL,
+    narrative_arc="rising_action",
+    dramatic_tension=0.8,
+)
+```
+
+**Templates**: `macbeth_directorial`, `heist_directorial`, `courtroom_directorial`
+
+### CYCLICAL Mode: Prophecy and Time Loops
+
+**Architecture** (February 2026): Full strategy implementation in `workflows/cyclical_strategy.py` with:
+
+**Cycle Semantics Interpretation** — LLM determines what "cyclical" means for each scenario:
+
+| Cycle Type | Behavior | Example |
+|------------|----------|---------|
+| `repeating` | Same events with minor variations | Groundhog Day loops |
+| `spiral` | Same structure, escalating stakes | Generational dynasties |
+| `causal_loop` | Cycle N causes conditions of cycle M | Bootstrap paradoxes |
+| `oscillating` | Alternating between two poles | Boom/bust economics |
+| `composite` | LLM-directed combination | Mixed patterns |
+
+**Prophecy System**:
+- `_generate_prophecy()` — Creates prophecies at cycle boundaries
+- `_check_prophecy_fulfillment()` — LLM rates fulfillment confidence
+- `_resolve_prophecies()` — Tracks fulfillment rates across paths
+
+**Causal Loop System**:
+- `_detect_causal_loop_opportunity()` — Identifies potential loop closures
+- `_enforce_causal_loop()` — Rewrites states to close loops
+- `_resolve_causal_loops()` — Verifies all loops are closed
+
+**Fidelity Allocation**:
+- Prophecy states → TRAINED
+- Cycle boundaries → DIALOG
+- Mid-cycle → SCENE
+
+```python
+config = TemporalConfig(
+    mode=TemporalMode.CYCLICAL,
+    cycle_length=4,
+    prophecy_accuracy=0.7,
+)
+```
+
+**Templates**: `groundhog_loop_cyclical`, `dynasty_cycles_cyclical`, `seasons_market_cyclical`
 
 ## M7: Causal Temporal Chains
 
@@ -863,7 +932,6 @@ Pre-configured strategies for common scenarios:
 complexity_map = {
     PEARL: 1.0,        # Baseline
     DIRECTORIAL: 1.2,  # Narrative structure overhead
-    NONLINEAR: 1.3,    # Complex presentation
     BRANCHING: 1.4,    # Multiple timelines
     CYCLICAL: 1.3,     # Prophecy validation
     PORTAL: 1.5,       # Backward inference (most expensive)

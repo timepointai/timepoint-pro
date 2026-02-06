@@ -78,9 +78,9 @@ class TestTemporalModeEnum:
         """Test all temporal mode enum values"""
         assert TemporalMode.PEARL == "pearl"
         assert TemporalMode.DIRECTORIAL == "directorial"
-        assert TemporalMode.NONLINEAR == "nonlinear"
         assert TemporalMode.BRANCHING == "branching"
         assert TemporalMode.CYCLICAL == "cyclical"
+        assert TemporalMode.PORTAL == "portal"
 
     def test_temporal_mode_string_conversion(self):
         """Test string conversion of temporal modes"""
@@ -151,20 +151,6 @@ class TestTemporalAgent:
         # Regular event
         prob = agent.influence_event_probability("normal daily occurrence", context)
         assert 0.5 <= prob <= 0.5 * (1 + 0.6 * 1.5)  # Modified by destiny weight
-
-    def test_influence_event_probability_nonlinear_mode(self):
-        """Test event probability influence in Nonlinear mode"""
-        config = {
-            "nonlinear_config": {
-                "flashback_probability": 1.0  # Always trigger for test
-            }
-        }
-        agent = TemporalAgent(TemporalMode.NONLINEAR, config)
-
-        context = {"base_probability": 0.5, "nonlinear_config": config["nonlinear_config"]}
-
-        prob = agent.influence_event_probability("memory from past", context)
-        assert prob == 0.5 * 1.3  # Slight boost for nonlinear presentation
 
     def test_influence_event_probability_branching_mode(self):
         """Test event probability influence in Branching mode"""
@@ -251,24 +237,6 @@ class TestTemporalModeValidation:
         )
         assert result["valid"] == True
         assert "Standard causality" in result["message"]
-
-    def test_validate_temporal_consistency_nonlinear_mode(self):
-        """Test temporal consistency in Nonlinear mode"""
-        from schemas import Entity, Timepoint
-
-        entity = Entity(entity_id="test_entity", entity_type="human")
-        timepoint = Timepoint(
-            timepoint_id="tp_test",
-            timestamp="2025-01-01T00:00:00",
-            event_description="test event",
-            entities_present=["test_entity"]
-        )
-
-        result = Validator._validators["temporal_consistency"]["func"](
-            entity, "flashback memory", timepoint, "nonlinear"
-        )
-        assert result["valid"] == True
-        assert "Temporal flexibility allowed" in result["message"]
 
     def test_validate_temporal_consistency_directorial_mode(self):
         """Test temporal consistency in Directorial mode"""

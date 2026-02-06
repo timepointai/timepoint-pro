@@ -503,7 +503,7 @@ class TestE2EIntegrationWithExistingSystem:
         config, _ = generator.generate_config(description)
 
         # Verify temporal mode is valid
-        valid_modes = ["pearl", "directorial", "nonlinear", "branching", "cyclical"]
+        valid_modes = ["pearl", "directorial", "branching", "cyclical", "portal"]
         assert config["temporal_mode"] in valid_modes
 
     def test_nl_config_focus_areas_valid(self):

@@ -193,7 +193,7 @@ ai_entity_service:
 
 # Mechanism 17: Modal Temporal Causality
 temporal_mode:
-  active_mode: pearl  # Default: "pearl", "directorial", "nonlinear", "branching", "cyclical"
+  active_mode: pearl  # Default: "pearl", "directorial", "branching", "cyclical", "portal"
   directorial:
     narrative_arc: "rising_action"  # rising_action, climax, falling_action, resolution
     dramatic_tension: 0.7  # 0.0-1.0 tension level
@@ -204,7 +204,3 @@ temporal_mode:
     prophecy_accuracy: 0.85  # How accurate prophecies are
     destiny_weight: 0.6  # How strongly destiny influences events
     loop_closure_events: ["prophecy_fulfilled", "destiny_manifested", "cycle_completed"]
-  nonlinear:
-    presentation_offset_max: 5  # Maximum timepoints between occurrence and presentation
-    flashback_probability: 0.2  # Probability of flashback sequences
-    foreshadowing_probability: 0.15  # Probability of foreshadowing hints

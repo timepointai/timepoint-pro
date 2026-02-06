@@ -358,7 +358,7 @@ STRESS - High Complexity (6)
 ----------------------------
   constitutional_convention_day1  28 entities, 500 timepoints ($500-1000)
   scarlet_study_deep              101 timepoints, all 19 mechanisms ($50-100)
-  empty_house_flashback           81 timepoints nonlinear ($30-50)
+  empty_house_flashback           81 timepoints directorial ($30-50)
   final_problem_branching         61 timepoints, 4 branches ($25-40)
   sign_loops_cyclical             Cyclical temporal patterns ($20-35)
   tensor_resolution_hybrid        Tests all tensor resolution paths

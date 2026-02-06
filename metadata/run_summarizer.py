@@ -262,11 +262,19 @@ Failed: {artifacts['validations_failed']}
                 dialogs = store.load_all_dialogs()
                 if dialogs and len(dialogs) > 0:
                     first_dialog = dialogs[0]
-                    if hasattr(first_dialog, 'turns') and len(first_dialog.turns) > 0:
+                    # Deserialize JSON string from DB storage
+                    turns_data = first_dialog.turns if hasattr(first_dialog, 'turns') else []
+                    if isinstance(turns_data, str):
+                        turns_data = json.loads(turns_data)
+                    if turns_data and len(turns_data) > 0:
                         excerpt_turns = []
-                        for turn in first_dialog.turns[:3]:  # First 3 turns
-                            speaker = turn.speaker if hasattr(turn, 'speaker') else 'Unknown'
-                            content = turn.content if hasattr(turn, 'content') else str(turn)
+                        for turn in turns_data[:3]:  # First 3 turns
+                            if isinstance(turn, dict):
+                                speaker = turn.get('speaker', 'Unknown')
+                                content = turn.get('content', str(turn))
+                            else:
+                                speaker = turn.speaker if hasattr(turn, 'speaker') else 'Unknown'
+                                content = turn.content if hasattr(turn, 'content') else str(turn)
                             excerpt_turns.append(f"{speaker}: {content[:100]}...")
                         dialog_excerpt = "\n".join(excerpt_turns)
             except Exception as e:

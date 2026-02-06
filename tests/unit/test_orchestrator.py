@@ -177,7 +177,7 @@ class TestSceneParser:
 
         assert isinstance(spec, SceneSpecification)
         assert spec.scene_title
-        assert spec.temporal_mode in ["pearl", "directorial", "nonlinear", "branching", "cyclical"]
+        assert spec.temporal_mode in ["pearl", "directorial", "branching", "cyclical", "portal"]
         assert len(spec.entities) > 0
         assert len(spec.timepoints) > 0
 

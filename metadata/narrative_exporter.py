@@ -204,11 +204,17 @@ class NarrativeExporter:
                 all_dialogs = store.load_all_dialogs() if hasattr(store, 'load_all_dialogs') else []
                 for dialog in all_dialogs:
                     if hasattr(dialog, 'dialog_id'):
+                        # Deserialize JSON strings from DB storage
+                        raw_participants = dialog.participants if hasattr(dialog, 'participants') else []
+                        raw_turns = dialog.turns if hasattr(dialog, 'turns') else []
+                        participants = json.loads(raw_participants) if isinstance(raw_participants, str) else (raw_participants or [])
+                        turns = json.loads(raw_turns) if isinstance(raw_turns, str) else (raw_turns or [])
+
                         excerpt = DialogExcerpt(
                             dialog_id=dialog.dialog_id,
                             timepoint_id=dialog.timepoint_id if hasattr(dialog, 'timepoint_id') else "unknown",
-                            participants=dialog.participants if hasattr(dialog, 'participants') else [],
-                            turns=dialog.turns if hasattr(dialog, 'turns') else []
+                            participants=participants,
+                            turns=turns
                         )
                         dialogs.append(excerpt)
             except Exception as e:

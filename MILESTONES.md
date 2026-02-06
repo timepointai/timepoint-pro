@@ -441,12 +441,18 @@ Broad accessibility and ecosystem.
 | Portal divergence detection | **COMPLETE** | `portal_strategy.py:_compute_path_divergence()` |
 | Portal quick mode | **COMPLETE** | `--portal-quick` flag, `run_all_mechanism_tests.py` |
 | Fidelity template scaling | **COMPLETE** | `temporal_agent.py:_apply_fidelity_template()` |
+| Directorial mode strategy | **COMPLETE** | `workflows/directorial_strategy.py` (~800 lines), arc engine, camera system |
+| Cyclical mode strategy | **COMPLETE** | `workflows/cyclical_strategy.py` (~900 lines), prophecy system, causal loops |
+| Directorial templates | **COMPLETE** | `macbeth_directorial`, `heist_directorial`, `courtroom_directorial` |
+| Cyclical templates | **COMPLETE** | `groundhog_loop_cyclical`, `dynasty_cycles_cyclical`, `seasons_market_cyclical` |
+| Portal scoring stubs | **COMPLETE** | 5 methods now use real LLM-based evaluation |
+| NONLINEAR mode removal | **COMPLETE** | Removed from codebase, now 5 modes |
 
 ---
 
 ## Reality Check
 
-**Where we are:** Working research prototype with 19 mechanisms, intelligent model selection, parallel execution, **complete tensor persistence system** (329+ tests), and **improved data integrity** (January 2026 fixes).
+**Where we are:** Working research prototype with 19 mechanisms, intelligent model selection, parallel execution, **complete tensor persistence system** (329+ tests), **improved data integrity** (January 2026 fixes), and **full temporal mode implementations** (February 2026).
 
 **What works:**
 - Single-run and parallel simulations with full temporal reasoning
@@ -463,6 +469,8 @@ Broad accessibility and ecosystem.
 - **Portal mode enhancements** (preserve all paths, divergence detection, quick mode, fidelity scaling)
 - **Data quality validation** (empty entities_present detection, entity reference validation)
 - **Entity persistence to shared DB** (enables cross-run convergence analysis)
+- **All 5 temporal modes fully implemented** (PEARL, DIRECTORIAL, BRANCHING, CYCLICAL, PORTAL)
+- **6 new showcase templates** (3 directorial, 3 cyclical)
 
 **What's missing:** External integrations, containerization, distributed execution.
 

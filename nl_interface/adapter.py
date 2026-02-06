@@ -51,7 +51,6 @@ class NLToProductionAdapter:
     TEMPORAL_MODE_MAP = {
         "pearl": TemporalMode.PEARL,
         "directorial": TemporalMode.DIRECTORIAL,
-        "nonlinear": TemporalMode.NONLINEAR,
         "branching": TemporalMode.BRANCHING,
         "cyclical": TemporalMode.CYCLICAL,
         "portal": TemporalMode.PORTAL,

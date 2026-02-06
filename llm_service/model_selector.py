@@ -103,6 +103,17 @@ class ActionType(Enum):
     PORTAL_PATH_SCORING = auto()        # Judge LLM evaluation of path realism
     PORTAL_FORWARD_SIMULATION = auto()  # Mini-simulation state generation
 
+    # Branching mode operations (M12)
+    BRANCHING_CONSEQUENT_GENERATION = auto()  # Generate forward consequent states from branches
+
+    # Directorial mode operations (M17)
+    DIRECTORIAL_NARRATIVE_PLANNING = auto()   # Plan five-act narrative structure
+    DIRECTORIAL_SCENE_GENERATION = auto()     # Generate directed scenes with POV/framing
+
+    # Cyclical mode operations (M17)
+    CYCLICAL_SEMANTICS_INTERPRETATION = auto()  # Determine cycle type and semantics
+    CYCLICAL_VARIATION_GENERATION = auto()      # Generate cycle variations with escalation
+
 
 @dataclass
 class ModelProfile:
@@ -116,7 +127,11 @@ class ModelProfile:
     capabilities: Set[ModelCapability] = field(default_factory=set)
 
     # Context window
-    context_tokens: int = 4096         # Max context tokens
+    context_tokens: int = 4096         # Max context (input + output) tokens
+
+    # Output limits - IMPORTANT: separate from context window!
+    # Most models have lower output limits than context windows
+    max_output_tokens: int = 4096      # Max output tokens the model can generate
 
     # Performance
     relative_speed: float = 1.0        # 1.0 = baseline, >1 = faster
@@ -152,6 +167,7 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
             ModelCapability.COST_EFFICIENT,
         },
         context_tokens=128000,
+        max_output_tokens=4096,  # Llama 3.1 8B output limit
         relative_speed=2.0,
         relative_cost=0.3,
         relative_quality=0.7,
@@ -173,6 +189,7 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
             ModelCapability.HIGH_QUALITY,
         },
         context_tokens=128000,
+        max_output_tokens=4096,  # Llama 3.1 70B output limit
         relative_speed=1.0,
         relative_cost=1.0,
         relative_quality=1.0,
@@ -198,6 +215,7 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
             ModelCapability.LONG_FORM_TEXT,
         },
         context_tokens=128000,
+        max_output_tokens=4096,  # Llama 3.1 405B output limit
         relative_speed=0.5,
         relative_cost=3.0,
         relative_quality=1.3,
@@ -219,6 +237,7 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
             ModelCapability.FAST_INFERENCE,
         },
         context_tokens=128000,
+        max_output_tokens=8192,  # Llama 4 Scout output limit (improved)
         relative_speed=1.5,
         relative_cost=0.8,
         relative_quality=1.1,
@@ -241,6 +260,7 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
             ModelCapability.COST_EFFICIENT,
         },
         context_tokens=32768,
+        max_output_tokens=4096,  # Qwen 2.5 7B output limit
         relative_speed=2.0,
         relative_cost=0.25,
         relative_quality=0.65,
@@ -263,6 +283,7 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
             ModelCapability.HIGH_QUALITY,
         },
         context_tokens=32768,
+        max_output_tokens=4096,  # Qwen 2.5 72B output limit
         relative_speed=1.0,
         relative_cost=0.9,
         relative_quality=1.05,
@@ -283,6 +304,7 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
             ModelCapability.LARGE_CONTEXT,
         },
         context_tokens=32768,
+        max_output_tokens=4096,  # QwQ 32B output limit
         relative_speed=0.7,
         relative_cost=1.2,
         relative_quality=1.15,
@@ -304,6 +326,7 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
             ModelCapability.COST_EFFICIENT,
         },
         context_tokens=32768,
+        max_output_tokens=4096,  # DeepSeek Chat output limit
         relative_speed=1.3,
         relative_cost=0.5,
         relative_quality=0.9,
@@ -326,6 +349,7 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
             ModelCapability.HIGH_QUALITY,
         },
         context_tokens=64000,
+        max_output_tokens=8192,  # DeepSeek R1 output limit (reasoning model)
         relative_speed=0.6,
         relative_cost=1.5,
         relative_quality=1.25,
@@ -347,6 +371,7 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
             ModelCapability.INSTRUCTION_FOLLOWING,
         },
         context_tokens=32768,
+        max_output_tokens=4096,  # Mistral 7B output limit
         relative_speed=2.5,
         relative_cost=0.2,
         relative_quality=0.6,
@@ -366,6 +391,7 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
             ModelCapability.FAST_INFERENCE,
         },
         context_tokens=32768,
+        max_output_tokens=4096,  # Mixtral 8x7B output limit
         relative_speed=1.5,
         relative_cost=0.6,
         relative_quality=0.85,
@@ -386,6 +412,7 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
             ModelCapability.HIGH_QUALITY,
         },
         context_tokens=65536,
+        max_output_tokens=8192,  # Mixtral 8x22B output limit (larger MoE)
         relative_speed=1.0,
         relative_cost=1.1,
         relative_quality=1.05,
@@ -416,6 +443,7 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
             ModelCapability.HIGH_QUALITY,
         },
         context_tokens=1048576,  # 1M tokens!
+        max_output_tokens=8192,  # Gemini Flash output limit
         relative_speed=2.5,      # Optimized for low latency
         relative_cost=0.5,       # $0.50/M input, $3.00/M output
         relative_quality=1.2,    # High quality reasoning
@@ -444,6 +472,7 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
             ModelCapability.HIGH_QUALITY,
         },
         context_tokens=128000,
+        max_output_tokens=4096,  # Groq API output limit
         relative_speed=5.0,      # ~300 tok/s vs ~60 tok/s baseline
         relative_cost=0.7,       # $0.59/$0.79 per 1M tokens
         relative_quality=1.0,    # Same as Llama 70B
@@ -466,6 +495,7 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
             ModelCapability.HIGH_QUALITY,
         },
         context_tokens=128000,
+        max_output_tokens=4096,  # Groq API output limit
         relative_speed=5.0,
         relative_cost=0.7,
         relative_quality=1.0,
@@ -627,6 +657,54 @@ ACTION_REQUIREMENTS: Dict[ActionType, Dict[str, Any]] = {
         "preferred": {ModelCapability.FAST_INFERENCE, ModelCapability.COST_EFFICIENT},
         "min_context_tokens": 8192,
         "min_output_tokens": 500,
+    },
+
+    # Branching mode operations (M12)
+    # BRANCHING_CONSEQUENT_GENERATION: Generate multiple consequent states from a branch point
+    # - Needs moderate output for structured JSON with multiple consequents
+    # - Each consequent has description, key_events, outcome_type, causal_link
+    # - Base: 2000 tokens, scales with number of consequents requested
+    ActionType.BRANCHING_CONSEQUENT_GENERATION: {
+        "required": {ModelCapability.STRUCTURED_JSON, ModelCapability.CAUSAL_REASONING, ModelCapability.TEMPORAL_REASONING},
+        "preferred": {ModelCapability.HIGH_QUALITY, ModelCapability.LOGICAL_REASONING},
+        "min_context_tokens": 16384,
+        "min_output_tokens": 2000,  # Base for 3 consequents
+        "tokens_per_unit": 600,     # Additional tokens per consequent
+        "output_scaling_factor": "num_consequents",  # Scale output by this context key
+    },
+
+    # Directorial mode operations (M17)
+    # DIRECTORIAL_NARRATIVE_PLANNING: Plan five-act narrative structure with character arcs
+    ActionType.DIRECTORIAL_NARRATIVE_PLANNING: {
+        "required": {ModelCapability.STRUCTURED_JSON, ModelCapability.LONG_FORM_TEXT},
+        "preferred": {ModelCapability.HIGH_QUALITY, ModelCapability.LOGICAL_REASONING},
+        "min_context_tokens": 16384,
+        "min_output_tokens": 2000,
+    },
+
+    # DIRECTORIAL_SCENE_GENERATION: Generate directed scenes with POV and framing
+    ActionType.DIRECTORIAL_SCENE_GENERATION: {
+        "required": {ModelCapability.STRUCTURED_JSON, ModelCapability.LONG_FORM_TEXT, ModelCapability.DIALOG_GENERATION},
+        "preferred": {ModelCapability.HIGH_QUALITY, ModelCapability.TEMPORAL_REASONING},
+        "min_context_tokens": 16384,
+        "min_output_tokens": 1000,
+    },
+
+    # Cyclical mode operations (M17)
+    # CYCLICAL_SEMANTICS_INTERPRETATION: Determine cycle type and variation mode
+    ActionType.CYCLICAL_SEMANTICS_INTERPRETATION: {
+        "required": {ModelCapability.STRUCTURED_JSON, ModelCapability.LOGICAL_REASONING, ModelCapability.TEMPORAL_REASONING},
+        "preferred": {ModelCapability.HIGH_QUALITY, ModelCapability.CAUSAL_REASONING},
+        "min_context_tokens": 8192,
+        "min_output_tokens": 1000,
+    },
+
+    # CYCLICAL_VARIATION_GENERATION: Generate cycle states with escalation and prophecy
+    ActionType.CYCLICAL_VARIATION_GENERATION: {
+        "required": {ModelCapability.STRUCTURED_JSON, ModelCapability.TEMPORAL_REASONING},
+        "preferred": {ModelCapability.HIGH_QUALITY, ModelCapability.CAUSAL_REASONING},
+        "min_context_tokens": 16384,
+        "min_output_tokens": 800,
     },
 }
 
@@ -1032,21 +1110,28 @@ class TokenBudgetEstimator:
         "score_with_reasoning": 200,  # Per scored item with explanation
     }
 
-    def __init__(self, action_requirements: Optional[Dict] = None):
+    def __init__(
+        self,
+        action_requirements: Optional[Dict] = None,
+        model_registry: Optional[Dict[str, ModelProfile]] = None
+    ):
         """
         Initialize estimator.
 
         Args:
             action_requirements: Custom requirements (uses default if None)
+            model_registry: Model registry for looking up output limits (uses default if None)
         """
         self.action_requirements = action_requirements or ACTION_REQUIREMENTS
+        self.model_registry = model_registry or MODEL_REGISTRY
 
     def estimate(
         self,
         action: ActionType,
         context: Optional[Dict[str, Any]] = None,
         prompt_length: int = 0,
-        safety_margin: float = 1.3
+        safety_margin: float = 1.3,
+        model_id: Optional[str] = None
     ) -> TokenBudgetEstimate:
         """
         Estimate appropriate token budget for an action.
@@ -1056,9 +1141,10 @@ class TokenBudgetEstimator:
             context: Context with scaling factors (e.g., candidate_count)
             prompt_length: Estimated prompt length in characters (for scaling)
             safety_margin: Multiplier for safety (default 1.3 = 30% buffer)
+            model_id: Model ID to look up max_output_tokens limit (optional)
 
         Returns:
-            TokenBudgetEstimate with recommended tokens
+            TokenBudgetEstimate with recommended tokens (capped at model limit if provided)
         """
         context = context or {}
 
@@ -1085,7 +1171,7 @@ class TokenBudgetEstimator:
         # Apply safety margin
         recommended = int(base_tokens * safety_margin)
 
-        # Compute min/max bounds
+        # Compute min/max bounds (before model cap)
         min_tokens = int(base_tokens * 0.7)  # 70% of base is minimum
         max_tokens = int(base_tokens * 2.0)  # 2x base is maximum useful
 
@@ -1094,6 +1180,24 @@ class TokenBudgetEstimator:
         if scaling_key:
             reasoning_parts.append(f"Scaling: {scaling_key}={context.get(scaling_key, 'N/A')}")
         reasoning_parts.append(f"Safety margin: {safety_margin}x")
+
+        # Cap at model's max_output_tokens if model_id provided
+        model_output_limit = None
+        if model_id and model_id in self.model_registry:
+            model_profile = self.model_registry[model_id]
+            model_output_limit = model_profile.max_output_tokens
+
+            if recommended > model_output_limit:
+                reasoning_parts.append(f"CAPPED: {recommended}->{model_output_limit} ({model_id})")
+                logger.warning(
+                    f"Token estimate {recommended} exceeds model limit {model_output_limit} "
+                    f"for {model_id}. Capping at model limit."
+                )
+                recommended = model_output_limit
+
+            # Also cap max_tokens at model limit
+            if max_tokens > model_output_limit:
+                max_tokens = model_output_limit
 
         return TokenBudgetEstimate(
             recommended_tokens=recommended,
@@ -1106,7 +1210,8 @@ class TokenBudgetEstimator:
     def get_retry_budget(
         self,
         previous_estimate: TokenBudgetEstimate,
-        retry_count: int = 1
+        retry_count: int = 1,
+        model_id: Optional[str] = None
     ) -> int:
         """
         Get increased token budget for retry after truncation.
@@ -1114,16 +1219,29 @@ class TokenBudgetEstimator:
         Args:
             previous_estimate: The estimate that led to truncation
             retry_count: Which retry attempt this is (1, 2, 3...)
+            model_id: Model ID to look up max_output_tokens limit (optional)
 
         Returns:
-            Increased token count for retry
+            Increased token count for retry (capped at model limit if provided)
         """
         # Exponential backoff on tokens: 1.5x, 2.25x, 3.375x...
         multiplier = previous_estimate.retry_multiplier ** retry_count
         retry_tokens = int(previous_estimate.recommended_tokens * multiplier)
 
         # Cap at max_tokens * 2 to prevent runaway
-        return min(retry_tokens, previous_estimate.max_tokens * 2)
+        max_cap = previous_estimate.max_tokens * 2
+
+        # Also cap at model's max_output_tokens if provided
+        if model_id and model_id in self.model_registry:
+            model_limit = self.model_registry[model_id].max_output_tokens
+            max_cap = min(max_cap, model_limit)
+            if retry_tokens > model_limit:
+                logger.warning(
+                    f"Retry budget {retry_tokens} exceeds model limit {model_limit} "
+                    f"for {model_id}. Capping at model limit."
+                )
+
+        return min(retry_tokens, max_cap)
 
     def detect_truncation(self, response: str, expected_structure: str = "json") -> bool:
         """
@@ -1184,6 +1302,7 @@ def get_token_estimator() -> TokenBudgetEstimator:
 def estimate_tokens_for_action(
     action: ActionType,
     context: Optional[Dict[str, Any]] = None,
+    model_id: Optional[str] = None,
     **kwargs
 ) -> TokenBudgetEstimate:
     """
@@ -1191,10 +1310,42 @@ def estimate_tokens_for_action(
 
     Args:
         action: Action type
-        context: Context with scaling factors
+        context: Context with scaling factors (e.g., candidate_count)
+        model_id: Model ID to look up max_output_tokens limit (caps estimate)
         **kwargs: Additional arguments for estimate()
 
     Returns:
-        TokenBudgetEstimate
+        TokenBudgetEstimate (capped at model limit if model_id provided)
+
+    Example:
+        # Estimate for portal reasoning with 5 candidates, capped at Llama 70B limit
+        estimate = estimate_tokens_for_action(
+            ActionType.PORTAL_BACKWARD_REASONING,
+            context={"candidate_count": 5},
+            model_id="meta-llama/llama-3.1-70b-instruct"
+        )
+        print(estimate.recommended_tokens)  # -> 4096 (capped)
     """
-    return get_token_estimator().estimate(action, context, **kwargs)
+    return get_token_estimator().estimate(action, context, model_id=model_id, **kwargs)
+
+
+def get_model_output_limit(model_id: str) -> int:
+    """
+    Get the max_output_tokens limit for a model.
+
+    Args:
+        model_id: Model identifier (e.g., "meta-llama/llama-3.1-70b-instruct")
+
+    Returns:
+        Max output tokens the model can generate, or 4096 if model not found
+
+    Example:
+        >>> get_model_output_limit("meta-llama/llama-3.1-70b-instruct")
+        4096
+        >>> get_model_output_limit("deepseek/deepseek-r1")
+        8192
+    """
+    if model_id in MODEL_REGISTRY:
+        return MODEL_REGISTRY[model_id].max_output_tokens
+    # Default fallback for unknown models
+    return 4096

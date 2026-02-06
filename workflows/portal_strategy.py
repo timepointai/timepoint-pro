@@ -1475,30 +1475,162 @@ Focus on: forward coherence, dialog realism, causal necessity, internal consiste
         return sorted_antecedents
 
     def _llm_score(self, antecedent: PortalState, consequent: PortalState) -> float:
-        """Ask LLM to rate plausibility 0-1"""
-        # TODO: Implement LLM scoring
-        # For now, return random score
-        return np.random.uniform(0.5, 1.0)
+        """Ask LLM to rate plausibility that antecedent leads to consequent (0-1)"""
+        try:
+            from pydantic import BaseModel
+
+            class PlausibilityScore(BaseModel):
+                score: float
+                reasoning: str
+
+            prompt = f"""Rate the plausibility that this earlier state leads to the later state.
+
+EARLIER STATE ({antecedent.year}):
+{antecedent.description[:300]}
+
+LATER STATE ({consequent.year}):
+{consequent.description[:300]}
+
+Rate plausibility from 0.0 (impossible) to 1.0 (highly plausible).
+Consider: Are the causal connections logical? Is the timeline realistic?"""
+
+            result = self.llm.generate_structured(
+                prompt=prompt,
+                response_model=PlausibilityScore,
+                system_prompt="You are an expert at evaluating causal plausibility between historical states.",
+                temperature=0.3,
+                max_tokens=300
+            )
+            return max(0.0, min(1.0, result.score))
+        except Exception as e:
+            print(f"    ⚠️  LLM plausibility scoring failed: {e}")
+            return np.random.uniform(0.5, 1.0)
 
     def _historical_precedent_score(self, ant: PortalState, cons: PortalState) -> float:
-        """Check if similar transitions occurred in history"""
-        # TODO: Query knowledge base for similar patterns
-        return 0.7  # Placeholder
+        """Check if similar transitions have historical precedent"""
+        try:
+            from pydantic import BaseModel
+            from typing import List as TypingList
+
+            class PrecedentScore(BaseModel):
+                score: float
+                historical_examples: TypingList[str]
+
+            prompt = f"""Has a transition like the following occurred in real history?
+
+FROM ({ant.year}): {ant.description[:250]}
+TO ({cons.year}): {cons.description[:250]}
+
+Rate historical precedent from 0.0 (never happened) to 1.0 (well-documented pattern).
+Cite up to 3 brief historical examples if any exist."""
+
+            result = self.llm.generate_structured(
+                prompt=prompt,
+                response_model=PrecedentScore,
+                system_prompt="You are a historian evaluating whether state transitions have real-world precedent.",
+                temperature=0.3,
+                max_tokens=400
+            )
+            return max(0.0, min(1.0, result.score))
+        except Exception as e:
+            print(f"    ⚠️  Historical precedent scoring failed: {e}")
+            return 0.7
 
     def _causal_necessity_score(self, ant: PortalState, cons: PortalState) -> float:
-        """Score based on how REQUIRED the antecedent is for the consequent"""
-        # TODO: Check logical implications
-        return 0.8  # Placeholder
+        """Score how logically REQUIRED the antecedent is for the consequent"""
+        try:
+            from pydantic import BaseModel
+            from typing import List as TypingList
+
+            class NecessityScore(BaseModel):
+                score: float
+                reasoning: str
+                alternatives: TypingList[str]
+
+            prompt = f"""Is the earlier state logically REQUIRED for the later state to occur?
+
+EARLIER STATE ({ant.year}): {ant.description[:250]}
+LATER STATE ({cons.year}): {cons.description[:250]}
+
+Rate causal necessity from 0.0 (completely unnecessary, many alternatives) to 1.0 (absolutely required, no alternatives).
+List up to 3 alternative paths that could also lead to the later state."""
+
+            result = self.llm.generate_structured(
+                prompt=prompt,
+                response_model=NecessityScore,
+                system_prompt="You are an expert in causal reasoning and counterfactual analysis.",
+                temperature=0.3,
+                max_tokens=400
+            )
+            return max(0.0, min(1.0, result.score))
+        except Exception as e:
+            print(f"    ⚠️  Causal necessity scoring failed: {e}")
+            return 0.8
 
     def _entity_capability_score(self, ant: PortalState, cons: PortalState) -> float:
-        """Validate entities can actually do what's required"""
-        # TODO: Check skills, resources, relationships, timeline
-        return 0.9  # Placeholder
+        """Validate that entities can plausibly achieve what the consequent describes"""
+        try:
+            from pydantic import BaseModel
+
+            class CapabilityScore(BaseModel):
+                score: float
+                entity_assessments: Dict[str, str]
+
+            # Build entity context
+            ant_entities = ", ".join(e.entity_id for e in ant.entities[:8]) if ant.entities else "unknown entities"
+            cons_entities = ", ".join(e.entity_id for e in cons.entities[:8]) if cons.entities else "unknown entities"
+
+            prompt = f"""Can the entities in the earlier state plausibly achieve what the later state describes?
+
+EARLIER STATE ({ant.year}): {ant.description[:200]}
+Entities: {ant_entities}
+
+LATER STATE ({cons.year}): {cons.description[:200]}
+Entities: {cons_entities}
+
+Rate entity capability from 0.0 (impossible given their skills/resources) to 1.0 (well within their capabilities).
+Assess key entities briefly."""
+
+            result = self.llm.generate_structured(
+                prompt=prompt,
+                response_model=CapabilityScore,
+                system_prompt="You are an expert at assessing whether actors have the skills, resources, and relationships to achieve outcomes.",
+                temperature=0.3,
+                max_tokens=400
+            )
+            return max(0.0, min(1.0, result.score))
+        except Exception as e:
+            print(f"    ⚠️  Entity capability scoring failed: {e}")
+            return 0.9
 
     def _dynamic_context_score(self, ant: PortalState, cons: PortalState) -> float:
-        """Score based on dynamic world context"""
-        # TODO: Check economic, political, technological plausibility
-        return 0.7  # Placeholder
+        """Score plausibility given economic, political, and technological context"""
+        try:
+            from pydantic import BaseModel
+
+            class ContextScore(BaseModel):
+                score: float
+                context_factors: Dict[str, str]
+
+            prompt = f"""Is this transition plausible given the broader world context of the time period?
+
+FROM ({ant.year}): {ant.description[:200]}
+TO ({cons.year}): {cons.description[:200]}
+
+Consider economic conditions, political environment, technological capabilities, and social norms of {ant.year}-{cons.year}.
+Rate contextual plausibility from 0.0 (anachronistic/impossible for the era) to 1.0 (perfectly fits the period)."""
+
+            result = self.llm.generate_structured(
+                prompt=prompt,
+                response_model=ContextScore,
+                system_prompt="You are a historian specializing in contextual analysis of events within their time periods.",
+                temperature=0.3,
+                max_tokens=400
+            )
+            return max(0.0, min(1.0, result.score))
+        except Exception as e:
+            print(f"    ⚠️  Dynamic context scoring failed: {e}")
+            return 0.7
 
     def _prune_low_scoring_paths(self, states: List[PortalState]) -> List[PortalState]:
         """Prune states below threshold to manage path explosion"""

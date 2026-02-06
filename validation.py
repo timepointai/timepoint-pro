@@ -1323,11 +1323,6 @@ def validate_temporal_consistency(
             return {"valid": True, "message": "Cyclical mode: Prophecy allowed"}
         return {"valid": True, "message": "Cyclical mode: Standard causality"}
 
-    elif mode == "nonlinear":
-        # Presentation order ≠ causal order
-        # Allow flashbacks and foreshadowing
-        return {"valid": True, "message": "Nonlinear mode: Temporal flexibility allowed"}
-
     elif mode == "directorial":
         # Narrative structure drives causality
         narrative_indicators = ["dramatic", "turning_point", "climax", "resolution"]
