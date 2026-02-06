@@ -102,20 +102,20 @@ TIMEPOINT MONITOR | 2026-01-11 14:35:00 | Mode: BOTH
 Chat Mode: ENABLED (type messages and press Enter to ask questions)
 ================================================================================
 
-[RAW] Running: portal_timepoint_unicorn [3/15]
+[RAW] Running: showcase_board_meeting [3/15]
 [RAW] Run ID: run_20260111_143500_abc123
 [RAW] Entities: 6, Timepoints: 12
 [RAW] Mechanisms: M1, M2, M3, M6, M7, M8, M11, M17
 [RAW] Cost: $0.08
 
 --- LLM SUMMARY (llama-3.1-8b @ 14:35:00) ---
-Portal simulation 3/15 complete. Currently running portal_timepoint_unicorn
+Portal simulation 3/15 complete. Currently running showcase_board_meeting
 (run_20260111_143500_abc123), which traces Timepoint's path from $1.2B
 valuation in March 2030 backward to founding in April 2024 using M17 modal
 temporal causality. The simulation has generated 12 timepoints across 6 entities
 at $0.08 cost.
 
-[RAW] ✅ Success: portal_timepoint_unicorn
+[RAW] ✅ Success: showcase_board_meeting
 ...
 ```
 

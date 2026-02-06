@@ -51,20 +51,16 @@ python run_all_mechanism_tests.py --nl "detective interrogates 3 witnesses about
 
 ### Template-Based Mode
 ```bash
-# List all 41 available templates
+# List all 13 verified templates
 ./run.sh list
 
 # Run a single template
 ./run.sh run board_meeting
-./run.sh run constitutional_convention_day1
+./run.sh run jefferson_dinner
 
 # Run templates by category
-./run.sh run --category core          # 18 mechanism isolation tests
-./run.sh run --category showcase      # 10 production-ready scenarios
-./run.sh run --category portal        # 4 backward reasoning scenarios
-
-# Portal quick mode - 5 backward steps for fast demos (~15 min vs 1+ hour)
-./run.sh run portal_startup_unicorn --portal-quick
+./run.sh run --category showcase      # 10 showcase scenarios
+./run.sh run --category convergence   # 3 convergence-optimized templates
 
 # Run templates by tier (complexity)
 ./run.sh quick                    # Fast tests (~2-3 min each)
@@ -145,10 +141,10 @@ Each mode changes what "time" means and how the simulation validates consistency
 | Mode | Description | Use Case | Example Template |
 |------|-------------|----------|------------------|
 | `pearl` | Standard causality, no time paradoxes | Default, most realistic | `board_meeting` |
-| `portal` | Backward reasoning from known outcomes | "How did we get here?" scenarios | `portal_startup_unicorn` |
-| `directorial` | Narrative-focused with dramatic tension | Stories, character arcs | `macbeth_directorial` |
-| `cyclical` | Allows prophecy and time loops | Sci-fi, mystical, generational | `groundhog_loop_cyclical` |
-| `branching` | Counterfactual what-if scenarios | Decision analysis, alternate history | `final_problem_branching` |
+| `portal` | Backward reasoning from known outcomes | "How did we get here?" scenarios | (no verified templates) |
+| `directorial` | Narrative-focused with dramatic tension | Stories, character arcs | `hound_shadow_directorial` |
+| `cyclical` | Allows prophecy and time loops | Sci-fi, mystical, generational | (no verified templates) |
+| `branching` | Counterfactual what-if scenarios | Decision analysis, alternate history | `vc_pitch_branching` |
 
 ### Choosing a Mode
 
@@ -165,15 +161,12 @@ Each mode changes what "time" means and how the simulation validates consistency
 ### Mode-Specific Templates
 
 ```bash
-# Directorial templates (narrative structure)
-./run.sh run macbeth_directorial      # Classical tragedy, 5-act structure
-./run.sh run heist_directorial        # Ensemble thriller, parallel timelines
-./run.sh run courtroom_directorial    # Legal drama, dual POV
+# Directorial template (narrative structure)
+./run.sh run hound_shadow_directorial  # Detective on foggy moors, directorial causality
 
-# Cyclical templates (prophecy and loops)
-./run.sh run groundhog_loop_cyclical  # Time loop, deja vu mechanism
-./run.sh run dynasty_cycles_cyclical  # Generational saga, spiral escalation
-./run.sh run seasons_market_cyclical  # Economic oscillation, analyst prophecy
+# Branching templates (counterfactual timelines)
+./run.sh run vc_pitch_branching        # VC pitch with counterfactual branching
+./run.sh run vc_pitch_strategies       # Multiple negotiation strategy variants
 ```
 
 ## Advanced Options
@@ -307,17 +300,17 @@ After generating a simulation:
 
 ```
 ================================================================================
-TEMPLATE CATALOG
+TEMPLATE CATALOG (Verified Only)
 ================================================================================
 ID                                       TIER         CATEGORY     MECHANISMS
 --------------------------------------------------------------------------------
-core/m01_heterogeneous_fidelity          quick        core         M1
-core/m07_causal_chains                   quick        core         M7
 showcase/board_meeting                   standard     showcase     M1, M7, M11 +1
-portal/startup_unicorn                   comprehensive portal      M17, M13, M7 +1
-stress/constitutional_convention_day1    stress       stress       M1, M2, M3 +7
+showcase/jefferson_dinner                standard     showcase     M3, M7, M11 +1
+showcase/hound_shadow_directorial        comprehensive showcase    M17, M10, M14 +3
+convergence/simple                       quick        convergence  M7, M11
+convergence/standard                     standard     convergence  M7, M11, M13
 --------------------------------------------------------------------------------
-Total: 41 templates
+Total: 13 verified templates
 ```
 
 ---

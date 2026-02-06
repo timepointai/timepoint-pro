@@ -27,7 +27,7 @@ def test_profile_loading():
 
     # Import required modules
     print("Loading modules...")
-    from generation.config_schema import SimulationConfig
+    from generation.templates.loader import TemplateLoader
     from generation.resilience_orchestrator import ResilientE2EWorkflowRunner
     from metadata.run_tracker import MetadataManager
     print("✓ Imports successful")
@@ -45,9 +45,10 @@ def test_profile_loading():
     print("✓ E2E runner initialized")
     print()
 
-    # Get portal_timepoint_unicorn config
-    print("Loading portal_timepoint_unicorn configuration...")
-    config = SimulationConfig.portal_timepoint_unicorn()
+    # Get board_meeting config (verified template)
+    print("Loading showcase/board_meeting configuration...")
+    loader = TemplateLoader()
+    config = loader.load_template("showcase/board_meeting")
     print("✓ Configuration loaded")
     print()
 

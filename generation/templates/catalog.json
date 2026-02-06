@@ -1,0 +1,210 @@
+{
+  "version": "2.0.0",
+  "description": "Timepoint Template Catalog - Verified templates only",
+  "last_updated": "2026-02-06",
+  "tiers": {
+    "quick": {
+      "description": "Fast validation tests",
+      "entities": "2-3",
+      "timepoints": "1-2",
+      "cost_estimate": "<$0.05",
+      "duration_estimate": "<1min"
+    },
+    "standard": {
+      "description": "Normal testing with moderate complexity",
+      "entities": "4-6",
+      "timepoints": "3-5",
+      "cost_estimate": "$0.05-0.20",
+      "duration_estimate": "1-5min"
+    },
+    "comprehensive": {
+      "description": "Full mechanism exercise with rich scenarios",
+      "entities": "7-10",
+      "timepoints": "5-10",
+      "cost_estimate": "$0.20-1.00",
+      "duration_estimate": "5-15min"
+    }
+  },
+  "mechanisms": {
+    "M1": "Heterogeneous Fidelity - Different resolution levels in same scene",
+    "M2": "Progressive Training - Entity quality improves over queries",
+    "M3": "Exposure Events - Knowledge flows from source to target",
+    "M4": "Physics Validation - Constraints block invalid states",
+    "M5": "Lazy Resolution - Query elevates resolution on demand",
+    "M6": "Tensor Compression - 97% compression with reconstruction",
+    "M7": "Causal Chains - Events in proper temporal order",
+    "M8": "Embodied States - Physical state affects cognition",
+    "M9": "On-Demand Entities - Missing entities auto-generated",
+    "M10": "Scene Atmosphere - Environment influences behavior",
+    "M11": "Dialog Synthesis - Multi-turn contextual conversation",
+    "M12": "Counterfactual Branching - Timeline splits at decision points",
+    "M13": "Relationship Evolution - Trust/tension changes over time",
+    "M14": "Circadian Patterns - Time-of-day affects behavior",
+    "M15": "Entity Prospection - Entity models future states",
+    "M16": "Animistic Entities - Non-human entities have agency",
+    "M17": "Modal Causality - PEARL/PORTAL/BRANCHING modes",
+    "M18": "Model Selection - Action-appropriate model chosen"
+  },
+  "patches": {
+    "corporate": [
+      "showcase/board_meeting",
+      "showcase/vc_pitch_pearl",
+      "showcase/vc_pitch_branching",
+      "showcase/vc_pitch_roadshow",
+      "showcase/vc_pitch_strategies"
+    ],
+    "historical": [
+      "showcase/jefferson_dinner"
+    ],
+    "crisis": [
+      "showcase/hospital_crisis"
+    ],
+    "mystical": [
+      "showcase/kami_shrine"
+    ],
+    "mystery": [
+      "showcase/detective_prospection",
+      "showcase/hound_shadow_directorial"
+    ],
+    "directorial": [
+      "showcase/hound_shadow_directorial"
+    ],
+    "convergence": [
+      "convergence/simple",
+      "convergence/standard",
+      "convergence/comprehensive"
+    ]
+  },
+  "templates": {
+    "showcase/board_meeting": {
+      "name": "Board Meeting",
+      "description": "Tech startup board meeting with CEO acquisition proposal",
+      "mechanisms": ["M1", "M7", "M11", "M13"],
+      "tier": "standard",
+      "category": "showcase",
+      "cost_estimate": "$0.05",
+      "duration_estimate": "2min",
+      "status": "verified"
+    },
+    "showcase/jefferson_dinner": {
+      "name": "Jefferson Dinner",
+      "description": "1790 Compromise Dinner between Jefferson, Hamilton, Madison",
+      "mechanisms": ["M3", "M7", "M11", "M13"],
+      "tier": "standard",
+      "category": "showcase",
+      "cost_estimate": "$0.05",
+      "duration_estimate": "2min",
+      "status": "verified"
+    },
+    "showcase/hospital_crisis": {
+      "name": "Hospital Crisis",
+      "description": "ER night shift with embodied states and circadian patterns",
+      "mechanisms": ["M8", "M14"],
+      "tier": "standard",
+      "category": "showcase",
+      "cost_estimate": "$0.05",
+      "duration_estimate": "2min",
+      "status": "verified"
+    },
+    "showcase/detective_prospection": {
+      "name": "Detective Prospection",
+      "description": "Holmes models Moriarty's future actions",
+      "mechanisms": ["M15", "M7"],
+      "tier": "standard",
+      "category": "showcase",
+      "cost_estimate": "$0.05",
+      "duration_estimate": "2min",
+      "status": "verified"
+    },
+    "showcase/kami_shrine": {
+      "name": "Kami Shrine Ritual",
+      "description": "Japanese shrine with animistic entities (building, deity, fox)",
+      "mechanisms": ["M16"],
+      "tier": "standard",
+      "category": "showcase",
+      "cost_estimate": "$0.05",
+      "duration_estimate": "2min",
+      "status": "verified"
+    },
+    "showcase/vc_pitch_pearl": {
+      "name": "VC Pitch (Pearl)",
+      "description": "Pre-seed pitch with pearl causality",
+      "mechanisms": ["M11", "M15", "M7", "M13"],
+      "tier": "standard",
+      "category": "showcase",
+      "cost_estimate": "$0.08",
+      "duration_estimate": "3min",
+      "status": "verified"
+    },
+    "showcase/vc_pitch_branching": {
+      "name": "VC Pitch (Branching)",
+      "description": "Pre-seed pitch with counterfactual branching",
+      "mechanisms": ["M11", "M12", "M13", "M15"],
+      "tier": "standard",
+      "category": "showcase",
+      "cost_estimate": "$0.10",
+      "duration_estimate": "4min",
+      "status": "verified"
+    },
+    "showcase/vc_pitch_roadshow": {
+      "name": "VC Pitch Roadshow",
+      "description": "Multi-meeting VC roadshow scenario",
+      "mechanisms": ["M11", "M13", "M15", "M14"],
+      "tier": "comprehensive",
+      "category": "showcase",
+      "cost_estimate": "$0.20",
+      "duration_estimate": "8min",
+      "status": "verified"
+    },
+    "showcase/vc_pitch_strategies": {
+      "name": "VC Pitch Strategies",
+      "description": "Multiple negotiation strategy variants",
+      "mechanisms": ["M11", "M15", "M12"],
+      "tier": "standard",
+      "category": "showcase",
+      "cost_estimate": "$0.12",
+      "duration_estimate": "5min",
+      "status": "verified"
+    },
+    "showcase/hound_shadow_directorial": {
+      "name": "Hound of Baskervilles",
+      "description": "Detective on foggy moors with directorial causality",
+      "mechanisms": ["M17", "M10", "M14", "M11", "M8", "M16"],
+      "tier": "comprehensive",
+      "category": "showcase",
+      "cost_estimate": "$0.25",
+      "duration_estimate": "8min",
+      "status": "verified"
+    },
+    "convergence/simple": {
+      "name": "Convergence Simple",
+      "description": "Ultra-lightweight for fast convergence testing",
+      "mechanisms": ["M7", "M11"],
+      "tier": "quick",
+      "category": "convergence",
+      "cost_estimate": "$0.02",
+      "duration_estimate": "30s",
+      "status": "verified"
+    },
+    "convergence/standard": {
+      "name": "Convergence Standard",
+      "description": "Moderate complexity for convergence testing",
+      "mechanisms": ["M7", "M11", "M13"],
+      "tier": "standard",
+      "category": "convergence",
+      "cost_estimate": "$0.05",
+      "duration_estimate": "60s",
+      "status": "verified"
+    },
+    "convergence/comprehensive": {
+      "name": "Convergence Comprehensive",
+      "description": "Rich causal structure for thorough convergence testing",
+      "mechanisms": ["M7", "M11", "M13", "M3"],
+      "tier": "comprehensive",
+      "category": "convergence",
+      "cost_estimate": "$0.10",
+      "duration_estimate": "90s",
+      "status": "verified"
+    }
+  }
+}

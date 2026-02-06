@@ -42,7 +42,7 @@ Strategies share a common interface: `run(config) -> List[Path]`. Each path cont
 
 ## Key Commands
 ```bash
-./run.sh list                    # List all 41 templates
+./run.sh list                    # List all 13 verified templates
 ./run.sh run board_meeting       # Run single template
 ./run.sh run --category core     # Run by category
 ./run.sh quick                   # Quick tier tests
@@ -93,8 +93,8 @@ Entities now sync to metadata/runs.db alongside timepoints for convergence analy
 
 ### Template Name Normalization
 Template names now accept both slash and underscore formats interchangeably:
-- `./run.sh run portal/startup_unicorn` works the same as
-- `./run.sh run portal_startup_unicorn`
+- `./run.sh run showcase/board_meeting` works the same as
+- `./run.sh run board_meeting`
 
 **Files:** `run_all_mechanism_tests.py:run_single_template()`
 
@@ -140,17 +140,11 @@ Implemented complete strategy classes for DIRECTORIAL and CYCLICAL temporal mode
 - `workflows/__init__.py`: Added exports for DirectorialStrategy and CyclicalStrategy
 - `llm_service/model_selector.py`: Added 4 new ActionType entries for mode-specific LLM calls
 
-### New Templates (6 total)
+### Templates (February 2026 cleanup)
 
-**Directorial Templates:**
-- `macbeth_directorial.json` - Classical five-act Shakespearean tragedy
-- `heist_directorial.json` - Ensemble heist with parallel timeline interleaving
-- `courtroom_directorial.json` - Legal drama with two-POV adversarial structure
-
-**Cyclical Templates:**
-- `groundhog_loop_cyclical.json` - Time loop with deja vu prophecy mechanism
-- `dynasty_cycles_cyclical.json` - Generational saga with spiral escalation
-- `seasons_market_cyclical.json` - Economic boom-bust with quarterly oscillation
+Pending directorial/cyclical templates were removed during template cleanup.
+The verified directorial template is `hound_shadow_directorial.json`.
+Mode strategies (directorial_strategy.py, cyclical_strategy.py) remain fully implemented.
 
 ### Portal Scoring Stubs Replaced
 
