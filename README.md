@@ -10,27 +10,31 @@ Because the problems that matter—backward causal reasoning, multi-entity state
 
 ## Why Structure, Not Just Prompts
 
-A frontier LLM can generate a plausible story about a Mars mission failure. Timepoint generates a **meaning graph**: typed entities with numerical emotional states, causal chains with scored alternatives, knowledge items with provenance, timelines with quantitative metadata. One is prose. The other is a computational artifact you can query, compare, analyze, and build on.
+A frontier LLM can generate a plausible story about a crew crash-landing on an alien planet. Timepoint generates a **meaning graph**: 10 typed entities with numerical emotional states, causal chains with scored alternatives across 3 counterfactual survival strategies, knowledge items with provenance ("Who discovered the water is contaminated? Who noticed the fauna predict storms?"), and timelines with 90+ quantitative state variables propagated across 5,100 steps. One is prose. The other is a computational artifact you can query, compare, analyze, and build on.
+
+The **Castaway Colony** template makes this concrete. Six crew members crash-land on Kepler-442b. Over 10 timepoints they must choose: fortify the crash site, explore the alien biosphere, or repair the emergency beacon. The template exercises all 19 mechanisms—including 7 that had zero verified templates before it existed.
 
 ### What structure provides that prompting cannot
 
-**Search, not generation.** PORTAL mode doesn't generate one backward path—it explores a tree. A 10-step backward trace generates 350 candidate antecedents (7 candidates x 10 steps x 5 paths), runs 350 mini forward-simulations, and has a judge LLM score each one. The winning causal chain is *selected from a search space*, not *generated in a single pass*. No amount of context window or chain-of-thought turns autoregressive generation into tree search with evaluation.
+**Search, not generation.** BRANCHING mode doesn't generate one survival strategy—it explores three. In Castaway Colony, the Day 7 branch point spawns parallel timelines (Fortify, Explore, Repair), each evaluated by a 405B judge LLM against resource constraints: O2 reserves, food rations in kg, hull integrity percentage. The winning strategy is *selected from a search space*, not *generated in a single pass*. No amount of context window or chain-of-thought turns autoregressive generation into tree search with evaluation.
 
-**Combinatorial complexity.** A simulation with N entities over T timepoints where each entity can influence K others produces O(N^K * T) possible interaction paths. Even modest scenarios (10 entities, 10 timepoints, 3 influence channels) generate state spaces that exceed any context window. This isn't a limitation that disappears with larger models—it's a mathematical property of the domain. Structure provides tractable navigation of intractable spaces through pruning, scoring, and selective expansion.
+**Combinatorial complexity.** Castaway Colony has 10 entities, 4 influence channels each, across 10 timepoints—producing O(100,000) possible interaction paths. That's one template. Even modest scenarios generate state spaces that exceed any context window. This isn't a limitation that disappears with larger models—it's a mathematical property of the domain. Structure provides tractable navigation of intractable spaces through pruning, scoring, and selective expansion.
 
-**Quantitative state propagation.** Emotional arcs, energy budgets, and knowledge flow are tracked numerically with explicit mathematical functions (exponential decay, symmetric clamping, circadian modulation). An LLM can write "she grew more stressed"—but it cannot track `valence = -0.580 → -0.600 → -0.620 → -0.640` with numerical precision across 862 coordinated calls. LLMs do not do reliable arithmetic over long sequences. This is a known architectural property of transformer attention, not a training gap that next year's model will close.
+**Quantitative state propagation.** O2 reserves deplete at 6 crew x 0.84 kg/hour. Water purification degrades at 0.5 liters/day. Hull integrity drops 0.3% per day from alien atmosphere. Radiation storms spike to 12 mSv/hour. These aren't flavor text—they're 90+ numerical values propagated across 5,100 steps with explicit mathematical functions. An LLM can write "supplies were running low"—but it cannot track `o2_reserve_hours = 336 → 288 → 240 → 192` with precision across 1,200 coordinated calls. LLMs do not do reliable arithmetic over long sequences. This is a known architectural property of transformer attention, not a training gap that next year's model will close.
 
-**Knowledge flow with provenance.** The output isn't "Lin Zhang knew about the anomalies." It's a typed graph edge: `{type: "fact", source: "lin_zhang", target: "thomas_webb", content: "5% decrease in O2 generator efficiency", timepoint: "tp_002_2030"}`. Structured data that downstream systems can query, aggregate, and reason over. A narrative paragraph is not computationally useful.
+**Knowledge flow with provenance.** The output isn't "the doctor discovered the water was contaminated." It's a typed graph edge: `{type: "empirical_observation", source: "dr_felix_okonkwo", target: "cmdr_yuki_tanaka", content: "water_source_contaminated_with_alien_microbes", timepoint: "tp_002"}` with a propagation chain: `okonkwo -> tanaka (critical alert) -> all_crew (rationing order)`. Structured data that downstream systems can query, aggregate, and reason over. A narrative paragraph is not computationally useful.
 
-**Convergence testing.** Run the same scenario three times and measure structural divergence quantitatively. Which causal links are robust? Which are sensitive to initial conditions? This requires deterministic structure around stochastic generation—comparable structural anchors to align against across runs.
+**Convergence testing.** Run Castaway Colony three times and ask: "Does the biologist always discover contaminated water first?" "Is fauna-predicts-storms a consensus knowledge edge?" "Does Branch C consistently require navigator data?" These are testable hypotheses across runs. This requires deterministic structure around stochastic generation—comparable structural anchors to align against.
 
-**Composable mechanisms.** The 19 mechanisms (M1-M19) are independently testable, independently fixable, and independently improvable. When emotional arousal saturated at 1.0, the fix was in M11's decay function—without touching M17 (portal reasoning) or M3 (knowledge flow). In a monolithic prompt, everything is entangled.
+**Composable mechanisms.** The 19 mechanisms (M1-M19) are independently testable, independently fixable, and independently improvable. In Castaway Colony, the alien ecosystem exercises M4/M6/M16 independently from crew dialog (M11) or branching (M12). When emotional arousal saturated at 1.0, the fix was in M11's decay function—without touching M17 (portal reasoning) or M3 (knowledge flow). In a monolithic prompt, everything is entangled.
 
 ### The engine/chassis distinction
 
 Growing LLM power makes the structure *more* valuable, not less. The LLM is the engine—it generates the raw material (dialog, antecedents, emotional keywords). But the value to a human isn't in the raw text. It's in the meaning graph. That's what you can analyze, visualize, compare across runs, feed into training pipelines, or use as input to other systems.
 
 A more powerful engine doesn't eliminate the need for a chassis, transmission, and steering. It makes the vehicle faster—but the structure is what makes it *drivable*.
+
+The Castaway Colony template demonstrates this directly: DeepSeek R1 calculates O2 depletion rates, Llama 70B generates crew conflict dialog, Qwen produces structured flora analysis JSON, and 405B judges branch outcomes. Four models, each doing what it's best at, coordinated by 19 mechanisms that no prompt could replicate.
 
 ---
 
@@ -47,14 +51,24 @@ export OPENROUTER_API_KEY=your_key_here
 # See it work
 ./run.sh quick                    # Quick-tier templates
 ./run.sh run board_meeting        # Single scenario
-./run.sh list                     # List all 14 verified templates
+./run.sh list                     # List all 15 templates
 ```
 
 ---
 
-## PORTAL Mode: Backward Temporal Reasoning
+## Flagship Templates
 
-The flagship feature. Given a future endpoint, discover plausible paths from the present.
+### Castaway Colony: Full-Mechanism Showcase
+
+The template that exercises all 19 mechanisms. Six crew members crash-land on Kepler-442b and must choose between three survival strategies. Exercises heterogeneous fidelity (M1), progressive training (M2), physics validation (M4), lazy resolution (M5), tensor compression (M6), on-demand entities (M9), and model selection (M18)—the 7 mechanisms that had zero verified templates before this one.
+
+```bash
+./run.sh run castaway_colony_branching  # All 19 mechanisms, branching mode
+```
+
+### PORTAL Mode: Backward Temporal Reasoning
+
+Given a future endpoint, discover plausible paths from the present.
 
 ```bash
 ./run.sh run mars_mission_portal        # Portal backward reasoning
@@ -100,7 +114,7 @@ Time isn't one thing. Timepoint supports five distinct temporal ontologies, each
 |------|-------------|----------|------------------|
 | **PEARL** | Standard causal DAG—causes precede effects | Default forward simulation | `board_meeting` |
 | **PORTAL** | Backward from endpoints to present | Strategic planning, path discovery | `mars_mission_portal` |
-| **BRANCHING** | Counterfactual timelines from decision points | "What if" analysis | `vc_pitch_branching` |
+| **BRANCHING** | Counterfactual timelines from decision points | "What if" analysis | `castaway_colony_branching` |
 | **CYCLICAL** | Prophetic/mythic time, future constrains past | Time loops, generational sagas | (no verified templates) |
 | **DIRECTORIAL** | Five-act narrative with tension arcs | Story-driven simulations | `hound_shadow_directorial` |
 
@@ -120,22 +134,28 @@ See [MECHANICS.md](MECHANICS.md) for full implementation details.
 Not everything needs full resolution. Resolution is a 2D surface over (entity, time) that concentrates detail where queries land:
 
 ```
-Query: "What did Alice tell Bob at T2 that changed his product strategy?"
+Castaway Colony fidelity map at Day 7 (branch decision):
 
-              T0    T1    T2    T3    T4    T5
-           +-----+-----+-----+-----+-----+-----+
-   Alice   |  .  |  o  |  #  |  #  |  o  |  .  |  <- queried at T2-T3
-           +-----+-----+-----+-----+-----+-----+
-   Bob     |  .  |  .  |  o  |  #  |  o  |  .  |  <- queried at T3
-           +-----+-----+-----+-----+-----+-----+
-   Carol   |  .  |  .  |  .  |  o  |  .  |  .  |  <- 1-hop from Bob
-           +-----+-----+-----+-----+-----+-----+
+                  Day1  Day3  Day5  Day7  Day14  Day21
+               +------+------+------+------+------+------+
+  Cmdr Tanaka  |  o   |  o   |  #   |  #   |  #   |  o   |  TRAINED (command decisions)
+               +------+------+------+------+------+------+
+  Dr Okonkwo   |  .   |  .   |  o   |  #   |  #   |  o   |  SCENE -> TRAINED (M2)
+               +------+------+------+------+------+------+
+  Eng Sharma   |  o   |  o   |  o   |  #   |  o   |  o   |  DIALOG (repair queries)
+               +------+------+------+------+------+------+
+  Nav Park     |  .   |  .   |  .   |  .   |  o   |  .   |  TENSOR -> DIALOG (M5)
+               +------+------+------+------+------+------+
+  Biosphere    |  .   |  .   |  .   |  .   |  .   |  .   |  TENSOR always (M6)
+               +------+------+------+------+------+------+
+  Crashed Ship |  .   |  .   |  .   |  .   |  .   |  .   |  TENSOR always (M1)
+               +------+------+------+------+------+------+
 
-   # = queried (full fidelity)     . = dormant (embedding only)
-   o = propagated (elevated)
+  # = queried (full fidelity)     . = dormant (embedding only)
+  o = propagated (elevated)
 ```
 
-A minor character exists as a 200-token tensor embedding until someone asks about them. Then the system elevates their resolution while preserving causal consistency with everything already established.
+The injured navigator exists as a 200-token tensor embedding until someone asks about pre-crash navigation data. Then lazy resolution (M5) elevates him to DIALOG while preserving causal consistency. The alien biosphere stays compressed as a tensor (M6) — 97% compression — until a query reconstructs it. The doctor progressively trains (M2) from SCENE to TRAINED as xenobiology queries accumulate.
 
 **Resolution Levels:**
 ```
@@ -153,25 +173,24 @@ Detail concentrates where it matters.
 Entities don't magically know things. The system tracks **exposure events**: who learned what, from whom, when.
 
 ```
-         T1              T2              T3
-          |               |               |
-  Alice --*---------------*---------------*--
-          |    tells Bob  |               |
-  Bob   --o---------------*---------------*--
-          |               |   tells Carol |
-  Carol --o---------------o---------------*--
+Castaway Colony knowledge propagation:
 
-  * = knows the information
-  o = doesn't know yet
+  Day 2: Okonkwo discovers contaminated water
+  Day 3: Okonkwo reports to Tanaka (critical alert)
+  Day 3: Tanaka orders rationing (all crew now know)
+  Day 4: Vasquez notices fauna migration correlates with pressure drops
+  Day 4: Vasquez tells Cole (defense planning), Vasquez tells Tanaka (strategy)
+  Day 6: Park queried about pre-crash nav data -> lazy resolution (M5)
+  Day 6: Park reveals hemisphere landing error -> Tanaka -> Vasquez (recalibrate models)
 
-  Query: "What does Carol know at T2?"
-  Answer: Nothing about the news -- she learns at T3 from Bob.
+  Query: "Does Cole know about the hemisphere error at Day 5?"
+  Answer: No. Park hasn't been queried yet. Cole learns after Day 6 propagation.
 ```
 
-This enables:
-- Preventing anachronisms ("How does Jefferson know about Louisiana Purchase in 1787?")
-- Tracing belief formation and information flow
-- Answering counterfactuals ("If Madison hadn't shared his notes, what would Hamilton believe?")
+Each discovery is a typed graph edge: `{type: "empirical_observation", source: "dr_felix_okonkwo", content: "water_source_contaminated_with_alien_microbes", timepoint: "tp_002"}`. This enables:
+- Preventing anachronisms (Cole can't plan around hemisphere data before Park reveals it)
+- Tracing belief formation and information flow across the crew
+- Answering counterfactuals ("If Okonkwo hadn't tested the water, when does contamination get discovered?")
 
 ---
 
@@ -220,8 +239,9 @@ This enables:
 
 ## Documentation
 
-- **[MECHANICS.md](MECHANICS.md)** -- Technical specification of all 19 mechanisms
+- **[MECHANICS.md](MECHANICS.md)** -- Technical specification of all 19 mechanisms, with Castaway Colony examples
 - **[QUICKSTART.md](QUICKSTART.md)** -- Detailed setup and usage guide
+- **[SYNTH.md](SYNTH.md)** -- SynthasAIzer control paradigm (envelopes, voices, patches)
 - **[MILESTONES.md](MILESTONES.md)** -- Roadmap from prototype to platform
 
 ---

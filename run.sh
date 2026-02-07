@@ -1939,6 +1939,7 @@ SHOWCASE_TEMPLATES=(
     "vc_pitch_strategies"
     "hound_shadow_directorial"
     "mars_mission_portal"
+    "castaway_colony_branching"
 )
 
 # Portal templates
@@ -2046,7 +2047,7 @@ main() {
         board_meeting|jefferson_dinner|hospital_crisis|detective_prospection|kami_shrine)
             cmd_run "$cmd" "$@"
             ;;
-        vc_pitch_pearl|vc_pitch_branching|vc_pitch_roadshow|vc_pitch_strategies|hound_shadow_directorial|mars_mission_portal)
+        vc_pitch_pearl|vc_pitch_branching|vc_pitch_roadshow|vc_pitch_strategies|hound_shadow_directorial|mars_mission_portal|castaway_colony_branching)
             cmd_run "$cmd" "$@"
             ;;
         # Portal templates

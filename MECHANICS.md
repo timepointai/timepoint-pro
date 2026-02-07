@@ -33,7 +33,7 @@ This enables 95% cost reduction without temporal incoherence—but only because 
 
 ## Conceptual Architecture
 
-The 18 mechanisms group into five pillars:
+The 19 mechanisms group into five pillars:
 
 | Pillar | Problem | Mechanisms |
 |--------|---------|------------|
@@ -67,6 +67,8 @@ Timepoint(T0, "Constitutional Convention")
 
 Resolution is **mutable**: queries elevate resolution (lazy loading), disuse can compress it back down. The system maintains both compressed and full representations, switching based on query patterns.
 
+**Castaway Colony example**: In the same scene, Commander Tanaka runs at TRAINED (heavily queried for command decisions), Engineer Sharma at DIALOG (repair assessments), the crashed Meridian at TENSOR (background life support tracking), and the injured Navigator Park at TENSOR_ONLY (inactive until queried about pre-crash data). Four different fidelity levels coexisting in one timepoint.
+
 **Token economics**: 100 entities × 10 timepoints at uniform high fidelity costs ~50M tokens. With heterogeneous fidelity (power-law distribution), this drops to ~2.5M tokens—95% reduction.
 
 ### Profile Loading Extension
@@ -99,6 +101,8 @@ EntityMetadata:
 
 Each query increments metadata. When thresholds are crossed, the system triggers elevation—generating richer state representations and storing both compressed and full versions. Quality accumulates; nothing is thrown away.
 
+**Castaway Colony example**: Dr. Okonkwo starts at SCENE resolution—a background doctor. As the crew discovers alien flora, xenobiology queries accumulate: "Is this lichen edible?" "What's the toxicity profile?" "Is the bioluminescence harmful?" After 3+ queries, he progressively elevates to DIALOG then TRAINED, becoming the most detailed entity in biosphere-related scenes. His quality tracks expertise demand, not pre-assigned importance.
+
 ## M5: Query-Driven Lazy Resolution
 
 Resolution decisions happen at query time, not simulation time:
@@ -115,6 +119,8 @@ def decide_resolution(entity, timepoint, query_history, thresholds):
 ```
 
 This is the key to cost reduction: we never pay for detail nobody asked about.
+
+**Castaway Colony example**: Navigator Jin Park starts at TENSOR_ONLY — injured, inactive, consuming minimal tokens. When Branch C (Repair & Signal) needs pre-crash orbital data to locate the emergency beacon, a query about navigation logs triggers lazy elevation to DIALOG. Park reveals the hemisphere landing error, which cascades to Vasquez (recalibrate weather models) and Tanaka (explains terrain mismatch). The system paid nothing for Park's detail until the moment it mattered.
 
 ## M6: Timepoint Tensor Model (TTM) Tensor Compression
 
@@ -136,6 +142,8 @@ TTMTensor:
 ```
 
 Tensors preserve enough structure for causal validation and can be re-expanded when queries require higher fidelity.
+
+**Castaway Colony example**: The Kepler-442b biosphere is compressed as a TTM tensor: `context_vector=[bioluminescence_intensity, electromagnetic_sensitivity, growth_rate]`, `biology_vector=[toxicity_index, nutrient_profile, symbiotic_relationships]`. This captures the alien ecosystem's state in ~1,600 tokens instead of ~50k — 97% compression. When a query asks "How does the flora respond to the crew's radio equipment?", the electromagnetic_sensitivity dimension reconstructs the relevant behavior without decompressing the entire biosphere.
 
 ### Dual Tensor Architecture & Synchronization
 
@@ -333,7 +341,7 @@ config = TemporalConfig(
 - Multiple timeline interleaving for complex narrative structures
 - Natural training data for story-aware language models
 
-**Templates**: `hound_shadow_directorial`
+**Templates**: `hound_shadow_directorial`, `castaway_colony_branching` (exercises M17 via BRANCHING mode causality)
 
 ### CYCLICAL Mode: Prophecy and Time Loops
 
@@ -443,6 +451,8 @@ def create_counterfactual_branch(parent_timeline, intervention_point, interventi
 
 Enables "what if Madison hadn't shared his notes?" queries with proper causal propagation.
 
+**Castaway Colony example**: At Day 7, Commander Tanaka's decision spawns three counterfactual branches. Branch A (Fortify & Wait) copies all state before Day 7 and propagates conservative resource consumption forward. Branch B (Explore & Adapt) applies exploration interventions — sending teams out, accumulating injuries and discoveries. Branch C (Repair & Signal) commits all resources to beacon repair. Each branch is internally consistent: Branch B can't use cave shelter discovered in Branch A's timeline, and Branch C can't benefit from food sources found during Branch B's exploration.
+
 ## M14: Circadian Activity Patterns
 
 Entities have activity probabilities that vary with time of day:
@@ -507,6 +517,8 @@ def validate_information(entity, context):
 **Biological Constraints**: Physical limitations (illness, fatigue, location) constrain behavior.
 
 **Network Flow**: Information propagation respects relationship topology.
+
+**Castaway Colony example**: Physics validation enforces hard constraints — O2 consumption (6 crew x 0.84 kg/hour) determines the depletion timeline. Water purification capacity (18 L/day, degrading at 0.5 L/day) limits daily intake. The engineer can't repair the beacon without the power coupling from the debris field. Nobody survives outside during radiation storms (12 mSv/hour). These aren't narrative suggestions — they're constraint violations that block invalid states, the same way conservation laws work in physics simulations.
 
 ## M19: Knowledge Extraction Agent
 
@@ -664,6 +676,8 @@ def generate_entity_on_demand(name, context):
 ```
 
 Pattern matching handles numbered entities ("attendee_47", "person_12") that emerge from queries about crowds or background characters.
+
+**Castaway Colony example**: "What did the crew find in cargo bay 3?" generates inventory entities on demand — supply crates with plausible damage states and utility values. "Any other survivors from the lower deck?" generates background crew members with injury states, knowledge profiles, and skill sets consistent with a research vessel crew. These entities didn't exist until the query created them, but they're causally consistent with the established scenario.
 
 ## M10: Scene-Level Entity Sets
 
@@ -832,6 +846,14 @@ Only open-source models with licenses permitting commercial synthetic data gener
 | **Mistral 7B** | 32k | Fast, cost-efficient | **Apache 2.0** |
 | **Mixtral 8x7B** | 32k | Balanced MoE | **Apache 2.0** |
 | **Mixtral 8x22B** | 64k | High quality MoE | **Apache 2.0** |
+
+**Castaway Colony example**: The template routes four distinct task types to specialized models:
+- **DeepSeek R1** handles O2 depletion calculations, radiation exposure modeling, and supply consumption projections — tasks requiring mathematical precision
+- **Llama 70B** generates crew interpersonal dialog, command decisions, and morale propagation — tasks requiring conversational fluency
+- **Qwen 72B** produces supply inventories, flora analysis reports, and damage assessments — tasks requiring reliable structured JSON output
+- **Llama 405B** judges counterfactual branch outcomes — tasks requiring the highest quality evaluation
+
+This is M18 in action: one simulation, four models, each doing what it does best.
 
 ### Selection Algorithm
 
@@ -1320,6 +1342,8 @@ E2E mode is useful for validating that a specific template produces consistent c
 - Real-time evaluation (too slow)
 
 ---
+
+**Castaway Colony — Full Mechanism Showcase (February 2026)**: The `castaway_colony_branching` template exercises all 19 mechanisms in a single scenario. It is the first template to verify M1 (heterogeneous fidelity), M2 (progressive training), M4 (physics validation), M5 (lazy resolution), M6 (tensor compression), M9 (on-demand entities), and M18 (model selection) — seven mechanisms that previously had zero verified templates. 10 entities, 3 counterfactual branches, 90+ quantitative state variables, O(100,000) interaction paths.
 
 **Implementation Status**: All 19 mechanisms implemented and verified. M19 (Knowledge Extraction Agent) added December 2025 to replace naive capitalization-based extraction with LLM-based semantic understanding. Convergence evaluation implemented with E2E testing mode and 3 convergence-optimized templates. Parallel execution (`--parallel N`) and free model support (`--free`, `--free-fast`) added December 2025. **Portal enhancements** added January 2026: `preserve_all_paths` (returns ALL paths), path divergence detection, `--portal-quick` mode (5 backward steps), fidelity template scaling, and **pivot point detection fix** (multi-strategy detection replacing broken `children_states` check).
 

@@ -47,7 +47,7 @@ Each mode has its own validation rules, fidelity allocation strategy, and genera
 - **Data quality validation** — Validates entity references, empty entities_present detection
 
 **Output:**
-- **14 verified simulation templates** — Showcase (including portal), and convergence categories
+- **15 simulation templates** — Showcase (including portal and full-mechanism Castaway Colony), and convergence categories
 - **Narrative exports** — Markdown, JSON, PDF generation
 - **API backend** — FastAPI REST API
 
@@ -466,6 +466,7 @@ Broad accessibility and ecosystem.
 | Cyclical mode strategy | **COMPLETE** | `workflows/cyclical_strategy.py` (~900 lines), prophecy system, causal loops |
 | Directorial templates | **COMPLETE** | `hound_shadow_directorial` (verified); macbeth/heist/courtroom removed as pending |
 | Cyclical templates | **REMOVED** | Pending templates removed; mode strategies remain implemented |
+| Castaway Colony showcase | **COMPLETE** | `castaway_colony_branching` — all 19 mechanisms, 10 entities, 3 branches, first M1/M2/M4/M5/M6/M9/M18 template |
 | Portal scoring stubs | **COMPLETE** | 5 methods now use real LLM-based evaluation |
 | NONLINEAR mode removal | **COMPLETE** | Removed from codebase, now 5 modes |
 
@@ -473,7 +474,7 @@ Broad accessibility and ecosystem.
 
 ## Reality Check
 
-**Where we are:** Working research prototype with 19 mechanisms, intelligent model selection, parallel execution, **complete tensor persistence system** (329+ tests), **improved data integrity** (January 2026 fixes), and **full temporal mode implementations** (February 2026).
+**Where we are:** Working research prototype with 19 mechanisms, intelligent model selection, parallel execution, **complete tensor persistence system** (329+ tests), **improved data integrity** (January 2026 fixes), **full temporal mode implementations** (February 2026), and **full-mechanism showcase template** (Castaway Colony — all 19 mechanisms verified in a single scenario).
 
 **What works:**
 - Single-run and parallel simulations with full temporal reasoning
@@ -498,6 +499,7 @@ Broad accessibility and ecosystem.
 - **Dialog temporal freshness** (prompt instructions prevent recycling same beats across timepoints)
 - **Portal prompt-schema alignment** (explicit format examples for key_events, entity context enrichment)
 - **Mars Mission Portal template** (first verified portal template — backward reasoning from 2031 to 2026)
+- **Castaway Colony template** (first full-mechanism showcase — all 19 mechanisms including 7 previously unverified: M1, M2, M4, M5, M6, M9, M18)
 
 **What's missing:** External integrations, containerization, distributed execution.
 

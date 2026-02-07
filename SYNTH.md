@@ -12,7 +12,7 @@
 |-------|---------|--------|-------|
 | **Phase 1** | ADSR Envelopes | **COMPLETE** | 53 unit tests |
 | **Phase 2** | Voice Controls | **COMPLETE** | Integrated |
-| **Phase 3** | Patch System | **COMPLETE** | 13 verified templates with patch metadata |
+| **Phase 3** | Patch System | **COMPLETE** | 15 templates with patch metadata |
 | **Phase 4** | Event Monitoring | Specification | - |
 
 ### What's Implemented
@@ -36,11 +36,11 @@ emitter.emit(SynthEvent.RUN_START, "run_123", {"template": "board_meeting"})
 **Patch System** (`generation/templates/loader.py`):
 - `TemplateLoader` with `get_all_patches()`, `list_patch_categories()`
 - `PatchInfo` dataclass with name, category, tags, author, version, description
-- 7 patch categories: corporate, historical, crisis, mystical, mystery, directorial, convergence
-- 13 verified JSON templates with patch metadata in `generation/templates/`
+- 9 patch categories: corporate, historical, crisis, mystical, mystery, directorial, portal, space, scifi, convergence
+- 15 JSON templates with patch metadata in `generation/templates/`
 
 **Template Organization**:
-- `generation/templates/showcase/` - 10 verified showcase scenarios
+- `generation/templates/showcase/` - 12 showcase scenarios (including `castaway_colony_branching` — full 19-mechanism showcase)
 - `generation/templates/convergence/` - 3 convergence-optimized templates
 
 ---
@@ -685,13 +685,17 @@ Add patch metadata to make templates discoverable:
 ```json
 {
   "patch": {
-    "name": "Human-readable name",
-    "category": "one of: corporate, historical, crisis, mystical, test",
-    "tags": ["relevant", "keywords"],
-    "description": "What this template demonstrates"
+    "name": "Castaway Colony",
+    "category": "scifi",
+    "tags": ["alien-planet", "survival", "branching", "knowledge-provenance", "full-mechanism-coverage", "showcase"],
+    "author": "timepoint-daedalus",
+    "version": "1.0",
+    "description": "Full-mechanism showcase: crash-landed crew on alien planet with branching survival strategies"
   }
 }
 ```
+
+Categories include: corporate, historical, crisis, mystical, mystery, directorial, portal, space, scifi, convergence.
 
 ---
 
