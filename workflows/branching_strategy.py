@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 import numpy as np
 import uuid
 
@@ -229,7 +230,8 @@ class BranchingStrategy:
     6. Return all branches with rankings
     """
 
-    def __init__(self, config: TemporalConfig, llm_client, store):
+    def __init__(self, config: TemporalConfig, llm_client, store,
+                 scenario_description: str = None, entity_roster: Dict = None):
         if config.mode != TemporalMode.BRANCHING:
             raise ValueError(f"BranchingStrategy requires mode=BRANCHING, got {config.mode}")
 
@@ -239,10 +241,25 @@ class BranchingStrategy:
         self.paths: List[BranchingPath] = []
         self.all_paths: List[BranchingPath] = []
 
+        # Scenario context for anchoring forward steps
+        self.scenario_description = scenario_description
+        self.entity_roster = entity_roster or {}
+
+        # Accumulated world state — carries forward across steps to prevent drift
+        self.accumulated_world_state = {
+            "discoveries": [],
+            "resource_states": {},
+            "entity_knowledge": {},
+            "key_events_history": [],
+            "monitoring": {"steps_completed": 0, "scenario_drift_warnings": 0},
+        }
+        self._world_state_lock = threading.Lock()
+
         # Get branching parameters from config or use defaults
         self.forward_steps = getattr(config, 'backward_steps', 15)  # Reuse backward_steps for forward
         self.branch_count = getattr(config, 'path_count', 4)  # Number of branches at decision points
         self.candidates_per_step = getattr(config, 'candidate_antecedents_per_step', 3)
+        self.max_parallel_workers = getattr(config, 'max_parallel_workers', 5)
 
     def run(self) -> List[BranchingPath]:
         """Execute forward simulation with branching."""
@@ -302,7 +319,10 @@ class BranchingStrategy:
             origin_year = datetime.now().year
 
         # Get initial description from config or generate placeholder
-        description = getattr(self.config, 'portal_description', None)
+        # Priority: instance attribute > config.scenario_description > config.portal_description
+        description = (self.scenario_description
+                       or getattr(self.config, 'scenario_description', None)
+                       or getattr(self.config, 'portal_description', None))
         if not description:
             description = "Initial state at the beginning of the branching simulation"
 
@@ -440,8 +460,45 @@ class BranchingStrategy:
         """Explore forward paths with branching at decision points."""
         return self._explore_chronological(origin)
 
+    def _process_single_state(
+        self,
+        state: BranchingState,
+        step: int,
+        target_year: int,
+        target_month: int,
+    ) -> List[BranchingState]:
+        """Process a single state for forward stepping (thread-safe).
+
+        Returns scored consequents for this state.
+        """
+        is_branch_point = self._is_branch_point(state, step)
+
+        if is_branch_point:
+            consequents = self._generate_consequents(
+                state, target_year, target_month,
+                count=self.candidates_per_step,
+                is_branch_point=True
+            )
+            state.is_branch_point = True
+        else:
+            consequents = self._generate_consequents(
+                state, target_year, target_month,
+                count=1,
+                is_branch_point=False
+            )
+
+        scored = self._score_consequents(consequents, state)
+        return scored[:self.candidates_per_step]
+
     def _explore_chronological(self, origin: BranchingState) -> List[BranchingPath]:
-        """Standard forward stepping with branching: T_0 → T_1 → T_2 → ..."""
+        """Standard forward stepping with branching: T_0 → T_1 → T_2 → ...
+
+        Parallelizes LLM calls within each step using ThreadPoolExecutor.
+        States at the same step level are independent and can be processed
+        concurrently. Step-to-step ordering remains sequential.
+        """
+        import copy
+
         paths = []
         current_states = [origin]
 
@@ -454,8 +511,9 @@ class BranchingStrategy:
         month_step = max(1, total_months // self.forward_steps)
 
         for step in range(self.forward_steps):
-            next_states = []
-
+            # Compute max_workers per step (0 = max, no ceiling)
+            n_items = max(1, len(current_states))
+            max_workers = n_items if self.max_parallel_workers == 0 else min(self.max_parallel_workers, n_items)
             # Calculate target time
             current_month_total = current_states[0].to_total_months() if current_states else origin.to_total_months()
             target_month_total = current_month_total + month_step
@@ -463,31 +521,45 @@ class BranchingStrategy:
             target_month = target_month_total % 12 or 12
 
             temp_state = BranchingState(year=target_year, month=target_month, description="", entities=[], world_state={})
-            print(f"  Forward step {step+1}/{self.forward_steps}: {temp_state.to_year_month_str()}")
+            n_states = len(current_states)
+            parallel_note = f" ({n_states} states in parallel)" if n_states > 1 else ""
+            print(f"  Forward step {step+1}/{self.forward_steps}: {temp_state.to_year_month_str()}{parallel_note}")
 
-            for state in current_states:
-                # Check if this is a decision/branch point
-                is_branch_point = self._is_branch_point(state, step)
-
-                if is_branch_point:
-                    # Generate multiple divergent futures
-                    consequents = self._generate_consequents(
-                        state, target_year, target_month,
-                        count=self.candidates_per_step,
-                        is_branch_point=True
+            if n_states <= 1:
+                # Single state — no threading overhead needed
+                next_states = []
+                for state in current_states:
+                    results = self._process_single_state(
+                        state, step, target_year, target_month
                     )
-                    state.is_branch_point = True
-                else:
-                    # Generate single continuation
-                    consequents = self._generate_consequents(
-                        state, target_year, target_month,
-                        count=1,
-                        is_branch_point=False
-                    )
+                    next_states.extend(results)
+            else:
+                # Multiple states — parallelize LLM calls
+                # Snapshot accumulated_world_state before parallel processing
+                pre_step_world_state = copy.deepcopy(self.accumulated_world_state)
+                next_states = []
 
-                # Score consequents
-                scored = self._score_consequents(consequents, state)
-                next_states.extend(scored[:self.candidates_per_step])
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    future_to_state = {
+                        executor.submit(
+                            self._process_single_state,
+                            state, step, target_year, target_month
+                        ): state
+                        for state in current_states
+                    }
+
+                    for future in as_completed(future_to_state):
+                        try:
+                            results = future.result()
+                            next_states.extend(results)
+                        except Exception as e:
+                            parent = future_to_state[future]
+                            print(f"    ⚠️  Parallel state failed ({parent.branch_id}): {e}")
+                            # Generate placeholder fallback
+                            placeholders = self._generate_placeholder_consequents(
+                                parent, target_year, target_month, 1
+                            )
+                            next_states.extend(placeholders)
 
             current_states = next_states
 
@@ -558,13 +630,50 @@ class BranchingStrategy:
 
         entity_names = [e.entity_id for e in current_state.entities[:10]] if current_state.entities else []
 
+        # Build entity roles section from roster
+        entity_roles_section = ""
+        if self.entity_roster:
+            role_lines = []
+            for eid, info in list(self.entity_roster.items())[:10]:
+                if isinstance(info, dict):
+                    role = info.get("role", info.get("description", eid))
+                    etype = info.get("entity_type", "human")
+                    role_lines.append(f"  - {eid} ({etype}): {role}")
+                else:
+                    role_lines.append(f"  - {eid}: {info}")
+            if role_lines:
+                entity_roles_section = "ENTITY ROLES (use these characters, not invented ones):\n" + "\n".join(role_lines)
+
+        # Build scenario anchor (first 800 chars)
+        scenario_anchor = ""
+        if self.scenario_description:
+            anchor_text = self.scenario_description[:800]
+            scenario_anchor = f"""SCENARIO ANCHOR — do NOT drift from this premise:
+{anchor_text}
+All events MUST remain grounded in this scenario. Do not introduce unrelated settings or themes."""
+
+        # Build accumulated world state summary
+        world_state_summary = self._summarize_accumulated_world_state()
+
+        # Step monitoring
+        steps_completed = self.accumulated_world_state["monitoring"]["steps_completed"]
+        drift_warnings = self.accumulated_world_state["monitoring"]["scenario_drift_warnings"]
+
         user_prompt = f"""Generate {count} possible NEXT states following this current state.
+
+{scenario_anchor}
+
+{entity_roles_section}
 
 CURRENT STATE ({current_state.to_year_month_str()}):
 {current_state.description}
 
-Entities: {', '.join(entity_names[:5]) if entity_names else 'None specified'}
+Entities present: {', '.join(entity_names[:5]) if entity_names else 'None specified'}
 World Context: {current_state.world_state}
+
+{world_state_summary}
+
+STEP MONITORING: step {steps_completed + 1}/{self.forward_steps}, drift_warnings={drift_warnings}
 
 TYPE: {prompt_type}
 TARGET TIME: {target_time_str}
@@ -572,15 +681,16 @@ TARGET TIME: {target_time_str}
 {diversity_instruction}
 
 For EACH consequent, provide:
-- description: What happens in {target_time_str} (2-3 sentences)
+- description: What happens in {target_time_str} (2-3 sentences, grounded in the scenario)
 - key_events: Array of 2-4 specific events
 - outcome_type: "positive", "negative", "neutral", or "twist"
 - causal_link: How this follows from the current state
+- resource_updates: Dict of resource changes (e.g., {{"food_supply": "declining", "morale": "improving"}})
 
 IMPORTANT: Return valid JSON with all string values properly quoted.
 Example format:
 {{"consequents": [
-  {{"description": "In {target_time_str}, the situation evolves as characters adapt to circumstances.", "key_events": ["Event one occurs", "Event two follows"], "outcome_type": "neutral", "causal_link": "This follows naturally from the previous state."}}
+  {{"description": "In {target_time_str}, the situation evolves as characters adapt to circumstances.", "key_events": ["Event one occurs", "Event two follows"], "outcome_type": "neutral", "causal_link": "This follows naturally from the previous state.", "resource_updates": {{}}}}
 ]}}
 
 Return ONLY valid JSON matching this exact structure. All strings must be quoted."""
@@ -593,14 +703,15 @@ Return ONLY valid JSON matching this exact structure. All strings must be quoted
                 key_events: List[str]
                 outcome_type: str
                 causal_link: str
+                resource_updates: Optional[Dict[str, str]] = None
 
             class ConsequentList(BaseModel):
                 consequents: List[ConsequentSchema]
 
             token_estimator = get_token_estimator()
             token_estimate = token_estimator.estimate(
-                ActionType.PORTAL_BACKWARD_REASONING,  # Reuse this action type
-                context={"candidate_count": count},
+                ActionType.BRANCHING_CONSEQUENT_GENERATION,
+                context={"num_consequents": count},
                 prompt_length=len(user_prompt)
             )
 
@@ -628,6 +739,11 @@ Return ONLY valid JSON matching this exact structure. All strings must be quoted
                     current_state.entities if current_state.entities else []
                 )
 
+                # Build world_state with accumulated context
+                resource_updates = {}
+                if hasattr(data, 'resource_updates') and data.resource_updates:
+                    resource_updates = data.resource_updates
+
                 state = BranchingState(
                     year=target_year,
                     month=target_month,
@@ -636,12 +752,15 @@ Return ONLY valid JSON matching this exact structure. All strings must be quoted
                     world_state={
                         "key_events": data.key_events,
                         "outcome_type": data.outcome_type,
-                        "causal_link": data.causal_link
+                        "causal_link": data.causal_link,
+                        "resource_updates": resource_updates,
                     },
                     plausibility_score=0.0,
                     parent_state=current_state,
                     branch_id=branch_id
                 )
+                # Accumulate world state for next step
+                self._accumulate_world_state(state)
                 consequents.append(state)
 
             # Pad with placeholders if needed
@@ -714,6 +833,50 @@ Return ONLY valid JSON matching this exact structure. All strings must be quoted
                     print(f"    ⚠️  JSON repair failed, using placeholders")
 
             return self._generate_placeholder_consequents(current_state, target_year, target_month, count)
+
+    def _accumulate_world_state(self, state: BranchingState) -> None:
+        """Merge key_events and resource_updates from a generated state into accumulated world state.
+
+        Thread-safe: uses lock to protect shared accumulated_world_state dict
+        during parallel forward step processing.
+        """
+        ws = state.world_state
+        with self._world_state_lock:
+            # Accumulate key events (keep last 10)
+            events = ws.get("key_events", [])
+            if events:
+                self.accumulated_world_state["key_events_history"].extend(events)
+                self.accumulated_world_state["key_events_history"] = \
+                    self.accumulated_world_state["key_events_history"][-10:]
+
+            # Merge resource updates
+            resource_updates = ws.get("resource_updates", {})
+            if resource_updates:
+                self.accumulated_world_state["resource_states"].update(resource_updates)
+
+            # Increment step counter
+            self.accumulated_world_state["monitoring"]["steps_completed"] += 1
+
+    def _summarize_accumulated_world_state(self) -> str:
+        """Produce a token-aware summary of accumulated world state for prompt inclusion.
+
+        Thread-safe: reads under lock to get a consistent snapshot.
+        """
+        with self._world_state_lock:
+            parts = []
+            events = self.accumulated_world_state.get("key_events_history", [])
+            if events:
+                recent = events[-5:]
+                parts.append("RECENT KEY EVENTS:\n" + "\n".join(f"  - {e}" for e in recent))
+
+            resources = self.accumulated_world_state.get("resource_states", {})
+            if resources:
+                res_lines = [f"  - {k}: {v}" for k, v in list(resources.items())[:8]]
+                parts.append("RESOURCE STATES:\n" + "\n".join(res_lines))
+
+        if not parts:
+            return ""
+        return "ACCUMULATED WORLD STATE:\n" + "\n".join(parts)
 
     def _generate_placeholder_consequents(
         self,

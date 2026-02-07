@@ -58,6 +58,7 @@
     "judge_model": "meta-llama/llama-3.1-405b-instruct",
     "judge_temperature": 0.3,
     "simulation_cache_results": true,
+    "max_parallel_workers": 8,
     "fidelity_planning_mode": "hybrid",
     "token_budget_mode": "soft",
     "token_budget": 50000.0,
