@@ -796,7 +796,8 @@ class FullE2EWorkflowRunner:
 
                 # Step 4.5: Synthesize dialogs (M11)
                 self._synthesize_dialogs(
-                    trained_entities, all_timepoints, scene_result, run_id
+                    trained_entities, all_timepoints, scene_result, run_id,
+                    config=config
                 )
 
                 # Step 4.6: Execute queries (M5)
@@ -953,7 +954,7 @@ class FullE2EWorkflowRunner:
                 for m in featured:
                     # Extract mechanism ID (e.g., "M10" from "M10_atmospheric_entities")
                     mech_id = m.split('_')[0] if '_' in m else m
-                    self.metadata_manager.record_mechanism(run_id, mech_id)
+                    self.metadata_manager.record_mechanism(run_id, mech_id, "template_metadata")
 
             self.logfire.info("Run tracking initialized", run_id=run_id)
             return metadata
@@ -1422,6 +1423,10 @@ class FullE2EWorkflowRunner:
                 print(f"Running forward simulation with counterfactual branches")
                 print(f"Steps: {config.temporal.backward_steps}")  # BRANCHING uses backward_steps as step count
                 print(f"{'='*80}\n")
+
+                # Inject scenario context into temporal agent for branching anchoring
+                temporal_agent.scenario_description = config.scenario_description
+                temporal_agent.entity_roster = config.metadata.get("entity_roster", {})
 
                 # Run branching simulation
                 branching_paths = temporal_agent.run_branching_simulation(config.temporal)
@@ -2288,9 +2293,11 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                 print("  ⚠️  No config - skipping parallel training")
                 return
 
-            # Get training configuration
+            # Get training configuration (max_parallel_workers acts as ceiling; 0 = no ceiling)
             target_maturity = getattr(config, 'target_tensor_maturity', 0.95)
-            max_workers = getattr(config, 'max_training_workers', 4)
+            global_cap = getattr(config, 'max_parallel_workers', 5)
+            subsystem_cap = getattr(config, 'max_training_workers', 4)
+            max_workers = subsystem_cap if global_cap == 0 else min(global_cap, subsystem_cap)
 
             # Get entities that need training
             entities_to_train = [
@@ -2357,12 +2364,30 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                 print(f"  ⚠️  Parallel training failed: {e}")
                 self.logfire.warn("Parallel tensor training failed", error=str(e))
 
+    @staticmethod
+    def _extract_dialog_beats(dialog: 'Dialog') -> List[str]:
+        """Extract 3-5 key beats from a dialog for temporal freshness enforcement."""
+        try:
+            turns = json.loads(dialog.turns) if isinstance(dialog.turns, str) else dialog.turns
+            beats = []
+            for turn in turns[:12]:
+                speaker = turn.get("speaker", "unknown")
+                content = turn.get("content", turn.get("text", ""))
+                if content and len(content) > 20:
+                    # Summarize: speaker + first 60 chars
+                    beats.append(f"{speaker}: {content[:60].strip()}")
+            # Return 3-5 most representative beats
+            return beats[:5]
+        except Exception:
+            return []
+
     def _synthesize_dialogs(
         self,
         entities: List[Entity],
         timepoints: List[Timepoint],
         scene_result: Dict,
-        run_id: str
+        run_id: str,
+        config: Optional['SimulationConfig'] = None
     ) -> None:
         """Step 4.5: Synthesize dialogs (M11) - entities already trained via ANDOS"""
         with self.logfire.span("step:dialog_synthesis"):
@@ -2374,6 +2399,14 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
 
             llm = scene_result["llm_client"]
             store = scene_result["store"]
+
+            # Get animism_level from config if available
+            animism_level = 0
+            if config and hasattr(config, 'entities') and hasattr(config.entities, 'animism_level'):
+                animism_level = config.entities.animism_level
+
+            # Beat accumulator for temporal freshness
+            prior_dialog_beats: List[str] = []
 
             # Synthesize dialogs for each timepoint
             dialogs_created = 0
@@ -2398,12 +2431,20 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                         timeline,
                         llm,
                         store,
-                        run_id=run_id  # January 2026: Pass run_id for dialog persistence
+                        run_id=run_id,
+                        animism_level=animism_level,
+                        prior_dialog_beats=prior_dialog_beats if prior_dialog_beats else None
                     )
 
                     # Save dialog to store
                     store.save_dialog(dialog)
                     dialogs_created += 1
+
+                    # Accumulate beats for next dialog's temporal freshness
+                    new_beats = self._extract_dialog_beats(dialog)
+                    prior_dialog_beats.extend(new_beats)
+                    # Keep only last 10 beats to bound prompt size
+                    prior_dialog_beats = prior_dialog_beats[-10:]
 
                     print(f"  ✓ Created dialog with {len(dialog_participants)} participants")
 

@@ -179,5 +179,30 @@ All 5 portal scoring methods now use real LLM-based evaluation instead of hardco
 ### NONLINEAR Mode Removed
 Removed the NONLINEAR temporal mode from codebase (was never fully implemented). Now 5 modes: PEARL, DIRECTORIAL, BRANCHING, CYCLICAL, PORTAL.
 
+### Branching Quality & Scenario Anchoring (February 2026)
+
+**Problem**: Castaway Colony ran successfully ($0.28, 482 LLM calls, 19/19 mechanisms) but output quality had critical issues: scenario drift by step 2, dialog repetition across 16 timepoints, environment entities speaking as humans, invalid groq fallback models.
+
+**Fixes across 6 files**:
+- `workflows/branching_strategy.py`: Fixed `portal_description` → `scenario_description` lookup. Fixed wrong ActionType (`PORTAL_BACKWARD_REASONING` → `BRANCHING_CONSEQUENT_GENERATION`). Added `scenario_description` and `entity_roster` params to `__init__`. Rewrote forward step prompt with SCENARIO ANCHOR block, ENTITY ROLES, ACCUMULATED WORLD STATE summary, and STEP MONITORING. Added `_accumulate_world_state()` and `_summarize_accumulated_world_state()` helpers. Extended ConsequentSchema with `resource_updates` field.
+- `workflows/dialog_synthesis.py`: Added `_filter_dialog_participants()` with animism_level thresholds (human=0, animal=1, environment=2, abstract=3) and per-type speaking modes. Added `_derive_dialog_params_from_persona()` for emotion×personality→behavior mapping. Updated `synthesize_dialog()` with `animism_level` and `prior_dialog_beats` params. Added Rule #9 (NON-HUMAN ENTITY VOICE RULES) to prompt. Enhanced Rule #8 with concrete beat avoidance from `prior_dialog_beats`.
+- `llm_service/model_selector.py`: Removed `groq/llama-3.3-70b-versatile` and `groq/llama-3.1-70b-versatile` (removed from OpenRouter). Updated `max_output_tokens`: Llama 70B/405B 4096→16384, Qwen 72B 4096→8192. Updated BRANCHING action: `min_context_tokens` 16384→32768, `min_output_tokens` 2000→3000, `tokens_per_unit` 600→800. Added `get_effective_output_limit()` method.
+- `workflows/knowledge_extraction.py`: Added `KNOWN_UNAVAILABLE` set for defensive fallback filtering in M19.
+- `workflows/temporal_agent.py`: Forwards `scenario_description` and `entity_roster` to BranchingStrategy.
+- `e2e_workflows/e2e_runner.py`: Injects scenario context before branching simulation. Passes `animism_level` and `prior_dialog_beats` to dialog synthesis. Added `_extract_dialog_beats()` accumulator.
+
+### Configurable `max_parallel_workers`
+
+Added `max_parallel_workers` field to `TemporalConfig` (default 5, range 0-20). Acts as a global ceiling for all parallel LLM call subsystems. Set to `0` for max parallelism (no ceiling — uses as many workers as items available):
+- **BranchingStrategy**: forward exploration workers (replaces hardcoded `min(5, branch_count*2)`)
+- **PortalStrategy**: ceiling for `max_antecedent_workers` in backward exploration
+- **e2e_runner**: ceiling for `max_training_workers` in parallel tensor training
+
+Override via environment: `TIMEPOINT_MAX_PARALLEL_WORKERS=10`. Works independently of `TIMEPOINT_FAST_SIMJUDGED` mode.
+
+OpenRouter guidance: 5-10 recommended for paid accounts ($1 balance = 1 RPS). Hard cap at 20.
+
+**Files:** `generation/config_schema.py`, `workflows/branching_strategy.py`, `workflows/portal_strategy.py`, `e2e_workflows/e2e_runner.py`, `generation/templates/showcase/castaway_colony_branching.json`
+
 ## Commits
 `type(scope): description` - types: feat, fix, refactor, test, docs, chore

@@ -567,8 +567,10 @@ Include 3-10 relevant entities."""
             temp_state = PortalState(year=step_year, month=step_month, description="", entities=[], world_state={})
             print(f"  Backward step {step+1}/{strategy.timepoint_count}: {temp_state.to_year_month_str()} @ {target_resolution}")
 
-            # Get parallelization settings
-            max_antecedent_workers = getattr(self.config, 'max_antecedent_workers', 3)
+            # Get parallelization settings (max_parallel_workers acts as ceiling; 0 = no ceiling)
+            global_cap = getattr(self.config, 'max_parallel_workers', 5)
+            subsystem_cap = getattr(self.config, 'max_antecedent_workers', 3)
+            max_antecedent_workers = subsystem_cap if global_cap == 0 else min(global_cap, subsystem_cap)
 
             # Process states - parallel if multiple states, sequential if just one
             if len(current_states) > 1 and max_antecedent_workers > 1:
