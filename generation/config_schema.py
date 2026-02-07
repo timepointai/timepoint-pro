@@ -546,6 +546,13 @@ class TemporalConfig(BaseModel):
         ge=1, le=6, default=3,
         description="Max parallel state processing in backward exploration"
     )
+    max_parallel_workers: int = Field(
+        ge=0, le=20, default=5,
+        description="Global max parallel LLM calls for forward exploration, backward reasoning, "
+                    "dialog synthesis, and tensor training. Acts as ceiling for all subsystem workers. "
+                    "0 = max (no ceiling, use all available items as workers). "
+                    "OpenRouter paid: 5-10 recommended ($1 balance = 1 RPS). Hard cap 20 for explicit values."
+    )
     fast_simulation_model: Optional[str] = Field(
         default=None,
         description="Use cheaper/faster model for mini-sims (None = use default model)"
@@ -596,6 +603,19 @@ class TemporalConfig(BaseModel):
             if os.environ.get("TIMEPOINT_MAX_SIMULATION_WORKERS"):
                 self.max_simulation_workers = int(os.environ["TIMEPOINT_MAX_SIMULATION_WORKERS"])
 
+            if os.environ.get("TIMEPOINT_MAX_PARALLEL_WORKERS"):
+                self.max_parallel_workers = int(os.environ["TIMEPOINT_MAX_PARALLEL_WORKERS"])
+
+        return self
+
+    @model_validator(mode='after')
+    def apply_worker_overrides(self) -> 'TemporalConfig':
+        """Apply max_parallel_workers from environment (works independently of fast mode)."""
+        import os
+        if os.environ.get("TIMEPOINT_MAX_PARALLEL_WORKERS"):
+            val = int(os.environ["TIMEPOINT_MAX_PARALLEL_WORKERS"])
+            # 0 = max parallelism (no ceiling); positive values capped at 20
+            self.max_parallel_workers = 0 if val == 0 else min(20, val)
         return self
 
 
