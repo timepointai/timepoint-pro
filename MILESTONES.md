@@ -47,7 +47,7 @@ Each mode has its own validation rules, fidelity allocation strategy, and genera
 - **Data quality validation** — Validates entity references, empty entities_present detection
 
 **Output:**
-- **13 verified simulation templates** — Showcase and convergence categories
+- **14 verified simulation templates** — Showcase (including portal), and convergence categories
 - **Narrative exports** — Markdown, JSON, PDF generation
 - **API backend** — FastAPI REST API
 
@@ -78,7 +78,7 @@ Current Architecture:
 │   └── providers/ — OpenRouter integration
 ├── nl_interface/ — Natural language input
 │   └── adapter.py — NLToProductionAdapter
-├── generation/templates/ — 41 JSON simulation templates with patch metadata
+├── generation/templates/ — 14 verified JSON simulation templates with patch metadata
 ├── synth/ — SynthasAIzer control layer (envelopes, voices, events)
 ├── validation.py (1,365 lines) — 5 physics validators
 ├── storage.py — SQLite persistence + transaction support
@@ -493,6 +493,11 @@ Broad accessibility and ecosystem.
 - **All 5 temporal modes fully implemented** (PEARL, DIRECTORIAL, BRANCHING, CYCLICAL, PORTAL)
 - **6 new showcase templates** (3 directorial, 3 cyclical)
 - **Robust JSON extraction** (bracket-depth matching replaces greedy regex in response parser)
+- **Arousal decay system** (exponential decay prevents emotional saturation at 1.0)
+- **Dialog entity anchoring** (explicit character roster prevents LLM hallucinating unrelated speakers)
+- **Dialog temporal freshness** (prompt instructions prevent recycling same beats across timepoints)
+- **Portal prompt-schema alignment** (explicit format examples for key_events, entity context enrichment)
+- **Mars Mission Portal template** (first verified portal template — backward reasoning from 2031 to 2026)
 
 **What's missing:** External integrations, containerization, distributed execution.
 

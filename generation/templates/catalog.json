@@ -69,6 +69,12 @@
     "directorial": [
       "showcase/hound_shadow_directorial"
     ],
+    "portal": [
+      "showcase/mars_mission_portal"
+    ],
+    "space": [
+      "showcase/mars_mission_portal"
+    ],
     "convergence": [
       "convergence/simple",
       "convergence/standard",
@@ -174,6 +180,16 @@
       "category": "showcase",
       "cost_estimate": "$0.25",
       "duration_estimate": "8min",
+      "status": "verified"
+    },
+    "showcase/mars_mission_portal": {
+      "name": "Ares III Mars Mission Portal",
+      "description": "Portal backward reasoning from failed Mars mission to root causes across 5 years",
+      "mechanisms": ["M17", "M3", "M7", "M8", "M11", "M13"],
+      "tier": "comprehensive",
+      "category": "showcase",
+      "cost_estimate": "$0.40",
+      "duration_estimate": "15min",
       "status": "verified"
     },
     "convergence/simple": {

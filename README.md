@@ -124,7 +124,7 @@ Time isn't one thing. Timepoint supports five distinct temporal ontologies, each
 | Mode | Description | Use When | Example Template |
 |------|-------------|----------|------------------|
 | **PEARL** | Standard causal DAG—causes precede effects | Default forward simulation | `board_meeting` |
-| **PORTAL** | Backward from endpoints to present | Strategic planning, path discovery | (no verified templates) |
+| **PORTAL** | Backward from endpoints to present | Strategic planning, path discovery | `mars_mission_portal` |
 | **BRANCHING** | Counterfactual timelines from decision points | "What if" analysis | `vc_pitch_branching` |
 | **CYCLICAL** | Prophetic/mythic time, future constrains past | Time loops, generational sagas | (no verified templates) |
 | **DIRECTORIAL** | Five-act narrative with tension arcs | Story-driven simulations | `hound_shadow_directorial` |
@@ -223,6 +223,32 @@ Cost reduction comes from query-driven fidelity, not lossy compression—tempora
 - Production systems requiring SLAs (research prototype)
 - Real-time applications (LLM latency dominates)
 - Enterprise scale (1000+ concurrent runs)
+
+---
+
+## Why Structure Matters (Even as LLMs Get Smarter)
+
+A frontier LLM with a million-token context window could generate a plausible backward causal chain and write dialog between characters. So why build structured simulation infrastructure around it?
+
+Because **the structure isn't scaffolding that gets removed—it's the product.**
+
+### What structure provides that prompting cannot
+
+**Search, not generation.** PORTAL mode doesn't generate one backward path—it explores a tree. A 10-step backward trace generates 350 candidate antecedents (7 candidates x 10 steps x 5 paths), runs 350 mini forward-simulations, and has a judge LLM score each one. The winning causal chain is *selected from a search space*, not *generated in a single pass*. No amount of context window or chain-of-thought turns autoregressive generation into tree search with evaluation.
+
+**Quantitative state propagation.** Emotional arcs, energy budgets, and knowledge flow are tracked numerically with explicit mathematical functions (exponential decay, symmetric clamping, circadian modulation). An LLM can write "she grew more stressed"—but it cannot track `valence = -0.580 → -0.600 → -0.620 → -0.640` with numerical precision across 862 coordinated calls. The system caught and fixed an arousal saturation bug through mathematical analysis. An LLM would never notice or self-correct a systematic numerical drift.
+
+**Knowledge flow with provenance.** The output isn't "Lin Zhang knew about the anomalies." It's a typed graph edge: `{type: "fact", source: "lin_zhang", target: "thomas_webb", content: "5% decrease in O2 generator efficiency", timepoint: "tp_002_2030"}`. Structured data that downstream systems can query, aggregate, and reason over. A narrative paragraph is not computationally useful.
+
+**Convergence testing.** Run the same scenario three times and measure structural divergence quantitatively. Which causal links are robust? Which are sensitive to initial conditions? This requires deterministic structure around stochastic generation—comparable structural anchors to align against across runs.
+
+**Composable mechanisms.** The 19 mechanisms (M1-M19) are independently testable, independently fixable, and independently improvable. When emotional arousal saturated at 1.0, the fix was in M11's decay function—without touching M17 (portal reasoning) or M3 (knowledge flow). In a monolithic prompt, everything is entangled.
+
+### The engine/chassis distinction
+
+Growing LLM power makes the structure *more* valuable, not less. The LLM is the engine—it generates the raw material (dialog, antecedents, emotional keywords). But the value to a human isn't in the raw text. It's in the **meaning graph**: typed entities with numerical emotional states, causal chains with scored alternatives, knowledge items with provenance, timelines with quantitative metadata. That's what you can analyze, visualize, compare across runs, feed into training pipelines, or use as input to other systems.
+
+A more powerful engine doesn't eliminate the need for a chassis, transmission, and steering. It makes the vehicle faster—but the structure is what makes it *drivable*.
 
 ---
 

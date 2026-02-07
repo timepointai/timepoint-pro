@@ -913,7 +913,8 @@ runs = sorted(all_runs, key=lambda r: r.started_at or '', reverse=True)[:$limit]
 if not runs:
     print('No runs found')
 else:
-    print(f"{'ID':<40} {'STATUS':<12} {'TEMPLATE':<25} {'COST':<10}")
+    h = '{:<40} {:<12} {:<25} {:<10}'.format('ID', 'STATUS', 'TEMPLATE', 'COST')
+    print(h)
     print('-' * 90)
     for r in runs:
         cost = f'\${r.cost_usd:.2f}' if r.cost_usd else '-'
@@ -1937,6 +1938,7 @@ SHOWCASE_TEMPLATES=(
     "vc_pitch_roadshow"
     "vc_pitch_strategies"
     "hound_shadow_directorial"
+    "mars_mission_portal"
 )
 
 # Portal templates
@@ -2044,7 +2046,7 @@ main() {
         board_meeting|jefferson_dinner|hospital_crisis|detective_prospection|kami_shrine)
             cmd_run "$cmd" "$@"
             ;;
-        vc_pitch_pearl|vc_pitch_branching|vc_pitch_roadshow|vc_pitch_strategies|hound_shadow_directorial)
+        vc_pitch_pearl|vc_pitch_branching|vc_pitch_roadshow|vc_pitch_strategies|hound_shadow_directorial|mars_mission_portal)
             cmd_run "$cmd" "$@"
             ;;
         # Portal templates

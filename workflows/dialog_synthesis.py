@@ -892,7 +892,14 @@ def synthesize_dialog(
         print(f"  ⚠️  JSON serialization error in scene_context: {e}")
         scene_json = json.dumps(scene_context, indent=2, default=str)
 
-    prompt = f"""Generate a realistic conversation between {len(entities)} historical figures.
+    # Build entity name list for prompt anchoring (prevents hallucinating other characters)
+    entity_names = [ctx["id"] for ctx in participants_context]
+    entity_name_list = ", ".join(entity_names)
+
+    prompt = f"""Generate a realistic conversation between these {len(participants_context)} characters: {entity_name_list}.
+
+IMPORTANT: ONLY use the character IDs listed below as speakers. Do NOT invent or substitute other characters.
+The speakers MUST be exactly: {entity_name_list}
 
 PARTICIPANTS:
 {participants_json}
@@ -952,6 +959,13 @@ CRITICAL INSTRUCTIONS:
 
    BAD (generic): "The partnership didn't work out."
    GOOD (specific): "DataCorp backed out when they saw our 23% churn rate. We've got 60 days to fix retention or lose the Sequoia term sheet."
+
+8. TEMPORAL FRESHNESS (CRITICAL - Avoid repeating the same beats):
+   - Each timepoint represents a DIFFERENT moment in time. The conversation should reflect NEW developments, not rehash previous discussions.
+   - If a character's recent_experiences reference prior conversations, BUILD ON those — don't repeat them verbatim.
+   - Introduce NEW concerns, NEW information, NEW tensions appropriate to this specific moment in the timeline.
+   - Characters should reference the SPECIFIC timepoint_context event, not generic recurring themes.
+   - Avoid these repetitive patterns: repeating the same statistics, restating the same ultimatums, recycling the same metaphors across timepoints.
 
 Generate 8-12 dialog turns showing realistic interaction given these constraints.
 """

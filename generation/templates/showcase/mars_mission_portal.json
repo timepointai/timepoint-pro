@@ -1,0 +1,100 @@
+{
+  "scenario_description": "PORTAL backward reasoning from a failed crewed Mars mission in 2031 to its origins in 2026. The Ares III crew of 4 astronauts launched successfully but lost contact during Mars orbital insertion. Working backward: What chain of technical decisions, interpersonal dynamics, budget compromises, and training gaps led to this outcome? Entities include Mission Commander Sarah Okafor (experienced but politically pressured), Flight Engineer Raj Mehta (brilliant but conflict-averse), Systems Engineer Lin Zhang (detected anomalies but was overruled), and Mission Director Thomas Webb (prioritized schedule over safety margins). Portal mode traces backward from the communication blackout through 10 backward steps to the mission's conception, exploring how institutional pressure, personality clashes, and cascading technical debt created an inevitable failure trajectory.",
+  "world_id": "mars_mission_portal",
+  "patch": {
+    "name": "Ares III Portal",
+    "category": "showcase",
+    "tags": ["portal", "space", "disaster-analysis", "backward-reasoning", "institutional-failure"],
+    "author": "timepoint-daedalus",
+    "version": "1.0",
+    "description": "Portal backward reasoning from Mars mission failure to root causes"
+  },
+  "entities": {
+    "count": 4,
+    "types": ["human"],
+    "initial_resolution": "trained",
+    "animism_level": 2,
+    "envelope": {
+      "attack": 0.3,
+      "decay": 0.15,
+      "sustain": 0.8,
+      "release": 0.2
+    }
+  },
+  "timepoints": {
+    "count": 10,
+    "start_time": null,
+    "resolution": "month",
+    "before_count": 0,
+    "after_count": 0
+  },
+  "temporal": {
+    "mode": "portal",
+    "narrative_arc": null,
+    "dramatic_tension": 0.7,
+    "cycle_length": null,
+    "prophecy_accuracy": 0.5,
+    "enable_counterfactuals": false,
+    "portal_description": "Ares III crewed Mars mission loses contact during orbital insertion in March 2031. Last telemetry shows cascading systems failures in life support and communications. The mission was celebrated as humanity's greatest achievement until silence fell. Trace backward to understand how this disaster was built, decision by decision.",
+    "portal_year": 2031,
+    "origin_year": 2026,
+    "backward_steps": 10,
+    "exploration_mode": "adaptive",
+    "oscillation_complexity_threshold": 10,
+    "candidate_antecedents_per_step": 7,
+    "path_count": 5,
+    "coherence_threshold": 0.7,
+    "checkpoint_interval": 3,
+    "llm_scoring_weight": 0.3,
+    "historical_precedent_weight": 0.2,
+    "causal_necessity_weight": 0.3,
+    "entity_capability_weight": 0.2,
+    "max_backtrack_depth": 3,
+    "portal_relaxation_enabled": true,
+    "use_simulation_judging": true,
+    "simulation_forward_steps": 1,
+    "simulation_max_entities": 4,
+    "simulation_include_dialog": false,
+    "judge_model": "meta-llama/llama-3.1-405b-instruct",
+    "judge_temperature": 0.3,
+    "simulation_cache_results": true,
+    "fidelity_planning_mode": "hybrid",
+    "token_budget_mode": "soft",
+    "token_budget": 30000.0,
+    "fidelity_template": "balanced",
+    "custom_fidelity_schedule": null,
+    "custom_temporal_steps": null
+  },
+  "outputs": {
+    "formats": ["jsonl", "json"],
+    "include_dialogs": true,
+    "include_relationships": true,
+    "include_knowledge_flow": true,
+    "export_ml_dataset": true,
+    "generate_narrative_exports": true,
+    "narrative_export_formats": ["markdown", "json", "pdf"],
+    "narrative_detail_level": "summary",
+    "enhance_narrative_with_llm": true
+  },
+  "variations": {
+    "enabled": false,
+    "count": 1,
+    "strategies": ["vary_personalities"],
+    "deduplication_threshold": 0.9
+  },
+  "metadata": {
+    "mechanisms_featured": [
+      "M17_modal_temporal_causality_portal",
+      "M3_causal_attribution",
+      "M7_emotional_state",
+      "M8_embodied_states",
+      "M11_dialog_synthesis",
+      "M13_relationship_tracking"
+    ]
+  },
+  "economic_scenario": null,
+  "founder_profiles": null,
+  "max_cost_usd": null,
+  "enable_checkpoints": true,
+  "checkpoint_interval": 5
+}
