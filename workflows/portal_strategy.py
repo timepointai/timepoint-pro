@@ -675,11 +675,28 @@ Include 3-10 relevant entities."""
         # Build LLM prompt for antecedent generation
         system_prompt = "You are an expert at backward temporal reasoning and counterfactual analysis."
 
-        # Extract key entities for context
+        # Extract key entities with role/description context for better anchoring
         entity_names = [e.entity_id for e in current_state.entities[:10]] if current_state.entities else []
         entity_summary = f"{len(current_state.entities)} entities" if current_state.entities else "No entities yet"
-        if entity_names:
-            entity_summary += f" (including {', '.join(entity_names[:5])})"
+        if current_state.entities:
+            entity_details = []
+            for e in current_state.entities[:10]:
+                name = e.entity_id
+                role = e.entity_metadata.get("role", "")
+                desc = e.entity_metadata.get("description", "")
+                knowledge = e.entity_metadata.get("initial_knowledge", [])
+                traits = e.entity_metadata.get("personality_traits", [])
+                detail = name
+                if role:
+                    detail += f" ({role})"
+                if desc:
+                    detail += f" - {desc}"
+                elif knowledge:
+                    detail += f" - knows: {', '.join(str(k) for k in knowledge[:3])}"
+                if traits:
+                    detail += f" [traits: {', '.join(str(t) for t in traits[:3])}]"
+                entity_details.append(detail)
+            entity_summary = "ENTITIES (use these specific characters in antecedent narratives):\n" + "\n".join(f"  - {d}" for d in entity_details)
 
         # Create human-readable target time string
         month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -691,7 +708,8 @@ Include 3-10 relevant entities."""
 CONSEQUENT STATE ({current_state.to_year_month_str()}):
 {current_state.description}
 
-Entities: {entity_summary}
+{entity_summary}
+
 World Context: {current_state.world_state}
 
 TARGET TIME FOR ANTECEDENTS: {target_time_str}
@@ -702,6 +720,7 @@ INSTRUCTIONS:
 3. Vary the approaches: some gradual, some pivotal moments, some lucky breaks
 4. Ensure each is historically/causally plausible
 5. Consider: entity capabilities, resource constraints, time requirements, external events
+6. CRITICAL: Antecedent narratives MUST feature the SPECIFIC entities listed above by name. Do not invent new characters or drift to unrelated organizations. The story is about THESE people and their decisions.
 
 SPECIFICITY REQUIREMENTS (CRITICAL):
 - Use CONCRETE numbers: "$5M Series A" not "raised funding", "42 employees" not "grew team"
@@ -713,7 +732,9 @@ SPECIFICITY REQUIREMENTS (CRITICAL):
 
 For EACH antecedent, provide:
 - description: Detailed narrative of what's happening in {target_time_str} (3-4 sentences with specific details)
-- key_events: Array of 3-5 SPECIFIC events with concrete details (dates, names, numbers when applicable)
+- key_events: A flat array of 3-5 SHORT STRINGS (not objects). Each string is a one-sentence event description.
+  CORRECT: ["NASA approves $200M budget increase in March", "Lin Zhang detects O2 generator anomaly"]
+  WRONG: [{"date": "March 2030", "description": "NASA approves budget"}]  ← Do NOT use objects
 - entity_changes: Dict mapping entity names to QUANTIFIED changes (skills gained, relationships formed, resources +/-)
 - world_context: Dict of contextual factors with SPECIFIC references (market conditions, competitor moves, regulatory changes)
 - causal_link: 2-3 sentence explanation connecting this state to the consequent with SPECIFIC causal mechanisms

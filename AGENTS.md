@@ -159,6 +159,17 @@ All 5 portal scoring methods now use real LLM-based evaluation instead of hardco
 - `metadata/narrative_exporter.py`: Added `json.loads()` deserialization for dialog data
 - `metadata/run_summarizer.py`: Fixed dialog turn parsing for narrative summaries
 - `llm_service/response_parser.py`: Replaced greedy regex JSON extraction with bracket-depth matching parser. The old regex (`\{[\s\S]*\}`) failed on truncated responses and text-wrapped JSON; the new `_extract_by_bracket_matching()` tracks bracket depth, string boundaries, and escape sequences character-by-character.
+- `workflows/dialog_synthesis.py`: **Arousal decay** — Added exponential decay toward baseline (0.3) with 15% relaxation rate before each dialog impact. Previously arousal only accumulated, saturating at 1.0 within 3-4 dialog rounds for all entities. Also rebalanced keyword weights (low-arousal: -0.03 from -0.01), reduced interaction cap (0.08 from 0.15), symmetric delta clamp [-0.25, +0.25].
+- `workflows/directorial_strategy.py`: **Prompt-schema alignment** — Added explicit format instructions to narrative planning prompt. LLM returned beats as `[{name, description}]` instead of `["string"]` and character_arcs with wrong field names. Fix specifies exact field structure in the prompt.
+- `workflows/dialog_synthesis.py`: **Entity hallucination prevention** — Replaced generic `"Generate a conversation between N historical figures"` with explicit entity name anchoring. Added `IMPORTANT: ONLY use the character IDs listed below as speakers. Do NOT invent or substitute other characters.` This prevents the LLM from hallucinating Leonardo da Vinci, Cleopatra, etc. when entity context is sparse.
+- `workflows/dialog_synthesis.py`: **Temporal freshness** — Added rule #8 (TEMPORAL FRESHNESS) to dialog prompt requiring new information per timepoint. Prevents recycling the same dialog beats ("3 weeks behind schedule", "Q4 targets") across every timepoint.
+- `workflows/portal_strategy.py`: **key_events schema** — Added explicit `CORRECT/WRONG` format examples to portal antecedent prompt. LLM consistently returned `key_events` as `[{date, description}]` objects instead of flat strings, causing Pydantic validation failures on every backward step.
+- `workflows/portal_strategy.py`: **Entity context enrichment** — Enriched entity_summary in antecedent generation prompt with roles, descriptions, knowledge items, and personality traits. Previously only listed entity IDs. Added rule #6 requiring antecedent narratives to feature the specific named entities, preventing drift to generic corporate/startup framing.
+
+### Mars Mission Portal Template (NEW)
+- `generation/templates/showcase/mars_mission_portal.json`: New portal mode template. Backward reasoning from failed Mars mission (2031) to origins (2026). 4 entities, 10 backward steps, simulation-judged with 405B judge model. First verified portal template.
+- `generation/templates/catalog.json`: Added `showcase/mars_mission_portal` entry, `portal` and `space` patch categories.
+- `run.sh`: Added `mars_mission_portal` to SHOWCASE_TEMPLATES array and dispatch case.
 
 ### NONLINEAR Mode Removed
 Removed the NONLINEAR temporal mode from codebase (was never fully implemented). Now 5 modes: PEARL, DIRECTORIAL, BRANCHING, CYCLICAL, PORTAL.
