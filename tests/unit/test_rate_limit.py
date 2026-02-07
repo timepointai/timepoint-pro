@@ -30,15 +30,23 @@ class TestRateLimitConfig:
     """Tests for RateLimitConfig."""
 
     def test_default_config(self):
-        """Test default configuration values."""
-        config = RateLimitConfig()
+        """Test default configuration values (without env var interference)."""
+        import os
+        # RateLimitConfig reads from env vars at construction time;
+        # clear any that other tests may have set to ensure clean defaults
+        rate_env_vars = [k for k in os.environ if k.startswith("RATE_LIMIT_")]
+        saved = {k: os.environ.pop(k) for k in rate_env_vars}
+        try:
+            config = RateLimitConfig()
 
-        # Check defaults
-        assert config.free_rpm == 10
-        assert config.basic_rpm == 60
-        assert config.pro_rpm == 300
-        assert config.enterprise_rpm == 1000
-        assert config.enabled is True
+            # Check defaults
+            assert config.free_rpm == 10
+            assert config.basic_rpm == 60
+            assert config.pro_rpm == 300
+            assert config.enterprise_rpm == 1000
+            assert config.enabled is True
+        finally:
+            os.environ.update(saved)
 
     def test_get_rpm_for_tier(self):
         """Test getting RPM for different tiers."""
