@@ -42,7 +42,7 @@ Strategies share a common interface: `run(config) -> List[Path]`. Each path cont
 
 ## Key Commands
 ```bash
-./run.sh list                    # List all 13 verified templates
+./run.sh list                    # List all 15 templates
 ./run.sh run board_meeting       # Run single template
 ./run.sh run --category core     # Run by category
 ./run.sh quick                   # Quick tier tests
@@ -166,10 +166,15 @@ All 5 portal scoring methods now use real LLM-based evaluation instead of hardco
 - `workflows/portal_strategy.py`: **key_events schema** — Added explicit `CORRECT/WRONG` format examples to portal antecedent prompt. LLM consistently returned `key_events` as `[{date, description}]` objects instead of flat strings, causing Pydantic validation failures on every backward step.
 - `workflows/portal_strategy.py`: **Entity context enrichment** — Enriched entity_summary in antecedent generation prompt with roles, descriptions, knowledge items, and personality traits. Previously only listed entity IDs. Added rule #6 requiring antecedent narratives to feature the specific named entities, preventing drift to generic corporate/startup framing.
 
-### Mars Mission Portal Template (NEW)
-- `generation/templates/showcase/mars_mission_portal.json`: New portal mode template. Backward reasoning from failed Mars mission (2031) to origins (2026). 4 entities, 10 backward steps, simulation-judged with 405B judge model. First verified portal template.
+### Mars Mission Portal Template
+- `generation/templates/showcase/mars_mission_portal.json`: Portal mode template. Backward reasoning from failed Mars mission (2031) to origins (2026). 4 entities, 10 backward steps, simulation-judged with 405B judge model. First verified portal template.
 - `generation/templates/catalog.json`: Added `showcase/mars_mission_portal` entry, `portal` and `space` patch categories.
 - `run.sh`: Added `mars_mission_portal` to SHOWCASE_TEMPLATES array and dispatch case.
+
+### Castaway Colony Full-Mechanism Showcase (NEW)
+- `generation/templates/showcase/castaway_colony_branching.json`: Full 19-mechanism showcase template. 6 crew members crash-land on Kepler-442b, must choose between 3 survival strategies (Fortify, Explore, Repair) at Day 7 branch point. 10 entities (human, abstract, building, animal), branching mode with simulation judging, 90+ quantitative state variables, O(100,000) interaction paths. First template to verify M1, M2, M4, M5, M6, M9, M18 — 7 mechanisms that previously had zero verified templates.
+- `generation/templates/catalog.json`: Added template entry with M1-M18 mechanisms, `scifi` and `space` patch categories.
+- `run.sh`: Added `castaway_colony_branching` to SHOWCASE_TEMPLATES array and dispatch case.
 
 ### NONLINEAR Mode Removed
 Removed the NONLINEAR temporal mode from codebase (was never fully implemented). Now 5 modes: PEARL, DIRECTORIAL, BRANCHING, CYCLICAL, PORTAL.

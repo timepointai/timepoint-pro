@@ -1,0 +1,390 @@
+{
+  "scenario_description": "The research vessel Meridian crash-lands on Kepler-442b after a navigation system failure during orbital insertion. Six crew members survive with partial supplies, a damaged ship, and no way to contact Earth for 14 months. Over 21 days tracked across 10 timepoints, they must decide: fortify the crash site, explore the alien biosphere, or attempt to repair the ship's emergency beacon. The planet is alive. Bioluminescent flora responds to electromagnetic signatures from the crew's equipment. A migratory fauna pattern the crew doesn't yet understand predicts violent weather cycles that follow no Earth logic. Knowledge provenance is survival: who discovered the water source is contaminated? Who noticed the fauna migration pattern predicts storms? Who found the cave system that could shelter them — or trap them? Commander Tanaka carries guilt for the crash. Dr. Okonkwo is fascinated by the xenobiology but starts as a background presence until his expertise becomes critical. Engineer Sharma is the only one who can assess ship repairs. Lt. Cole advocates a fortress strategy. Atmospheric scientist Vasquez tracks alien weather patterns. Navigator Park, injured in the crash with limited mobility, holds pre-crash navigation data that could explain why they landed on the wrong hemisphere. The crashed Meridian itself is a depleting resource — life support draining, hull integrity degrading. Crew morale propagates through the group as an emergent force. On Day 7, Commander Tanaka must choose: Branch A (Fortify & Wait) consolidates at the crash site, repairing life support and rationing supplies — conservative but depletes reserves. Branch B (Explore & Adapt) sends teams into the alien biosphere to discover food sources, map cave systems, and learn fauna patterns — higher risk but builds knowledge. Branch C (Repair & Signal) commits all resources to repairing the emergency beacon — fastest path to rescue if successful, catastrophic if it fails. Each branch is evaluated against quantitative resource constraints: O2 reserves, food rations in kg, water purification rate, hull integrity percentage, ambient radiation levels, and fauna migration indices. The alien biosphere has its own agency through bioluminescent response patterns, and the local fauna follows migratory instincts that the crew can learn to read. This scenario exercises all 19 mechanisms including heterogeneous fidelity (M1: ship at TENSOR, commander at TRAINED, injured navigator at SCENE), progressive training (M2: Dr. Okonkwo elevates from SCENE to TRAINED as xenobiology queries accumulate), physics validation (M4: O2 consumption rate x crew count = depletion timeline), lazy resolution (M5: navigator elevated on query about pre-crash data), tensor compression (M6: biosphere as TTM tensor), on-demand entities (M9: cargo bay inventory and lower deck survivors generated on query), and model selection (M18: specialized models for math, dialog, structured JSON, and branch evaluation).",
+  "world_id": "castaway_colony_branching",
+  "patch": {
+    "name": "Castaway Colony",
+    "category": "scifi",
+    "tags": ["alien-planet", "survival", "branching", "knowledge-provenance", "full-mechanism-coverage", "showcase"],
+    "author": "timepoint-daedalus",
+    "version": "1.0",
+    "description": "Full-mechanism showcase: crash-landed crew on alien planet with branching survival strategies and knowledge provenance as core mechanic"
+  },
+  "entities": {
+    "count": 10,
+    "types": ["human", "abstract", "building", "animal"],
+    "initial_resolution": "scene",
+    "animism_level": 4,
+    "envelope": {
+      "attack": 0.3,
+      "decay": 0.15,
+      "sustain": 0.8,
+      "release": 0.3
+    }
+  },
+  "timepoints": {
+    "count": 4,
+    "start_time": null,
+    "resolution": "day",
+    "before_count": 3,
+    "after_count": 7
+  },
+  "temporal": {
+    "mode": "branching",
+    "narrative_arc": null,
+    "dramatic_tension": 0.8,
+    "cycle_length": null,
+    "prophecy_accuracy": 0.5,
+    "enable_counterfactuals": true,
+    "portal_description": null,
+    "portal_year": null,
+    "origin_year": null,
+    "backward_steps": 15,
+    "exploration_mode": "adaptive",
+    "oscillation_complexity_threshold": 10,
+    "candidate_antecedents_per_step": 7,
+    "path_count": 5,
+    "coherence_threshold": 0.7,
+    "checkpoint_interval": 3,
+    "llm_scoring_weight": 0.3,
+    "historical_precedent_weight": 0.2,
+    "causal_necessity_weight": 0.3,
+    "entity_capability_weight": 0.2,
+    "max_backtrack_depth": 3,
+    "portal_relaxation_enabled": true,
+    "use_simulation_judging": true,
+    "simulation_forward_steps": 2,
+    "simulation_max_entities": 10,
+    "simulation_include_dialog": true,
+    "judge_model": "meta-llama/llama-3.1-405b-instruct",
+    "judge_temperature": 0.3,
+    "simulation_cache_results": true,
+    "fidelity_planning_mode": "hybrid",
+    "token_budget_mode": "soft",
+    "token_budget": 50000.0,
+    "fidelity_template": "dramatic",
+    "custom_fidelity_schedule": null,
+    "custom_temporal_steps": null
+  },
+  "outputs": {
+    "formats": ["jsonl", "json", "markdown"],
+    "include_dialogs": true,
+    "include_relationships": true,
+    "include_knowledge_flow": true,
+    "export_ml_dataset": true,
+    "generate_narrative_exports": true,
+    "narrative_export_formats": ["markdown", "json", "pdf"],
+    "narrative_detail_level": "comprehensive",
+    "enhance_narrative_with_llm": true
+  },
+  "variations": {
+    "enabled": true,
+    "count": 3,
+    "strategies": ["vary_personalities", "vary_starting_conditions", "vary_knowledge"],
+    "deduplication_threshold": 0.9
+  },
+  "metadata": {
+    "mechanisms_featured": [
+      "M1_heterogeneous_fidelity",
+      "M2_progressive_training",
+      "M3_exposure_events",
+      "M4_physics_validation",
+      "M5_lazy_resolution",
+      "M6_tensor_compression",
+      "M7_causal_chains",
+      "M8_embodied_states",
+      "M9_on_demand_entities",
+      "M10_scene_atmosphere",
+      "M11_dialog_synthesis",
+      "M12_counterfactual_branching",
+      "M13_relationship_evolution",
+      "M14_circadian_patterns",
+      "M15_entity_prospection",
+      "M16_animistic_entities",
+      "M17_modal_causality",
+      "M18_model_selection",
+      "M19_knowledge_extraction"
+    ],
+    "entity_roster": {
+      "cmdr_yuki_tanaka": {
+        "type": "human",
+        "role": "Mission commander, geologist",
+        "initial_fidelity": "trained",
+        "initial_knowledge": ["crash_cause_partial", "crew_manifest", "supply_inventory_estimate"],
+        "influence_channels": ["command_authority", "geological_expertise", "guilt_driven_caution"],
+        "key_state_variables": ["stress_level", "decision_confidence", "guilt_index"]
+      },
+      "dr_felix_okonkwo": {
+        "type": "human",
+        "role": "Ship's doctor and xenobiologist",
+        "initial_fidelity": "scene",
+        "progressive_training_trigger": "xenobiology_query_count >= 3",
+        "initial_knowledge": ["basic_medical_supplies", "earth_biology_baseline"],
+        "influence_channels": ["medical_authority", "scientific_curiosity", "xenobiology_expertise"],
+        "key_state_variables": ["fascination_level", "diagnostic_accuracy", "stress_degradation"]
+      },
+      "eng_priya_sharma": {
+        "type": "human",
+        "role": "Chief engineer, sole ship repair capability",
+        "initial_fidelity": "dialog",
+        "initial_knowledge": ["ship_systems_architecture", "damage_assessment_partial", "beacon_repair_requirements"],
+        "influence_channels": ["technical_authority", "repair_feasibility_assessment", "resource_cost_estimation"],
+        "key_state_variables": ["sleep_deprivation_hours", "repair_quality_modifier", "confidence_in_beacon"]
+      },
+      "lt_marcus_cole": {
+        "type": "human",
+        "role": "Security and survival specialist",
+        "initial_fidelity": "dialog",
+        "initial_knowledge": ["perimeter_defense_protocols", "rationing_schedules", "threat_assessment_framework"],
+        "influence_channels": ["military_authority", "survival_pragmatism", "fortress_advocacy"],
+        "key_state_variables": ["vigilance_level", "trust_in_commander", "threat_perception"]
+      },
+      "sci_elena_vasquez": {
+        "type": "human",
+        "role": "Atmospheric scientist, weather pattern tracker",
+        "initial_fidelity": "dialog",
+        "initial_knowledge": ["earth_atmospheric_models", "basic_kepler442b_data", "instrument_calibration"],
+        "influence_channels": ["weather_prediction", "data_analysis", "pattern_recognition"],
+        "key_state_variables": ["prediction_accuracy", "instrument_status", "circadian_disruption"]
+      },
+      "nav_jin_park": {
+        "type": "human",
+        "role": "Navigator, injured in crash with limited mobility",
+        "initial_fidelity": "tensor_only",
+        "lazy_resolution_trigger": "query_about_pre_crash_navigation_data",
+        "initial_knowledge": ["pre_crash_flight_path", "orbital_insertion_failure_data", "hemisphere_anomaly"],
+        "influence_channels": ["navigation_expertise", "crash_witness_testimony", "limited_mobility_constraint"],
+        "key_state_variables": ["injury_severity", "mobility_percentage", "cognitive_clarity", "pain_level"]
+      },
+      "kepler_biosphere": {
+        "type": "abstract",
+        "role": "Alien ecosystem with bioluminescent response patterns",
+        "initial_fidelity": "tensor_only",
+        "tensor_compression": {
+          "context_vector": ["bioluminescence_intensity", "electromagnetic_sensitivity", "growth_rate"],
+          "biology_vector": ["toxicity_index", "nutrient_profile", "symbiotic_relationships"],
+          "compression_ratio": 0.97
+        },
+        "initial_knowledge": [],
+        "influence_channels": ["bioluminescent_signaling", "electromagnetic_response", "ecosystem_feedback"],
+        "key_state_variables": ["bioluminescence_intensity", "electromagnetic_field_strength", "growth_cycle_phase"]
+      },
+      "crashed_meridian": {
+        "type": "building",
+        "role": "Damaged research vessel with depleting life support",
+        "initial_fidelity": "tensor_only",
+        "initial_knowledge": [],
+        "influence_channels": ["life_support_output", "shelter_integrity", "component_availability"],
+        "key_state_variables": ["hull_integrity_pct", "o2_reserve_hours", "power_output_kw", "beacon_repair_pct"]
+      },
+      "local_fauna": {
+        "type": "animal",
+        "role": "Migratory creatures whose patterns predict weather",
+        "initial_fidelity": "tensor_only",
+        "initial_knowledge": [],
+        "influence_channels": ["migration_pattern_signal", "threat_behavior", "weather_correlation"],
+        "key_state_variables": ["migration_index", "proximity_to_crash_site_km", "aggression_level", "herd_size"]
+      },
+      "crew_morale": {
+        "type": "abstract",
+        "role": "Collective psychological state, emergent group property",
+        "initial_fidelity": "tensor_only",
+        "initial_knowledge": [],
+        "influence_channels": ["hope_propagation", "fear_contagion", "conflict_amplification"],
+        "key_state_variables": ["cohesion_index", "hope_level", "conflict_intensity", "fatigue_factor"]
+      }
+    },
+    "branching_points": [
+      {
+        "timepoint": "tp_005",
+        "day": 7,
+        "trigger": "Commander Tanaka must decide colony strategy based on accumulated knowledge",
+        "branches": {
+          "branch_a_fortify": {
+            "label": "Fortify & Wait",
+            "description": "Consolidate at crash site. Repair life support, ration supplies, build defenses. Conservative but depletes reserves. Succeeds if beacon was already repaired; fails if supplies run out before rescue window.",
+            "resource_bias": "conservation",
+            "risk_profile": "low_risk_low_reward",
+            "key_constraint": "supply_depletion_rate > resupply_rate"
+          },
+          "branch_b_explore": {
+            "label": "Explore & Adapt",
+            "description": "Send teams into alien biosphere. Discover food sources, map cave systems, learn fauna patterns. Higher risk (injuries, unknown threats) but builds knowledge base. Bioluminescent response becomes asset.",
+            "resource_bias": "knowledge_investment",
+            "risk_profile": "high_risk_high_reward",
+            "key_constraint": "exploration_casualties < critical_crew_threshold"
+          },
+          "branch_c_repair": {
+            "label": "Repair & Signal",
+            "description": "All resources toward repairing emergency beacon. Engineer Sharma leads, but critical components scattered across debris field. Fastest path to rescue if successful; catastrophic if fails.",
+            "resource_bias": "all_in_on_rescue",
+            "risk_profile": "binary_outcome",
+            "key_constraint": "beacon_components_found >= required_components"
+          }
+        }
+      }
+    ],
+    "state_space_analysis": {
+      "entities": 10,
+      "influence_channels_per_entity": 4,
+      "timepoints": 10,
+      "interaction_paths": "O(100000)",
+      "estimated_llm_calls": 1200,
+      "propagation_steps": 5100,
+      "quantitative_state_variables": 90
+    },
+    "quantitative_tracking": {
+      "o2_reserves": {
+        "unit": "hours",
+        "initial": 336,
+        "depletion_rate": "6_crew * 0.84_kg_per_hour",
+        "critical_threshold": 48
+      },
+      "food_rations": {
+        "unit": "kg",
+        "initial": 180,
+        "consumption_rate": "6_crew * 2.1_kg_per_day",
+        "critical_threshold": 25
+      },
+      "water_purification_rate": {
+        "unit": "liters_per_day",
+        "initial_capacity": 18,
+        "degradation_rate": "0.5_liters_per_day_loss",
+        "minimum_requirement": 12
+      },
+      "hull_integrity": {
+        "unit": "percentage",
+        "initial": 62,
+        "degradation_rate": "0.3_pct_per_day_from_atmosphere",
+        "critical_threshold": 30
+      },
+      "radiation_exposure": {
+        "unit": "millisieverts",
+        "ambient_rate": "0.8_msv_per_day",
+        "storm_rate": "12_msv_per_hour",
+        "annual_limit": 50
+      },
+      "fauna_migration_index": {
+        "unit": "relative_scale_0_to_1",
+        "description": "Proximity and density of local fauna, correlates with incoming weather",
+        "storm_correlation": 0.87
+      }
+    },
+    "knowledge_provenance_examples": [
+      {
+        "discovery": "purple_lichen_edible_after_boiling",
+        "discoverer": "dr_felix_okonkwo",
+        "timepoint": "tp_003",
+        "propagation": ["dr_felix_okonkwo -> cmdr_yuki_tanaka (direct report)", "cmdr_yuki_tanaka -> crew_morale (hope boost)"],
+        "graph_edge_type": "empirical_observation"
+      },
+      {
+        "discovery": "fauna_migration_correlates_with_pressure_drops",
+        "discoverer": "sci_elena_vasquez",
+        "timepoint": "tp_004",
+        "propagation": ["sci_elena_vasquez -> lt_marcus_cole (defense planning)", "sci_elena_vasquez -> cmdr_yuki_tanaka (strategy input)"],
+        "graph_edge_type": "pattern_inference"
+      },
+      {
+        "discovery": "cave_system_500m_northwest",
+        "discoverer": "lt_marcus_cole",
+        "timepoint": "tp_004",
+        "propagation": ["lt_marcus_cole -> cmdr_yuki_tanaka (shelter option)", "cmdr_yuki_tanaka -> eng_priya_sharma (structural assessment)"],
+        "graph_edge_type": "terrain_reconnaissance"
+      },
+      {
+        "discovery": "water_source_contaminated_with_alien_microbes",
+        "discoverer": "dr_felix_okonkwo",
+        "timepoint": "tp_002",
+        "propagation": ["dr_felix_okonkwo -> cmdr_yuki_tanaka (critical alert)", "cmdr_yuki_tanaka -> all_crew (rationing order)"],
+        "graph_edge_type": "empirical_observation"
+      },
+      {
+        "discovery": "hemisphere_landing_error_from_nav_data",
+        "discoverer": "nav_jin_park",
+        "timepoint": "tp_006",
+        "lazy_resolution_triggered": true,
+        "propagation": ["nav_jin_park -> cmdr_yuki_tanaka (explains terrain mismatch)", "cmdr_yuki_tanaka -> sci_elena_vasquez (recalibrate weather models)"],
+        "graph_edge_type": "data_analysis"
+      }
+    ],
+    "convergence_testing": {
+      "hypotheses": [
+        {
+          "id": "H1",
+          "statement": "Does the biologist always discover contaminated water first?",
+          "expected": "High convergence — Okonkwo's role makes him the natural discoverer",
+          "mechanism": "M3_exposure_events"
+        },
+        {
+          "id": "H2",
+          "statement": "Is fauna-predicts-storms a consensus knowledge edge across runs?",
+          "expected": "Medium convergence — Vasquez or Cole could notice the pattern",
+          "mechanism": "M19_knowledge_extraction"
+        },
+        {
+          "id": "H3",
+          "statement": "Does Branch C (Repair) consistently require navigator data from Park?",
+          "expected": "High convergence — beacon repair needs orbital data that only Park has",
+          "mechanism": "M5_lazy_resolution"
+        },
+        {
+          "id": "H4",
+          "statement": "Does crew morale diverge significantly across branches by tp_008?",
+          "expected": "Yes — Branch B boosts morale through discovery; Branch A degrades through confinement",
+          "mechanism": "M16_animistic_entities"
+        }
+      ]
+    },
+    "readme_thesis_demonstration": {
+      "search_not_generation": "BRANCHING mode explores 3 survival strategies; each is evaluated by 405B judge against resource constraints, not just generated for plausibility",
+      "combinatorial_complexity": "10 entities x 4 influence channels x 10 timepoints = O(100,000) interaction paths that no prompt could enumerate",
+      "quantitative_state_propagation": "O2 reserves, food rations (kg), water purification rate, injury severity, hull integrity, ambient radiation — 90+ numerical values across 5,100 propagation steps",
+      "knowledge_provenance": "Who discovered edible flora? Who knows the storm pattern? Who found the beacon parts? Each discovery is a typed graph edge with source, timepoint, and propagation chain",
+      "convergence": "Does the biologist always discover contaminated water first? Is fauna-predicts-storms a consensus edge? Testable hypotheses across multiple runs",
+      "composable_mechanisms": "Alien ecosystem exercises M4/M6/M16 independently from crew dialog (M11) or branching (M12). Mechanisms compose without interference"
+    },
+    "circadian_config": {
+      "alien_day_length_hours": 28,
+      "bioluminescence_pattern": "intensifies during 12-hour alien night cycle",
+      "crew_circadian_disruption": "Earth-adapted 24hr cycle vs 28hr alien day causes cumulative fatigue and cognitive degradation",
+      "fauna_diurnal_pattern": "migration peaks during alien dawn (hours 0-4 of day cycle)"
+    },
+    "model_selection_config": {
+      "M18_routing": {
+        "math_and_physics": {
+          "tasks": ["O2 depletion calculations", "radiation exposure modeling", "supply consumption projections"],
+          "preferred_model": "deepseek/deepseek-r1"
+        },
+        "dialog_and_conflict": {
+          "tasks": ["crew interpersonal dialog", "command decisions", "morale propagation"],
+          "preferred_model": "meta-llama/llama-3.1-70b-instruct"
+        },
+        "structured_json": {
+          "tasks": ["supply inventories", "flora analysis reports", "damage assessments"],
+          "preferred_model": "qwen/qwen-2.5-72b-instruct"
+        },
+        "branch_evaluation": {
+          "tasks": ["counterfactual branch judging", "strategy outcome assessment"],
+          "preferred_model": "meta-llama/llama-3.1-405b-instruct"
+        }
+      }
+    },
+    "on_demand_entity_triggers": {
+      "M9_examples": [
+        {
+          "query": "What did the crew find in cargo bay 3?",
+          "generates": "Inventory entities with plausible damage states and utility values"
+        },
+        {
+          "query": "Any other survivors from the lower deck?",
+          "generates": "Background crew members with injury states, knowledge, and skill profiles"
+        }
+      ]
+    }
+  },
+  "economic_scenario": null,
+  "founder_profiles": null,
+  "max_cost_usd": 5.0,
+  "enable_checkpoints": true,
+  "checkpoint_interval": 5
+}

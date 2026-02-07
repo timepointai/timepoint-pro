@@ -73,7 +73,11 @@
       "showcase/mars_mission_portal"
     ],
     "space": [
-      "showcase/mars_mission_portal"
+      "showcase/mars_mission_portal",
+      "showcase/castaway_colony_branching"
+    ],
+    "scifi": [
+      "showcase/castaway_colony_branching"
     ],
     "convergence": [
       "convergence/simple",
@@ -191,6 +195,16 @@
       "cost_estimate": "$0.40",
       "duration_estimate": "15min",
       "status": "verified"
+    },
+    "showcase/castaway_colony_branching": {
+      "name": "Castaway Colony",
+      "description": "Full-mechanism showcase: crash-landed crew on alien planet with branching survival strategies and knowledge provenance as core mechanic",
+      "mechanisms": ["M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12", "M13", "M14", "M15", "M16", "M17", "M18"],
+      "tier": "comprehensive",
+      "category": "showcase",
+      "cost_estimate": "$1.50",
+      "duration_estimate": "20min",
+      "status": "pending"
     },
     "convergence/simple": {
       "name": "Convergence Simple",

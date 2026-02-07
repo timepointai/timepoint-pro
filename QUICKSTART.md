@@ -51,15 +51,18 @@ python run_all_mechanism_tests.py --nl "detective interrogates 3 witnesses about
 
 ### Template-Based Mode
 ```bash
-# List all 13 verified templates
+# List all 15 templates
 ./run.sh list
 
 # Run a single template
 ./run.sh run board_meeting
 ./run.sh run jefferson_dinner
 
+# Run the full-mechanism showcase (all 19 mechanisms)
+./run.sh run castaway_colony_branching
+
 # Run templates by category
-./run.sh run --category showcase      # 10 showcase scenarios
+./run.sh run --category showcase      # 12 showcase scenarios
 ./run.sh run --category convergence   # 3 convergence-optimized templates
 
 # Run templates by tier (complexity)
@@ -141,10 +144,10 @@ Each mode changes what "time" means and how the simulation validates consistency
 | Mode | Description | Use Case | Example Template |
 |------|-------------|----------|------------------|
 | `pearl` | Standard causality, no time paradoxes | Default, most realistic | `board_meeting` |
-| `portal` | Backward reasoning from known outcomes | "How did we get here?" scenarios | (no verified templates) |
+| `portal` | Backward reasoning from known outcomes | "How did we get here?" scenarios | `mars_mission_portal` |
 | `directorial` | Narrative-focused with dramatic tension | Stories, character arcs | `hound_shadow_directorial` |
 | `cyclical` | Allows prophecy and time loops | Sci-fi, mystical, generational | (no verified templates) |
-| `branching` | Counterfactual what-if scenarios | Decision analysis, alternate history | `vc_pitch_branching` |
+| `branching` | Counterfactual what-if scenarios | Decision analysis, alternate history | `castaway_colony_branching` |
 
 ### Choosing a Mode
 
@@ -156,11 +159,17 @@ Each mode changes what "time" means and how the simulation validates consistency
 
 **Use CYCLICAL when:** Time loops, generational patterns, or prophecy are structurally important. The system interprets what "cyclical" means for your scenario—Groundhog Day loops, dynasty sagas, economic boom-bust cycles. Prophecies become structural (must be fulfilled or subverted), not decorative.
 
-**Use BRANCHING when:** You want parallel "what if" timelines. A single decision point spawns multiple futures, each internally consistent but diverging from the branch point. Good for strategy analysis and counterfactual reasoning.
+**Use BRANCHING when:** You want parallel "what if" timelines. A single decision point spawns multiple futures, each internally consistent but diverging from the branch point. The Castaway Colony template branches at Day 7 into three survival strategies (Fortify, Explore, Repair), each evaluated against quantitative resource constraints. Good for strategy analysis and counterfactual reasoning.
 
 ### Mode-Specific Templates
 
 ```bash
+# Full-mechanism showcase (all 19 mechanisms, branching mode)
+./run.sh run castaway_colony_branching # Alien planet survival, 3 counterfactual branches
+
+# Portal template (backward reasoning)
+./run.sh run mars_mission_portal       # Backward from Mars mission failure to root causes
+
 # Directorial template (narrative structure)
 ./run.sh run hound_shadow_directorial  # Detective on foggy moors, directorial causality
 
@@ -300,17 +309,19 @@ After generating a simulation:
 
 ```
 ================================================================================
-TEMPLATE CATALOG (Verified Only)
+TEMPLATE CATALOG
 ================================================================================
-ID                                       TIER         CATEGORY     MECHANISMS
+ID                                       TIER           CATEGORY     MECHANISMS
 --------------------------------------------------------------------------------
-showcase/board_meeting                   standard     showcase     M1, M7, M11 +1
-showcase/jefferson_dinner                standard     showcase     M3, M7, M11 +1
-showcase/hound_shadow_directorial        comprehensive showcase    M17, M10, M14 +3
-convergence/simple                       quick        convergence  M7, M11
-convergence/standard                     standard     convergence  M7, M11, M13
+showcase/castaway_colony_branching       comprehensive  showcase     M1, M2, M3 +15
+showcase/board_meeting                   standard       showcase     M1, M7, M11 +1
+showcase/jefferson_dinner                standard       showcase     M3, M7, M11 +1
+showcase/hound_shadow_directorial        comprehensive  showcase     M17, M10, M14 +3
+showcase/mars_mission_portal             comprehensive  showcase     M17, M3, M7 +3
+convergence/simple                       quick          convergence  M7, M11
+convergence/standard                     standard       convergence  M7, M11, M13
 --------------------------------------------------------------------------------
-Total: 13 verified templates
+Total: 15 templates
 ```
 
 ---
