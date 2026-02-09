@@ -736,7 +736,7 @@ For EACH antecedent, provide:
 - description: Detailed narrative of what's happening in {target_time_str} (3-4 sentences with specific details)
 - key_events: A flat array of 3-5 SHORT STRINGS (not objects). Each string is a one-sentence event description.
   CORRECT: ["NASA approves $200M budget increase in March", "Lin Zhang detects O2 generator anomaly"]
-  WRONG: [{"date": "March 2030", "description": "NASA approves budget"}]  ← Do NOT use objects
+  WRONG: [{{"date": "March 2030", "description": "NASA approves budget"}}]  ← Do NOT use objects
 - entity_changes: Dict mapping entity names to QUANTIFIED changes (skills gained, relationships formed, resources +/-)
 - world_context: Dict of contextual factors with SPECIFIC references (market conditions, competitor moves, regulatory changes)
 - causal_link: 2-3 sentence explanation connecting this state to the consequent with SPECIFIC causal mechanisms
