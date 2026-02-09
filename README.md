@@ -28,11 +28,13 @@ The **Castaway Colony** template makes this concrete. Six crew members crash-lan
 
 **Composable mechanisms.** The 19 mechanisms (M1-M19) are independently testable, independently fixable, and independently improvable. In Castaway Colony, the alien ecosystem exercises M4/M6/M16 independently from crew dialog (M11) or branching (M12). When emotional arousal saturated at 1.0, the fix was in M11's decay function—without touching M17 (portal reasoning) or M3 (knowledge flow). In a monolithic prompt, everything is entangled.
 
+**Emergent emotional realism (persona2params).** The pipeline `entity_metadata → personality_traits → _derive_speaking_style() → _derive_dialog_params_from_persona() → dialog prompt` is a labeled workflow, not a hand-tuned model. It maps archetype traits to speaking patterns (verbosity, formality, tone) and then combines emotional state with those patterns to produce dialog behavior (turn length, interruption frequency, conversational focus). The result: LLMs handle the emotion-to-parameters mapping intuitively well. Tanaka's valence 0.50→0.86 over a survival arc, Sharma's arousal 0.24→0.70 as engineering crises compound—these trajectories emerge from the system without per-character tuning. The structure gives the LLM enough constraint to produce realistic emotional evolution while the LLM's own understanding of human psychology fills in the rest. High arousal plus negative valence yields short, clipped, interrupting turns. Low energy yields trailing-off disengagement. The persona2params pipeline is deliberately thin: it provides the right metadata at the right moment and trusts the LLM to interpret it.
+
 ### The engine/chassis distinction
 
 Growing LLM power makes the structure *more* valuable, not less. The LLM is the engine—it generates the raw material (dialog, antecedents, emotional keywords). But the value to a human isn't in the raw text. It's in the meaning graph. That's what you can analyze, visualize, compare across runs, feed into training pipelines, or use as input to other systems.
 
-A more powerful engine doesn't eliminate the need for a chassis, transmission, and steering. It makes the vehicle faster—but the structure is what makes it *drivable*.
+A more powerful engine doesn't eliminate the need for a chassis, transmission, and steering. It makes the vehicle faster—but the structure is what makes it *drivable*. And when that simulation renders training data, the structure is what makes it *learnable*—every example carries its causal history, knowledge provenance, and quantitative state, so downstream models learn to reason about causality and information flow, not just generate plausible text about them.
 
 The Castaway Colony template demonstrates this directly: DeepSeek R1 calculates O2 depletion rates, Llama 70B generates crew conflict dialog, Qwen produces structured flora analysis JSON, and 405B judges branch outcomes. Four models, each doing what it's best at, coordinated by 19 mechanisms that no prompt could replicate.
 
@@ -194,6 +196,97 @@ Each discovery is a typed graph edge: `{type: "empirical_observation", source: "
 
 ---
 
+## Synthetic Training Data
+
+The simulation isn't just queryable—it's renderable as training data. And the structure changes what "training data" means.
+
+A prompt-based pipeline produces input-output text pairs. Timepoint renders training examples where each datapoint is a **structured computational artifact**:
+
+```
+=== CAUSAL HISTORY (M7) ===                    ← full event chain leading to this moment
+Timeline leading to current moment (2 events):
+  tp_001_formation: Founders decide on roles and equity split.
+  tp_002: First investor meeting; Jennifer asks the MRR question.
+
+=== RELATIONSHIP CONTEXT (M13) ===             ← social graph state at query time
+Relationships with entities present:
+  jennifer_park: cautious (trust: 0.35, alignment: 0.20)
+
+=== KNOWLEDGE PROVENANCE (M3) ===              ← who knows what, from whom, when
+Primary sources: scene_initialization (3 items), jennifer_park (2 items)
+Learning modes: experienced (85%), told (15%)
+Recent: "competitor raised $10M Series A" (from david_kim, confidence: 0.9)
+
+=== ENTITY STATE (M6) ===                      ← quantitative cognitive/physical state
+founder_a at T0:
+  Physical: Age 32, energy 74/100
+  Cognitive: 8 knowledge items, 0.65 decision confidence
+  Emotional: Valence 0.24, Arousal 0.60
+
+=== PREDICTION TASK ===
+Predict: new knowledge, energy change, emotional impact, causal reasoning.
+```
+
+Each completion includes structured JSON with energy dynamics, emotional deltas, mechanism explanations, and full entity metadata. The training data teaches models to **reason within causal structure**, not just pattern-match surface text.
+
+### What makes it different
+
+**Causal ancestry, not context windows.** Every example includes the specific chain of events that caused the current state—not "the team was stressed" but the sequence: `competitor_raises_$10M → jennifer_demeanor_shifts → power_dynamic_inverts → founder_a_arousal: 0.24→0.60`. Models learn causal chains, not vibes.
+
+**Knowledge provenance, not omniscience.** Each entity's knowledge is the set of exposure events they've accumulated. Training examples encode *who knows what and how they learned it*. Models learn about information flow, not just information.
+
+**Counterfactual pairs.** BRANCHING mode generates natural contrastive examples from the same decision point—same entities, same setup, different choices, different outcomes. The $50K MRR answer and the pre-revenue hesitation diverge from one branch point. This is structured contrastive training data that no single-pass generator produces.
+
+**Quantitative state propagation.** Not "supplies were running low" but `o2_reserve_hours: 336 → 288 → 240 → 192` across thousands of propagation steps. Models learn to track numerical state with precision.
+
+**Mechanism annotations.** Each example tagged with which of the 19 mechanisms produced it (M7 causal chain, M11 dialog, M12 counterfactual, M3 knowledge flow), enabling mechanism-specific fine-tuning or filtering.
+
+### Output formats
+
+| Format | Use Case |
+|--------|----------|
+| **JSONL** | ML training pipelines (streaming, line-delimited prompt/completion pairs) |
+| **JSON / CSV / SQLite** | Analysis, querying, visualization |
+| **Fountain / PDF** | Industry-standard screenplays (Courier 12pt, proper margins) |
+| **Markdown** | Human-readable narrative summaries with character arcs and dialog |
+
+### Convergence: quality assurance without ground truth
+
+How do you validate synthetic data when there's no label set? Run the same template N times with different random seeds. Extract causal graphs. Compute pairwise Jaccard similarity.
+
+If "the doctor discovers contaminated water first" appears in 9/10 runs, it's a robust structural feature of the scenario. If a causal edge appears in 3/10 runs, it's stochastic noise. This provides a **reliability signal for training data** without requiring human labels.
+
+```
+Convergence grades:
+  A: ≥90%  Highly robust (structural features dominate)
+  B: ≥80%  Robust (minor variations in non-critical paths)
+  C: ≥70%  Moderate (some contested edges)
+  D: ≥50%  Unstable (significant run-to-run variation)
+  F: <50%  Unreliable (stochastic dominates structure)
+```
+
+```bash
+./run.sh convergence e2e board_meeting          # Run 3x + analyze
+./run.sh convergence e2e --runs 5 castaway_colony_branching
+./run.sh convergence history                    # Show past results
+```
+
+### Cost and licensing
+
+Heterogeneous fidelity (M1) + tensor compression (M6) + intelligent model selection (M18) compound:
+
+| Approach | Tokens | Approximate Cost |
+|----------|--------|------------------|
+| Naive uniform fidelity | ~50M | ~$500 |
+| Heterogeneous fidelity | ~2.5M | ~$25 |
+| With TTM compression | ~250k | ~$2.50 |
+
+Real-world costs: $0.15–$0.30 for branching templates (60 training examples), $0.50–$2.00 for full showcase templates (hundreds of examples). The VC Pitch Branching template generates 60 training examples across 16 timepoints with 4 entities, 16 dialogs, and 165 dialog exchanges for $0.30.
+
+All 12 models in the pipeline—Llama 3.1/4, Qwen 2.5, DeepSeek, Mistral—carry MIT, Apache 2.0, or Llama/Qwen community licenses. **Commercial synthetic data generation is explicitly permitted.** The pipeline deliberately excludes models with restrictive output ownership clauses.
+
+---
+
 ## Architecture
 
 ```
@@ -214,7 +307,7 @@ Each discovery is a typed graph edge: `{type: "empirical_observation", source: "
 +----------------------------+------------------------------+
                              v
 +-----------------------------------------------------------+
-|  Model Selection (12 open-source LLMs via OpenRouter)      |
+|  Model Selection (10 open-source LLMs via OpenRouter)      |
 |  Action-appropriate: math->DeepSeek, dialog->Llama         |
 +-----------------------------------------------------------+
 ```
@@ -224,9 +317,10 @@ Each discovery is a typed graph edge: `{type: "empirical_observation", source: "
 ## When to Use This
 
 **Good fit:**
+- Synthetic training data with causal provenance, counterfactual pairs, and mechanism annotations
+- Fine-tuning data for temporal reasoning, knowledge tracking, state propagation, or multi-entity dialog
 - "How do we get from here to there" scenarios (PORTAL mode)
 - Simulations requiring causal consistency and knowledge provenance
-- Training data generation for temporal/causal reasoning
 - Deep queries into specific entities or moments
 - Anywhere combinatorial state spaces exceed what a single prompt can navigate
 
