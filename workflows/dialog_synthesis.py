@@ -709,6 +709,126 @@ def _apply_circadian_energy_adjustment(base_energy: float, hour: int,
     return adjusted_energy
 
 
+def _filter_dialog_participants(
+    entities: List[Entity],
+    animism_level: int = 0
+) -> tuple:
+    """
+    Filter entities for dialog participation based on animism_level.
+
+    Entity type → minimum animism_level threshold:
+      human: 0 (always eligible)
+      animal: 1
+      building/object/environment: 2
+      abstract/concept: 3
+      Other: 4+
+
+    Non-human entities that DO participate get a _dialog_speaking_mode
+    injected into their metadata for prompt use.
+
+    Args:
+        entities: All candidate entities
+        animism_level: Animism threshold from config (0=humans only)
+
+    Returns:
+        Tuple of (included_entities, excluded_entity_ids)
+    """
+    ANIMISM_THRESHOLDS = {
+        "human": 0, "person": 0, "character": 0,
+        "animal": 1, "creature": 1,
+        "building": 2, "object": 2, "environment": 2,
+        "location": 2, "vehicle": 2,
+        "abstract": 3, "concept": 3, "force": 3,
+    }
+
+    SPEAKING_MODES = {
+        "animal": "behavioral narration (third-person actions and reactions, no human grammar)",
+        "creature": "behavioral narration (third-person actions and reactions, no human grammar)",
+        "building": "environmental narration (sensory descriptions felt by occupants)",
+        "object": "environmental narration (sensory descriptions felt by occupants)",
+        "environment": "environmental narration (sensory descriptions felt by occupants)",
+        "location": "environmental narration (sensory descriptions felt by occupants)",
+        "vehicle": "environmental narration (sensory descriptions felt by occupants)",
+        "abstract": "collective consciousness (emergent sentiment, atmospheric shift)",
+        "concept": "collective consciousness (emergent sentiment, atmospheric shift)",
+        "force": "collective consciousness (emergent sentiment, atmospheric shift)",
+    }
+
+    included = []
+    excluded_ids = []
+
+    for entity in entities:
+        etype = entity.entity_type.lower() if entity.entity_type else "human"
+        threshold = ANIMISM_THRESHOLDS.get(etype, 4)
+
+        if animism_level >= threshold:
+            # Inject speaking mode for non-human entities
+            if threshold > 0:
+                entity.entity_metadata["_dialog_speaking_mode"] = SPEAKING_MODES.get(
+                    etype, "narrated presence (described, not speaking)"
+                )
+            included.append(entity)
+        else:
+            excluded_ids.append(entity.entity_id)
+            logger.info(f"Excluding {entity.entity_id} ({etype}) from dialog: "
+                       f"animism_level={animism_level} < threshold={threshold}")
+
+    return included, excluded_ids
+
+
+def _derive_dialog_params_from_persona(
+    speaking_style: Dict[str, str],
+    emotional_state: Dict[str, float],
+    energy: float,
+    entity_type: str = "human"
+) -> Dict[str, str]:
+    """
+    Map emotion x personality → dialog behavior parameters.
+
+    Returns modulation hints for the prompt to differentiate character voices
+    based on their current emotional and physical state.
+    """
+    valence = emotional_state.get("valence", 0.0)
+    arousal = emotional_state.get("arousal", 0.3)
+
+    params = {}
+
+    # High arousal + negative valence → short, intense, interrupting
+    if arousal > 0.7 and valence < -0.2:
+        params["turn_length"] = "short, clipped"
+        params["interruption"] = "frequently interrupts others"
+        params["focus"] = "fixated on the immediate problem"
+    # High arousal + positive valence → expansive, assertive
+    elif arousal > 0.7 and valence > 0.2:
+        params["turn_length"] = "longer, expansive"
+        params["interruption"] = "speaks confidently over others"
+        params["focus"] = "forward-looking, proposing solutions"
+    # Low energy → trailing off, disengaged
+    elif energy < 30:
+        params["turn_length"] = "short, trailing off"
+        params["interruption"] = "rarely initiates, responds when addressed"
+        params["focus"] = "distracted, low engagement"
+    # Low arousal + negative valence → withdrawn, pessimistic
+    elif arousal < 0.3 and valence < -0.2:
+        params["turn_length"] = "moderate but guarded"
+        params["interruption"] = "waits to speak, hesitant"
+        params["focus"] = "pessimistic, raising concerns"
+    # Balanced/neutral
+    else:
+        params["turn_length"] = "moderate"
+        params["interruption"] = "normal conversational flow"
+        params["focus"] = "engaged, balanced"
+
+    # Confidence modulation
+    confidence = speaking_style.get("speech_pattern", "direct")
+    if confidence == "commanding" and valence > 0:
+        params["assertion"] = "makes decisive statements"
+    elif confidence == "questioning":
+        params["assertion"] = "probes with questions before committing"
+
+    return params
+
+
 @track_mechanism("M11", "dialog_synthesis")
 def synthesize_dialog(
     entities: List[Entity],
@@ -716,7 +836,9 @@ def synthesize_dialog(
     timeline: List[Dict],
     llm: 'LLMClient',
     store: Optional['GraphStore'] = None,
-    run_id: Optional[str] = None  # January 2026: Added for dialog persistence/convergence
+    run_id: Optional[str] = None,
+    animism_level: int = 0,
+    prior_dialog_beats: Optional[List[str]] = None
 ) -> Dialog:
     """Generate conversation with full physical/emotional/temporal context"""
 
@@ -731,6 +853,11 @@ def synthesize_dialog(
                 sanitized_item[key] = value
         sanitized_timeline.append(sanitized_item)
     timeline = sanitized_timeline
+
+    # Filter entities by animism_level (exclude non-human types below threshold)
+    entities, excluded_ids = _filter_dialog_participants(entities, animism_level)
+    if excluded_ids:
+        print(f"    [M11] Excluded {len(excluded_ids)} entities from dialog (animism_level={animism_level}): {', '.join(excluded_ids)}")
 
     # Build comprehensive context for each participant
     participants_context = []
@@ -808,6 +935,9 @@ def synthesize_dialog(
                 entity.entity_metadata.get("archetype_id", "")
             ),
 
+            # Dialog speaking mode for non-human entities
+            "dialog_speaking_mode": entity.entity_metadata.get("_dialog_speaking_mode"),
+
             # Physical State (affects engagement)
             "age": physical.age,
             "health": physical.health_status,
@@ -853,6 +983,14 @@ def synthesize_dialog(
                 for other_id, rel in relationship_states.items()
             }
         }
+
+        # Derive dialog behavior params from persona + emotional state
+        participant_ctx["dialog_behavior"] = _derive_dialog_params_from_persona(
+            speaking_style=participant_ctx["speaking_style"],
+            emotional_state=participant_ctx["emotional_state"],
+            energy=participant_ctx["energy_remaining"],
+            entity_type=entity.entity_type or "human"
+        )
 
         participants_context.append(participant_ctx)
 
@@ -966,7 +1104,39 @@ CRITICAL INSTRUCTIONS:
    - Introduce NEW concerns, NEW information, NEW tensions appropriate to this specific moment in the timeline.
    - Characters should reference the SPECIFIC timepoint_context event, not generic recurring themes.
    - Avoid these repetitive patterns: repeating the same statistics, restating the same ultimatums, recycling the same metaphors across timepoints.
+"""
 
+    # Add prior beats avoidance if available
+    if prior_dialog_beats:
+        beats_list = "\n".join(f"   - {beat}" for beat in prior_dialog_beats[-5:])
+        prompt += f"""
+   BEATS ALREADY COVERED (Do NOT repeat these — advance the narrative):
+{beats_list}
+   You MUST introduce NEW developments beyond these. Repeating these beats is a failure.
+"""
+
+    # Add non-human entity voice rules if any non-human participants
+    non_human_participants = [
+        ctx for ctx in participants_context
+        if ctx.get("dialog_speaking_mode")
+    ]
+    if non_human_participants:
+        voice_rules = []
+        for ctx in non_human_participants:
+            mode = ctx["dialog_speaking_mode"]
+            voice_rules.append(f"   - {ctx['id']}: {mode}")
+        rules_text = "\n".join(voice_rules)
+        prompt += f"""
+9. NON-HUMAN ENTITY VOICE RULES:
+   The following entities are NOT human. They must NOT speak with human dialog patterns.
+   Instead, use the specified narration mode for each:
+{rules_text}
+   Format non-human "speech" as narrated action or environmental description, NOT quoted dialog.
+   Example (environment): *The biosphere's humidity sensors trigger a cascade of moisture warnings across the habitat modules.*
+   Example (animal): *The colony's lab rat freezes, whiskers twitching, then bolts toward the ventilation shaft.*
+"""
+
+    prompt += """
 Generate 8-12 dialog turns showing realistic interaction given these constraints.
 """
 

@@ -189,7 +189,7 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
             ModelCapability.HIGH_QUALITY,
         },
         context_tokens=128000,
-        max_output_tokens=4096,  # Llama 3.1 70B output limit
+        max_output_tokens=16384,  # Llama 3.1 70B: OpenRouter supports up to 16k output
         relative_speed=1.0,
         relative_cost=1.0,
         relative_quality=1.0,
@@ -215,7 +215,7 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
             ModelCapability.LONG_FORM_TEXT,
         },
         context_tokens=128000,
-        max_output_tokens=4096,  # Llama 3.1 405B output limit
+        max_output_tokens=16384,  # Llama 3.1 405B: OpenRouter supports up to 16k output
         relative_speed=0.5,
         relative_cost=3.0,
         relative_quality=1.3,
@@ -283,7 +283,7 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
             ModelCapability.HIGH_QUALITY,
         },
         context_tokens=32768,
-        max_output_tokens=4096,  # Qwen 2.5 72B output limit
+        max_output_tokens=8192,  # Qwen 2.5 72B: supports up to 8k output
         relative_speed=1.0,
         relative_cost=0.9,
         relative_quality=1.05,
@@ -452,62 +452,13 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
     ),
 
     # =========================================================================
-    # GROQ - Ultra-fast inference via specialized LPU hardware
-    # Use with --groq or --fast flag for speed-critical workloads
-    # Free tier available (14K TPM), Llama license applies to outputs
+    # GROQ - Removed (February 2026)
+    # groq/llama-3.3-70b-versatile and groq/llama-3.1-70b-versatile were
+    # removed from OpenRouter. Use meta-llama/llama-3.1-70b-instruct or
+    # meta-llama/llama-4-scout via standard OpenRouter instead.
+    # groq/llama-3.1-8b-instant and groq/mixtral-8x7b-32768 were also
+    # previously removed.
     # =========================================================================
-    "groq/llama-3.3-70b-versatile": ModelProfile(
-        model_id="groq/llama-3.3-70b-versatile",
-        display_name="Groq Llama 3.3 70B",
-        provider="groq",
-        license="llama3.3",
-        capabilities={
-            ModelCapability.STRUCTURED_JSON,
-            ModelCapability.DIALOG_GENERATION,
-            ModelCapability.LOGICAL_REASONING,
-            ModelCapability.INSTRUCTION_FOLLOWING,
-            ModelCapability.LARGE_CONTEXT,
-            ModelCapability.VERY_LARGE_CONTEXT,
-            ModelCapability.FAST_INFERENCE,
-            ModelCapability.HIGH_QUALITY,
-        },
-        context_tokens=128000,
-        max_output_tokens=4096,  # Groq API output limit
-        relative_speed=5.0,      # ~300 tok/s vs ~60 tok/s baseline
-        relative_cost=0.7,       # $0.59/$0.79 per 1M tokens
-        relative_quality=1.0,    # Same as Llama 70B
-        notes="Ultra-fast inference via Groq LPU. Use --groq flag. Best quality on Groq."
-    ),
-
-    "groq/llama-3.1-70b-versatile": ModelProfile(
-        model_id="groq/llama-3.1-70b-versatile",
-        display_name="Groq Llama 3.1 70B",
-        provider="groq",
-        license="llama3.1",
-        capabilities={
-            ModelCapability.STRUCTURED_JSON,
-            ModelCapability.DIALOG_GENERATION,
-            ModelCapability.LOGICAL_REASONING,
-            ModelCapability.INSTRUCTION_FOLLOWING,
-            ModelCapability.LARGE_CONTEXT,
-            ModelCapability.VERY_LARGE_CONTEXT,
-            ModelCapability.FAST_INFERENCE,
-            ModelCapability.HIGH_QUALITY,
-        },
-        context_tokens=128000,
-        max_output_tokens=4096,  # Groq API output limit
-        relative_speed=5.0,
-        relative_cost=0.7,
-        relative_quality=1.0,
-        notes="Ultra-fast 70B on Groq LPU. Use --groq flag."
-    ),
-
-    # NOTE: groq/llama-3.1-8b-instant was removed from OpenRouter (January 2026)
-    # Use groq/llama-3.3-70b-versatile or meta-llama/llama-3.1-8b-instruct instead
-
-    # NOTE: groq/mixtral-8x7b-32768 was removed from OpenRouter (January 2026)
-    # The model ID is no longer valid. Use mistralai/mixtral-8x7b-instruct via standard OpenRouter
-    # or groq/llama-3.3-70b-versatile for fast inference needs.
 }
 
 
@@ -667,9 +618,9 @@ ACTION_REQUIREMENTS: Dict[ActionType, Dict[str, Any]] = {
     ActionType.BRANCHING_CONSEQUENT_GENERATION: {
         "required": {ModelCapability.STRUCTURED_JSON, ModelCapability.CAUSAL_REASONING, ModelCapability.TEMPORAL_REASONING},
         "preferred": {ModelCapability.HIGH_QUALITY, ModelCapability.LOGICAL_REASONING},
-        "min_context_tokens": 16384,
-        "min_output_tokens": 2000,  # Base for 3 consequents
-        "tokens_per_unit": 600,     # Additional tokens per consequent
+        "min_context_tokens": 32768,   # Increased for scenario anchor + accumulated state
+        "min_output_tokens": 3000,     # Increased for resource_updates + richer descriptions
+        "tokens_per_unit": 800,        # Increased for richer consequent descriptions
         "output_scaling_factor": "num_consequents",  # Scale output by this context key
     },
 
@@ -942,6 +893,24 @@ class ModelSelector:
     def get_model_profile(self, model_id: str) -> Optional[ModelProfile]:
         """Get profile for a specific model."""
         return self.registry.get(model_id)
+
+    def get_effective_output_limit(self, model_id: str) -> int:
+        """
+        Get the effective max_output_tokens for a model.
+
+        Queries the registry for the model's output limit. Returns 4096
+        as default for unknown models.
+
+        Args:
+            model_id: Model identifier (e.g., "meta-llama/llama-3.1-70b-instruct")
+
+        Returns:
+            Max output tokens the model supports
+        """
+        profile = self.registry.get(model_id)
+        if profile:
+            return profile.max_output_tokens
+        return 4096
 
     def list_models_with_capability(
         self,

@@ -453,6 +453,16 @@ Enables "what if Madison hadn't shared his notes?" queries with proper causal pr
 
 **Castaway Colony example**: At Day 7, Commander Tanaka's decision spawns three counterfactual branches. Branch A (Fortify & Wait) copies all state before Day 7 and propagates conservative resource consumption forward. Branch B (Explore & Adapt) applies exploration interventions — sending teams out, accumulating injuries and discoveries. Branch C (Repair & Signal) commits all resources to beacon repair. Each branch is internally consistent: Branch B can't use cave shelter discovered in Branch A's timeline, and Branch C can't benefit from food sources found during Branch B's exploration.
 
+### Scenario Anchoring (Forward Step Grounding)
+
+BRANCHING mode forward steps are anchored to the scenario premise via three mechanisms:
+
+1. **Scenario Anchor Block**: Every forward step prompt includes the first 800 characters of the `scenario_description` with explicit "do NOT drift from this premise" instruction. This prevents the LLM from abandoning the scenario (e.g., turning a Kepler-442b colony simulation into a virtual reality narrative).
+2. **Entity Roster**: Rich role descriptions from the template's `entity_roster` are injected per step, ensuring the LLM uses the defined characters rather than inventing new ones.
+3. **Accumulated World State**: A persistent store tracks `key_events_history` (last 10 events), `resource_states` (latest values), and `monitoring` (steps completed, drift warnings). This summary is included in every forward step prompt, giving the LLM a running context of what has already happened.
+
+Each generated consequent now includes `resource_updates` (e.g., `{"food_supply": "declining", "hull_integrity": "stable"}`), which merge into the accumulated state for the next step.
+
 ## M14: Circadian Activity Patterns
 
 Entities have activity probabilities that vary with time of day:
@@ -722,6 +732,30 @@ Before dialog synthesis, the system syncs TTMTensor → CognitiveTensor to ensur
 
 This enables emotional evolution across dialogs—entities accumulate emotional state changes throughout the simulation rather than resetting to defaults.
 
+### Voice Differentiation: persona2params Pipeline
+
+Dialog synthesis includes a multi-stage voice differentiation pipeline:
+
+1. **`entity_metadata` → `personality_traits`**: Template defines traits per entity (e.g., `["analytical", "reserved", "pragmatic"]`)
+2. **`personality_traits` → `_derive_speaking_style()`**: Maps traits to concrete speaking patterns: verbosity (terse/moderate/verbose), formality (casual/neutral/formal), tone (warm/neutral/cold/passionate), vocabulary (simple/technical/philosophical/business), speech_pattern (direct/elaborate/questioning/commanding)
+3. **`speaking_style` × `emotional_state` → `_derive_dialog_params_from_persona()`**: Combines current emotional state (valence, arousal) and energy level with speaking style to produce per-turn behavior parameters: turn length, interruption frequency, conversational focus
+4. **All of the above → dialog prompt**: Injected as structured context per participant, enabling the LLM to produce distinct voices without explicit style instructions per character
+
+The LLM handles the emotion-to-parameters mapping intuitively well. The pipeline is deliberately thin—it provides the right metadata at the right moment and trusts the LLM to interpret it.
+
+### Entity Type Filtering (Animism-Aware Dialog)
+
+Non-human entities (animals, buildings, environments, abstracts) are filtered from dialog participation based on the template's `animism_level` setting. Entities that pass the threshold receive per-type speaking modes injected into the prompt:
+- **Animals**: Behavioral narration (third-person actions, no human grammar)
+- **Buildings/environments**: Environmental narration (sensory descriptions felt by occupants)
+- **Abstracts**: Collective consciousness (emergent sentiment, atmospheric shift)
+
+This prevents the bug where environment entities like `kepler_442b` spoke with human dialog patterns ("I think we should...") and instead produces narrated environmental presence ("*The biosphere's humidity sensors trigger a cascade of moisture warnings across the habitat modules.*").
+
+### Temporal Freshness (Beat Avoidance)
+
+Dialog synthesis accepts `prior_dialog_beats`—a rolling list of speaker+content summaries from previous dialogs in the same run. These beats are listed in the prompt with explicit "Do NOT repeat" instruction, forcing the LLM to advance the narrative rather than recycling the same beats ("72 hours to fix life support") across every timepoint.
+
 ## M13: Multi-Entity Synthesis
 
 Relationships evolve and can be analyzed across entities:
@@ -772,6 +806,19 @@ class AnimismLevel:
 ```
 
 The conference room "wants" productive meetings; the startup's codebase "resists" certain changes. This captures how non-human entities shape behavior without requiring explicit rules—the animistic frame lets the LLM reason about object/institution agency naturally.
+
+### Dialog Enforcement
+
+M16 connects to M11 (Dialog Synthesis) through `_filter_dialog_participants()`. Entity types are mapped to minimum `animism_level` thresholds:
+
+| Entity Type | Threshold | Speaking Mode |
+|-------------|-----------|---------------|
+| human, person, character | 0 | Normal dialog |
+| animal, creature | 1 | Behavioral narration (third-person actions) |
+| building, object, environment, location, vehicle | 2 | Environmental narration (sensory descriptions) |
+| abstract, concept, force | 3 | Collective consciousness (emergent sentiment) |
+
+At `animism_level=0` (default), only humans participate in dialog. Higher levels include non-human entities with appropriate speaking modes injected into the prompt. This prevents non-human entities from speaking as humans while still allowing their presence in the narrative.
 
 ---
 
@@ -1067,7 +1114,7 @@ The simulation engine (18 mechanisms above) is implemented. The following descri
 
 | Concern | Who Handles It |
 |---------|----------------|
-| Text generation (dialog, descriptions) | LLM (12 open-source models via OpenRouter) |
+| Text generation (dialog, descriptions) | LLM (10 open-source models via OpenRouter) |
 | Model selection for action type | Timepoint (M18) |
 | Temporal mode semantics | Timepoint (M17) |
 | Causal chain validation | Timepoint (M7, M4) |
@@ -1365,6 +1412,17 @@ E2E mode is useful for validating that a specific template produces consistent c
 - **Portal key_events Schema**: Added `CORRECT/WRONG` format examples to antecedent generation prompt. LLM consistently returned `key_events` as `[{date, description}]` objects instead of `["string"]`, causing Pydantic validation failures on every backward step. Same pattern as directorial prompt fix.
 - **Portal Entity Context Enrichment**: Enriched entity_summary with roles, descriptions, knowledge items, and personality traits (previously just entity IDs). Added instruction #6 requiring named entities in antecedent narratives, preventing drift to generic corporate framing.
 - **Mars Mission Portal Template**: First verified portal template (`showcase/mars_mission_portal`). Backward reasoning from Ares III Mars mission failure (2031) to origins (2026), 4 entities, 10 backward steps, simulation-judged with 405B. Exercises M3, M7, M8, M11, M13, M17.
+
+**February 2026 Branching Quality & Scenario Anchoring**:
+- **Scenario Anchoring**: `BranchingStrategy` now accepts `scenario_description` and `entity_roster` from the simulation config. Every forward step prompt includes a SCENARIO ANCHOR block (first 800 chars of the scenario description) with explicit "do NOT drift" instruction. This fixes scenario drift where branching mode abandoned the scenario premise (e.g., Kepler-442b colony → virtual reality narrative) by step 2.
+- **World State Accumulation**: Forward steps now accumulate state across the simulation. `accumulated_world_state` tracks `key_events_history[-10:]`, `resource_states`, and step monitoring. Each prompt includes a summary of recent events and current resource states, preventing the LLM from forgetting what happened in prior steps.
+- **Entity Type Filtering (Animism Enforcement)**: `_filter_dialog_participants()` enforces `animism_level` thresholds: human=0 (always), animal=1, building/environment=2, abstract=3. Entities below the threshold are excluded from dialog. Non-human entities that pass get injected speaking modes: animals use behavioral narration (third-person), environments use sensory description, abstracts use collective consciousness. This fixes the bug where `kepler_442b` (an environment entity) spoke with human dialog patterns.
+- **persona2params Pipeline**: New `_derive_dialog_params_from_persona()` maps emotion state × personality traits → dialog behavior parameters (turn length, interruption frequency, conversational focus). High arousal + negative valence → short, clipped, interrupting turns. Low energy → trailing off, disengaged. Injected alongside `speaking_style` into dialog prompts for per-character voice modulation.
+- **Dialog Temporal Freshness (Beat Avoidance)**: `synthesize_dialog()` now accepts `prior_dialog_beats` — a rolling list of speaker+content summaries from previous dialogs. The prompt explicitly lists beats already covered with "Do NOT repeat" instruction, forcing the LLM to advance the narrative. The E2E runner accumulates beats via `_extract_dialog_beats()` across timepoints.
+- **Groq Model Removal**: Removed `groq/llama-3.3-70b-versatile` and `groq/llama-3.1-70b-versatile` from MODEL_REGISTRY (removed from OpenRouter). Added `KNOWN_UNAVAILABLE` set in M19 knowledge extraction for defensive fallback filtering. Model count: 12 → 10 open-source models.
+- **Dynamic Token Limits**: Updated `max_output_tokens` to reflect actual provider capabilities: Llama 3.1 70B/405B → 16384 (was 4096), Qwen 2.5 72B → 8192 (was 4096). Updated BRANCHING_CONSEQUENT_GENERATION action requirements: `min_context_tokens` 16384→32768, `min_output_tokens` 2000→3000, `tokens_per_unit` 600→800.
+- **ActionType Fix**: Token estimation in `BranchingStrategy._generate_consequents()` was using `PORTAL_BACKWARD_REASONING` action type. Fixed to use `BRANCHING_CONSEQUENT_GENERATION` with correct `num_consequents` scaling key.
+- **ConsequentSchema Extension**: Added `resource_updates: Dict` field to track resource state changes per forward step (e.g., `{"food_supply": "declining", "morale": "improving"}`). Feeds into accumulated world state.
 
 **Platform Status**: Infrastructure vision; see [MILESTONES.md](MILESTONES.md) for roadmap.
 **See also**: [README.md](README.md) for quick start, [QUICKSTART.md](QUICKSTART.md) for natural language usage.
