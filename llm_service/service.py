@@ -280,6 +280,10 @@ class LLMService:
         """
         return self.call_logger.end_session()
 
+    def get_provider_name(self) -> str:
+        """Return the name of the active provider."""
+        return self.provider.get_provider_name()
+
     def get_statistics(self) -> Dict[str, Any]:
         """Get service statistics"""
         return {

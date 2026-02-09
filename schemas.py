@@ -286,7 +286,7 @@ class Timepoint(SQLModel, table=True):
             import warnings
             warnings.warn(
                 f"Timepoint '{self.timepoint_id}' created with empty entities_present. "
-                f"Event: '{self.event_description[:50]}...' - This may indicate entity inference is not working.",
+                f"Event: '{(self.event_description or 'unknown')[:50]}...' - This may indicate entity inference is not working.",
                 UserWarning,
                 stacklevel=2
             )
@@ -303,8 +303,14 @@ class DialogTurn(BaseModel):
     timestamp: datetime
     emotional_tone: Optional[str] = None  # inferred emotional tone
     knowledge_references: List[str] = []  # knowledge items referenced
-    confidence: float = 1.0  # confidence in generation
+    confidence: Optional[float] = 1.0  # confidence in generation
     physical_state_influence: Optional[str] = None  # how physical state affected utterance
+
+    @field_validator('confidence', mode='before')
+    @classmethod
+    def coerce_none_confidence(cls, v):
+        """LLMs frequently return null for confidence — default to 1.0"""
+        return v if v is not None else 1.0
 
     @field_validator('knowledge_references', mode='before')
     @classmethod

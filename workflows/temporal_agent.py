@@ -1089,11 +1089,13 @@ Return ONLY a JSON object with format:
         if not isinstance(config, TemporalConfig):
             raise ValueError(f"config must be TemporalConfig, got {type(config)}")
 
-        # Create and run BranchingStrategy
+        # Create and run BranchingStrategy with scenario context
         branching_strategy = BranchingStrategy(
             config=config,
             llm_client=self.llm_client,
-            store=self.store
+            store=self.store,
+            scenario_description=getattr(self, 'scenario_description', None),
+            entity_roster=getattr(self, 'entity_roster', None)
         )
 
         # Execute forward simulation with branching

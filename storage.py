@@ -228,6 +228,13 @@ class GraphStore:
             statement = select(Timepoint).order_by(Timepoint.timestamp)
             return list(session.exec(statement).all())
 
+    def get_timepoints(self, timeline_id: str) -> list[Timepoint]:
+        """Get all timepoints for a given timeline."""
+        with Session(self.engine) as session:
+            return list(session.exec(
+                select(Timepoint).where(Timepoint.timeline_id == timeline_id)
+            ).all())
+
     def get_timepoints_by_run(self, run_id: str) -> list[Timepoint]:
         """Get all timepoints for a specific run, ordered by timestamp"""
         with Session(self.engine) as session:

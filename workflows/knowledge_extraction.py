@@ -23,7 +23,7 @@ This is mechanism M19 in the MECHANICS.md documentation.
 
 from typing import List, Dict, Optional, Any
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 import json
 import logging
 
@@ -53,7 +53,14 @@ class KnowledgeExtractionResponse(BaseModel):
     """LLM response for knowledge extraction."""
     items: List[ExtractedKnowledge] = Field(default_factory=list, description="Extracted knowledge items")
     reasoning: Optional[str] = Field(default="", description="Brief reasoning about what was extracted and why")
-    skipped_content: Optional[str] = Field(default=None, description="Content that was intentionally not extracted")
+    skipped_content: Optional[Any] = Field(default=None, description="Content that was intentionally not extracted")
+
+    @field_validator("skipped_content", mode="before")
+    @classmethod
+    def coerce_skipped_content(cls, v):
+        if isinstance(v, list):
+            return "\n".join(str(item) for item in v)
+        return v
 
 
 # ============================================================================
@@ -364,10 +371,23 @@ def extract_knowledge_from_dialog(
     Returns:
         KnowledgeExtractionResult with extracted items and metadata
     """
+    # Models known to be unavailable on OpenRouter (removed or deprecated)
+    KNOWN_UNAVAILABLE = {
+        "groq/llama-3.3-70b-versatile",
+        "groq/llama-3.1-70b-versatile",
+        "groq/llama-3.1-8b-instant",
+        "groq/mixtral-8x7b-32768",
+    }
+
     # Get fallback chain for robust model selection
     # This prevents failures when the primary model is unavailable
     model_fallback_chain = get_fallback_models(ActionType.KNOWLEDGE_EXTRACTION, chain_length=3)
-    model = model_fallback_chain[0] if model_fallback_chain else "meta-llama/llama-3.1-70b-instruct"
+    # Filter out known-unavailable models
+    model_fallback_chain = [m for m in model_fallback_chain if m not in KNOWN_UNAVAILABLE]
+    # Ensure we always have at least one valid model
+    if not model_fallback_chain:
+        model_fallback_chain = ["meta-llama/llama-3.1-70b-instruct"]
+    model = model_fallback_chain[0]
 
     # Build causal context from existing knowledge
     causal_context = build_causal_context(entities, store)

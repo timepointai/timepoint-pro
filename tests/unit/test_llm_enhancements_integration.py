@@ -272,7 +272,8 @@ def test_m12_counterfactual_with_llm(llm_client):
             timepoint_id="tp_1789_04_30",
             timestamp=datetime(1789, 4, 30),
             event_description="Washington inaugurated as president",
-            entities_present=["washington", "adams", "jefferson"]
+            entities_present=["washington", "adams", "jefferson"],
+            timeline_id="baseline_1789"
         )
         store.save_timepoint(tp1)
 

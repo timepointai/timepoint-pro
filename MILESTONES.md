@@ -438,7 +438,7 @@ Broad accessibility and ecosystem.
 | Multi-model support | **COMPLETE** | M18 in `llm_service/model_selector.py` |
 | Per-action model selection | **COMPLETE** | `call_with_action()`, `structured_call_with_action()` |
 | Fallback chains | **COMPLETE** | `get_fallback_chain()` |
-| License compliance | **COMPLETE** | 12 models, MIT/Apache 2.0/Llama/Qwen |
+| License compliance | **COMPLETE** | 10 models, MIT/Apache 2.0/Llama/Qwen (groq models removed Feb 2026) |
 | NL interface | **COMPLETE** | `nl_interface/adapter.py` |
 | Convergence evaluation | **COMPLETE** | `evaluation/convergence.py`, storage layer, dashboard |
 | Convergence E2E testing | **COMPLETE** | `--convergence-e2e` mode in `run_all_mechanism_tests.py` |

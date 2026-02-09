@@ -45,7 +45,7 @@ def create_test_entity(entity_id: str) -> Entity:
         entity_metadata={}
     )
 
-def test_llm_call(llm_client: LLMClient, entity_id: str) -> Tuple[bool, float, str]:
+def test_llm_call(llm_client: LLMClient, entity_id: str = "test_entity_0") -> Tuple[bool, float, str]:
     """
     Make a single LLM call and return (success, duration, error_msg).
 
