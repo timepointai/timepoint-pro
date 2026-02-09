@@ -89,7 +89,6 @@ Current Architecture:
 ### Not Yet Implemented
 
 - External integrations (prediction markets, webhooks)
-- Containerization / distributed deployment
 - Advanced dashboard visualizations
 - Distributed execution (1000+ concurrent workers)
 
@@ -138,7 +137,8 @@ Before adding infrastructure, stabilize the core.
 - [ ] Schema documentation (partial - see PERSISTENCE-PLAN.md)
 
 ### 1.4 Deployment Basics
-- [ ] Dockerfile for single-container deployment
+- [x] Docker sandbox (`claude-container.sh`) — containerized Claude Code with iptables network isolation, `up` command
+- [ ] Dockerfile for single-container deployment (production)
 - [ ] Docker Compose for local dev
 - [x] Environment variable management (.env support)
 - [ ] Basic CI (run tests on PR)
@@ -501,7 +501,7 @@ Broad accessibility and ecosystem.
 - **Mars Mission Portal template** (first verified portal template — backward reasoning from 2031 to 2026)
 - **Castaway Colony template** (first full-mechanism showcase — all 19 mechanisms including 7 previously unverified: M1, M2, M4, M5, M6, M9, M18)
 
-**What's missing:** External integrations, containerization, distributed execution.
+**What's missing:** External integrations, production containerization (Dockerfile/Compose), distributed execution. Development containerization exists via `claude-container.sh`.
 
 **Timeline:** 2-3 years to full platform vision.
 

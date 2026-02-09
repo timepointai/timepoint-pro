@@ -33,6 +33,16 @@ export OPENROUTER_API_KEY="your_key_here"
 
 **Important**: The API key must be on a **single line** with no line breaks. If you see "Illegal header value" errors, check that your key doesn't have embedded newlines.
 
+### Docker Sandbox (Optional)
+
+Run in an isolated container with network restrictions:
+
+```bash
+./claude-container.sh up          # Launch containerized Claude Code
+```
+
+The container mounts the project directory read-write but restricts network access to approved API endpoints via iptables.
+
 ## Examples
 
 **Note**: All commands require environment variables to be loaded first (see Setup above).
@@ -118,7 +128,9 @@ Typical runs cost **$0.02-0.10** depending on:
 - Number of timepoints (1-10)
 - Temporal mode complexity
 
-*Updated January 2026: Costs are ~10x lower than previous estimates due to efficient Llama 4 Scout pricing.*
+Comprehensive PORTAL runs (10 backward steps, simulation-judged candidates) cost **$0.50-$1.00** and take ~60-90 minutes.
+
+*Updated February 2026: Costs are ~10x lower than previous estimates due to efficient Llama 4 Scout pricing.*
 
 ### Free Mode ($0 cost)
 

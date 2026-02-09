@@ -54,6 +54,9 @@ export OPENROUTER_API_KEY=your_key_here
 ./run.sh quick                    # Quick-tier templates
 ./run.sh run board_meeting        # Single scenario
 ./run.sh list                     # List all 15 templates
+
+# Or run in a Docker sandbox (containerized Claude Code with network isolation)
+./claude-container.sh up
 ```
 
 ---
@@ -105,6 +108,20 @@ PORTAL doesn't predict the future—it maps the decision landscape backward:
 - **Pivot points**: moments where paths diverge (Series B terms, market choice)
 - **Closed paths**: some present choices eliminate the target outcome entirely
 - **Path constraints**: what must be true at each stage for the endpoint to remain reachable
+
+**What a real PORTAL run produces** (Mars Mission Portal — Ares III failure traced backward from 2031 to 2026):
+
+| Metric | Value |
+|--------|-------|
+| Backward steps | 10 (2031 → 2026), each with 7 candidates simulation-judged by 405B |
+| Pivot points | 94 detected across 10 divergent paths |
+| Dialogs | 10 conversations, 97 exchanges, 4 characters |
+| Mechanisms activated | 14 of 19 in a single run |
+| Emotional tracking | Character arcs over 5 years of reconstructed history (valence range: -0.66 to +0.85) |
+| Resilience | Recovered from DNS failures and truncated API responses via automatic retry |
+| Cost | $0.51 total | 873 LLM calls | ~70 minutes |
+
+The system doesn't just find *a* path — it explores a search space of ~700 candidate antecedents (7 candidates x 10 steps x 10 paths), runs mini forward-simulations to score each, and prunes to the most coherent backward chain (best path coherence: 0.809). The output is a queryable meaning graph with knowledge provenance, not a narrative paragraph.
 
 ---
 
@@ -337,6 +354,7 @@ All 12 models in the pipeline—Llama 3.1/4, Qwen 2.5, DeepSeek, Mistral—carry
 - **[QUICKSTART.md](QUICKSTART.md)** -- Detailed setup and usage guide
 - **[SYNTH.md](SYNTH.md)** -- SynthasAIzer control paradigm (envelopes, voices, patches)
 - **[MILESTONES.md](MILESTONES.md)** -- Roadmap from prototype to platform
+- **[claude-container.sh](claude-container.sh)** -- Docker sandbox for containerized development with iptables network isolation
 
 ---
 
