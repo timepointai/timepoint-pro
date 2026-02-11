@@ -41,7 +41,7 @@ Run in an isolated container with network restrictions:
 ./claude-container.sh up          # Launch containerized Claude Code
 ```
 
-The container mounts the project directory read-write but restricts network access to approved API endpoints via iptables.
+The container mounts the project directory read-write but restricts network access to approved API endpoints via iptables. Dependencies are installed automatically via `poetry install` on first boot.
 
 ## Examples
 
@@ -188,6 +188,20 @@ Each mode changes what "time" means and how the simulation validates consistency
 # Branching templates (counterfactual timelines)
 ./run.sh run vc_pitch_branching        # VC pitch with counterfactual branching
 ./run.sh run vc_pitch_strategies       # Multiple negotiation strategy variants
+```
+
+## Running Tests
+
+```bash
+# Run SynthasAIzer ADPRS waveform tests (142 tests, no LLM calls)
+./run.sh test synth
+
+# Run all unit tests
+python -m pytest tests/unit/ -v
+
+# Run integration tests (waveform pipeline)
+python -m pytest tests/integration/test_adprs_phase2_integration.py \
+  tests/integration/test_waveform_sufficiency.py -v
 ```
 
 ## Advanced Options
