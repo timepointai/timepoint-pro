@@ -17,6 +17,7 @@
 | **ADPRS Phase 1** | Fidelity Envelope + Trajectory Tracker | **COMPLETE** | 50 unit tests |
 | **ADPRS Phase 2** | Cold/Warm Fitting + Harmonic Extension | **COMPLETE** | 38 unit tests, 6 integration |
 | **ADPRS Phase 3** | Shadow Evaluation + Waveform Scheduling | **COMPLETE** | 36 unit tests, 12 integration |
+| **ADPRS Production** | Pipeline Integration + Cross-Run Warm-Start | **COMPLETE** | Wired into e2e_runner |
 
 **Total ADPRS tests: 142** (124 unit + 18 integration), all passing.
 
@@ -802,10 +803,10 @@ CognitiveSnapshot ──→ TrajectoryTracker ──→ ADPRSFitter ──→ AD
 |--------|---------|
 | `fidelity_envelope.py` | `ADPRSEnvelope` model, `ADPRSComposite` (max-of-N), phi→band mapping, serialization |
 | `trajectory_tracker.py` | `CognitiveSnapshot` accumulation, tau normalization, activation series extraction |
-| `adprs_fitter.py` | Cold fit (scipy `differential_evolution`), warm fit (refine from prior), cross-run convergence |
+| `adprs_fitter.py` | Cold fit (scipy `differential_evolution`), warm fit (refine from prior), cross-run warm-start from shared DB |
 | `harmonic_fitter.py` | K=3 multi-harmonic extension, spectral distance metric, automatic K-fallback |
-| `shadow_evaluator.py` | Observation-only divergence tracking, per-entity reports, event emission |
-| `waveform_scheduler.py` | Compute gate: phi→resolution→skip-LLM decisions, sufficiency reports (WSR metric) |
+| `shadow_evaluator.py` | Divergence tracking with report persistence to run metadata for cross-run analysis |
+| `waveform_scheduler.py` | Per-entity compute gate: TENSOR/SCENE band entities skip LLM dialog, sufficiency reports (WSR) |
 
 ### Waveform Sufficiency Ratio (WSR)
 
@@ -843,6 +844,32 @@ python -m pytest tests/unit/test_fidelity_envelope.py tests/unit/test_trajectory
   tests/integration/test_adprs_phase2_integration.py \
   tests/integration/test_waveform_sufficiency.py -v
 ```
+
+### Production Pipeline Integration
+
+The ADPRS system is fully wired into the E2E production pipeline (`e2e_workflows/e2e_runner.py`):
+
+**Per-entity waveform gating in dialog synthesis:**
+- During `_synthesize_dialogs()`, the waveform scheduler evaluates each entity at each timepoint
+- Entities in **TENSOR** or **SCENE** bands are excluded from LLM dialog calls (trajectory snapshots still recorded)
+- If fewer than 2 eligible entities remain at a timepoint, dialog is skipped entirely
+- This is additive to the existing all-TENSOR skip: even when some entities are in DIALOG/TRAINED band, individual low-band entities are filtered out
+
+**Shadow evaluation persistence:**
+- `_shadow_evaluate_all_timepoints()` runs after timepoint generation in all temporal modes
+- The shadow report (total evaluations, divergence rate, mean/max divergence) is persisted to `datasets/{world_id}/shadow_report.json`
+- The summary is also attached to run metadata for cross-run analysis
+
+**Cross-run warm-start fitting:**
+- At run start, `_load_prior_adprs_envelopes()` queries the shared convergence DB for entities from prior runs that have fitted `adprs_envelopes` in their metadata
+- Prior envelopes are copied into current entity metadata, enabling `ADPRSFitter.warm_fit()` to refine from the prior instead of cold-starting
+- After fitting, entities are re-persisted to the shared DB so the next run picks up the improved envelopes
+- The waveform scheduler is initialized early (before timepoint generation) from prior envelopes, so gating decisions apply from the first timepoint
+
+**Backward compatibility:**
+- All waveform code paths are guarded by `if self._waveform_scheduler is not None` / `if waveform_schedule` checks
+- When no ADPRS envelopes exist (first run, or envelopes not configured), all code paths are no-ops
+- Existing configs work unchanged
 
 ---
 
@@ -917,7 +944,7 @@ The SynthasAIzer paradigm provides:
 2. **Voice controls** for entity mixing (mute/solo/gain)
 3. **Patch system** for template organization
 4. **Event emission** for monitoring and visualization
-5. **ADPRS waveforms** for continuous fidelity control — fitted per-entity envelopes that map cognitive activation to resolution bands, enabling skip-LLM decisions and compute gating (142 tests, WSR > 0.7)
+5. **ADPRS waveforms** for continuous fidelity control — fitted per-entity envelopes that map cognitive activation to resolution bands, with per-entity LLM gating in production dialog synthesis, shadow evaluation persistence, and cross-run warm-start fitting (142 tests, WSR > 0.7)
 
 All features are:
 - Optional (backward compatible)

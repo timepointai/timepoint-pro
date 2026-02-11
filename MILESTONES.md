@@ -79,7 +79,7 @@ Current Architecture:
 ├── nl_interface/ — Natural language input
 │   └── adapter.py — NLToProductionAdapter
 ├── generation/templates/ — 14 verified JSON simulation templates with patch metadata
-├── synth/ — SynthasAIzer control layer (envelopes, voices, events)
+├── synth/ — SynthasAIzer control layer (ADPRS waveforms, envelopes, voices, events)
 ├── validation.py (1,365 lines) — 5 physics validators
 ├── storage.py — SQLite persistence + transaction support
 ├── dashboards/ — FastAPI REST API backend
@@ -469,6 +469,10 @@ Broad accessibility and ecosystem.
 | Castaway Colony showcase | **COMPLETE** | `castaway_colony_branching` — all 19 mechanisms, 10 entities, 3 branches, first M1/M2/M4/M5/M6/M9/M18 template |
 | Portal scoring stubs | **COMPLETE** | 5 methods now use real LLM-based evaluation |
 | NONLINEAR mode removal | **COMPLETE** | Removed from codebase, now 5 modes |
+| ADPRS per-entity gating | **COMPLETE** | TENSOR/SCENE band entities skip LLM dialog in `_synthesize_dialogs()` |
+| ADPRS shadow persistence | **COMPLETE** | Shadow reports persisted to run metadata for cross-run analysis |
+| ADPRS cross-run warm-start | **COMPLETE** | Prior envelopes loaded from shared DB, re-persisted after fitting |
+| ADPRS early scheduler init | **COMPLETE** | Waveform scheduler initialized from prior envelopes before timepoint generation |
 
 ---
 
@@ -500,6 +504,7 @@ Broad accessibility and ecosystem.
 - **Portal prompt-schema alignment** (explicit format examples for key_events, entity context enrichment)
 - **Mars Mission Portal template** (first verified portal template — backward reasoning from 2031 to 2026)
 - **Castaway Colony template** (first full-mechanism showcase — all 19 mechanisms including 7 previously unverified: M1, M2, M4, M5, M6, M9, M18)
+- **ADPRS production pipeline** (per-entity waveform gating in dialog synthesis, shadow evaluation persistence to metadata, cross-run warm-start fitting from shared DB)
 
 **What's missing:** External integrations, production containerization (Dockerfile/Compose), distributed execution. Development containerization exists via `claude-container.sh`.
 
