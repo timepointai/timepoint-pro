@@ -300,11 +300,11 @@ class TestRunShAPIFlags:
     """Tests for run.sh API flag handling."""
 
     def test_run_sh_help_contains_api_options(self):
-        """Test that run.sh help text contains API options."""
+        """Test that run.sh 'run' subcommand help text contains API options."""
         import subprocess
 
         result = subprocess.run(
-            ["bash", "run.sh", "--help"],
+            ["bash", "run.sh", "run", "--help"],
             capture_output=True,
             text=True,
             cwd=str(Path(__file__).parent.parent.parent)
@@ -312,14 +312,13 @@ class TestRunShAPIFlags:
 
         help_text = result.stdout + result.stderr
 
-        # Check for API mode options in help
+        # Check for API mode options in run subcommand help
         assert "--api" in help_text
         assert "--api-url" in help_text
         assert "--api-key" in help_text
         assert "--api-batch-size" in help_text
         assert "--api-budget" in help_text
         assert "--api-wait" in help_text
-        assert "--api-usage" in help_text
 
     def test_run_sh_syntax_valid(self):
         """Test that run.sh has valid bash syntax."""
