@@ -802,8 +802,18 @@ class FullE2EWorkflowRunner:
                 # Step 2.5: Initialize baseline tensors (NEW - Phase 11 Architecture Pivot)
                 self._initialize_baseline_tensors(scene_result, run_id)
 
+                # Step 2.5b: Load prior ADPRS envelopes for warm-start fitting
+                prior_loaded = self._load_prior_adprs_envelopes(
+                    scene_result.get("entities", []), config.world_id
+                )
+                if prior_loaded > 0:
+                    print(f"  [ADPRS Cross-Run] Loaded prior envelopes for {prior_loaded} entities")
+
                 # Step 2.6: Initialize ADPRS shadow evaluator (Phase 1)
                 self._initialize_shadow_evaluator(scene_result, config, run_id)
+
+                # Step 2.7: Initialize waveform scheduler from prior envelopes (if any)
+                self._initialize_waveform_scheduler(scene_result.get("entities", []))
 
                 # Step 3: Generate all timepoints
                 all_timepoints = self._generate_all_timepoints(
@@ -1333,6 +1343,41 @@ class FullE2EWorkflowRunner:
                 cache_hit_rate=entities_resolved / max(1, entities_initialized)
             )
 
+    def _load_prior_adprs_envelopes(self, entities: List[Entity], world_id: str) -> int:
+        """Load ADPRS envelopes from prior runs for warm-start fitting."""
+        loaded = 0
+        try:
+            shared_store = self._get_shared_store()
+            from sqlmodel import Session, select
+            with Session(shared_store.engine) as session:
+                for entity in entities:
+                    # Prior runs store entities as {run_id}_{entity_id}
+                    # Search for any entity whose entity_id ends with _{entity.entity_id}
+                    # and has adprs_envelopes in metadata
+                    statement = select(Entity).where(
+                        Entity.entity_id.like(f"%_{entity.entity_id}")
+                    )
+                    prior_entities = session.exec(statement).all()
+                    # Find the most recent one with adprs_envelopes
+                    best_prior = None
+                    for prior in prior_entities:
+                        if (prior.entity_metadata
+                                and prior.entity_metadata.get("adprs_envelopes")
+                                and prior.entity_id != entity.entity_id):
+                            best_prior = prior
+                    if best_prior:
+                        entity.entity_metadata["adprs_envelopes"] = (
+                            best_prior.entity_metadata["adprs_envelopes"]
+                        )
+                        loaded += 1
+        except Exception as e:
+            # Non-fatal — shared DB may not exist on first run
+            if loaded == 0:
+                pass  # Silently ignore if nothing was loaded
+            else:
+                print(f"  [ADPRS Cross-Run] Partial load ({loaded} entities), error: {e}")
+        return loaded
+
     def _initialize_shadow_evaluator(
         self, scene_result: Dict, config, run_id: str
     ) -> None:
@@ -1448,6 +1493,9 @@ class FullE2EWorkflowRunner:
             except Exception as e:
                 print(f"    Warning: Could not persist shadow report: {e}")
 
+            # Store on scene_result for metadata persistence
+            scene_result["adprs_shadow_report"] = summary
+
     def _fit_adprs_envelopes(
         self, entities: List[Entity], scene_result: Dict, run_id: str,
         config=None, validation_mode: bool = False
@@ -1513,6 +1561,9 @@ class FullE2EWorkflowRunner:
 
         # Phase 3: Initialize waveform scheduler from fitted envelopes
         self._initialize_waveform_scheduler(entities)
+
+        # Re-persist entities with fitted envelopes to shared DB for cross-run warm-start
+        self._persist_all_entities_for_convergence(entities, run_id)
 
         # Persist WSR to fit metadata if in validation mode
         if validation_mode and self._waveform_scheduler is not None:
@@ -2725,10 +2776,32 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                             continue
                         self._waveform_metrics["called_llm"] += 1
 
-                    # Select a subset of entities for dialog (2-4 entities)
+                    # Per-entity waveform gating: exclude TENSOR and SCENE entities from dialog
+                    if waveform_schedule:
+                        from synth.fidelity_envelope import FidelityBand
+                        eligible_entities = []
+                        for entity in entities:
+                            band = waveform_schedule.get((entity.entity_id, timepoint_idx))
+                            if band is None or band not in (FidelityBand.TENSOR, FidelityBand.SCENE):
+                                eligible_entities.append(entity)
+                            else:
+                                # Still record trajectory snapshot for skipped entity
+                                if self._trajectory_tracker is not None:
+                                    self._trajectory_tracker.record_snapshot(entity, timepoint, timepoint_idx)
+                    else:
+                        eligible_entities = entities
+
+                    if len(eligible_entities) < 2:
+                        # Not enough entities above SCENE band for dialog
+                        if self._trajectory_tracker is not None:
+                            for entity in entities:
+                                self._trajectory_tracker.record_snapshot(entity, timepoint, timepoint_idx)
+                        continue
+
+                    # Select dialog_participants from eligible_entities only
                     import random
-                    num_participants = min(4, len(entities))
-                    dialog_participants = random.sample(entities, num_participants)
+                    num_participants = min(4, len(eligible_entities))
+                    dialog_participants = random.sample(eligible_entities, num_participants)
 
                     print(f"  Generating dialog for {timepoint.timepoint_id} with {num_participants} entities...")
 
@@ -3186,6 +3259,20 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                 token_budget_compliance=token_budget_compliance,
                 fidelity_efficiency_score=fidelity_efficiency_score
             )
+
+            # ADPRS: Include shadow evaluation report in metadata
+            adprs_shadow = scene_result.get("adprs_shadow_report")
+            if adprs_shadow and metadata:
+                shadow_note = (
+                    f"ADPRS Shadow: {adprs_shadow.get('total_evaluations', 0)} evals, "
+                    f"{adprs_shadow.get('divergence_rate_pct', 0)}% divergence, "
+                    f"mean={adprs_shadow.get('mean_divergence', 0)}"
+                )
+                if metadata.summary:
+                    metadata.summary += f"\n{shadow_note}"
+                else:
+                    metadata.summary = shadow_note
+                print(f"  📊 ADPRS shadow report attached to metadata")
 
             # Phase 6: Record simulation completion to usage tracking
             if self._track_usage and self._usage_bridge:
