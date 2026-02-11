@@ -318,6 +318,11 @@ All 12 models in the pipeline—Llama 3.1/4, Qwen 2.5, DeepSeek, Mistral—carry
 +----------------------------+------------------------------+
                              v
 +-----------------------------------------------------------+
+|  SynthasAIzer Waveform Scheduler                           |
+|  ADPRS envelopes: phi→band→skip-LLM compute gating        |
++----------------------------+------------------------------+
+                             v
++-----------------------------------------------------------+
 |  19 Mechanisms (see MECHANICS.md)                          |
 |  Fidelity graphs, causal chains, knowledge tracking,       |
 |  entity prospection, animistic agency, ...                 |
@@ -352,7 +357,7 @@ All 12 models in the pipeline—Llama 3.1/4, Qwen 2.5, DeepSeek, Mistral—carry
 
 - **[MECHANICS.md](MECHANICS.md)** -- Technical specification of all 19 mechanisms, with Castaway Colony examples
 - **[QUICKSTART.md](QUICKSTART.md)** -- Detailed setup and usage guide
-- **[SYNTH.md](SYNTH.md)** -- SynthasAIzer control paradigm (envelopes, voices, patches)
+- **[SYNTH.md](SYNTH.md)** -- SynthasAIzer control paradigm (ADSR envelopes, ADPRS waveforms, voices, patches)
 - **[MILESTONES.md](MILESTONES.md)** -- Roadmap from prototype to platform
 - **[claude-container.sh](claude-container.sh)** -- Docker sandbox for containerized development with iptables network isolation
 
