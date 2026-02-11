@@ -115,6 +115,16 @@ class FullE2EWorkflowRunner:
         # Phase 7: TensorRAG for resolution (lazy initialization)
         self._tensor_rag = None
 
+        # Phase 1 ADPRS: Shadow evaluator (lazy initialization)
+        self._shadow_evaluator = None
+
+        # Phase 2 ADPRS: Trajectory tracker (lazy initialization)
+        self._trajectory_tracker = None
+
+        # Phase 3: Waveform scheduler (lazy initialization)
+        self._waveform_scheduler = None
+        self._waveform_metrics = {"skipped": 0, "called_llm": 0}
+
         # Phase 6: Usage tracking for CLI/API quota integration
         self._usage_bridge = None
         self._track_usage = track_usage and USAGE_TRACKING_AVAILABLE
@@ -376,27 +386,35 @@ class FullE2EWorkflowRunner:
 
                 print(f"  📊 Found {len(all_events)} exposure events in temp store")
 
+                # Create FRESH copies to avoid session detachment issues
+                fresh_events = []
                 for event in all_events:
-                    try:
-                        # Create a FRESH ExposureEvent copy to avoid session detachment issues
-                        # The original event is bound to the temp DB session
-                        fresh_event = ExposureEvent(
-                            entity_id=event.entity_id,
-                            event_type=event.event_type,
-                            information=event.information,
-                            source=event.source,
-                            timestamp=event.timestamp,
-                            confidence=event.confidence,
-                            timepoint_id=event.timepoint_id,
-                            run_id=run_id  # Set run_id for convergence filtering
-                        )
-                        shared_store.save_exposure_event(fresh_event)
-                        events_persisted += 1
-                    except Exception as e:
-                        # Skip duplicates or errors but log them
-                        events_skipped += 1
-                        if events_skipped <= 3:  # Only log first few
-                            print(f"    ⚠️  Skipped event: {e}")
+                    fresh_events.append(ExposureEvent(
+                        entity_id=event.entity_id,
+                        event_type=event.event_type,
+                        information=event.information,
+                        source=event.source,
+                        timestamp=event.timestamp,
+                        confidence=event.confidence,
+                        timepoint_id=event.timepoint_id,
+                        run_id=run_id,
+                    ))
+
+            # Batch-persist in a single transaction to avoid lock thrashing
+            if fresh_events:
+                try:
+                    shared_store.save_exposure_events(fresh_events)
+                    events_persisted = len(fresh_events)
+                except Exception as e:
+                    print(f"    ⚠️  Batch persist failed, falling back to individual: {e}")
+                    for fresh_event in fresh_events:
+                        try:
+                            shared_store.save_exposure_event(fresh_event)
+                            events_persisted += 1
+                        except Exception as e2:
+                            events_skipped += 1
+                            if events_skipped <= 3:
+                                print(f"    ⚠️  Skipped event: {e2}")
 
             if events_persisted > 0:
                 print(f"  📊 Persisted {events_persisted} exposure events for convergence")
@@ -450,27 +468,36 @@ class FullE2EWorkflowRunner:
 
                 print(f"  📊 Found {len(all_dialogs)} dialogs in temp store")
 
+                # Create FRESH copies to avoid session detachment issues
+                fresh_dialogs = []
                 for dialog in all_dialogs:
-                    try:
-                        # Create a FRESH Dialog copy to avoid session detachment issues
-                        fresh_dialog = Dialog(
-                            dialog_id=f"{run_id}_{dialog.dialog_id}",  # Prefix with run_id for uniqueness
-                            timepoint_id=dialog.timepoint_id,
-                            participants=dialog.participants,
-                            turns=dialog.turns,
-                            context_used=dialog.context_used,
-                            duration_seconds=dialog.duration_seconds,
-                            information_transfer_count=dialog.information_transfer_count,
-                            created_at=dialog.created_at,
-                            run_id=run_id  # Set run_id for convergence filtering
-                        )
-                        shared_store.save_dialog(fresh_dialog)
-                        dialogs_persisted += 1
-                    except Exception as e:
-                        # Skip duplicates or errors but log them
-                        dialogs_skipped += 1
-                        if dialogs_skipped <= 3:  # Only log first few
-                            print(f"    ⚠️  Skipped dialog: {e}")
+                    fresh_dialogs.append(Dialog(
+                        dialog_id=f"{run_id}_{dialog.dialog_id}",
+                        timepoint_id=dialog.timepoint_id,
+                        participants=dialog.participants,
+                        turns=dialog.turns,
+                        context_used=dialog.context_used,
+                        duration_seconds=dialog.duration_seconds,
+                        information_transfer_count=dialog.information_transfer_count,
+                        created_at=dialog.created_at,
+                        run_id=run_id,
+                    ))
+
+            # Batch-persist in a single transaction to avoid lock thrashing
+            if fresh_dialogs:
+                try:
+                    shared_store.save_dialogs(fresh_dialogs)
+                    dialogs_persisted = len(fresh_dialogs)
+                except Exception as e:
+                    print(f"    ⚠️  Batch persist failed, falling back to individual: {e}")
+                    for fresh_dialog in fresh_dialogs:
+                        try:
+                            shared_store.save_dialog(fresh_dialog)
+                            dialogs_persisted += 1
+                        except Exception as e2:
+                            dialogs_skipped += 1
+                            if dialogs_skipped <= 3:
+                                print(f"    ⚠️  Skipped dialog: {e2}")
 
             if dialogs_persisted > 0:
                 print(f"  📊 Persisted {dialogs_persisted} dialogs for convergence")
@@ -775,6 +802,9 @@ class FullE2EWorkflowRunner:
                 # Step 2.5: Initialize baseline tensors (NEW - Phase 11 Architecture Pivot)
                 self._initialize_baseline_tensors(scene_result, run_id)
 
+                # Step 2.6: Initialize ADPRS shadow evaluator (Phase 1)
+                self._initialize_shadow_evaluator(scene_result, config, run_id)
+
                 # Step 3: Generate all timepoints
                 all_timepoints = self._generate_all_timepoints(
                     scene_result, config, run_id
@@ -795,9 +825,21 @@ class FullE2EWorkflowRunner:
                 self._persist_all_entities_for_convergence(trained_entities, run_id)
 
                 # Step 4.5: Synthesize dialogs (M11)
+                # Phase 2 ADPRS: Initialize trajectory tracker before dialog synthesis
+                try:
+                    from synth.trajectory_tracker import TrajectoryTracker
+                    self._trajectory_tracker = TrajectoryTracker()
+                except ImportError:
+                    self._trajectory_tracker = None
+
                 self._synthesize_dialogs(
                     trained_entities, all_timepoints, scene_result, run_id,
                     config=config
+                )
+
+                # Step 4.5b: Fit ADPRS envelopes from observed trajectories (Phase 2)
+                self._fit_adprs_envelopes(
+                    trained_entities, scene_result, run_id, config=config
                 )
 
                 # Step 4.6: Execute queries (M5)
@@ -1291,6 +1333,244 @@ class FullE2EWorkflowRunner:
                 cache_hit_rate=entities_resolved / max(1, entities_initialized)
             )
 
+    def _initialize_shadow_evaluator(
+        self, scene_result: Dict, config, run_id: str
+    ) -> None:
+        """
+        Step 2.6: Initialize ADPRS shadow evaluator (Phase 1 — shadow mode).
+
+        Registers ADPRS fidelity envelopes for entities that have them configured
+        in entity_metadata or in the template's EntityConfig.adprs_envelopes.
+        If no envelopes are found, shadow evaluator stays None (no-op).
+        """
+        try:
+            from synth.shadow_evaluator import ShadowEvaluator
+            from synth.fidelity_envelope import ADPRSEnvelope, ADPRSComposite
+        except ImportError:
+            return
+
+        evaluator = ShadowEvaluator(run_id=run_id)
+        entities = scene_result.get("entities", [])
+
+        for entity in entities:
+            # First: check entity_metadata for per-entity envelopes
+            if hasattr(entity, "entity_metadata") and entity.entity_metadata:
+                evaluator.register_from_metadata(entity.entity_id, entity.entity_metadata)
+
+        # Second: fall back to template-level defaults from config.entities.adprs_envelopes
+        if not evaluator.has_envelopes() and hasattr(config, "entities") and config.entities:
+            template_envelopes = getattr(config.entities, "adprs_envelopes", None)
+            if template_envelopes:
+                composite = ADPRSComposite(
+                    envelopes=[ADPRSEnvelope.from_metadata_dict(e) for e in template_envelopes]
+                )
+                for entity in entities:
+                    if entity.entity_id not in evaluator._envelopes:
+                        evaluator.register_entity_envelopes(entity.entity_id, composite)
+
+        if evaluator.has_envelopes():
+            self._shadow_evaluator = evaluator
+            print(f"  [ADPRS Shadow] Registered envelopes for {len(evaluator._envelopes)} entities")
+        else:
+            self._shadow_evaluator = None
+
+    def _shadow_evaluate_all_timepoints(
+        self, all_timepoints: list, scene_result: Dict
+    ) -> None:
+        """
+        Run ADPRS shadow evaluation across all timepoints and print summary.
+
+        This is observation-only — no fidelity decisions are changed.
+        Called after timepoint generation completes in each mode.
+        """
+        if self._shadow_evaluator is None:
+            return
+
+        from datetime import datetime, timezone
+
+        entities = scene_result.get("entities", [])
+        entity_map = {e.entity_id: e for e in entities}
+
+        for tp in all_timepoints:
+            # Determine timestamp from timepoint
+            tp_timestamp = getattr(tp, "timestamp", None)
+            if tp_timestamp is None:
+                tp_timestamp = datetime.now(timezone.utc)
+            elif isinstance(tp_timestamp, str):
+                try:
+                    tp_timestamp = datetime.fromisoformat(tp_timestamp)
+                except (ValueError, TypeError):
+                    tp_timestamp = datetime.now(timezone.utc)
+
+            if tp_timestamp.tzinfo is None:
+                tp_timestamp = tp_timestamp.replace(tzinfo=timezone.utc)
+
+            tp_id = getattr(tp, "timepoint_id", str(id(tp)))
+
+            # Evaluate each entity present at this timepoint
+            entities_present = getattr(tp, "entities_present", [])
+            for entity_id in entities_present:
+                entity = entity_map.get(entity_id)
+                if entity is None:
+                    continue
+                actual_level = getattr(entity, "resolution_level", "tensor_only")
+                if hasattr(actual_level, "value"):
+                    actual_level = actual_level.value
+                self._shadow_evaluator.evaluate(
+                    entity_id=entity_id,
+                    actual_resolution_value=actual_level,
+                    timepoint_id=tp_id,
+                    timestamp=tp_timestamp,
+                )
+
+        # Print summary report and persist to JSON
+        report = self._shadow_evaluator.get_report()
+        if report.total_evaluations > 0:
+            summary = report.summary()
+            print(f"\n  [ADPRS Shadow Report]")
+            print(f"    Total evaluations:  {summary['total_evaluations']}")
+            print(f"    Divergent:          {summary['divergent_count']} ({summary['divergence_rate_pct']}%)")
+            print(f"    Mean divergence:    {summary['mean_divergence']}")
+            print(f"    Max divergence:     {summary['max_divergence']}")
+
+            # Persist shadow_report.json for Phase 2 training data
+            try:
+                import json
+                from pathlib import Path
+                config = scene_result.get("config")
+                world_id = config.world_id if config else "unknown"
+                output_dir = Path("datasets") / world_id
+                output_dir.mkdir(parents=True, exist_ok=True)
+                report_path = output_dir / "shadow_report.json"
+                with open(report_path, "w") as f:
+                    json.dump(report.to_json_dict(), f, indent=2)
+                print(f"    Persisted: {report_path}")
+            except Exception as e:
+                print(f"    Warning: Could not persist shadow report: {e}")
+
+    def _fit_adprs_envelopes(
+        self, entities: List[Entity], scene_result: Dict, run_id: str,
+        config=None, validation_mode: bool = False
+    ) -> None:
+        """
+        Step 4.5b: Fit ADPRS envelopes to observed cognitive trajectories (Phase 2).
+
+        Uses trajectory tracker data collected during dialog synthesis to fit
+        emergent waveform parameters per entity. Re-initializes shadow evaluator
+        with fitted envelopes.
+
+        Args:
+            validation_mode: If True, compares waveform predictions to actuals
+                and persists WSR to adprs_fit_metadata (Phase 3.5).
+        """
+        if self._trajectory_tracker is None:
+            return
+
+        try:
+            from synth.adprs_fitter import ADPRSFitter
+        except ImportError:
+            print("  [ADPRS Fit] Warning: adprs_fitter not available, skipping")
+            return
+
+        tracker_summary = self._trajectory_tracker.summary()
+        if tracker_summary["entities_tracked"] == 0:
+            print("  [ADPRS Fit] No trajectory data collected, skipping envelope fitting")
+            return
+
+        print(f"\n  [ADPRS Fit] Trajectory summary: {tracker_summary['entities_tracked']} entities, "
+              f"{tracker_summary['total_snapshots']} total snapshots")
+
+        fitter = ADPRSFitter(min_points=5)
+        results = fitter.fit_all(self._trajectory_tracker, entities)
+
+        if not results:
+            print("  [ADPRS Fit] No entities had sufficient data for fitting")
+            return
+
+        # Determine duration and t0 from timepoints/config
+        from datetime import datetime, timezone
+        t0_iso = "2026-01-01T00:00:00+00:00"
+        duration_ms = 31536000000.0  # 1 year default
+
+        # Try to extract from scene_result or config
+        if config and hasattr(config, "start_date") and config.start_date:
+            t0_iso = config.start_date if isinstance(config.start_date, str) else config.start_date.isoformat()
+        if config and hasattr(config, "duration_ms") and config.duration_ms:
+            duration_ms = float(config.duration_ms)
+
+        updated = ADPRSFitter.apply_to_entities(results, entities, duration_ms, t0_iso)
+        print(f"  [ADPRS Fit] Fitted {updated} entities:")
+
+        for entity_id, fit_result in results.items():
+            p = fit_result.params
+            status = "converged" if fit_result.converged else "fallback"
+            print(f"    {entity_id}: A={p['A']:.3f} P={p['P']:.3f} S={p['S']:.3f} "
+                  f"baseline={p['baseline']:.3f} ({fit_result.method}, {status}, "
+                  f"MSE={fit_result.residual:.5f})")
+
+        # Re-initialize shadow evaluator with the fitted envelopes
+        self._initialize_shadow_evaluator(scene_result, config, run_id)
+
+        # Phase 3: Initialize waveform scheduler from fitted envelopes
+        self._initialize_waveform_scheduler(entities)
+
+        # Persist WSR to fit metadata if in validation mode
+        if validation_mode and self._waveform_scheduler is not None:
+            wsr_report = self._waveform_scheduler.sufficiency_report()
+            for entity_id in results:
+                entity = next((e for e in entities if e.entity_id == entity_id), None)
+                if entity and "adprs_fit_metadata" in entity.entity_metadata:
+                    entity.entity_metadata["adprs_fit_metadata"]["wsr"] = wsr_report.get("wsr")
+
+    def _initialize_waveform_scheduler(self, entities: List[Entity]) -> None:
+        """Initialize waveform scheduler from entities with fitted ADPRS envelopes."""
+        try:
+            from synth.waveform_scheduler import WaveformScheduler
+            self._waveform_scheduler = WaveformScheduler()
+            registered = 0
+            for entity in entities:
+                if hasattr(entity, "entity_metadata") and entity.entity_metadata:
+                    adprs_data = entity.entity_metadata.get("adprs_envelopes")
+                    if adprs_data:
+                        self._waveform_scheduler.register_from_metadata(
+                            entity.entity_id, entity.entity_metadata
+                        )
+                        registered += 1
+            if registered > 0:
+                print(f"  [Waveform] Scheduler initialized with {registered} entity envelopes")
+            else:
+                self._waveform_scheduler = None
+        except ImportError:
+            self._waveform_scheduler = None
+
+    def _waveform_resolution_schedule(
+        self,
+        entities: List[Entity],
+        timepoints: List,
+    ) -> Dict:
+        """
+        Phase 3: Generate waveform-based resolution schedule.
+
+        For entities with fitted ADPRS envelopes: evaluate phi at each timepoint tau,
+        map to resolution band. For entities without envelopes: return None (fallback
+        to existing resolution logic).
+
+        Returns:
+            Dict mapping (entity_id, timepoint_index) -> FidelityBand or None
+        """
+        schedule = {}
+        if self._waveform_scheduler is None:
+            return schedule
+
+        n_timepoints = len(timepoints)
+        for tp_idx, _tp in enumerate(timepoints):
+            tau = tp_idx / max(n_timepoints - 1, 1)
+            for entity in entities:
+                band = self._waveform_scheduler.schedule_entity(entity.entity_id, tau)
+                if band is not None:
+                    schedule[(entity.entity_id, tp_idx)] = band
+        return schedule
+
     def _compute_andos_layers(
         self, entities: List[Entity], run_id: str
     ) -> List[List[Entity]]:
@@ -1414,6 +1694,7 @@ class FullE2EWorkflowRunner:
                     is_portal_mode=True
                 )
 
+                self._shadow_evaluate_all_timepoints(all_timepoints, scene_result)
                 return all_timepoints
 
             # MODE DETECTION: Check if branching simulation
@@ -1452,6 +1733,7 @@ class FullE2EWorkflowRunner:
                     is_branching_mode=True
                 )
 
+                self._shadow_evaluate_all_timepoints(all_timepoints, scene_result)
                 return all_timepoints
 
             # MODE DETECTION: Check if directorial simulation
@@ -1488,6 +1770,7 @@ class FullE2EWorkflowRunner:
                     is_directorial_mode=True
                 )
 
+                self._shadow_evaluate_all_timepoints(all_timepoints, scene_result)
                 return all_timepoints
 
             # MODE DETECTION: Check if cyclical simulation
@@ -1524,6 +1807,7 @@ class FullE2EWorkflowRunner:
                     is_cyclical_mode=True
                 )
 
+                self._shadow_evaluate_all_timepoints(all_timepoints, scene_result)
                 return all_timepoints
 
             # FORWARD MODE: Original forward generation logic
@@ -1583,6 +1867,8 @@ class FullE2EWorkflowRunner:
                     break
 
             print(f"✓ Generated {len(all_timepoints)} timepoints")
+
+            self._shadow_evaluate_all_timepoints(all_timepoints, scene_result)
 
             self.logfire.info(
                 "Temporal generation complete",
@@ -2408,11 +2694,37 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
             # Beat accumulator for temporal freshness
             prior_dialog_beats: List[str] = []
 
+            # Phase 3: Generate waveform resolution schedule if available
+            waveform_schedule = self._waveform_resolution_schedule(entities, timepoints)
+            if waveform_schedule:
+                print(f"  [Waveform] Resolution schedule covers {len(waveform_schedule)} (entity, timepoint) pairs")
+
             # Synthesize dialogs for each timepoint
             dialogs_created = 0
 
-            for timepoint in timepoints:
+            for timepoint_idx, timepoint in enumerate(timepoints):
                 try:
+                    # Phase 3: Check waveform schedule — if ALL entities are in TENSOR band
+                    # for this timepoint, skip dialog synthesis entirely
+                    if waveform_schedule:
+                        from synth.fidelity_envelope import FidelityBand
+                        entity_bands = [
+                            waveform_schedule.get((e.entity_id, timepoint_idx))
+                            for e in entities
+                        ]
+                        all_tensor = all(
+                            b == FidelityBand.TENSOR for b in entity_bands if b is not None
+                        )
+                        if all_tensor and any(b is not None for b in entity_bands):
+                            self._waveform_metrics["skipped"] += 1
+                            print(f"  [Waveform] Skipping dialog for {timepoint.timepoint_id} (all entities in TENSOR band)")
+                            # Still record trajectory snapshots with predicted values
+                            if self._trajectory_tracker is not None:
+                                for entity in entities:
+                                    self._trajectory_tracker.record_snapshot(entity, timepoint, timepoint_idx)
+                            continue
+                        self._waveform_metrics["called_llm"] += 1
+
                     # Select a subset of entities for dialog (2-4 entities)
                     import random
                     num_participants = min(4, len(entities))
@@ -2446,6 +2758,11 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                     # Keep only last 10 beats to bound prompt size
                     prior_dialog_beats = prior_dialog_beats[-10:]
 
+                    # Phase 2 ADPRS: Record cognitive state snapshots after dialog backprop sync
+                    if self._trajectory_tracker is not None:
+                        for entity in dialog_participants:
+                            self._trajectory_tracker.record_snapshot(entity, timepoint, timepoint_idx)
+
                     print(f"  ✓ Created dialog with {len(dialog_participants)} participants")
 
                 except Exception as e:
@@ -2458,10 +2775,21 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
 
             print(f"✓ Synthesized {dialogs_created} dialogs")
 
+            # Phase 3: Report waveform sufficiency metrics
+            if waveform_schedule:
+                skipped = self._waveform_metrics["skipped"]
+                called = self._waveform_metrics["called_llm"]
+                total = skipped + called
+                ratio = skipped / total if total > 0 else 0.0
+                print(f"  [Waveform] Sufficiency: skipped={skipped}, called_llm={called}, "
+                      f"ratio={ratio:.2%}")
+
             self.logfire.info(
                 "Dialog synthesis complete",
                 dialogs_created=dialogs_created,
-                timepoints_processed=len(timepoints)
+                timepoints_processed=len(timepoints),
+                waveform_skipped=self._waveform_metrics["skipped"],
+                waveform_called_llm=self._waveform_metrics["called_llm"],
             )
 
     def _execute_queries(

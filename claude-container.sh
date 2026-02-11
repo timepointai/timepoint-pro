@@ -105,8 +105,10 @@ is_running() {
 }
 
 # Load .env vars without mounting the file (security: inject as env vars only)
+# Populates the global ENV_ARGS array (arrays can't survive subshells/echo)
+ENV_ARGS=()
 collect_env_vars() {
-    local env_args=()
+    ENV_ARGS=()
 
     # Source .env if it exists
     if [[ -f "${PROJECT_DIR}/.env" ]]; then
@@ -117,23 +119,21 @@ collect_env_vars() {
     fi
 
     # Pass through API keys (from .env or current environment)
-    [[ -n "${OPENROUTER_API_KEY:-}" ]]  && env_args+=(-e "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}")
-    [[ -n "${ANTHROPIC_API_KEY:-}" ]]   && env_args+=(-e "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}")
-    [[ -n "${OXEN_API_KEY:-}" ]]        && env_args+=(-e "OXEN_API_KEY=${OXEN_API_KEY}")
-    [[ -n "${GROQ_API_KEY:-}" ]]        && env_args+=(-e "GROQ_API_KEY=${GROQ_API_KEY}")
-    [[ -n "${TIMEPOINT_API_KEY:-}" ]]   && env_args+=(-e "TIMEPOINT_API_KEY=${TIMEPOINT_API_KEY}")
+    [[ -n "${OPENROUTER_API_KEY:-}" ]]  && ENV_ARGS+=(-e "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}")
+    [[ -n "${ANTHROPIC_API_KEY:-}" ]]   && ENV_ARGS+=(-e "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}")
+    [[ -n "${OXEN_API_KEY:-}" ]]        && ENV_ARGS+=(-e "OXEN_API_KEY=${OXEN_API_KEY}")
+    [[ -n "${GROQ_API_KEY:-}" ]]        && ENV_ARGS+=(-e "GROQ_API_KEY=${GROQ_API_KEY}")
+    [[ -n "${TIMEPOINT_API_KEY:-}" ]]   && ENV_ARGS+=(-e "TIMEPOINT_API_KEY=${TIMEPOINT_API_KEY}")
 
     # Claude Code settings
-    env_args+=(-e "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1")
-    env_args+=(-e "NODE_OPTIONS=--max-old-space-size=4096")
+    ENV_ARGS+=(-e "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1")
+    ENV_ARGS+=(-e "NODE_OPTIONS=--max-old-space-size=4096")
 
     # Extra allowed domains for firewall
-    [[ -n "${EXTRA_DOMAINS}" ]] && env_args+=(-e "EXTRA_ALLOWED_DOMAINS=${EXTRA_DOMAINS}")
+    [[ -n "${EXTRA_DOMAINS}" ]] && ENV_ARGS+=(-e "EXTRA_ALLOWED_DOMAINS=${EXTRA_DOMAINS}")
 
     # Timezone
-    env_args+=(-e "TZ=${TZ:-America/Los_Angeles}")
-
-    echo "${env_args[@]}"
+    ENV_ARGS+=(-e "TZ=${TZ:-America/Los_Angeles}")
 }
 
 # ============================================================================
@@ -187,9 +187,8 @@ cmd_start() {
         cmd_build
     fi
 
-    # Collect environment variables
-    local env_args
-    env_args=$(collect_env_vars)
+    # Collect environment variables into ENV_ARGS global array
+    collect_env_vars
 
     # Ensure ~/.claude exists on host
     mkdir -p "${HOST_CLAUDE_DIR}"
@@ -203,7 +202,6 @@ cmd_start() {
     # - Same-path workspace mount (Docker Sandbox pattern)
     # - ~/.claude mounted for settings persistence
     # - .env vars injected (not mounted)
-    # shellcheck disable=SC2086
     docker run -d \
         --name "${CONTAINER_NAME}" \
         --cap-add=NET_ADMIN \
@@ -211,7 +209,7 @@ cmd_start() {
         -v "${PROJECT_DIR}:${PROJECT_DIR}:delegated" \
         -v "${HOST_CLAUDE_DIR}:/home/claude/.claude" \
         -w "${PROJECT_DIR}" \
-        ${env_args} \
+        "${ENV_ARGS[@]}" \
         "${IMAGE_NAME}" \
         sleep infinity
 
@@ -229,12 +227,16 @@ cmd_start() {
     # Install project dependencies if pyproject.toml exists
     if [[ -f "${PROJECT_DIR}/pyproject.toml" ]]; then
         log_info "Installing Python dependencies..."
+        # Prefer poetry (project uses [tool.poetry.dependencies]).
+        # pip install -e . with poetry-core backend exits 0 but installs zero
+        # deps because they aren't in [project.dependencies], so it must NOT
+        # come first in an || chain.
+        docker exec -w "${PROJECT_DIR}" "${CONTAINER_NAME}" \
+            poetry install --no-interaction 2>&1 | tail -5 || \
         docker exec -w "${PROJECT_DIR}" "${CONTAINER_NAME}" \
             pip install --no-cache-dir -e ".[dev]" 2>/dev/null || \
         docker exec -w "${PROJECT_DIR}" "${CONTAINER_NAME}" \
             pip install --no-cache-dir -r requirements.txt 2>/dev/null || \
-        docker exec -w "${PROJECT_DIR}" "${CONTAINER_NAME}" \
-            poetry install --no-interaction 2>/dev/null || \
         log_warn "Could not auto-install dependencies (install manually via shell)"
     fi
 

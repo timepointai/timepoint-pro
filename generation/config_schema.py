@@ -352,6 +352,10 @@ class EntityConfig(BaseModel):
         default=None,
         description="Default voice controls for entities (None = full participation)"
     )
+    adprs_envelopes: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="ADPRS fidelity envelope parameters for shadow evaluation"
+    )
 
     def get_envelope(self) -> EnvelopeConfig:
         """Get envelope config, falling back to default if not set."""
