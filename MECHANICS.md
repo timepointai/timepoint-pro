@@ -722,6 +722,8 @@ DialogTurn:
 
 **Validation**: Dialog is checked for knowledge consistency (can speaker know this?), relationship consistency (would they say this to this person?), and realism (physical/emotional constraints on speech).
 
+**ADPRS Waveform Gating**: When entities have fitted ADPRS envelopes, the waveform scheduler evaluates each entity's resolution band per timepoint. Entities in TENSOR or SCENE bands are excluded from dialog participant selection (their trajectory snapshots are still recorded for fitting). If fewer than 2 eligible entities remain, dialog is skipped entirely. This gates M11 LLM calls based on per-entity cognitive activation predictions, reducing cost without losing trajectory data. Shadow evaluation runs post-hoc to track divergence between ADPRS predictions and actual resolution. See [SYNTH.md](SYNTH.md) for ADPRS specification.
+
 ### Tensor Synchronization in Dialog
 
 Before dialog synthesis, the system syncs TTMTensor → CognitiveTensor to ensure trained emotional values are used (see M6: Dual Tensor Architecture). After dialog:

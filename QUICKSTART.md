@@ -204,6 +204,30 @@ python -m pytest tests/integration/test_adprs_phase2_integration.py \
   tests/integration/test_waveform_sufficiency.py -v
 ```
 
+### ADPRS Waveform Output
+
+When entities have fitted ADPRS envelopes (from prior runs or template config), you'll see waveform gating during dialog synthesis:
+
+```
+  [Waveform] Scheduler initialized with 4 entity envelopes
+  [Waveform] Resolution schedule covers 40 (entity, timepoint) pairs
+  [Waveform] Skipping dialog for tp_003 (all entities in TENSOR band)
+  Generating dialog for tp_004 with 3 entities...
+  [ADPRS Shadow Report]
+    Total evaluations:  40
+    Divergent:          3 (7.5%)
+    Mean divergence:    0.12
+    Max divergence:     0.35
+  [ADPRS Fit] Fitted 4 entities:
+    cmdr_tanaka: A=0.820 P=2.000 S=0.710 baseline=0.145 (cold, converged, MSE=0.00234)
+```
+
+**What the metrics mean:**
+- **Waveform schedule**: Maps each (entity, timepoint) pair to a resolution band. TENSOR/SCENE band entities skip LLM dialog.
+- **Shadow report**: Compares ADPRS predictions to actual resolution choices. Low divergence = good predictions. Target: <15% divergence rate.
+- **WSR (Waveform Sufficiency Ratio)**: `correct_predictions / total_predictions`. Target: WSR > 0.7. Reported in `datasets/{world_id}/shadow_report.json`.
+- **Cross-run improvement**: Fitted envelopes persist to the shared DB. Subsequent runs load prior envelopes for warm-start fitting, improving WSR over time.
+
 ## Advanced Options
 
 ```bash

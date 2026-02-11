@@ -185,6 +185,8 @@ Most entities stay at TENSOR. Few ever need TRAINED.
 Detail concentrates where it matters.
 ```
 
+**ADPRS Waveform Gating:** Entities with fitted ADPRS envelopes get per-entity LLM gating during dialog synthesis. The waveform scheduler evaluates each entity's cognitive activation (phi) at each timepoint and maps it to a resolution band. Entities in TENSOR or SCENE bands are excluded from LLM dialog calls — their trajectory snapshots are still recorded but no tokens are spent. Shadow evaluation tracks divergence between ADPRS predictions and actual resolution, persisting reports to run metadata. Fitted envelopes are stored in entity metadata and reloaded on subsequent runs for warm-start refinement, so predictions improve over time. See [SYNTH.md](SYNTH.md) for full specification.
+
 ---
 
 ## Knowledge Provenance
@@ -319,7 +321,8 @@ All 12 models in the pipeline—Llama 3.1/4, Qwen 2.5, DeepSeek, Mistral—carry
                              v
 +-----------------------------------------------------------+
 |  SynthasAIzer Waveform Scheduler                           |
-|  ADPRS envelopes: phi→band→skip-LLM compute gating        |
+|  ADPRS envelopes: phi→band→per-entity LLM gating          |
+|  TENSOR/SCENE band entities skip dialog; cross-run fitting |
 +----------------------------+------------------------------+
                              v
 +-----------------------------------------------------------+
