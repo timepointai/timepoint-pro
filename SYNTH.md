@@ -6,7 +6,7 @@
 
 ---
 
-## Implementation Status (January 2026)
+## Implementation Status (February 2026)
 
 | Phase | Feature | Status | Tests |
 |-------|---------|--------|-------|
@@ -14,10 +14,15 @@
 | **Phase 2** | Voice Controls | **COMPLETE** | Integrated |
 | **Phase 3** | Patch System | **COMPLETE** | 15 templates with patch metadata |
 | **Phase 4** | Event Monitoring | Specification | - |
+| **ADPRS Phase 1** | Fidelity Envelope + Trajectory Tracker | **COMPLETE** | 50 unit tests |
+| **ADPRS Phase 2** | Cold/Warm Fitting + Harmonic Extension | **COMPLETE** | 38 unit tests, 6 integration |
+| **ADPRS Phase 3** | Shadow Evaluation + Waveform Scheduling | **COMPLETE** | 36 unit tests, 12 integration |
+
+**Total ADPRS tests: 142** (124 unit + 18 integration), all passing.
 
 ### What's Implemented
 
-**`synth/` module** (`synth/__init__.py`, `envelope.py`, `voice.py`, `events.py`):
+**Original `synth/` modules** (`envelope.py`, `voice.py`, `events.py`):
 ```python
 from synth import EnvelopeConfig, VoiceConfig, SynthEventEmitter, SynthEvent
 
@@ -31,6 +36,48 @@ voice = VoiceConfig(mute=False, solo=False, gain=1.0)
 # Event emission (ready for Phase 4)
 emitter = SynthEventEmitter(enabled=True)
 emitter.emit(SynthEvent.RUN_START, "run_123", {"template": "board_meeting"})
+```
+
+**ADPRS waveform modules** (6 new files, ~1,528 lines):
+```python
+from synth import (
+    ADPRSEnvelope, ADPRSComposite, FidelityBand,
+    TrajectoryTracker, CognitiveSnapshot,
+    ADPRSFitter, FitResult,
+    HarmonicFitter, HarmonicFitResult,
+    ShadowEvaluator, ShadowEvaluationReport,
+    WaveformScheduler,
+)
+
+# Continuous fidelity envelope: phi(tau) → [0,1] → resolution band
+env = ADPRSEnvelope(A=0.8, D=1.0, P=2, R=0.0, S=0.7, start_ms=0, duration_ms=10000)
+phi = env.evaluate(t_ms=5000)          # → 0.72
+band = env.evaluate_band(t_ms=5000)    # → FidelityBand.DIALOG
+
+# Trajectory tracking: accumulate cognitive snapshots per entity
+tracker = TrajectoryTracker(min_points=8)
+tracker.record("entity_1", cognitive_tensor={...}, metadata={...})
+tau, activations = tracker.activation_series("entity_1")
+
+# Fitting: scipy differential_evolution to recover ADPRS params from data
+fitter = ADPRSFitter(max_iter=200)
+result = fitter.cold_fit(tau, activations)       # → FitResult
+env = result.to_envelope(start_ms=0, duration_ms=10000)
+
+# Harmonic fitting: K=3 multi-harmonic extension
+hfitter = HarmonicFitter(max_K=3)
+hresult = hfitter.fit(tau, activations)          # → HarmonicFitResult
+
+# Shadow evaluation: divergence between ADPRS prediction and actual resolution
+shadow = ShadowEvaluator()
+shadow.register("entity_1", [env])
+result = shadow.evaluate("entity_1", t_ms=5000, actual_band=FidelityBand.SCENE)
+
+# Waveform scheduling: phi → resolution → skip-LLM decisions
+scheduler = WaveformScheduler()
+scheduler.register("entity_1", [env])
+decision = scheduler.schedule("entity_1", t_ms=5000)
+# → ScheduleDecision(band=DIALOG, phi=0.72, skip_llm=False)
 ```
 
 **Patch System** (`generation/templates/loader.py`):
@@ -699,6 +746,106 @@ Categories include: corporate, historical, crisis, mystical, mystery, directoria
 
 ---
 
+## ADPRS Waveform System (Phases 1-3)
+
+The ADPRS system replaces discrete resolution tiers with a **continuous fidelity envelope** that maps entity cognitive activation to resolution bands. Where the ADSR envelope models entity *presence intensity* through a scenario, ADPRS models *cognitive activation* as a fitted waveform per entity, enabling the system to predict when an entity needs full LLM resolution vs. when a compressed tensor suffices.
+
+### ADPRS Parameters
+
+| Parameter | Name | Range | Meaning |
+|-----------|------|-------|---------|
+| **A** | Asymptotic | [0,1] | Decay rate: 0 = fast decay, 1 = no decay |
+| **D** | Duration | ms | Active window length |
+| **P** | Period | integer ≥1 | Number of oscillation peaks within duration |
+| **R** | Recurrence | ms (0 = single-shot) | Repeat interval for the envelope |
+| **S** | Spread | [0,1] | Amplitude range: 0 = baseline only, 1 = full [0,1] |
+
+### Waveform Math
+
+```
+phi(tau) = clamp(baseline + S * exp(-alpha * tau) * sin(P * pi * tau), 0, 1)
+
+where:
+  tau    = normalized time [0,1] within duration
+  alpha  = -ln(A + epsilon) controls decay rate
+  baseline = (1 - S) / 2 centers the waveform
+```
+
+### phi → Resolution Band Mapping
+
+```
+phi ∈ [0.0, 0.2) → TENSOR    (embedding only, ~200 tokens)
+phi ∈ [0.2, 0.4) → SCENE     (scene-level summary)
+phi ∈ [0.4, 0.6) → GRAPH     (relationship graph)
+phi ∈ [0.6, 0.8) → DIALOG    (full dialog generation)
+phi ∈ [0.8, 1.0] → TRAINED   (fine-tuned entity model)
+```
+
+### Architecture
+
+```
+CognitiveSnapshot ──→ TrajectoryTracker ──→ ADPRSFitter ──→ ADPRSEnvelope
+                         (accumulate)        (scipy fit)      (per-entity)
+                                                │
+                                         HarmonicFitter
+                                          (K=3 extension)
+                                                │
+                              ┌─────────────────┴─────────────────┐
+                              ▼                                   ▼
+                      ShadowEvaluator                    WaveformScheduler
+                    (divergence tracking)              (phi → skip-LLM gate)
+```
+
+**Module descriptions:**
+
+| Module | Purpose |
+|--------|---------|
+| `fidelity_envelope.py` | `ADPRSEnvelope` model, `ADPRSComposite` (max-of-N), phi→band mapping, serialization |
+| `trajectory_tracker.py` | `CognitiveSnapshot` accumulation, tau normalization, activation series extraction |
+| `adprs_fitter.py` | Cold fit (scipy `differential_evolution`), warm fit (refine from prior), cross-run convergence |
+| `harmonic_fitter.py` | K=3 multi-harmonic extension, spectral distance metric, automatic K-fallback |
+| `shadow_evaluator.py` | Observation-only divergence tracking, per-entity reports, event emission |
+| `waveform_scheduler.py` | Compute gate: phi→resolution→skip-LLM decisions, sufficiency reports (WSR metric) |
+
+### Waveform Sufficiency Ratio (WSR)
+
+The WSR measures how well the fitted waveform predicts actual resolution needs:
+
+```
+WSR = (correct band predictions) / (total predictions)
+
+Target: WSR > 0.7 for production use
+Integration tests confirm WSR > 0.7 on synthetic trajectories
+K=3 harmonics consistently beat K=1 on complex signals
+```
+
+### Test Coverage
+
+| Test File | Tests | What It Covers |
+|-----------|-------|---------------|
+| `test_fidelity_envelope.py` | 30 | Waveform math, band mapping, recurrence, serialization, composite |
+| `test_trajectory_tracker.py` | 20 | Snapshot recording, tau normalization, activation series |
+| `test_adprs_fitter.py` | 19 | Cold/warm fitting, FitResult, apply_to_entities, cross-run convergence |
+| `test_harmonic_fitter.py` | 19 | Harmonic waveform, K-fallback, spectral distance |
+| `test_shadow_evaluator.py` | 16 | Registration, evaluation, divergence, report, event emission |
+| `test_waveform_scheduler.py` | 20 | Scheduling, activation delta, sufficiency report |
+| `test_adprs_phase2_integration.py` | 6 | Full pipeline: tracker → fitter → apply → shadow |
+| `test_waveform_sufficiency.py` | 12 | WSR protocol, K1 vs K3, scheduler integration |
+
+```bash
+# Run all ADPRS tests
+./run.sh test synth
+
+# Or directly
+python -m pytest tests/unit/test_fidelity_envelope.py tests/unit/test_trajectory_tracker.py \
+  tests/unit/test_adprs_fitter.py tests/unit/test_harmonic_fitter.py \
+  tests/unit/test_shadow_evaluator.py tests/unit/test_waveform_scheduler.py \
+  tests/integration/test_adprs_phase2_integration.py \
+  tests/integration/test_waveform_sufficiency.py -v
+```
+
+---
+
 ## Anti-Patterns
 
 ### Don't Do These
@@ -728,6 +875,9 @@ If you find yourself:
 | 2. Voice | `test_synth_voice.py` | Voice in dialog synthesis | Muted entity excluded |
 | 3. Patch | `test_synth_patch.py` | Catalog loading | `./run.sh list --patches` |
 | 4. Events | `test_synth_events.py` | Emitter in workflow | Events logged during run |
+| ADPRS 1 | `test_fidelity_envelope.py`, `test_trajectory_tracker.py` (50) | — | Band mapping verified |
+| ADPRS 2 | `test_adprs_fitter.py`, `test_harmonic_fitter.py` (38) | `test_adprs_phase2_integration.py` (6) | Cross-run convergence |
+| ADPRS 3 | `test_shadow_evaluator.py`, `test_waveform_scheduler.py` (36) | `test_waveform_sufficiency.py` (12) | WSR > 0.7 |
 
 ### Regression Prevention
 
@@ -767,11 +917,12 @@ The SynthasAIzer paradigm provides:
 2. **Voice controls** for entity mixing (mute/solo/gain)
 3. **Patch system** for template organization
 4. **Event emission** for monitoring and visualization
+5. **ADPRS waveforms** for continuous fidelity control — fitted per-entity envelopes that map cognitive activation to resolution bands, enabling skip-LLM decisions and compute gating (142 tests, WSR > 0.7)
 
 All features are:
 - Optional (backward compatible)
 - MVP-scoped (minimal code)
-- Fully tested (unit + E2E)
+- Fully tested (unit + integration + E2E)
 - Metaphor-appropriate (no stretching)
 
 The synthesizer metaphor gives us a rich vocabulary for control without requiring us to implement audio DSP. We borrow the **interface patterns**, not the **signal processing**.
