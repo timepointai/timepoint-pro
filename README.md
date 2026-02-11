@@ -1,42 +1,38 @@
 # Timepoint Daedalus
 
-**Structured temporal simulation for problems that outgrow prompting.**
+**Structured temporal simulation that renders queryable meaning graphs, not prose.**
 
-LLMs are getting smarter. Context windows are measured in millions of tokens. So why build structured simulation infrastructure around them?
+An LLM can generate a plausible story about a crew crash-landing on an alien planet. Timepoint generates this:
 
-Because the problems that matter—backward causal reasoning, multi-entity state tracking, knowledge provenance, convergence analysis—are not generation problems. They're **search, coordination, and verification** problems. The structure isn't scaffolding that gets removed as models improve. It's the product. And it becomes *more* valuable as the engines get more powerful, not less.
+```
+10 entities with tracked emotional state (valence, arousal, energy per timestep)
+90+ quantitative variables propagated across 5,100 steps (O2, food, hull, radiation)
+3 counterfactual branches from a single decision point, each scored by 405B judge
+typed knowledge graph: who learned what, from whom, at which timepoint
+convergence-testable: run 3x, measure causal graph Jaccard similarity
+training data where every example carries its full causal ancestry
+$0.30, ~1,200 LLM calls, 4 models (DeepSeek R1, Llama 70B, Qwen 72B, 405B)
+```
 
----
+The output is a structured computational artifact — typed graph edges with provenance, auditable causal chains, quantitative state you can propagate and query. Not a narrative summary. The difference matters when you want to fine-tune downstream models on causal reasoning, knowledge flow, or multi-entity state tracking, because each training example carries the full chain of events that produced it.
 
-## Why Structure, Not Just Prompts
+### The key architectural bet
 
-A frontier LLM can generate a plausible story about a crew crash-landing on an alien planet. Timepoint generates a **meaning graph**: 10 typed entities with numerical emotional states, causal chains with scored alternatives across 3 counterfactual survival strategies, knowledge items with provenance ("Who discovered the water is contaminated? Who noticed the fauna predict storms?"), and timelines with 90+ quantitative state variables propagated across 5,100 steps. One is prose. The other is a computational artifact you can query, compare, analyze, and build on.
+Fidelity is a 2D surface over (entity, timepoint). Most entities at most timesteps sit at TENSOR resolution (~200 tokens). A few get elevated to DIALOG or TRAINED (~50k tokens) when queries land on them. This is query-driven lazy resolution — you never pay for detail nobody asked about. The result is ~95% token reduction vs. uniform fidelity, without losing causal structure, because the system maintains explicit exposure events and temporal chains that survive compression.
 
-The **Castaway Colony** template makes this concrete. Six crew members crash-land on Kepler-442b. Over 10 timepoints they must choose: fortify the crash site, explore the alien biosphere, or repair the emergency beacon. The template exercises all 19 mechanisms—including 7 that had zero verified templates before it existed.
+19 mechanisms (M1-M19) are independently composable: fidelity management, causal chains, knowledge provenance, entity simulation, model selection. When emotional arousal saturated at 1.0, the fix was in M11's decay function — without touching M17 (portal reasoning) or M3 (knowledge flow). In a monolithic prompt, everything is entangled.
 
-### What structure provides that prompting cannot
+### What structure gives you that scaling context windows does not
 
-**Search, not generation.** BRANCHING mode doesn't generate one survival strategy—it explores three. In Castaway Colony, the Day 7 branch point spawns parallel timelines (Fortify, Explore, Repair), each evaluated by a 405B judge LLM against resource constraints: O2 reserves, food rations in kg, hull integrity percentage. The winning strategy is *selected from a search space*, not *generated in a single pass*. No amount of context window or chain-of-thought turns autoregressive generation into tree search with evaluation.
+**Tree search, not autoregression.** BRANCHING mode spawns parallel timelines from a decision point, evaluates each against constraints, selects the best. This is search over a combinatorial space (10 entities x 4 channels x 10 timepoints = O(100k) interaction paths). No context window turns next-token prediction into tree search with evaluation.
 
-**Combinatorial complexity.** Castaway Colony has 10 entities, 4 influence channels each, across 10 timepoints—producing O(100,000) possible interaction paths. That's one template. Even modest scenarios generate state spaces that exceed any context window. This isn't a limitation that disappears with larger models—it's a mathematical property of the domain. Structure provides tractable navigation of intractable spaces through pruning, scoring, and selective expansion.
+**Reliable quantitative state.** `o2_reserve_hours = 336 → 288 → 240 → 192` across 1,200 coordinated calls. 90+ numerical values with explicit functions. Transformers don't do reliable arithmetic over long sequences — this is architectural, not a training gap.
 
-**Quantitative state propagation.** O2 reserves deplete at 6 crew x 0.84 kg/hour. Water purification degrades at 0.5 liters/day. Hull integrity drops 0.3% per day from alien atmosphere. Radiation storms spike to 12 mSv/hour. These aren't flavor text—they're 90+ numerical values propagated across 5,100 steps with explicit mathematical functions. An LLM can write "supplies were running low"—but it cannot track `o2_reserve_hours = 336 → 288 → 240 → 192` with precision across 1,200 coordinated calls. LLMs do not do reliable arithmetic over long sequences. This is a known architectural property of transformer attention, not a training gap that next year's model will close.
+**Knowledge as a typed graph.** Not "the doctor discovered contamination" but `{source: "okonkwo", target: "tanaka", content: "water_contaminated", timepoint: "tp_002"}` with propagation chain `okonkwo -> tanaka (alert) -> all_crew (rationing)`. Entities can't know things without tracked exposure events. Anachronisms are prevented structurally.
 
-**Knowledge flow with provenance.** The output isn't "the doctor discovered the water was contaminated." It's a typed graph edge: `{type: "empirical_observation", source: "dr_felix_okonkwo", target: "cmdr_yuki_tanaka", content: "water_source_contaminated_with_alien_microbes", timepoint: "tp_002"}` with a propagation chain: `okonkwo -> tanaka (critical alert) -> all_crew (rationing order)`. Structured data that downstream systems can query, aggregate, and reason over. A narrative paragraph is not computationally useful.
+**Convergence as quality signal.** Run the same template 3x with different seeds, extract causal graphs, compute pairwise Jaccard. Edges that appear in 9/10 runs are structural; edges in 3/10 are noise. This gives you a reliability signal for synthetic training data without human labels.
 
-**Convergence testing.** Run Castaway Colony three times and ask: "Does the biologist always discover contaminated water first?" "Is fauna-predicts-storms a consensus knowledge edge?" "Does Branch C consistently require navigator data?" These are testable hypotheses across runs. This requires deterministic structure around stochastic generation—comparable structural anchors to align against.
-
-**Composable mechanisms.** The 19 mechanisms (M1-M19) are independently testable, independently fixable, and independently improvable. In Castaway Colony, the alien ecosystem exercises M4/M6/M16 independently from crew dialog (M11) or branching (M12). When emotional arousal saturated at 1.0, the fix was in M11's decay function—without touching M17 (portal reasoning) or M3 (knowledge flow). In a monolithic prompt, everything is entangled.
-
-**Emergent emotional realism (persona2params).** The pipeline `entity_metadata → personality_traits → _derive_speaking_style() → _derive_dialog_params_from_persona() → dialog prompt` is a labeled workflow, not a hand-tuned model. It maps archetype traits to speaking patterns (verbosity, formality, tone) and then combines emotional state with those patterns to produce dialog behavior (turn length, interruption frequency, conversational focus). The result: LLMs handle the emotion-to-parameters mapping intuitively well. Tanaka's valence 0.50→0.86 over a survival arc, Sharma's arousal 0.24→0.70 as engineering crises compound—these trajectories emerge from the system without per-character tuning. The structure gives the LLM enough constraint to produce realistic emotional evolution while the LLM's own understanding of human psychology fills in the rest. High arousal plus negative valence yields short, clipped, interrupting turns. Low energy yields trailing-off disengagement. The persona2params pipeline is deliberately thin: it provides the right metadata at the right moment and trusts the LLM to interpret it.
-
-### The engine/chassis distinction
-
-Growing LLM power makes the structure *more* valuable, not less. The LLM is the engine—it generates the raw material (dialog, antecedents, emotional keywords). But the value to a human isn't in the raw text. It's in the meaning graph. That's what you can analyze, visualize, compare across runs, feed into training pipelines, or use as input to other systems.
-
-A more powerful engine doesn't eliminate the need for a chassis, transmission, and steering. It makes the vehicle faster—but the structure is what makes it *drivable*. And when that simulation renders training data, the structure is what makes it *learnable*—every example carries its causal history, knowledge provenance, and quantitative state, so downstream models learn to reason about causality and information flow, not just generate plausible text about them.
-
-The Castaway Colony template demonstrates this directly: DeepSeek R1 calculates O2 depletion rates, Llama 70B generates crew conflict dialog, Qwen produces structured flora analysis JSON, and 405B judges branch outcomes. Four models, each doing what it's best at, coordinated by 19 mechanisms that no prompt could replicate.
+**Emergent persona dynamics.** Tanaka's valence 0.50 → 0.86 over a survival arc. Sharma's arousal 0.24 → 0.70 as crises compound. The `persona2params` pipeline maps traits to speaking style to dialog parameters — high arousal + negative valence yields short, interrupting turns; low energy yields trailing-off disengagement. No per-character tuning. The structure provides the right metadata at the right moment and the LLM's understanding of human psychology does the rest.
 
 ---
 
@@ -372,4 +368,4 @@ Apache 2.0
 
 ---
 
-*Named for Daedalus, who mastered the labyrinth but warned: don't trust technology too much—or too little. Simulation is powerful, but not reality.*
+*The models generate. The structure reasons about time, causality, and consistency. Named for Daedalus — who mastered the labyrinth but warned his son about the limits of the tools.*
