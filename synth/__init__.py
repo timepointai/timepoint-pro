@@ -39,6 +39,12 @@ Example:
 
 from synth.envelope import EnvelopeConfig, DEFAULT_ENVELOPE
 from synth.voice import VoiceConfig, VoiceMixer, DEFAULT_VOICE
+from synth.fidelity_envelope import ADPRSEnvelope, ADPRSComposite, FidelityBand, phi_to_resolution_band
+from synth.shadow_evaluator import ShadowEvaluator, ShadowEvaluationReport
+from synth.trajectory_tracker import TrajectoryTracker, CognitiveSnapshot
+from synth.adprs_fitter import ADPRSFitter, FitResult, adprs_waveform
+from synth.harmonic_fitter import HarmonicFitter, HarmonicFitResult, harmonic_adprs_waveform
+from synth.waveform_scheduler import WaveformScheduler
 from synth.events import (
     SynthEvent,
     SynthEventData,
@@ -58,6 +64,27 @@ __all__ = [
     "VoiceConfig",
     "VoiceMixer",
     "DEFAULT_VOICE",
+    # Fidelity Envelopes (ADPRS)
+    "ADPRSEnvelope",
+    "ADPRSComposite",
+    "FidelityBand",
+    "phi_to_resolution_band",
+    # Shadow Evaluator
+    "ShadowEvaluator",
+    "ShadowEvaluationReport",
+    # Trajectory Tracker (Phase 2)
+    "TrajectoryTracker",
+    "CognitiveSnapshot",
+    # ADPRS Fitter (Phase 2)
+    "ADPRSFitter",
+    "FitResult",
+    "adprs_waveform",
+    # Harmonic Fitter (Phase 2.5)
+    "HarmonicFitter",
+    "HarmonicFitResult",
+    "harmonic_adprs_waveform",
+    # Waveform Scheduler (Phase 3)
+    "WaveformScheduler",
     # Events
     "SynthEvent",
     "SynthEventData",

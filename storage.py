@@ -100,7 +100,11 @@ class GraphStore:
     """Unified storage for entities, timelines, and graphs"""
 
     def __init__(self, db_url: str = "sqlite:///timepoint.db"):
-        self.engine = create_engine(db_url)
+        engine_kwargs = {}
+        if "sqlite" in db_url:
+            # Set busy timeout so writes wait for locks instead of failing immediately
+            engine_kwargs["connect_args"] = {"timeout": 30}
+        self.engine = create_engine(db_url, **engine_kwargs)
         SQLModel.metadata.create_all(self.engine)
         # Enable WAL mode for better concurrent write performance
         # (allows multiple readers + one writer simultaneously)
@@ -349,6 +353,13 @@ class GraphStore:
             session.commit()
             session.refresh(dialog)
             return dialog
+
+    def save_dialogs(self, dialogs: list[Dialog]) -> None:
+        """Batch save dialogs in a single transaction"""
+        with Session(self.engine) as session:
+            for dialog in dialogs:
+                session.add(dialog)
+            session.commit()
 
     def get_dialog(self, dialog_id: str) -> Optional[Dialog]:
         """Get a dialog by ID"""
