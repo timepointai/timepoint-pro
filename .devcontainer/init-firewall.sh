@@ -84,6 +84,7 @@ ALLOWED_DOMAINS=(
     "pypi.org"
     "files.pythonhosted.org"
     "upload.pypi.org"
+    "github.com"
 )
 
 # Add extra domains from environment variable (space-separated)
