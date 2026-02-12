@@ -16,7 +16,17 @@ $0.30, ~1,200 LLM calls, 4 models (DeepSeek R1, Llama 70B, Qwen 72B, 405B)
 
 The output is a structured computational artifact — typed graph edges with provenance, auditable causal chains, quantitative state you can propagate and query. Not a narrative summary. The difference matters when you want to fine-tune downstream models on causal reasoning, knowledge flow, or multi-entity state tracking, because each training example carries the full chain of events that produced it.
 
-### The key architectural bet
+
+### WRITTEN BY A HUMAN
+## the rest co-authored by AI 
+
+*Timepoint Daedalus works enables "synthetic time travel".*
+
+Since I was a kid, I have wanted a portal where I could travel to any place, at any time. As we progress towards and immersive VR future, with beyond-intelligence level models, that feels more and more plausible to experience sitting at home at my desk on any given afternoon. This repo allows extremely detailed simulation of synthetic social networks. It allows the user to manipulate the timeline in novel ways, including a work-backwards mode where you set a goal, like "make my President in 2040" and it creates the most logical path backwards through time to make that dream come true -- that function is named "PORTAL" as a reference to my own childhood dreams. Please give Timepoint-Daedalus a try if you are interested in how LLM's can perform powerful simulations with very little configuration. There are baked in templates, so all you need is an OpenRouter key to get started rendering scenarios, and you only need to ask a coding agent for help to render structured training data for each character to fine-tune models for individualized roleplaying. 
+
+_[x.com/seanmcdonaldxyz](x.com/seanmcdonalxyz)_
+
+### The key architectural bet: adaptive stepwise fideltiy 
 
 Fidelity is a 2D surface over (entity, timepoint). Most entities at most timesteps sit at TENSOR resolution (~200 tokens). A few get elevated to DIALOG or TRAINED (~50k tokens) when queries land on them. This is query-driven lazy resolution — you never pay for detail nobody asked about. The result is ~95% token reduction vs. uniform fidelity, without losing causal structure, because the system maintains explicit exposure events and temporal chains that survive compression.
 
@@ -352,6 +362,39 @@ All 10 models in the pipeline—Llama 3.1/4, Qwen 2.5, DeepSeek, Mistral—carry
 
 ---
 
+## Persona Chat: Talk to Our Testing Personas
+
+Four detailed testing personas represent real-world evaluation contexts. Each has a domain-specific template that exercises their stated use case, and a chat harness that lets you discuss any document from their perspective.
+
+| Persona | Domain | Template Mode | Template |
+|---------|--------|---------------|----------|
+| **AGENT1** — Victoria Langford-Chen | Corporate Finance | PORTAL | `persona/agent1_regulatory_stress` |
+| **AGENT2** — Dr. Raj Venkataraman | Aerospace Engineering | BRANCHING | `persona/agent2_mission_failure` |
+| **AGENT3** — Marcus Delgado-Washington | Legal Tech (Startup) | PEARL | `persona/agent3_litigation_discovery` |
+| **AGENT4** — Dr. Kate Nez-Bridger | Wildlife Ecology (RMEF) | CYCLICAL | `persona/agent4_elk_migration` |
+
+**Chat with a persona about any document:**
+
+```bash
+# Interactive conversation — Victoria reviews the README
+./run.sh chat --persona AGENT1 --context README.md
+
+# Batch question — Raj evaluates quantitative state propagation
+./run.sh chat --persona AGENT2 --batch "What concerns you about the quantitative state propagation?"
+
+# Run a persona's template, then chat about the results
+./run.sh run persona/agent3_litigation_discovery
+./run.sh chat --persona AGENT3 --context output/simulations/summary_*.json \
+  --batch "How well did this simulation capture information asymmetry?"
+
+# Kate reviews MECHANICS.md from an ecologist's perspective
+./run.sh chat --persona AGENT4 --context MECHANICS.md --max-tokens 500
+```
+
+The system prompt is simple: persona markdown + context file contents. No framework, no abstraction — just `OpenRouterClient` from `llm.py`. Full persona backgrounds are in [`docs/testing_personas/`](docs/testing_personas/).
+
+---
+
 ## Documentation
 
 - **[MECHANICS.md](MECHANICS.md)** -- Technical specification of all 19 mechanisms, with Castaway Colony examples
@@ -359,6 +402,7 @@ All 10 models in the pipeline—Llama 3.1/4, Qwen 2.5, DeepSeek, Mistral—carry
 - **[SYNTH.md](SYNTH.md)** -- SynthasAIzer control paradigm (ADSR envelopes, ADPRS waveforms, voices, patches)
 - **[MILESTONES.md](MILESTONES.md)** -- Roadmap from prototype to platform
 - **[claude-container.sh](claude-container.sh)** -- Docker sandbox for containerized development with iptables network isolation
+- **[docs/testing_personas/](docs/testing_personas/)** -- Four detailed testing personas (finance, aerospace, legal tech, wildlife ecology)
 
 ---
 

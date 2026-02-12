@@ -83,6 +83,16 @@
       "convergence/simple",
       "convergence/standard",
       "convergence/comprehensive"
+    ],
+    "legal": [
+      "showcase/sec_investigation",
+      "persona/agent3_litigation_discovery"
+    ],
+    "persona": [
+      "persona/agent1_regulatory_stress",
+      "persona/agent2_mission_failure",
+      "persona/agent3_litigation_discovery",
+      "persona/agent4_elk_migration"
     ]
   },
   "templates": {
@@ -206,6 +216,16 @@
       "duration_estimate": "20min",
       "status": "pending"
     },
+    "showcase/sec_investigation": {
+      "name": "SEC Insider Trading Investigation",
+      "description": "SEC enforcement investigation with information barriers, discovery sequencing, and MNPI knowledge provenance",
+      "mechanisms": ["M3", "M7", "M11", "M13", "M15"],
+      "tier": "standard",
+      "category": "showcase",
+      "cost_estimate": "$0.08",
+      "duration_estimate": "3min",
+      "status": "verified"
+    },
     "convergence/simple": {
       "name": "Convergence Simple",
       "description": "Ultra-lightweight for fast convergence testing",
@@ -234,6 +254,46 @@
       "category": "convergence",
       "cost_estimate": "$0.10",
       "duration_estimate": "90s",
+      "status": "verified"
+    },
+    "persona/agent1_regulatory_stress": {
+      "name": "Regulatory Stress Portal (AGENT1)",
+      "description": "PORTAL backward reasoning from adverse portfolio outcome to root cause for regulatory audit",
+      "mechanisms": ["M17", "M3", "M7", "M11", "M13"],
+      "tier": "standard",
+      "category": "persona",
+      "cost_estimate": "$0.08",
+      "duration_estimate": "3min",
+      "status": "verified"
+    },
+    "persona/agent2_mission_failure": {
+      "name": "Mission Failure Branching (AGENT2)",
+      "description": "Cascading hardware failure with crew response branching and quantitative state propagation",
+      "mechanisms": ["M12", "M3", "M4", "M7", "M8", "M11"],
+      "tier": "standard",
+      "category": "persona",
+      "cost_estimate": "$0.10",
+      "duration_estimate": "4min",
+      "status": "verified"
+    },
+    "persona/agent3_litigation_discovery": {
+      "name": "Litigation Discovery Pearl (AGENT3)",
+      "description": "PEARL mode litigation with enforced information asymmetry through discovery timeline",
+      "mechanisms": ["M3", "M7", "M11", "M13", "M19"],
+      "tier": "standard",
+      "category": "persona",
+      "cost_estimate": "$0.06",
+      "duration_estimate": "2min",
+      "status": "verified"
+    },
+    "persona/agent4_elk_migration": {
+      "name": "Elk Migration Cyclical (AGENT4)",
+      "description": "CYCLICAL seasonal elk migration under climate pressure with predator-prey and management dynamics",
+      "mechanisms": ["M7", "M8", "M11", "M13", "M14", "M16"],
+      "tier": "standard",
+      "category": "persona",
+      "cost_estimate": "$0.10",
+      "duration_estimate": "4min",
       "status": "verified"
     }
   }
