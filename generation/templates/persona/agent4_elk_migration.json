@@ -1,0 +1,150 @@
+{
+  "scenario_description": "Dr. Kate Nez-Bridger (AGENT4) elk migration scenario. CYCLICAL mode simulation of the Northern Yellowstone elk herd over two seasonal cycles (2 years). Four entities interact across the landscape: the herd matriarch (embodying herd decision-making and migration memory), a wolf pack (predation pressure that shifts seasonally), a district ranger (management decisions and human-elk conflict), and a university biologist (monitoring and adaptive management recommendations). The simulation tracks two full annual cycles: spring migration, summer range, fall rut and hunting season, winter range and mortality. Climate pressure manifests as reduced snowpack affecting spring green-up timing, which cascades through forage availability, calf survival, migration timing, and human-elk conflict at ranch boundaries. Quantitative state includes herd count by age/sex class, vegetation biomass, snow depth, and predation rate.",
+  "world_id": "agent4_elk_migration",
+  "patch": {
+    "name": "Elk Migration Cyclical",
+    "category": "persona",
+    "tags": ["ecology", "cyclical", "migration", "wildlife", "climate", "persona-agent4"],
+    "author": "timepoint-daedalus",
+    "version": "1.0",
+    "description": "CYCLICAL seasonal elk migration under climate pressure with predator-prey and management dynamics"
+  },
+  "entities": {
+    "count": 4,
+    "types": ["human", "animal", "abstract"],
+    "initial_resolution": "trained",
+    "animism_level": 3,
+    "envelope": {
+      "attack": 0.2,
+      "decay": 0.2,
+      "sustain": 0.7,
+      "release": 0.3
+    }
+  },
+  "timepoints": {
+    "count": 6,
+    "start_time": null,
+    "resolution": "month",
+    "before_count": 0,
+    "after_count": 0
+  },
+  "temporal": {
+    "mode": "cyclical",
+    "narrative_arc": null,
+    "dramatic_tension": 0.5,
+    "cycle_length": 3,
+    "prophecy_accuracy": 0.7,
+    "enable_counterfactuals": false,
+    "portal_description": null,
+    "portal_year": null,
+    "origin_year": null,
+    "backward_steps": 15,
+    "exploration_mode": "adaptive",
+    "oscillation_complexity_threshold": 10,
+    "candidate_antecedents_per_step": 7,
+    "path_count": 5,
+    "coherence_threshold": 0.7,
+    "checkpoint_interval": 3,
+    "llm_scoring_weight": 0.3,
+    "historical_precedent_weight": 0.2,
+    "causal_necessity_weight": 0.3,
+    "entity_capability_weight": 0.2,
+    "max_backtrack_depth": 3,
+    "portal_relaxation_enabled": true,
+    "use_simulation_judging": false,
+    "simulation_forward_steps": 2,
+    "simulation_max_entities": 4,
+    "simulation_include_dialog": true,
+    "judge_model": "meta-llama/llama-3.1-405b-instruct",
+    "judge_temperature": 0.3,
+    "simulation_cache_results": true,
+    "fidelity_planning_mode": "hybrid",
+    "token_budget_mode": "soft",
+    "token_budget": 15000.0,
+    "fidelity_template": "balanced",
+    "custom_fidelity_schedule": null,
+    "custom_temporal_steps": null
+  },
+  "outputs": {
+    "formats": ["jsonl", "json"],
+    "include_dialogs": true,
+    "include_relationships": true,
+    "include_knowledge_flow": true,
+    "export_ml_dataset": true,
+    "generate_narrative_exports": true,
+    "narrative_export_formats": ["markdown", "json", "pdf"],
+    "narrative_detail_level": "summary",
+    "enhance_narrative_with_llm": true
+  },
+  "variations": {
+    "enabled": false,
+    "count": 1,
+    "strategies": ["vary_starting_conditions"],
+    "deduplication_threshold": 0.9
+  },
+  "metadata": {
+    "mechanisms_featured": [
+      "M7_causal_chains",
+      "M8_embodied_states",
+      "M11_dialog_synthesis",
+      "M13_relationship_tracking",
+      "M14_circadian_patterns",
+      "M16_animistic_entities"
+    ],
+    "persona_reference": "AGENT4 - Dr. Katherine Nez-Bridger, Director of Conservation Science, RMEF",
+    "entity_roster": {
+      "herd_matriarch": {
+        "type": "animal",
+        "role": "Lead cow embodying herd migration memory and group decision-making. Routes learned from her mother.",
+        "initial_knowledge": ["traditional_migration_route", "winter_range_boundaries", "calving_ground_locations"],
+        "key_state_variables": ["body_condition_score", "herd_count_cows", "herd_count_calves", "herd_count_bulls", "migration_timing_days"]
+      },
+      "wolf_pack_lamar": {
+        "type": "animal",
+        "role": "Lamar Valley wolf pack. Predation pressure shifts seasonally with prey vulnerability.",
+        "initial_knowledge": ["territory_boundaries", "prey_vulnerability_patterns", "denning_site_locations"],
+        "key_state_variables": ["pack_size", "kill_rate_per_week", "territory_overlap_with_herd_pct"]
+      },
+      "ranger_thompson": {
+        "type": "human",
+        "role": "District ranger managing hunting permits, rancher conflict, and habitat monitoring.",
+        "initial_knowledge": ["hunting_district_regulations", "rancher_complaint_history", "habitat_condition_reports"],
+        "key_state_variables": ["elk_damage_complaints", "permits_issued", "conflict_incidents_per_month"]
+      },
+      "dr_wilson_biologist": {
+        "type": "human",
+        "role": "University of Montana wildlife biologist with GPS collar data and population models.",
+        "initial_knowledge": ["gps_collar_movement_data", "population_survey_results", "climate_projection_rcp45"],
+        "key_state_variables": ["estimated_population", "calf_cow_ratio", "winter_mortality_rate"]
+      }
+    },
+    "cyclical_structure": {
+      "description": "6 timepoints representing two seasonal cycles. Each cycle covers: spring migration + calving, summer range + growth, fall rut + hunting season.",
+      "timepoints": [
+        {"tp": 1, "season": "Spring Year 1", "events": "Migration north, calving, green-up assessment"},
+        {"tp": 2, "season": "Summer Year 1", "events": "Summer range, calf survival, wolf predation peak"},
+        {"tp": 3, "season": "Fall/Winter Year 1", "events": "Rut, hunting season, fall migration south, winter mortality"},
+        {"tp": 4, "season": "Spring Year 2", "events": "Migration north under drought conditions, reduced green-up"},
+        {"tp": 5, "season": "Summer Year 2", "events": "Compressed summer range, increased human-elk conflict"},
+        {"tp": 6, "season": "Fall/Winter Year 2", "events": "Reduced calf recruitment, policy response, management adaptation"}
+      ]
+    },
+    "quantitative_tracking": {
+      "herd_population": {"unit": "count", "initial_cows": 320, "initial_calves": 95, "initial_bulls": 140},
+      "vegetation_biomass": {"unit": "kg_per_hectare", "spring_peak": 2400, "winter_low": 800},
+      "snow_depth": {"unit": "cm", "normal_april": 45, "drought_april": 15},
+      "predation_rate": {"unit": "kills_per_week", "winter": 2.1, "summer": 0.8},
+      "calf_survival_rate": {"unit": "proportion", "normal": 0.72, "drought": 0.48}
+    },
+    "climate_scenario": {
+      "description": "Year 2 introduces drought conditions: reduced snowpack, early but weak green-up, compressed summer range, increased fire risk",
+      "temperature_anomaly_c": 1.5,
+      "precipitation_deficit_pct": 25
+    }
+  },
+  "economic_scenario": null,
+  "founder_profiles": null,
+  "max_cost_usd": null,
+  "enable_checkpoints": true,
+  "checkpoint_interval": 5
+}

@@ -1,0 +1,147 @@
+{
+  "scenario_description": "SEC enforcement investigation into insider trading at a mid-cap pharmaceutical company. A junior analyst tipped the SEC that executives traded ahead of a failed FDA trial. Four entities navigate the investigation with structurally enforced information barriers: the SEC enforcement attorney builds a case through formal channels only (subpoenas, depositions, trading records); the company general counsel faces conflicting duties to the board and implicated executives; the whistleblower holds direct knowledge but fears retaliation; and outside defense counsel represents the implicated VP with privileged communications the SEC cannot access. Knowledge provenance tracks exactly who knew about material non-public information (the Phase III trial failure) and when, which is the legal definition of insider trading liability.",
+  "world_id": "sec_investigation",
+  "patch": {
+    "name": "SEC Insider Trading Investigation",
+    "category": "legal",
+    "tags": ["legal", "investigation", "knowledge-provenance", "information-asymmetry", "securities", "regulatory"],
+    "author": "timepoint-daedalus",
+    "version": "1.0",
+    "description": "SEC enforcement investigation with information barriers, discovery sequencing, and knowledge provenance tracking material non-public information flow"
+  },
+  "entities": {
+    "count": 4,
+    "types": ["human"],
+    "initial_resolution": "dialog",
+    "animism_level": 0,
+    "envelope": {
+      "attack": 0.15,
+      "decay": 0.1,
+      "sustain": 0.85,
+      "release": 0.2
+    }
+  },
+  "timepoints": {
+    "count": 5,
+    "start_time": null,
+    "resolution": "week",
+    "before_count": 0,
+    "after_count": 0
+  },
+  "temporal": {
+    "mode": "pearl",
+    "narrative_arc": null,
+    "dramatic_tension": 0.7,
+    "cycle_length": null,
+    "prophecy_accuracy": 0.5,
+    "enable_counterfactuals": false,
+    "portal_description": null,
+    "portal_year": null,
+    "origin_year": null,
+    "backward_steps": 15,
+    "exploration_mode": "adaptive",
+    "oscillation_complexity_threshold": 10,
+    "candidate_antecedents_per_step": 7,
+    "path_count": 5,
+    "coherence_threshold": 0.7,
+    "checkpoint_interval": 3,
+    "llm_scoring_weight": 0.3,
+    "historical_precedent_weight": 0.2,
+    "causal_necessity_weight": 0.3,
+    "entity_capability_weight": 0.2,
+    "max_backtrack_depth": 3,
+    "portal_relaxation_enabled": true,
+    "use_simulation_judging": false,
+    "simulation_forward_steps": 2,
+    "simulation_max_entities": 4,
+    "simulation_include_dialog": true,
+    "judge_model": "meta-llama/llama-3.1-405b-instruct",
+    "judge_temperature": 0.3,
+    "simulation_cache_results": true,
+    "fidelity_planning_mode": "hybrid",
+    "token_budget_mode": "soft",
+    "token_budget": 15000.0,
+    "fidelity_template": "balanced",
+    "custom_fidelity_schedule": null,
+    "custom_temporal_steps": null
+  },
+  "outputs": {
+    "formats": ["jsonl", "json"],
+    "include_dialogs": true,
+    "include_relationships": true,
+    "include_knowledge_flow": true,
+    "export_ml_dataset": true,
+    "generate_narrative_exports": true,
+    "narrative_export_formats": ["markdown", "json", "pdf"],
+    "narrative_detail_level": "summary",
+    "enhance_narrative_with_llm": true
+  },
+  "variations": {
+    "enabled": false,
+    "count": 1,
+    "strategies": ["vary_knowledge"],
+    "deduplication_threshold": 0.9
+  },
+  "metadata": {
+    "mechanisms_featured": [
+      "M3_exposure_events",
+      "M7_causal_chains",
+      "M11_dialog_synthesis",
+      "M13_relationship_tracking",
+      "M15_entity_prospection"
+    ],
+    "entity_roster": {
+      "sec_attorney_walsh": {
+        "type": "human",
+        "role": "SEC Division of Enforcement senior attorney. Builds case through formal channels: subpoenas, document requests, depositions. Cannot access privileged defense communications.",
+        "initial_knowledge": ["anonymous_tip_content", "public_trading_records", "fda_calendar_public", "sec_enforcement_manual"]
+      },
+      "general_counsel_park": {
+        "type": "human",
+        "role": "Company general counsel. Duty to cooperate with SEC investigation while protecting the company. Learned about the trading pattern from internal audit before the SEC inquiry. Conflicting loyalties.",
+        "initial_knowledge": ["internal_audit_trading_flag", "executive_compensation_records", "board_communication_history", "company_insider_trading_policy"]
+      },
+      "whistleblower_chen": {
+        "type": "human",
+        "role": "Junior clinical data analyst. Overheard VP discussing the Phase III failure before public announcement, then observed VP's broker call. Filed anonymous SEC tip. Identity protected by Dodd-Frank but fears retaliation.",
+        "initial_knowledge": ["overheard_conversation_details", "observed_broker_call", "phase_iii_failure_timeline", "own_employment_vulnerability"]
+      },
+      "defense_counsel_morrison": {
+        "type": "human",
+        "role": "Outside white-collar defense attorney representing the implicated VP. Has attorney-client privileged knowledge of VP's actual trading rationale. Must decide cooperation vs. contest strategy.",
+        "initial_knowledge": ["client_privileged_interview", "vp_trading_history", "pre_existing_10b5_plan_details", "prior_sec_settlement_precedents"]
+      }
+    },
+    "knowledge_provenance_emphasis": {
+      "description": "This template is designed to exercise M3 knowledge provenance in a securities law context. The central legal question — who possessed material non-public information (MNPI) and when — maps directly to exposure event tracking.",
+      "information_barriers": [
+        "SEC attorney cannot access attorney-client privileged communications between VP and defense counsel",
+        "General counsel knows about internal audit flag but has not disclosed it to SEC yet",
+        "Whistleblower identity is sealed — SEC knows content of tip but other entities do not know the source",
+        "Defense counsel has privileged knowledge of VP's actual intent that no other entity can access",
+        "Judge (if case escalates) only sees formally filed pleadings and admitted evidence"
+      ],
+      "investigation_timeline": [
+        {"timepoint": 1, "event": "SEC receives anonymous tip via Dodd-Frank portal. Opens preliminary inquiry. Pulls public trading records. Company unaware of investigation."},
+        {"timepoint": 2, "event": "SEC issues formal subpoena to company for trading records and communications. General counsel learns of investigation, must decide what to disclose from internal audit. Defense counsel retained."},
+        {"timepoint": 3, "event": "Document production reveals suspicious email chain. SEC requests whistleblower deposition (identity still sealed). Defense counsel files motion to quash on privilege grounds."},
+        {"timepoint": 4, "event": "Depositions conducted. General counsel's conflicting loyalty tested — board demands cooperation, VP demands protection. Key evidence surfaces from IT forensics."},
+        {"timepoint": 5, "event": "SEC presents settlement offer vs. enforcement action. Defense counsel must advise: settle (admit liability, pay fine) or contest (risk trial). Whistleblower's Dodd-Frank bounty depends on outcome."}
+      ]
+    },
+    "legal_framework": {
+      "statutes": ["Securities Exchange Act §10(b)", "SEC Rule 10b-5", "Dodd-Frank §21F whistleblower provisions"],
+      "key_legal_concepts": [
+        "Material Non-Public Information (MNPI): Information not yet public that a reasonable investor would consider important",
+        "Tipper-tippee liability: Both the source and recipient of MNPI can be liable",
+        "Attorney-client privilege: Communications between VP and defense counsel are protected",
+        "Upjohn warning: General counsel must clarify they represent the company, not individual executives"
+      ]
+    }
+  },
+  "economic_scenario": null,
+  "founder_profiles": null,
+  "max_cost_usd": null,
+  "enable_checkpoints": true,
+  "checkpoint_interval": 5
+}

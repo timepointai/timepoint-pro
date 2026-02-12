@@ -74,6 +74,7 @@ USAGE:
 
 COMMANDS:
     run         Execute simulations
+    chat        Chat with a testing persona (AGENT1-4)
     list        List templates, runs, or stats
     status      Show run status and results
     export      Export run data
@@ -858,6 +859,15 @@ EXAMPLES:
     # Model override
     ./run.sh run --model deepseek/deepseek-chat board_meeting
 EOF
+}
+
+# ============================================================================
+# COMMAND: CHAT (Persona Chat)
+# ============================================================================
+
+cmd_chat() {
+    check_env
+    $PYTHON persona_chat.py "$@"
 }
 
 # ============================================================================
@@ -2001,6 +2011,9 @@ main() {
             ;;
         run)
             cmd_run "$@"
+            ;;
+        chat)
+            cmd_chat "$@"
             ;;
         list)
             cmd_list "$@"
