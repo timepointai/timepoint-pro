@@ -19,7 +19,18 @@
       "decay": 0.15,
       "sustain": 0.8,
       "release": 0.2
-    }
+    },
+    "adprs_envelopes": [
+      {
+        "A": 0.75,
+        "D": 157788000000.0,
+        "P": 2.5,
+        "R": 0.0,
+        "S": 0.85,
+        "t0": "2026-01-01T00:00:00+00:00",
+        "baseline": 0.12
+      }
+    ]
   },
   "timepoints": {
     "count": 10,
@@ -54,7 +65,7 @@
     "use_simulation_judging": true,
     "simulation_forward_steps": 1,
     "simulation_max_entities": 4,
-    "simulation_include_dialog": false,
+    "simulation_include_dialog": true,
     "judge_model": "meta-llama/llama-3.1-405b-instruct",
     "judge_temperature": 0.3,
     "simulation_cache_results": true,

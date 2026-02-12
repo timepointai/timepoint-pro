@@ -167,7 +167,7 @@ All 5 portal scoring methods now use real LLM-based evaluation instead of hardco
 - `workflows/portal_strategy.py`: **Entity context enrichment** — Enriched entity_summary in antecedent generation prompt with roles, descriptions, knowledge items, and personality traits. Previously only listed entity IDs. Added rule #6 requiring antecedent narratives to feature the specific named entities, preventing drift to generic corporate/startup framing.
 
 ### Mars Mission Portal Template
-- `generation/templates/showcase/mars_mission_portal.json`: Portal mode template. Backward reasoning from failed Mars mission (2031) to origins (2026). 4 entities, 10 backward steps, simulation-judged with 405B judge model. First verified portal template.
+- `generation/templates/showcase/mars_mission_portal.json`: Portal mode template. Backward reasoning from failed Mars mission (2031) to origins (2026). 4 entities, 10 backward steps, simulation-judged with 405B judge model. First verified portal template. ADPRS envelopes configured in template JSON (`adprs_envelopes` array), `simulation_include_dialog: true`.
 - `generation/templates/catalog.json`: Added `showcase/mars_mission_portal` entry, `portal` and `space` patch categories.
 - `run.sh`: Added `mars_mission_portal` to SHOWCASE_TEMPLATES array and dispatch case.
 

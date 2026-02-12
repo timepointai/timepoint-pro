@@ -298,7 +298,7 @@ Heterogeneous fidelity (M1) + tensor compression (M6) + intelligent model select
 
 Real-world costs: $0.15–$0.30 for branching templates (60 training examples), $0.50–$2.00 for full showcase templates (hundreds of examples). The VC Pitch Branching template generates 60 training examples across 16 timepoints with 4 entities, 16 dialogs, and 165 dialog exchanges for $0.30.
 
-All 12 models in the pipeline—Llama 3.1/4, Qwen 2.5, DeepSeek, Mistral—carry MIT, Apache 2.0, or Llama/Qwen community licenses. **Commercial synthetic data generation is explicitly permitted.** The pipeline deliberately excludes models with restrictive output ownership clauses.
+All 10 models in the pipeline—Llama 3.1/4, Qwen 2.5, DeepSeek, Mistral—carry MIT, Apache 2.0, or Llama/Qwen community licenses. **Commercial synthetic data generation is explicitly permitted.** The pipeline deliberately excludes models with restrictive output ownership clauses.
 
 ---
 

@@ -866,6 +866,9 @@ The ADPRS system is fully wired into the E2E production pipeline (`e2e_workflows
 - After fitting, entities are re-persisted to the shared DB so the next run picks up the improved envelopes
 - The waveform scheduler is initialized early (before timepoint generation) from prior envelopes, so gating decisions apply from the first timepoint
 
+**Template-configured envelopes:**
+- `mars_mission_portal` is the first template with ADPRS envelopes in its JSON config (`adprs_envelopes` array with A=0.75, D=157788000000.0, P=2.5, S=0.85, baseline=0.12). This enables waveform gating from the first run without requiring prior fitted data.
+
 **Backward compatibility:**
 - All waveform code paths are guarded by `if self._waveform_scheduler is not None` / `if waveform_schedule` checks
 - When no ADPRS envelopes exist (first run, or envelopes not configured), all code paths are no-ops

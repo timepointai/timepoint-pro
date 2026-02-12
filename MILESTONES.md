@@ -28,7 +28,7 @@ Each mode has its own validation rules, fidelity allocation strategy, and genera
 - **19 simulation mechanisms** (M1-M19) — See [MECHANICS.md](MECHANICS.md)
 - **M18: Intelligent Model Selection** — Capability-based per-action model selection
 - **M19: Knowledge Extraction** — LLM-based semantic knowledge extraction from entities
-- **12 Open-Source Models** — All via OpenRouter, all permit commercial synthetic data
+- **10 Open-Source Models** — All via OpenRouter, all permit commercial synthetic data
 - **Natural Language Interface** — `nl_interface/` integrated via `NLToProductionAdapter`
 - **Parallel execution** — `--parallel N` for N concurrent workers with thread-safe rate limiting
 - **Free model support** — `--free`, `--free-fast`, `--list-free-models` for $0 cost testing
@@ -78,7 +78,7 @@ Current Architecture:
 │   └── providers/ — OpenRouter integration
 ├── nl_interface/ — Natural language input
 │   └── adapter.py — NLToProductionAdapter
-├── generation/templates/ — 14 verified JSON simulation templates with patch metadata
+├── generation/templates/ — 15 verified JSON simulation templates with patch metadata
 ├── synth/ — SynthasAIzer control layer (ADPRS waveforms, envelopes, voices, events)
 ├── validation.py (1,365 lines) — 5 physics validators
 ├── storage.py — SQLite persistence + transaction support
@@ -502,7 +502,7 @@ Broad accessibility and ecosystem.
 - **Dialog entity anchoring** (explicit character roster prevents LLM hallucinating unrelated speakers)
 - **Dialog temporal freshness** (prompt instructions prevent recycling same beats across timepoints)
 - **Portal prompt-schema alignment** (explicit format examples for key_events, entity context enrichment)
-- **Mars Mission Portal template** (first verified portal template — backward reasoning from 2031 to 2026)
+- **Mars Mission Portal template** (first verified portal template — backward reasoning from 2031 to 2026, ADPRS envelopes in template config, dialog enabled)
 - **Castaway Colony template** (first full-mechanism showcase — all 19 mechanisms including 7 previously unverified: M1, M2, M4, M5, M6, M9, M18)
 - **ADPRS production pipeline** (per-entity waveform gating in dialog synthesis, shadow evaluation persistence to metadata, cross-run warm-start fitting from shared DB)
 
