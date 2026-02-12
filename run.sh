@@ -2060,7 +2060,11 @@ main() {
         board_meeting|jefferson_dinner|hospital_crisis|detective_prospection|kami_shrine)
             cmd_run "$cmd" "$@"
             ;;
-        vc_pitch_pearl|vc_pitch_branching|vc_pitch_roadshow|vc_pitch_strategies|hound_shadow_directorial|mars_mission_portal|castaway_colony_branching)
+        vc_pitch_pearl|vc_pitch_branching|vc_pitch_roadshow|vc_pitch_strategies|hound_shadow_directorial|mars_mission_portal|castaway_colony_branching|sec_investigation)
+            cmd_run "$cmd" "$@"
+            ;;
+        # Persona templates
+        agent1_regulatory_stress|agent2_mission_failure|agent3_litigation_discovery|agent3_litigation_portal|agent4_elk_migration)
             cmd_run "$cmd" "$@"
             ;;
         # Portal templates

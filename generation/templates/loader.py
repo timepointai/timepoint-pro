@@ -44,6 +44,7 @@ class TemplateCategory(str, Enum):
     """Template categories."""
     SHOWCASE = "showcase"
     CONVERGENCE = "convergence"
+    PERSONA = "persona"
 
 
 class TemplateStatus(str, Enum):

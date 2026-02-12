@@ -70,7 +70,8 @@
       "showcase/hound_shadow_directorial"
     ],
     "portal": [
-      "showcase/mars_mission_portal"
+      "showcase/mars_mission_portal",
+      "persona/agent3_litigation_portal"
     ],
     "space": [
       "showcase/mars_mission_portal",
@@ -86,12 +87,14 @@
     ],
     "legal": [
       "showcase/sec_investigation",
-      "persona/agent3_litigation_discovery"
+      "persona/agent3_litigation_discovery",
+      "persona/agent3_litigation_portal"
     ],
     "persona": [
       "persona/agent1_regulatory_stress",
       "persona/agent2_mission_failure",
       "persona/agent3_litigation_discovery",
+      "persona/agent3_litigation_portal",
       "persona/agent4_elk_migration"
     ]
   },
@@ -284,6 +287,16 @@
       "category": "persona",
       "cost_estimate": "$0.06",
       "duration_estimate": "2min",
+      "status": "verified"
+    },
+    "persona/agent3_litigation_portal": {
+      "name": "Litigation Discovery Portal (AGENT3)",
+      "description": "PORTAL backward reasoning from $47M trade secret verdict to the chain of decisions that made it inevitable",
+      "mechanisms": ["M17", "M3", "M7", "M11", "M13", "M15"],
+      "tier": "comprehensive",
+      "category": "persona",
+      "cost_estimate": "$0.40",
+      "duration_estimate": "15min",
       "status": "verified"
     },
     "persona/agent4_elk_migration": {

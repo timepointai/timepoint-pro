@@ -24,9 +24,9 @@ The output is a structured computational artifact — typed graph edges with pro
 
 Since I was a kid, I have wanted a portal where I could travel to any place, at any time. As we progress towards and immersive VR future, with beyond-intelligence level models, that feels more and more plausible to experience sitting at home at my desk on any given afternoon. This repo allows extremely detailed simulation of synthetic social networks. It allows the user to manipulate the timeline in novel ways, including a work-backwards mode where you set a goal, like "make my President in 2040" and it creates the most logical path backwards through time to make that dream come true -- that function is named "PORTAL" as a reference to my own childhood dreams. Please give Timepoint-Daedalus a try if you are interested in how LLM's can perform powerful simulations with very little configuration. There are baked in templates, so all you need is an OpenRouter key to get started rendering scenarios, and you only need to ask a coding agent for help to render structured training data for each character to fine-tune models for individualized roleplaying. 
 
-_[x.com/seanmcdonaldxyz](x.com/seanmcdonalxyz)_
+_[x.com/seanmcdonaldxyz](https://x.com/seanmcdonaldxyz)_
 
-### The key architectural bet: adaptive stepwise fideltiy 
+### The key architectural bet: adaptive stepwise fidelity
 
 Fidelity is a 2D surface over (entity, timepoint). Most entities at most timesteps sit at TENSOR resolution (~200 tokens). A few get elevated to DIALOG or TRAINED (~50k tokens) when queries land on them. This is query-driven lazy resolution — you never pay for detail nobody asked about. The result is ~95% token reduction vs. uniform fidelity, without losing causal structure, because the system maintains explicit exposure events and temporal chains that survive compression.
 
