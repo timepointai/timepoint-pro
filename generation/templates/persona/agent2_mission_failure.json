@@ -1,0 +1,152 @@
+{
+  "scenario_description": "Dr. Raj Venkataraman (AGENT2) mission failure analysis scenario. BRANCHING mode simulation of a cascading hardware failure during a crewed lunar gateway mission. At T+72 hours, the primary coolant loop pump fails, triggering thermal cascade across three subsystems. The crew must choose between three response strategies: manual repair (high risk, preserves mission), automated backup activation (moderate risk, degrades capability), or mission abort (low risk, mission loss). Each branch propagates forward with quantitative state tracking for O2 reserves, power budget, thermal balance, and crew fatigue. Knowledge provenance tracks when each crew member becomes aware of anomalous telemetry and how information delays affect decision quality.",
+  "world_id": "agent2_mission_failure",
+  "patch": {
+    "name": "Mission Failure Branching",
+    "category": "persona",
+    "tags": ["aerospace", "branching", "hardware-failure", "crew-decision", "quantitative-state", "persona-agent2"],
+    "author": "timepoint-daedalus",
+    "version": "1.0",
+    "description": "Cascading hardware failure with crew response branching and quantitative state propagation"
+  },
+  "entities": {
+    "count": 4,
+    "types": ["human"],
+    "initial_resolution": "trained",
+    "animism_level": 0,
+    "envelope": {
+      "attack": 0.3,
+      "decay": 0.15,
+      "sustain": 0.8,
+      "release": 0.2
+    }
+  },
+  "timepoints": {
+    "count": 5,
+    "start_time": null,
+    "resolution": "hour",
+    "before_count": 2,
+    "after_count": 3
+  },
+  "temporal": {
+    "mode": "branching",
+    "narrative_arc": null,
+    "dramatic_tension": 0.8,
+    "cycle_length": null,
+    "prophecy_accuracy": 0.5,
+    "enable_counterfactuals": true,
+    "portal_description": null,
+    "portal_year": null,
+    "origin_year": null,
+    "backward_steps": 15,
+    "exploration_mode": "adaptive",
+    "oscillation_complexity_threshold": 10,
+    "candidate_antecedents_per_step": 7,
+    "path_count": 5,
+    "coherence_threshold": 0.7,
+    "checkpoint_interval": 3,
+    "llm_scoring_weight": 0.3,
+    "historical_precedent_weight": 0.2,
+    "causal_necessity_weight": 0.3,
+    "entity_capability_weight": 0.2,
+    "max_backtrack_depth": 3,
+    "portal_relaxation_enabled": true,
+    "use_simulation_judging": true,
+    "simulation_forward_steps": 2,
+    "simulation_max_entities": 4,
+    "simulation_include_dialog": true,
+    "judge_model": "meta-llama/llama-3.1-405b-instruct",
+    "judge_temperature": 0.3,
+    "simulation_cache_results": true,
+    "fidelity_planning_mode": "hybrid",
+    "token_budget_mode": "soft",
+    "token_budget": 20000.0,
+    "fidelity_template": "dramatic",
+    "custom_fidelity_schedule": null,
+    "custom_temporal_steps": null
+  },
+  "outputs": {
+    "formats": ["jsonl", "json"],
+    "include_dialogs": true,
+    "include_relationships": true,
+    "include_knowledge_flow": true,
+    "export_ml_dataset": true,
+    "generate_narrative_exports": true,
+    "narrative_export_formats": ["markdown", "json", "pdf"],
+    "narrative_detail_level": "summary",
+    "enhance_narrative_with_llm": true
+  },
+  "variations": {
+    "enabled": false,
+    "count": 1,
+    "strategies": ["vary_starting_conditions"],
+    "deduplication_threshold": 0.9
+  },
+  "metadata": {
+    "mechanisms_featured": [
+      "M12_counterfactual_branching",
+      "M3_exposure_events",
+      "M4_physics_validation",
+      "M7_causal_chains",
+      "M8_embodied_states",
+      "M11_dialog_synthesis"
+    ],
+    "persona_reference": "AGENT2 - Dr. Rajesh Venkataraman, Principal Systems Engineer, Mission Assurance",
+    "entity_roster": {
+      "cmdr_okafor": {
+        "type": "human",
+        "role": "Mission Commander, must choose response strategy under time pressure",
+        "initial_knowledge": ["mission_timeline", "crew_status", "abort_procedures"]
+      },
+      "eng_martinez": {
+        "type": "human",
+        "role": "Flight Engineer, sole expertise on coolant loop repair feasibility",
+        "initial_knowledge": ["coolant_system_schematics", "spare_parts_inventory", "repair_time_estimates"]
+      },
+      "dr_song_surgeon": {
+        "type": "human",
+        "role": "Flight Surgeon, monitors crew physiological state and fatigue",
+        "initial_knowledge": ["crew_medical_baselines", "fatigue_thresholds", "stress_indicators"]
+      },
+      "ground_control_chen": {
+        "type": "human",
+        "role": "Ground Control lead, 4-second comm delay, institutional risk aversion",
+        "initial_knowledge": ["telemetry_history", "abort_criteria", "mission_rules"]
+      }
+    },
+    "branching_points": [
+      {
+        "timepoint": "tp_003",
+        "trigger": "Commander must choose response strategy after coolant pump failure confirmed",
+        "branches": {
+          "branch_a_manual_repair": {
+            "label": "Manual Repair",
+            "description": "Engineer attempts EVA repair of coolant pump. High risk: EVA in thermal stress environment. Preserves full mission capability if successful.",
+            "risk_profile": "high_risk_high_reward"
+          },
+          "branch_b_backup_activation": {
+            "label": "Automated Backup",
+            "description": "Activate redundant coolant loop. Moderate risk: backup loop has 60% rated capacity. Degrades mission capability but maintains crew safety margin.",
+            "risk_profile": "moderate_risk_moderate_reward"
+          },
+          "branch_c_abort": {
+            "label": "Mission Abort",
+            "description": "Initiate return trajectory. Low crew risk but total mission loss. Ground control preference.",
+            "risk_profile": "low_risk_mission_loss"
+          }
+        }
+      }
+    ],
+    "quantitative_tracking": {
+      "o2_reserves": {"unit": "hours", "initial": 480, "critical_threshold": 72},
+      "power_budget": {"unit": "kilowatts", "initial": 12.5, "minimum_safe": 4.0},
+      "thermal_balance": {"unit": "celsius_delta", "initial": 0, "critical_threshold": 15},
+      "crew_fatigue": {"unit": "hours_awake", "initial": 8, "impairment_threshold": 24}
+    }
+  },
+  "economic_scenario": null,
+  "founder_profiles": null,
+  "max_cost_usd": null,
+  "enable_checkpoints": true,
+  "checkpoint_interval": 5
+}

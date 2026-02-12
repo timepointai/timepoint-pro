@@ -185,6 +185,9 @@ Each mode changes what "time" means and how the simulation validates consistency
 # Directorial template (narrative structure)
 ./run.sh run hound_shadow_directorial  # Detective on foggy moors, directorial causality
 
+# Legal template (knowledge provenance + information barriers)
+./run.sh run sec_investigation         # SEC insider trading with enforced discovery sequencing
+
 # Branching templates (counterfactual timelines)
 ./run.sh run vc_pitch_branching        # VC pitch with counterfactual branching
 ./run.sh run vc_pitch_strategies       # Multiple negotiation strategy variants
@@ -302,6 +305,45 @@ curl -X POST http://localhost:8000/search/compose \
 ```
 
 See `api/` directory for full endpoint documentation.
+
+---
+
+## Persona Chat
+
+Chat with four detailed testing personas, each representing a real-world domain evaluator. Load any document as context and get feedback from their perspective.
+
+```bash
+# Interactive chat with a persona about your docs
+./run.sh chat --persona AGENT1 --context README.md
+
+# Batch question (ask and exit)
+./run.sh chat --persona AGENT2 --batch "What concerns you about the quantitative state propagation?"
+
+# Multiple context files
+./run.sh chat --persona AGENT3 --context README.md MECHANICS.md --max-tokens 500
+
+# Override model and temperature
+python persona_chat.py --persona AGENT4 --context MECHANICS.md --model anthropic/claude-opus-4-6 --temperature 0.5
+```
+
+**Personas:**
+
+| ID | Name | Domain | Their Template |
+|----|------|--------|----------------|
+| AGENT1 | Victoria Langford-Chen | Corporate Finance / Regulatory | `persona/agent1_regulatory_stress` (PORTAL) |
+| AGENT2 | Dr. Raj Venkataraman | Aerospace / Mission Assurance | `persona/agent2_mission_failure` (BRANCHING) |
+| AGENT3 | Marcus Delgado-Washington | Legal Tech Startup | `persona/agent3_litigation_discovery` (PEARL) |
+| AGENT4 | Dr. Kate Nez-Bridger | Wildlife Ecology / RMEF | `persona/agent4_elk_migration` (CYCLICAL) |
+
+**Post-run analysis — run a persona template, then chat about the output:**
+
+```bash
+./run.sh run persona/agent2_mission_failure
+./run.sh chat --persona AGENT2 --context output/simulations/summary_*.json \
+  --batch "Did the branching adequately model crew decision-making under cascading failure?"
+```
+
+Full persona backgrounds are in `docs/testing_personas/AGENT{1-4}.md`.
 
 ---
 
