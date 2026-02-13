@@ -22,11 +22,11 @@ The output is a structured computational artifact — typed graph edges with pro
 
 *Timepoint Daedalus enables "synthetic time travel".*
 
-Since I was a kid, I have wanted a portal where I could travel to any place, at any time. As we progress towards and immersive VR future, with post-intelligence models, it feels more and more plausible to soon experience something like my childhood dream, but sitting at home at my desk on any given afternoon. This repo is a step towards that, and I hope you'll join me in bringing it to life. Timepoint-Daedalus allows extremely detailed simulation of synthetic social networks. Critically, allows the user to manipulate the flow of time in novel ways, including a work-backwards mode where you set a goal, like "make me the President in 2040" and it creates the most logical path backwards through time to make that dream come true. You can even ground the steps against research and LLM-based judges using tool calls. That backwards logic feature is named "PORTAL" as a reference to my own childhood dreams. Take the portal to that future, and walk backwards to today.
+Since I was a kid, I have wanted a portal where I could travel to any place, at any time. As we progress towards an immersive VR future, with post-intelligence models, it feels more and more plausible to soon experience something like my childhood dream, but sitting at home at my desk on any given afternoon. This repo is a step towards that, and I hope you'll join me in bringing it to life. Timepoint-Daedalus allows extremely detailed simulation of synthetic social networks. Critically, it allows the user to manipulate the flow of time in novel ways, including a work-backwards mode where you set a goal, like "make me the President in 2040" and it creates the most logical path backwards through time to make that dream come true. You can even ground the steps against research and LLM-based judges using tool calls. That backwards logic feature is named "PORTAL" as a reference to my own childhood dreams. Take the portal to that future, and walk backwards to today.
 
-A key point to make is that Timepoint has a novel definition of "tensor" ans is generally different than the kind of pytorch tensors we all know and love. I thought about making a novel name for the Timepoint Tensor Model (TTM) but it felt disingenuous as these are for-sure tensors. 
+A key point to make is that Timepoint has a novel definition of "tensor" and is generally different than the kind of pytorch tensors we all know and love. I thought about making a novel name for the Timepoint Tensor Model (TTM) but it felt disingenuous as these are for-sure tensors.
 
-Please give Timepoint-Daedalus a try if you would benefit from a tool that enables LLM's to perform powerful, highly parameterized social network simulations with very little initial configuration. 
+Please give Timepoint-Daedalus a try if you would benefit from a tool that enables LLMs to perform powerful, highly parameterized social network simulations with very little initial configuration. Training data auto-uploads to [Oxen.ai](https://oxen.ai) for versioning and fine-tuning if you set `OXEN_API_KEY` — otherwise it saves locally as JSONL and SQLite.
 
 #### Quickstart: 
 
@@ -44,7 +44,7 @@ To output structured training data for each character to fine-tune models for in
 prompt: You are going to operate a typed social network graph simulation generator, Timepoint-Daedalus, to render training data for roleplaying finetunes. Read the markdown documents, then give me a few choices for templates to run to generate sample data.
 ```
 
- My experience so far is that the models finetuned around Timepoint output are powerful predictors of human and corporate behavior.
+My experience so far is that the models finetuned around Timepoint output are powerful predictors of human and corporate behavior.
 
 _[x.com/seanmcdonaldxyz](https://x.com/seanmcdonaldxyz)_
 
@@ -321,6 +321,24 @@ Each completion includes structured JSON with energy dynamics, emotional deltas,
 | **JSON / CSV / SQLite** | Analysis, querying, visualization |
 | **Fountain / PDF** | Industry-standard screenplays (Courier 12pt, proper margins) |
 | **Markdown** | Human-readable narrative summaries with character arcs and dialog |
+
+### Render to Oxen.ai
+
+Training data auto-uploads to [Oxen.ai](https://oxen.ai) for dataset versioning, collaboration, and fine-tuning when `OXEN_API_KEY` is set. Without it, everything saves locally.
+
+```bash
+# Local only (default)
+./run.sh run board_meeting
+# → datasets/board_meeting/training_*.jsonl
+# → datasets/board_meeting/sim_*.db (SQLite)
+
+# With Oxen upload
+export OXEN_API_KEY=your_token
+./run.sh run board_meeting
+# → local files + auto-upload to Oxen.ai with commit history
+```
+
+The `oxen_integration/` module handles dataset upload, repo/branch management, tensor versioning (Parquet), and a fine-tuning launcher with cost estimation and human-in-the-loop approval. Four data formatters ship out of the box: entity evolution, dialog synthesis, knowledge flow, and relationship dynamics.
 
 ### Convergence: quality assurance without ground truth
 
