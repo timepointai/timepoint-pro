@@ -243,7 +243,7 @@ class PortalStrategy:
         paths: List of discovered portal paths
     """
 
-    def __init__(self, config: TemporalConfig, llm_client, store):
+    def __init__(self, config: TemporalConfig, llm_client, store, entity_roster=None):
         """
         Initialize portal strategy.
 
@@ -251,6 +251,9 @@ class PortalStrategy:
             config: TemporalConfig with mode=PORTAL
             llm_client: LLM client for generation and scoring
             store: GraphStore for persistence
+            entity_roster: Optional dict of entity definitions from template metadata.
+                           When provided, entities are created from this roster instead
+                           of being inferred from description text via LLM.
         """
         if config.mode != TemporalMode.PORTAL:
             raise ValueError(f"PortalStrategy requires mode=PORTAL, got {config.mode}")
@@ -258,6 +261,7 @@ class PortalStrategy:
         self.config = config
         self.llm = llm_client
         self.store = store
+        self.entity_roster = entity_roster or {}
         self.paths: List[PortalPath] = []  # Top-ranked paths (backward compatible)
         self.all_paths: List[PortalPath] = []  # ALL generated paths for exploration
 
@@ -353,8 +357,12 @@ class PortalStrategy:
 
     def _generate_portal_state(self) -> PortalState:
         """Generate the endpoint state from description, including entity inference."""
-        # Extract entities from portal description using LLM
-        entities = self._infer_entities_from_description(self.config.portal_description)
+        # Prefer structured entity_roster from template metadata over LLM extraction
+        if self.entity_roster:
+            entities = self._create_entities_from_roster(self.entity_roster)
+            print(f"    ✓ Created {len(entities)} entities from template entity_roster")
+        else:
+            entities = self._infer_entities_from_description(self.config.portal_description)
 
         return PortalState(
             year=self.config.portal_year,
@@ -363,6 +371,32 @@ class PortalStrategy:
             world_state={"placeholder": True},
             plausibility_score=1.0  # Portal is given, score is 1.0
         )
+
+    def _create_entities_from_roster(self, roster: Dict[str, Any]) -> List[Entity]:
+        """
+        Create Entity objects from a structured entity_roster dict.
+
+        The roster maps entity_id -> {type, role, initial_knowledge, ...}.
+        This ensures entities match the template's intended characters
+        rather than being inferred from scenario text.
+        """
+        entities = []
+        for entity_id, info in roster.items():
+            entity_type = info.get("type", "human")
+            role = info.get("role", "")
+            initial_knowledge = info.get("initial_knowledge", [])
+
+            entities.append(Entity(
+                entity_id=entity_id,
+                entity_type=entity_type,
+                entity_metadata={
+                    "name": entity_id.replace("_", " ").title(),
+                    "role": role,
+                    "initial_knowledge": initial_knowledge,
+                    "source": "template_entity_roster"
+                }
+            ))
+        return entities
 
     def _infer_entities_from_description(self, description: str) -> List[Entity]:
         """
