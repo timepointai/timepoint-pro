@@ -1721,6 +1721,9 @@ class FullE2EWorkflowRunner:
                 print(f"Timeframe: {config.temporal.origin_year} → {config.temporal.portal_year}")
                 print(f"{'='*80}\n")
 
+                # Inject entity roster for portal entity creation (same as branching mode)
+                temporal_agent.entity_roster = config.metadata.get("entity_roster", {}) if config.metadata else {}
+
                 # Run portal simulation
                 portal_paths = temporal_agent.run_portal_simulation(config.temporal)
 

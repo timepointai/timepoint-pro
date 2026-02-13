@@ -101,7 +101,29 @@
       "M8_embodied_states",
       "M11_dialog_synthesis",
       "M13_relationship_tracking"
-    ]
+    ],
+    "entity_roster": {
+      "sarah_okafor": {
+        "type": "human",
+        "role": "Mission Commander. Experienced astronaut, politically pressured by NASA leadership to maintain schedule. Ultimately responsible for crew safety decisions.",
+        "initial_knowledge": ["mission_parameters", "crew_capabilities", "nasa_political_pressure"]
+      },
+      "raj_mehta": {
+        "type": "human",
+        "role": "Flight Engineer. Brilliant systems analyst, conflict-averse personality. Detects problems early but hesitates to escalate concerns through the chain of command.",
+        "initial_knowledge": ["flight_systems_status", "engineering_specifications", "anomaly_detection_protocols"]
+      },
+      "lin_zhang": {
+        "type": "human",
+        "role": "Systems Engineer. Detected ALSS anomalies during testing but was overruled by schedule pressure. Holds critical technical knowledge about the oxygen generator design flaw.",
+        "initial_knowledge": ["alss_design_specifications", "oxygen_generator_test_results", "system_redundancy_architecture"]
+      },
+      "thomas_webb": {
+        "type": "human",
+        "role": "Mission Director (ground). Prioritized schedule and budget over safety margins. Made key decisions to reduce crew size and accept simplified life support systems.",
+        "initial_knowledge": ["budget_constraints", "schedule_milestones", "stakeholder_expectations"]
+      }
+    }
   },
   "economic_scenario": null,
   "founder_profiles": null,

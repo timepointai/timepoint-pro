@@ -1,5 +1,7 @@
 # Timepoint Daedalus
 
+**[See a complete example run &rarr;](EXAMPLE_RUN.md)** &mdash; Every output from a single PORTAL simulation: timeline, dialogs, knowledge graph, ADPRS waveforms, entity tensors, training data.
+
 **Structured temporal simulation that renders queryable meaning graphs, not prose.**
 
 An LLM can generate a plausible story about a crew crash-landing on an alien planet. Timepoint generates this:
@@ -397,6 +399,7 @@ The system prompt is simple: persona markdown + context file contents. No framew
 
 ## Documentation
 
+- **[EXAMPLE_RUN.md](EXAMPLE_RUN.md)** -- Complete example run with every output artifact: timeline, dialogs, knowledge graph, ADPRS waveforms, entity tensors, training data
 - **[MECHANICS.md](MECHANICS.md)** -- Technical specification of all 19 mechanisms, with Castaway Colony examples
 - **[QUICKSTART.md](QUICKSTART.md)** -- Detailed setup and usage guide
 - **[SYNTH.md](SYNTH.md)** -- SynthasAIzer control paradigm (ADSR envelopes, ADPRS waveforms, voices, patches)

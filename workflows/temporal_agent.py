@@ -1055,7 +1055,8 @@ Return ONLY a JSON object with format:
         portal_strategy = PortalStrategy(
             config=config,
             llm_client=self.llm_client,
-            store=self.store
+            store=self.store,
+            entity_roster=getattr(self, 'entity_roster', None)
         )
 
         # Execute backward simulation
