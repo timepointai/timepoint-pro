@@ -35,6 +35,10 @@ A complete PORTAL-mode simulation tracing backward from a catastrophic Mars miss
 9. [Mechanism Usage](#9-mechanism-usage)
 10. [Training Data](#10-training-data)
 11. [Run Metadata](#11-run-metadata)
+12. [What You Can Do Next](#12-what-you-can-do-next)
+13. [Port to Oxen.ai](#13-port-to-oxenai)
+14. [API & Programmatic Access](#14-api--programmatic-access)
+15. [Additional Capabilities](#15-additional-capabilities)
 
 ---
 
@@ -495,10 +499,269 @@ All inference via OpenRouter, MIT/Apache-licensed models only:
 
 ---
 
+## 12. What You Can Do Next
+
+The run above produced structured artifacts in `datasets/mars_mission_portal/` and `metadata/runs.db`. Here's what's available after every run.
+
+### Query the results
+
+```python
+from reporting.query_engine import EnhancedQueryEngine
+
+engine = EnhancedQueryEngine()
+results = engine.execute_batch([
+    "What was the key decision point?",
+    "Who influenced the outcome most?",
+    "How did Zhang's knowledge state change over time?"
+], world_id="mars_mission_portal")
+
+relationships = engine.summarize_relationships(world_id="mars_mission_portal")
+timeline = engine.timeline_summary(world_id="mars_mission_portal")
+```
+
+### Export to additional formats
+
+The run auto-generates markdown, JSON, and PDF. You can also export to other formats:
+
+```bash
+./run.sh export last --format jsonl       # ML training pipelines
+./run.sh export last --format json        # Structured JSON
+./run.sh export last --format fountain    # Professional screenplay (.fountain)
+```
+
+| Format | Use Case |
+|--------|----------|
+| **JSONL** | Streaming ML training data (prompt/completion pairs) |
+| **JSON / CSV / SQLite** | Analysis, querying, visualization |
+| **Fountain / PDF** | Industry-standard screenplays (Courier 12pt, proper margins) |
+| **Parquet** | Columnar format for ML pipelines (via `oxen_integration`) |
+| **Markdown** | Human-readable narrative (auto-generated) |
+
+### Run convergence testing
+
+Run the same scenario multiple times and measure structural consistency:
+
+```bash
+./run.sh convergence e2e mars_mission_portal          # Run 3x + analyze
+./run.sh convergence e2e --runs 5 mars_mission_portal # Run 5x
+./run.sh convergence history                          # Past results
+```
+
+Causal edges appearing in 9/10 runs are structural; edges in 3/10 are noise. Convergence grades: A (≥90%) through F (<50%).
+
+### Chat with a persona about the results
+
+```bash
+./run.sh chat --persona AGENT2 --context datasets/mars_mission_portal/narrative_*.markdown \
+  --batch "As an aerospace engineer, what concerns you about this mission's failure chain?"
+```
+
+---
+
+## 13. Port to Oxen.ai
+
+Training data auto-uploads to [Oxen.ai](https://oxen.ai) when `OXEN_API_KEY` is set. Without it, everything saves locally.
+
+### Auto-upload during a run
+
+```bash
+export OPENROUTER_API_KEY=your_key
+export OXEN_API_KEY=your_oxen_token
+
+./run.sh run mars_mission_portal
+# → local JSONL + SQLite as usual
+# → auto-uploads training_*.jsonl to Oxen.ai with commit history
+# → prints dataset URL and fine-tune URL on completion
+```
+
+### Programmatic upload and versioning
+
+```python
+from oxen_integration import OxenClient
+
+client = OxenClient(namespace="your-username", repo_name="mars-mission-data")
+
+# Upload a dataset
+result = client.upload_dataset("datasets/mars_mission_portal/training_20260212.jsonl",
+                               commit_message="Mars mission PORTAL run")
+print(result.dataset_url)    # View on Oxen Hub
+print(result.finetune_url)   # One-click fine-tune
+
+# Branch management for experiments
+client.create_branch("experiment-v2", from_branch="main")
+client.switch_branch("experiment-v2")
+```
+
+### Tensor versioning (Parquet)
+
+```python
+from oxen_integration import TensorVersionController, write_instances_parquet
+
+# Export entity tensors to Parquet for ML pipelines
+write_instances_parquet(entity_tensors, "mars_tensors.parquet")
+
+# Version tensors on Oxen with branch tracking
+controller = TensorVersionController(client)
+controller.sync_tensors(tensor_data, version="1.0.0")
+```
+
+### Fine-tuning pipeline
+
+```python
+from oxen_integration import FineTuneConfig, FineTuneLauncher, DataFormatter
+
+# Validate and format training data
+formatter = DataFormatter()
+formatted = formatter.to_chat_format(training_examples)
+validation = formatter.validate_dataset(formatted)
+
+# Configure and launch fine-tuning
+config = FineTuneConfig(
+    dataset_path="datasets/mars_mission_portal/training_20260212.jsonl",
+    base_model="Qwen/Qwen2.5-1.5B-Instruct",
+    num_epochs=3, batch_size=4
+)
+launcher = FineTuneLauncher(client)
+job = launcher.prepare_and_approve(config, "training_data.jsonl")
+instructions = launcher.launch_via_notebook(job)
+```
+
+### Four specialized data formatters
+
+| Formatter | Produces | Use Case |
+|-----------|----------|----------|
+| **EntityEvolutionFormatter** | State progression pairs (before → after) | Train models to predict character arcs |
+| **DialogSynthesisFormatter** | Multi-turn conversation pairs | Train conversational models |
+| **KnowledgeFlowFormatter** | Information propagation patterns | Train knowledge extraction models |
+| **RelationshipDynamicsFormatter** | Relationship evolution sequences | Train social dynamics models |
+
+### Model evaluation
+
+```python
+from oxen_integration import ModelEvaluator
+
+evaluator = ModelEvaluator(base_model="gpt-3.5-turbo", finetuned_model="ft-custom-123")
+results = evaluator.evaluate_side_by_side(test_cases, auto_evaluate=True)
+print(f"Win rate: {results.improvement_percentage}%")
+```
+
+---
+
+## 14. API & Programmatic Access
+
+### REST API
+
+```bash
+./run.sh api start          # Start server on port 8080
+./run.sh dashboard          # Start dashboard backend on port 8000
+```
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/runs` | GET | List simulation runs (paginated) |
+| `/api/run/{run_id}` | GET | Full run details |
+| `/api/narrative/{run_id}` | GET | Narrative report |
+| `/api/screenplay/{run_id}` | GET | Screenplay in Fountain format |
+| `/api/dialogs/{run_id}` | GET | Dialog transcripts |
+| `/api/templates` | GET | All templates with metadata |
+| `/api/mechanisms` | GET | All 19 mechanisms with descriptions |
+| `/api/meta-analytics` | GET | System-wide statistics |
+| `/api/convergence-stats` | GET | Convergence analysis results |
+
+### API-mode execution
+
+```bash
+./run.sh run --api board_meeting                                    # Submit via API
+./run.sh run --api-url http://remote:8080 --api-key KEY board_meeting  # Remote server
+./run.sh run --api-batch-size 10 --api-budget 50.00 quick           # Batch with budget
+./run.sh api usage                                                  # Check quota
+```
+
+### Natural language interface
+
+```bash
+./run.sh run --nl "CEO announces mandatory salary cuts due to market downturn"
+./run.sh run --nl "First contact with alien species" --nl-entities 5 --nl-timepoints 3
+```
+
+### Python API
+
+```python
+from generation.templates.loader import TemplateLoader
+
+loader = TemplateLoader()
+templates = loader.list_templates(tier="quick", category="core", mechanism="M7")
+matrix = loader.get_coverage_matrix()           # Mechanism coverage across templates
+validation = loader.validate_template("core/m01_heterogeneous_fidelity")
+```
+
+---
+
+## 15. Additional Capabilities
+
+### CLI options not shown in this run
+
+```bash
+# Model selection
+./run.sh run --model deepseek/deepseek-chat board_meeting   # Specific model
+./run.sh run --groq board_meeting                           # Groq (300 tok/s)
+./run.sh run --free board_meeting                           # Best free model ($0)
+./run.sh run --fast quick                                   # Fastest model
+
+# Parallelism & cost
+./run.sh run --parallel 4 quick              # 4 concurrent templates
+./run.sh run --dry-run board_meeting         # Cost estimate without running
+./run.sh run --budget 50.00 quick            # Hard budget cap
+
+# Filtering
+./run.sh run --tier quick                    # By complexity tier
+./run.sh run --category portal               # By category
+./run.sh run --mechanism M7,M15              # By specific mechanisms
+
+# Monitoring
+./run.sh run --monitor board_meeting         # Real-time progress dashboard
+./run.sh run --monitor --chat standard       # Monitoring + persona chat
+
+# Portal depth levels
+./run.sh run --portal-simjudged-quick mars_mission_portal       # 1 step (~2x cost)
+./run.sh run --portal-simjudged mars_mission_portal             # 2 steps (~3x cost)
+./run.sh run --portal-simjudged-thorough mars_mission_portal    # 3 steps (~4-5x cost)
+```
+
+### SynthasAIzer controls (synthesizer-inspired entity modulation)
+
+```python
+from synth import EnvelopeConfig, VoiceConfig, VoiceMixer
+
+# ADSR envelope for dramatic buildup
+envelope = EnvelopeConfig(attack=0.3, decay=0.1, sustain=0.9, release=0.5)
+
+# Voice mixing — solo one entity, mute another
+mixer = VoiceMixer()
+mixer.add_voice("protagonist", VoiceConfig(gain=1.0, solo=True))
+mixer.add_voice("bystander", VoiceConfig(gain=0.0, muted=True))
+```
+
+### Docker sandbox
+
+```bash
+./claude-container.sh up       # Build + start + launch Claude Code in sandbox
+./claude-container.sh shell    # Interactive shell
+./claude-container.sh test     # Connectivity check
+```
+
+Network-isolated container with iptables firewall, allowlisted API endpoints, and `.env` injection.
+
+### Template inventory
+
+50 templates across 6 categories: 19 core mechanism tests (M1--M19), 10 showcase scenarios, 4 portal templates, 6 stress tests, 3 convergence templates, and 8 persona templates. Run `./run.sh list` to see all of them.
+
+---
+
 ### Reproduce this run
 
 ```bash
-git clone https://github.com/realityinspector/timepoint-daedalus.git
+git clone https://github.com/timepoint-ai/timepoint-daedalus.git
 cd timepoint-daedalus
 pip install -r requirements.txt
 export OPENROUTER_API_KEY=your_key_here
