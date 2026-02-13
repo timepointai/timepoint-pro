@@ -1,8 +1,8 @@
 # Timepoint Daedalus
 
-**Structured temporal simulation that renders queryable meaning graphs, not prose.** See what a single run actually produces: **[complete example run with every output artifact &rarr;](EXAMPLE_RUN.md)**
+**Social network simulation engine that renders queryable meaning graphs, not prose.** See what a single run actually produces: **[complete example run with every output artifact &rarr;](EXAMPLE_RUN.md)**
 
-An LLM can generate a plausible story about a crew crash-landing on an alien planet. Timepoint generates this:
+An LLM can generate a plausible story about a crew crash-landing on an alien planet. Timepoint simulates the entire social network:
 
 ```
 10 entities with tracked emotional state (valence, arousal, energy per timestep)
@@ -14,35 +14,66 @@ training data where every example carries its full causal ancestry
 $0.30, ~1,200 LLM calls, 4 models (DeepSeek R1, Llama 70B, Qwen 72B, 405B)
 ```
 
-The output is a structured computational artifact — typed graph edges with provenance, auditable causal chains, quantitative state you can propagate and query. Not a narrative summary. The difference matters when you want to fine-tune downstream models on causal reasoning, knowledge flow, or multi-entity state tracking, because each training example carries the full chain of events that produced it.
+The output is a structured computational artifact — typed graph edges with provenance, auditable causal chains, quantitative state you can propagate and query. Not a narrative summary. The difference matters when you need to test how a decision propagates through a social network, fine-tune downstream models on causal reasoning, or trace how information flows between entities over time.
 
 
 ### WRITTEN BY A HUMAN
-## the rest co-authored by AI 
+## the rest co-authored by AI
 
-*Timepoint Daedalus works enables "synthetic time travel".*
+*Timepoint Daedalus enables "synthetic time travel".*
 
-Since I was a kid, I have wanted a portal where I could travel to any place, at any time. As we progress towards and immersive VR future, with beyond-intelligence level models, that feels more and more plausible to experience sitting at home at my desk on any given afternoon. This repo allows extremely detailed simulation of synthetic social networks. It allows the user to manipulate the timeline in novel ways, including a work-backwards mode where you set a goal, like "make my President in 2040" and it creates the most logical path backwards through time to make that dream come true -- that function is named "PORTAL" as a reference to my own childhood dreams. Please give Timepoint-Daedalus a try if you are interested in how LLM's can perform powerful simulations with very little configuration. There are baked in templates, so all you need is an OpenRouter key to get started rendering scenarios, and you only need to ask a coding agent for help to render structured training data for each character to fine-tune models for individualized roleplaying. 
+Since I was a kid, I have wanted a portal where I could travel to any place, at any time. As we progress towards and immersive VR future, with post-intelligence models, it feels more and more plausible to soon experience something like my childhood dream, but sitting at home at my desk on any given afternoon. This repo is a step towards that, and I hope you'll join me in bringing it to life. Timepoint-Daedalus allows extremely detailed simulation of synthetic social networks. Critically, allows the user to manipulate the flow of time in novel ways, including a work-backwards mode where you set a goal, like "make me the President in 2040" and it creates the most logical path backwards through time to make that dream come true. You can even ground the steps against research and LLM-based judges using tool calls. That backwards logic feature is named "PORTAL" as a reference to my own childhood dreams. Take the portal to that future, and walk backwards to today.
+
+A key point to make is that Timepoint has a novel definition of "tensor" ans is generally different than the kind of pytorch tensors we all know and love. I thought about making a novel name for the Timepoint Tensor Model (TTM) but it felt disingenuous as these are for-sure tensors. 
+
+Please give Timepoint-Daedalus a try if you would benefit from a tool that enables LLM's to perform powerful, highly parameterized social network simulations with very little initial configuration. 
+
+#### Quickstart: 
+
+```
+export OPENROUTER_API_KEY={your_key}
+```
+```
+./run.sh run mars_mission_portal  
+```
+
+#### Output Training Data: 
+To output structured training data for each character to fine-tune models for individualized roleplaying, just ask a coding agent: 
+
+```
+prompt: You are going to operate a typed social network graph simulation generator, Timepoint-Daedalus, to render training data for roleplaying finetunes. Read the markdown documents, then give me a few choices for templates to run to generate sample data.
+```
+
+ My experience so far is that the models finetuned around Timepoint output are powerful predictors of human and corporate behavior.
 
 _[x.com/seanmcdonaldxyz](https://x.com/seanmcdonaldxyz)_
 
-### The key architectural bet: adaptive stepwise fidelity
 
-Fidelity is a 2D surface over (entity, timepoint). Most entities at most timesteps sit at TENSOR resolution (~200 tokens). A few get elevated to DIALOG or TRAINED (~50k tokens) when queries land on them. This is query-driven lazy resolution — you never pay for detail nobody asked about. The result is ~95% token reduction vs. uniform fidelity, without losing causal structure, because the system maintains explicit exposure events and temporal chains that survive compression.
+---
 
-19 mechanisms (M1-M19) are independently composable: fidelity management, causal chains, knowledge provenance, entity simulation, model selection. When emotional arousal saturated at 1.0, the fix was in M11's decay function — without touching M17 (portal reasoning) or M3 (knowledge flow). In a monolithic prompt, everything is entangled.
+## Why Simulate Social Networks?
 
-### What structure gives you that scaling context windows does not
+Every organization navigates complex social dynamics — board decisions, team reactions, market shifts, competitive responses. Traditional approaches rely on gut instinct or oversimplified models. LLMs understand human psychology but lose consistency across hundreds of interactions.
 
-**Tree search, not autoregression.** BRANCHING mode spawns parallel timelines from a decision point, evaluates each against constraints, selects the best. This is search over a combinatorial space (10 entities x 4 channels x 10 timepoints = O(100k) interaction paths). No context window turns next-token prediction into tree search with evaluation.
+Timepoint bridges this gap. Define a scenario, set initial conditions, and the engine simulates how people actually interact — tracking emotional states, propagating knowledge through relationships, and maintaining causal chains you can query afterward.
 
-**Reliable quantitative state.** `o2_reserve_hours = 336 → 288 → 240 → 192` across 1,200 coordinated calls. 90+ numerical values with explicit functions. Transformers don't do reliable arithmetic over long sequences — this is architectural, not a training gap.
+**Test decisions before you make them.** Run a board meeting three ways and compare which framing gets buy-in. Model a product launch and watch competitor reactions cascade. Use PORTAL mode to trace backward from a desired outcome and find the critical path that gets you there.
 
-**Knowledge as a typed graph.** Not "the doctor discovered contamination" but `{source: "okonkwo", target: "tanaka", content: "water_contaminated", timepoint: "tp_002"}` with propagation chain `okonkwo -> tanaka (alert) -> all_crew (rationing)`. Entities can't know things without tracked exposure events. Anachronisms are prevented structurally.
+**Avoid unforeseen consequences.** When 10 entities interact across 50 timepoints with tracked knowledge flow, emergent dynamics surface that intuition misses. The doctor discovers contamination and tells the commander, who orders rationing — but the engineer wasn't in the room and keeps using contaminated water. Structure catches what narrative misses.
 
-**Convergence as quality signal.** Run the same template 3x with different seeds, extract causal graphs, compute pairwise Jaccard. Edges that appear in 9/10 runs are structural; edges in 3/10 are noise. This gives you a reliability signal for synthetic training data without human labels.
+**See market-scale reactions.** Simulate how news propagates through a network, how trust shifts, how coalitions form and fracture. Each entity's decisions are grounded in their specific knowledge state, emotional trajectory, and relationship history — not generic "the market reacted negatively."
 
-**Emergent persona dynamics.** Tanaka's valence 0.50 → 0.86 over a survival arc. Sharma's arousal 0.24 → 0.70 as crises compound. The `persona2params` pipeline maps traits to speaking style to dialog parameters — high arousal + negative valence yields short, interrupting turns; low energy yields trailing-off disengagement. No per-character tuning. The structure provides the right metadata at the right moment and the LLM's understanding of human psychology does the rest.
+---
+
+## Depth Levels
+
+Timepoint meets you where you are.
+
+**Vibe coders:** Set `OPENROUTER_API_KEY`, run `./run.sh run mars_mission_portal`, read the markdown narrative that comes back. Templates handle all configuration. You get characters with emotional arcs, branching decisions, and dialogues — no setup beyond an API key.
+
+**Simulation builders:** Explore 5 temporal modes, 19 composable mechanisms, and query-driven fidelity allocation. Run the same scenario 3x and measure causal graph convergence. Design custom templates with entity rosters, knowledge seeds, and mode-specific constraints. The parameter space is large and well-documented.
+
+**ML engineers:** This is a structured training data engine. Every example carries full causal ancestry, knowledge provenance, mechanism annotations, and quantitative state vectors. Counterfactual pairs come free from BRANCHING mode. Fine-tune models that reason within causal structure, not just pattern-match surface text.
 
 ---
 
@@ -79,7 +110,7 @@ The template that exercises all 19 mechanisms. Six crew members crash-land on Ke
 
 ### PORTAL Mode: Backward Temporal Reasoning
 
-Given a future endpoint, discover plausible paths from the present.
+Given a future endpoint, discover plausible paths from the present. Use this for strategic planning, goal decomposition, or understanding which present-day decisions lock in — or eliminate — future outcomes.
 
 ```bash
 ./run.sh run mars_mission_portal        # Portal backward reasoning
@@ -133,7 +164,7 @@ The system doesn't just find *a* path — it explores a search space of ~700 can
 
 ## Temporal Modes
 
-Time isn't one thing. Timepoint supports five distinct temporal ontologies, each with its own notion of causality, validation rules, and fidelity allocation strategy:
+Different questions need different models of causality. Forward team dynamics need strict information flow. Strategic planning needs backward reasoning. "What if?" analysis needs counterfactual branching.
 
 | Mode | Description | Use When | Example Template |
 |------|-------------|----------|------------------|
@@ -154,9 +185,29 @@ See [MECHANICS.md](MECHANICS.md) for full implementation details.
 
 ---
 
-## Query-Driven Fidelity
+## How the Engine Works
 
-Not everything needs full resolution. Resolution is a 2D surface over (entity, time) that concentrates detail where queries land:
+### Adaptive stepwise fidelity
+
+*The core architectural bet.* Fidelity is a 2D surface over (entity, timepoint). Most entities at most timesteps sit at TENSOR resolution (~200 tokens). A few get elevated to DIALOG or TRAINED (~50k tokens) when queries land on them. This is query-driven lazy resolution — you never pay for detail nobody asked about. The result is ~95% token reduction vs. uniform fidelity, without losing causal structure, because the system maintains explicit exposure events and temporal chains that survive compression.
+
+19 mechanisms (M1-M19) are independently composable: fidelity management, causal chains, knowledge provenance, entity simulation, model selection. When emotional arousal saturated at 1.0, the fix was in M11's decay function — without touching M17 (portal reasoning) or M3 (knowledge flow). In a monolithic prompt, everything is entangled.
+
+### What structure gives you that scaling context windows does not
+
+**Tree search, not autoregression.** BRANCHING mode spawns parallel timelines from a decision point, evaluates each against constraints, selects the best. This is search over a combinatorial space (10 entities x 4 channels x 10 timepoints = O(100k) interaction paths). No context window turns next-token prediction into tree search with evaluation.
+
+**Reliable quantitative state.** `o2_reserve_hours = 336 → 288 → 240 → 192` across 1,200 coordinated calls. 90+ numerical values with explicit functions. Transformers don't do reliable arithmetic over long sequences — this is architectural, not a training gap.
+
+**Knowledge as a typed graph.** Not "the doctor discovered contamination" but `{source: "okonkwo", target: "tanaka", content: "water_contaminated", timepoint: "tp_002"}` with propagation chain `okonkwo -> tanaka (alert) -> all_crew (rationing)`. Entities can't know things without tracked exposure events. Anachronisms are prevented structurally.
+
+**Convergence as quality signal.** Run the same template 3x with different seeds, extract causal graphs, compute pairwise Jaccard. Edges that appear in 9/10 runs are structural; edges in 3/10 are noise. This gives you a reliability signal for synthetic training data without human labels.
+
+**Emergent persona dynamics.** Tanaka's valence 0.50 → 0.86 over a survival arc. Sharma's arousal 0.24 → 0.70 as crises compound. The `persona2params` pipeline maps traits to speaking style to dialog parameters — high arousal + negative valence yields short, interrupting turns; low energy yields trailing-off disengagement. No per-character tuning. The structure provides the right metadata at the right moment and the LLM's understanding of human psychology does the rest.
+
+### Query-driven fidelity
+
+Most of the simulation runs at minimal cost — detail materializes only where you look.
 
 ```
 Castaway Colony fidelity map at Day 7 (branch decision):
@@ -193,11 +244,9 @@ Detail concentrates where it matters.
 
 **ADPRS Waveform Gating:** Entities with fitted ADPRS envelopes get per-entity LLM gating during dialog synthesis. The waveform scheduler evaluates each entity's cognitive activation (phi) at each timepoint and maps it to a resolution band. Entities in TENSOR or SCENE bands are excluded from LLM dialog calls — their trajectory snapshots are still recorded but no tokens are spent. Shadow evaluation tracks divergence between ADPRS predictions and actual resolution, persisting reports to run metadata. Fitted envelopes are stored in entity metadata and reloaded on subsequent runs for warm-start refinement, so predictions improve over time. See [SYNTH.md](SYNTH.md) for full specification.
 
----
+### Knowledge provenance
 
-## Knowledge Provenance
-
-Entities don't magically know things. The system tracks **exposure events**: who learned what, from whom, when.
+In any social network simulation, who knows what matters. Entities don't magically know things — the system tracks **exposure events**: who learned what, from whom, when.
 
 ```
 Castaway Colony knowledge propagation:
@@ -223,9 +272,7 @@ Each discovery is a typed graph edge: `{type: "empirical_observation", source: "
 
 ## Synthetic Training Data
 
-The simulation isn't just queryable—it's renderable as training data. And the structure changes what "training data" means.
-
-A prompt-based pipeline produces input-output text pairs. Timepoint renders training examples where each datapoint is a **structured computational artifact**:
+The simulation isn't just queryable — it renders structured training examples where each datapoint is a computational artifact, not a text completion.
 
 ```
 === CAUSAL HISTORY (M7) ===                    ← full event chain leading to this moment
@@ -348,11 +395,11 @@ All 10 models in the pipeline—Llama 3.1/4, Qwen 2.5, DeepSeek, Mistral—carry
 ## When to Use This
 
 **Good fit:**
+- Scenario planning: simulate board meetings, product launches, competitive dynamics before committing
+- Strategic path-finding: use PORTAL mode to work backward from goals and identify critical decisions
 - Synthetic training data with causal provenance, counterfactual pairs, and mechanism annotations
 - Fine-tuning data for temporal reasoning, knowledge tracking, state propagation, or multi-entity dialog
-- "How do we get from here to there" scenarios (PORTAL mode)
-- Simulations requiring causal consistency and knowledge provenance
-- Deep queries into specific entities or moments
+- Simulations requiring causal consistency and knowledge provenance across many entities and timepoints
 - Anywhere combinatorial state spaces exceed what a single prompt can navigate
 
 **Not the right tool (yet):**
