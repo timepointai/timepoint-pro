@@ -2,29 +2,34 @@
 
 **Social network simulation engine that renders queryable meaning graphs, not prose.** See what a single run actually produces: **[complete example run with every output artifact &rarr;](EXAMPLE_RUN.md)**
 
-An LLM can generate a plausible story about a crew crash-landing on an alien planet. Timepoint simulates the entire social network:
+Any frontier LLM can generate a plausible story about a crew crash-landing on an alien planet. 
+
+Timepoint simulates the entire social graph, across "timepoints" which, if you are experienced in social network simulation, is similar to ticks or timestamps:
 
 ```
-10 entities with tracked emotional state (valence, arousal, energy per timestep)
-90+ quantitative variables propagated across 5,100 steps (O2, food, hull, radiation)
-3 counterfactual branches from a single decision point, each scored by 405B judge
-typed knowledge graph: who learned what, from whom, at which timepoint
-convergence-testable: run 3x, measure causal graph Jaccard similarity
-training data where every example carries its full causal ancestry
-$0.30, ~1,200 LLM calls, 4 models (DeepSeek R1, Llama 70B, Qwen 72B, 405B)
+- n Timepoints / steps rendered 
+- typed knowledge graph: who knows whom and how, who learned what, from whom, at which timepoint
+- 10 entities with tracked emotional state (valence, arousal, energy per timestep)
+- 90+ quantitative variables propagated across 5,100 steps (O2, food, hull, radiation)
+- 3 counterfactual branches from a single decision point, each scored by 405B judge
+- convergence-testable: run 3x, measure causal graph Jaccard similarity
+- training data where every example carries its full causal ancestry
+- $0.30, ~1,200 LLM calls, 4 models (DeepSeek R1, Llama 70B, Qwen 72B, 405B)
 ```
 
 The output is a structured computational artifact — typed graph edges with provenance, auditable causal chains, quantitative state you can propagate and query. Not a narrative summary. The difference matters when you need to test how a decision propagates through a social network, fine-tune downstream models on causal reasoning, or trace how information flows between entities over time.
 
+### tl;dr 
 
-### WRITTEN BY A HUMAN
+Vibe code complex social network simulations, like "Simulate the day before the Declaration of Independence." or "Simulate a colony on Mars, exploring a new zone for the first time on a 10 day trip." Ask your coding agent to pull the repo, setup OPENROUTER_API_KEY in .env and you are ready to go. 
+
+
+### INTRO WRITTEN BY A HUMAN
 ## the rest co-authored by AI
 
 *Timepoint Daedalus enables "synthetic time travel".*
 
 Since I was a kid, I have wanted a portal where I could travel to any place, at any time. As we progress towards an immersive VR future, with post-intelligence models, it feels more and more plausible to soon experience something like my childhood dream, but sitting at home at my desk on any given afternoon. This repo is a step towards that, and I hope you'll join me in bringing it to life. Timepoint-Daedalus allows extremely detailed simulation of synthetic social networks. Critically, it allows the user to manipulate the flow of time in novel ways, including a work-backwards mode where you set a goal, like "make me the President in 2040" and it creates the most logical path backwards through time to make that dream come true. You can even ground the steps against research and LLM-based judges using tool calls. That backwards logic feature is named "PORTAL" as a reference to my own childhood dreams. Take the portal to that future, and walk backwards to today.
-
-A key point to make is that Timepoint has a novel definition of "tensor" and is generally different than the kind of pytorch tensors we all know and love. I thought about making a novel name for the Timepoint Tensor Model (TTM) but it felt disingenuous as these are for-sure tensors.
 
 Please give Timepoint-Daedalus a try if you would benefit from a tool that enables LLMs to perform powerful, highly parameterized social network simulations with very little initial configuration. 
 
@@ -82,7 +87,7 @@ Timepoint meets you where you are.
 ## Quick Start
 
 ```bash
-git clone https://github.com/realityinspector/timepoint-daedalus.git
+git clone https://github.com/timepoint-ai/timepoint-daedalus.git
 cd timepoint-daedalus
 pip install -r requirements.txt
 
