@@ -26,7 +26,7 @@ Since I was a kid, I have wanted a portal where I could travel to any place, at 
 
 A key point to make is that Timepoint has a novel definition of "tensor" and is generally different than the kind of pytorch tensors we all know and love. I thought about making a novel name for the Timepoint Tensor Model (TTM) but it felt disingenuous as these are for-sure tensors.
 
-Please give Timepoint-Daedalus a try if you would benefit from a tool that enables LLMs to perform powerful, highly parameterized social network simulations with very little initial configuration. Training data auto-uploads to [Oxen.ai](https://oxen.ai) for versioning and fine-tuning if you set `OXEN_API_KEY` — otherwise it saves locally as JSONL and SQLite.
+Please give Timepoint-Daedalus a try if you would benefit from a tool that enables LLMs to perform powerful, highly parameterized social network simulations with very little initial configuration. 
 
 #### Quickstart: 
 
@@ -44,7 +44,9 @@ To output structured training data for each character to fine-tune models for in
 prompt: You are going to operate a typed social network graph simulation generator, Timepoint-Daedalus, to render training data for roleplaying finetunes. Read the markdown documents, then give me a few choices for templates to run to generate sample data.
 ```
 
-My experience so far is that the models finetuned around Timepoint output are powerful predictors of human and corporate behavior.
+Training data auto-uploads to [Oxen.ai](https://oxen.ai) for versioning and fine-tuning if you set `OXEN_API_KEY` — otherwise it saves locally as JSONL and SQLite. I chose Oxen because it easily finetunes small models from this output. 
+
+*My experience so far is that the models finetuned around Timepoint output are powerful predictors of human and corporate behavior.* 
 
 _[x.com/seanmcdonaldxyz](https://x.com/seanmcdonaldxyz)_
 
