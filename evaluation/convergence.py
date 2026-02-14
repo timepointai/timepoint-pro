@@ -6,16 +6,34 @@ The unique value of Timepoint: it predicts causal mechanisms, not just outcomes.
 This module measures whether multiple runs of the same scenario produce
 consistent causal chains - convergence indicates robust mechanisms.
 
+Two levels of convergence analysis are provided:
+
+1. **Structural consistency** (edge-level): Measures whether runs produce the
+   same causal graph edges via Jaccard similarity. High structural convergence
+   means runs agree on exact causal links (who told whom, which timepoints
+   connect). See ``graph_similarity`` and ``compute_convergence``.
+
+2. **Outcome convergence** (outcome-level): Measures whether runs reach the
+   same high-level conclusions even when the specific edges differ. Two runs
+   where different characters discover contamination should count as convergent
+   for the outcome, even if the precise information-flow paths diverge. See
+   ``extract_outcome_summary``, ``outcome_similarity``, and
+   ``compute_outcome_convergence``.
+
 Key concepts:
 - CausalGraph: Structured representation of timepoint chains + knowledge flow
 - Convergence: Agreement across independent runs (different models/seeds/modes)
 - Divergence points: Specific causal links where runs disagree
+- Outcome summary: High-level characterisation (knowledge discovered, entity
+  roles, critical entities, event ordering) derived from graph structure
 """
 
+from collections import Counter
 from dataclasses import dataclass, field
 from typing import List, Set, Tuple, Dict, Optional, Any
 from datetime import datetime
 from itertools import combinations
+import hashlib
 import json
 import logging
 
@@ -482,3 +500,310 @@ def compute_convergence_from_graphs(graphs: List[CausalGraph]) -> ConvergenceRes
         consensus_edges=consensus_edges,
         contested_edges=contested_edges,
     )
+
+
+# ---------------------------------------------------------------------------
+# Outcome-level convergence analysis
+# ---------------------------------------------------------------------------
+
+
+def _jaccard(a: set, b: set) -> float:
+    """Jaccard similarity between two sets.  Returns 1.0 when both are empty."""
+    if not a and not b:
+        return 1.0
+    if not a or not b:
+        return 0.0
+    return len(a & b) / len(a | b)
+
+
+def _classify_entity_role(in_degree: int, out_degree: int) -> str:
+    """Classify an entity's role from its knowledge-edge degrees.
+
+    * **source**: only outgoing knowledge edges (out > 0, in == 0)
+    * **sink**: only incoming knowledge edges (in > 0, out == 0)
+    * **relay**: both incoming and outgoing knowledge edges
+    * **isolated**: no knowledge edges at all
+    """
+    if out_degree > 0 and in_degree == 0:
+        return "source"
+    elif in_degree > 0 and out_degree == 0:
+        return "sink"
+    elif in_degree > 0 and out_degree > 0:
+        return "relay"
+    else:
+        return "isolated"
+
+
+def _betweenness_from_knowledge_edges(
+    entities: Set[str],
+    knowledge_edges: Set[Tuple[str, str]],
+) -> Dict[str, float]:
+    """Approximate betweenness centrality for entities on the knowledge graph.
+
+    Uses Brandes-style BFS from every source node.  The graph is treated as
+    directed (knowledge flows from source to target).  Entities that sit on
+    more shortest paths between other entities are considered more "critical"
+    to the information flow.
+
+    Returns a dict mapping entity_id -> betweenness score (unnormalised).
+    """
+    # Build adjacency list
+    adjacency: Dict[str, List[str]] = {e: [] for e in entities}
+    for src, tgt in knowledge_edges:
+        if src in adjacency:
+            adjacency[src].append(tgt)
+
+    betweenness: Dict[str, float] = {e: 0.0 for e in entities}
+
+    for source in entities:
+        # BFS from source
+        stack: List[str] = []
+        predecessors: Dict[str, List[str]] = {e: [] for e in entities}
+        sigma: Dict[str, int] = {e: 0 for e in entities}
+        sigma[source] = 1
+        dist: Dict[str, int] = {e: -1 for e in entities}
+        dist[source] = 0
+        queue: List[str] = [source]
+
+        while queue:
+            v = queue.pop(0)
+            stack.append(v)
+            for w in adjacency.get(v, []):
+                # First visit?
+                if dist[w] < 0:
+                    dist[w] = dist[v] + 1
+                    queue.append(w)
+                # Shortest path via v?
+                if dist[w] == dist[v] + 1:
+                    sigma[w] += sigma[v]
+                    predecessors[w].append(v)
+
+        # Back-propagation of dependencies
+        delta: Dict[str, float] = {e: 0.0 for e in entities}
+        while stack:
+            w = stack.pop()
+            for v in predecessors[w]:
+                if sigma[w] > 0:
+                    delta[v] += (sigma[v] / sigma[w]) * (1.0 + delta[w])
+            if w != source:
+                betweenness[w] += delta[w]
+
+    return betweenness
+
+
+def extract_outcome_summary(graph: CausalGraph) -> Dict[str, Any]:
+    """Extract high-level outcome characteristics from a causal graph.
+
+    Rather than comparing individual edges, this function distills the graph
+    into an *outcome summary* that captures what happened at a macro level:
+
+    * ``knowledge_discovered`` -- set of information items that were
+      propagated, derived from the endpoints of knowledge edges.
+    * ``entity_roles`` -- mapping of each entity to its role in the
+      information flow (``source``, ``sink``, ``relay``, or ``isolated``).
+    * ``critical_entities`` -- the entities with the highest betweenness
+      centrality in the knowledge graph (most knowledge edges pass through
+      them).
+    * ``event_sequence_hash`` -- a deterministic hash of the normalised
+      temporal-edge sequence, useful for checking whether two runs follow
+      the same event ordering.
+
+    Args:
+        graph: A :class:`CausalGraph` extracted from a single simulation run.
+
+    Returns:
+        Dictionary with the four keys described above.
+    """
+    # -- knowledge_discovered ------------------------------------------------
+    # Each knowledge edge (source, target) represents a piece of information
+    # being transferred.  We treat the frozenset {source, target} as the
+    # canonical name for that information item so that direction does not
+    # matter when comparing across runs.
+    knowledge_discovered: Set[frozenset] = set()
+    for src, tgt in graph.knowledge_edges:
+        knowledge_discovered.add(frozenset({src, tgt}))
+
+    # -- entity_roles --------------------------------------------------------
+    in_degree: Counter = Counter()
+    out_degree: Counter = Counter()
+    for src, tgt in graph.knowledge_edges:
+        out_degree[src] += 1
+        in_degree[tgt] += 1
+
+    entity_roles: Dict[str, str] = {}
+    for entity in graph.entities:
+        entity_roles[entity] = _classify_entity_role(
+            in_degree.get(entity, 0),
+            out_degree.get(entity, 0),
+        )
+
+    # -- critical_entities ---------------------------------------------------
+    betweenness = _betweenness_from_knowledge_edges(
+        graph.entities, graph.knowledge_edges,
+    )
+    if betweenness:
+        max_score = max(betweenness.values())
+        # Threshold: entities with betweenness >= 80 % of max are "critical".
+        # When max_score is 0 (no paths), nothing is critical.
+        if max_score > 0:
+            threshold = max_score * 0.8
+            critical_entities: Set[str] = {
+                e for e, score in betweenness.items() if score >= threshold
+            }
+        else:
+            critical_entities = set()
+    else:
+        critical_entities = set()
+
+    # -- event_sequence_hash -------------------------------------------------
+    # Sort temporal edges into a deterministic sequence and hash the result.
+    # Sorting by (source, target) gives a canonical ordering that is stable
+    # across runs regardless of insertion order.
+    sorted_temporal = sorted(graph.temporal_edges)
+    sequence_str = json.dumps(sorted_temporal, sort_keys=True)
+    event_sequence_hash = hashlib.sha256(sequence_str.encode("utf-8")).hexdigest()
+
+    return {
+        "knowledge_discovered": knowledge_discovered,
+        "entity_roles": entity_roles,
+        "critical_entities": critical_entities,
+        "event_sequence_hash": event_sequence_hash,
+    }
+
+
+def outcome_similarity(o1: Dict[str, Any], o2: Dict[str, Any]) -> float:
+    """Compute weighted similarity between two outcome summaries.
+
+    The similarity is a weighted combination of four components:
+
+    * **knowledge Jaccard** (weight 0.4) -- Jaccard similarity between the
+      ``knowledge_discovered`` sets.
+    * **critical-entity Jaccard** (weight 0.3) -- Jaccard similarity between
+      the ``critical_entities`` sets.
+    * **role match rate** (weight 0.2) -- fraction of entities (present in
+      either summary) that are assigned the same role.
+    * **sequence similarity** (weight 0.1) -- 1.0 if the
+      ``event_sequence_hash`` values are identical, 0.0 otherwise.
+
+    Args:
+        o1: Outcome summary from :func:`extract_outcome_summary`.
+        o2: Outcome summary from :func:`extract_outcome_summary`.
+
+    Returns:
+        Similarity score in [0.0, 1.0].
+    """
+    # 1. Knowledge Jaccard (0.4)
+    knowledge_sim = _jaccard(o1["knowledge_discovered"], o2["knowledge_discovered"])
+
+    # 2. Critical-entity Jaccard (0.3)
+    critical_sim = _jaccard(o1["critical_entities"], o2["critical_entities"])
+
+    # 3. Role match rate (0.2)
+    all_entities = set(o1["entity_roles"].keys()) | set(o2["entity_roles"].keys())
+    if all_entities:
+        matches = sum(
+            1 for e in all_entities
+            if o1["entity_roles"].get(e) == o2["entity_roles"].get(e)
+        )
+        role_sim = matches / len(all_entities)
+    else:
+        role_sim = 1.0  # Both empty
+
+    # 4. Sequence similarity (0.1)
+    sequence_sim = 1.0 if o1["event_sequence_hash"] == o2["event_sequence_hash"] else 0.0
+
+    return (
+        0.4 * knowledge_sim
+        + 0.3 * critical_sim
+        + 0.2 * role_sim
+        + 0.1 * sequence_sim
+    )
+
+
+def compute_outcome_convergence(
+    graphs: List[CausalGraph],
+) -> Dict[str, Any]:
+    """Compute outcome-level convergence across multiple simulation runs.
+
+    This complements :func:`compute_convergence_from_graphs` (which measures
+    *structural consistency* at the edge level) by measuring whether the runs
+    reach the same high-level outcomes.
+
+    Args:
+        graphs: List of :class:`CausalGraph` objects (at least 2).
+
+    Returns:
+        Dictionary with the following keys:
+
+        * ``outcome_mean_similarity`` -- average pairwise outcome similarity.
+        * ``structural_mean_similarity`` -- average pairwise edge-level
+          Jaccard similarity (the existing metric, included for comparison).
+        * ``knowledge_convergence`` -- fraction of knowledge items that appear
+          in *every* run.
+        * ``role_stability`` -- fraction of entities that are assigned the
+          same role in *every* run in which they appear.
+
+    Raises:
+        ValueError: If fewer than 2 graphs are provided.
+    """
+    if len(graphs) < 2:
+        raise ValueError("Need at least 2 graphs to compute outcome convergence")
+
+    # Extract outcome summaries
+    summaries = [extract_outcome_summary(g) for g in graphs]
+
+    # -- outcome_mean_similarity ---------------------------------------------
+    outcome_sims: List[float] = []
+    for s1, s2 in combinations(summaries, 2):
+        outcome_sims.append(outcome_similarity(s1, s2))
+    outcome_mean = sum(outcome_sims) / len(outcome_sims) if outcome_sims else 0.0
+
+    # -- structural_mean_similarity ------------------------------------------
+    structural_sims: List[float] = []
+    for g1, g2 in combinations(graphs, 2):
+        structural_sims.append(graph_similarity(g1, g2))
+    structural_mean = (
+        sum(structural_sims) / len(structural_sims) if structural_sims else 0.0
+    )
+
+    # -- knowledge_convergence -----------------------------------------------
+    # Fraction of distinct knowledge items that appear in ALL runs.
+    all_knowledge: Set[frozenset] = set()
+    knowledge_counts: Counter = Counter()
+    for s in summaries:
+        for item in s["knowledge_discovered"]:
+            all_knowledge.add(item)
+            knowledge_counts[item] += 1
+    n_runs = len(graphs)
+    if all_knowledge:
+        universal_knowledge = sum(
+            1 for item in all_knowledge if knowledge_counts[item] == n_runs
+        )
+        knowledge_convergence = universal_knowledge / len(all_knowledge)
+    else:
+        knowledge_convergence = 1.0  # No knowledge in any run -- vacuously converged
+
+    # -- role_stability ------------------------------------------------------
+    # For each entity that appears in at least one run, check whether it has
+    # the same role in every run where it appears.
+    entity_role_sets: Dict[str, Set[str]] = {}
+    for s in summaries:
+        for entity, role in s["entity_roles"].items():
+            if entity not in entity_role_sets:
+                entity_role_sets[entity] = set()
+            entity_role_sets[entity].add(role)
+
+    if entity_role_sets:
+        stable_count = sum(
+            1 for roles in entity_role_sets.values() if len(roles) == 1
+        )
+        role_stability = stable_count / len(entity_role_sets)
+    else:
+        role_stability = 1.0  # No entities -- vacuously stable
+
+    return {
+        "outcome_mean_similarity": outcome_mean,
+        "structural_mean_similarity": structural_mean,
+        "knowledge_convergence": knowledge_convergence,
+        "role_stability": role_stability,
+    }

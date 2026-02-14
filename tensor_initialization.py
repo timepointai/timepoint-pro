@@ -8,7 +8,7 @@ This replaces the old prospection-based initialization (which created bias leaka
 The new approach:
 1. Baseline initialization: Create empty tensor schema from entity metadata (instant, no LLM)
 2. LLM-guided population: 2-3 refinement loops to populate tensor values
-3. Parallel training: LangGraph-based simulated dialogs with quasi-backprop
+3. Parallel refinement: LangGraph-based simulated dialogs with iterative tensor updates
 4. Maturity index: Quality gate ensuring tensor is operational (>= 0.95 maturity)
 5. Optional prospection: M15 becomes truly optional again
 
@@ -421,7 +421,7 @@ def populate_tensor_llm_guided(
     """
     Populate tensor values through LLM-guided refinement loops.
 
-    This is the "quasi-backprop" step where LLM iteratively refines tensor
+    LLM-guided iterative refinement step where LLM refines tensor
     values based on:
     - Loop 1: Entity metadata analysis
     - Loop 2: Graph structure and relationships
@@ -814,7 +814,7 @@ def train_tensor_to_maturity(
     The actual implementation would:
     1. Launch parallel LangGraph instances
     2. Simulate dialogs/interactions
-    3. Compute gradients (quasi-backprop)
+    3. Compute state deltas (iterative refinement)
     4. Update tensor values
     5. Recompute maturity
     6. Continue until maturity >= target_maturity

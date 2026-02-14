@@ -797,10 +797,17 @@ Rate:
 
     def _resolve_prophecies(self, path: CyclicalPath):
         """Walk path states, compute prophecy fulfillment rates."""
-        path_prophecies = [p for p in self.prophecies if p.get('path_idx', -1) == self.all_paths.index(path) if path in self.all_paths]
+        # Find path index by identity (id()) since CyclicalPath may not support equality
+        path_idx = None
+        for i, p in enumerate(self.all_paths):
+            if p is path:
+                path_idx = i
+                break
 
-        # If path not yet in all_paths, use all prophecies
-        if not path_prophecies:
+        if path_idx is not None:
+            path_prophecies = [p for p in self.prophecies if p.get('path_idx', -1) == path_idx]
+        else:
+            # Path not yet in all_paths — use all prophecies
             path_prophecies = self.prophecies
 
         if not path_prophecies:

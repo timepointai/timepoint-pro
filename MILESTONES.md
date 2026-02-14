@@ -42,12 +42,12 @@ Each mode has its own validation rules, fidelity allocation strategy, and genera
 
 **Data Integrity:**
 - **SQLite persistence** — `metadata/runs.db` for run tracking, `timepoint.db` for temp per-run data
-- **Convergence evaluation** — Causal graph consistency analysis with E2E testing mode
+- **Convergence evaluation** — Structural (edge Jaccard) and outcome-level (role stability, knowledge convergence) analysis with E2E testing mode
 - **Entity inference in Portal mode** — LLM-based `entities_present` inference
 - **Data quality validation** — Validates entity references, empty entities_present detection
 
 **Output:**
-- **15 simulation templates** — Showcase (including portal and full-mechanism Castaway Colony), and convergence categories
+- **21 simulation templates** — All verified with live LLM calls (Feb 2026): 12 showcase, 5 persona, 3 convergence, 1 comprehensive convergence
 - **Narrative exports** — Markdown, JSON, PDF generation
 - **API backend** — FastAPI REST API
 
@@ -78,7 +78,7 @@ Current Architecture:
 │   └── providers/ — OpenRouter integration
 ├── nl_interface/ — Natural language input
 │   └── adapter.py — NLToProductionAdapter
-├── generation/templates/ — 15 verified JSON simulation templates with patch metadata
+├── generation/templates/ — 21 verified JSON simulation templates with patch metadata
 ├── synth/ — SynthasAIzer control layer (ADPRS waveforms, envelopes, voices, events)
 ├── validation.py (1,365 lines) — 5 physics validators
 ├── storage.py — SQLite persistence + transaction support
@@ -465,7 +465,7 @@ Broad accessibility and ecosystem.
 | Directorial mode strategy | **COMPLETE** | `workflows/directorial_strategy.py` (~800 lines), arc engine, camera system |
 | Cyclical mode strategy | **COMPLETE** | `workflows/cyclical_strategy.py` (~900 lines), prophecy system, causal loops |
 | Directorial templates | **COMPLETE** | `hound_shadow_directorial` (verified); macbeth/heist/courtroom removed as pending |
-| Cyclical templates | **REMOVED** | Pending templates removed; mode strategies remain implemented |
+| Cyclical templates | **COMPLETE** | `agent4_elk_migration` verified: 5 paths, 5 cycles, prophecy resolution, coherence 0.727 |
 | Castaway Colony showcase | **COMPLETE** | `castaway_colony_branching` — all 19 mechanisms, 10 entities, 3 branches, first M1/M2/M4/M5/M6/M9/M18 template |
 | Portal scoring stubs | **COMPLETE** | 5 methods now use real LLM-based evaluation |
 | NONLINEAR mode removal | **COMPLETE** | Removed from codebase, now 5 modes |
@@ -473,12 +473,18 @@ Broad accessibility and ecosystem.
 | ADPRS shadow persistence | **COMPLETE** | Shadow reports persisted to run metadata for cross-run analysis |
 | ADPRS cross-run warm-start | **COMPLETE** | Prior envelopes loaded from shared DB, re-persisted after fitting |
 | ADPRS early scheduler init | **COMPLETE** | Waveform scheduler initialized from prior envelopes before timepoint generation |
+| QuantitativeStateEngine | **COMPLETE** | `workflows/quantitative_state.py` — deterministic resource propagation per entity per timepoint |
+| Outcome-level convergence | **COMPLETE** | `evaluation/convergence.py` — `extract_outcome_summary()`, `outcome_similarity()`, `compute_outcome_convergence()` |
+| M4 constraint enforcement | **COMPLETE** | Rebuilt from 2 age checks to full resource constraint validation, renamed from "Physics Validation" |
+| Training data variance fix | **COMPLETE** | Entity-specific energy, event-derived importance, full knowledge extraction |
+| Voice distinctiveness scoring | **COMPLETE** | `_check_voice_distinctiveness()` in dialog_synthesis.py, anti-hedging instructions, few-shot voice examples |
+| Full 21-template verification | **COMPLETE** | All templates pass with live LLM calls: $4.09 total, 6,279 calls, 94 entities, 169 timepoints, 515 training examples |
 
 ---
 
 ## Reality Check
 
-**Where we are:** Working research prototype with 19 mechanisms, intelligent model selection, parallel execution, **complete tensor persistence system** (329+ tests), **improved data integrity** (January 2026 fixes), **full temporal mode implementations** (February 2026), and **full-mechanism showcase template** (Castaway Colony — all 19 mechanisms verified in a single scenario).
+**Where we are:** Working research prototype with 19 mechanisms, intelligent model selection, parallel execution, **complete tensor persistence system** (329+ tests), **improved data integrity** (January 2026 fixes), **full temporal mode implementations** (February 2026), **full-mechanism showcase template** (Castaway Colony — all 19 mechanisms verified in a single scenario), and **21 verified templates across all 5 temporal modes** (February 13, 2026 — 100% pass rate, $4.09 total cost).
 
 **What works:**
 - Single-run and parallel simulations with full temporal reasoning
@@ -496,7 +502,7 @@ Broad accessibility and ecosystem.
 - **Data quality validation** (empty entities_present detection, entity reference validation)
 - **Entity persistence to shared DB** (enables cross-run convergence analysis)
 - **All 5 temporal modes fully implemented** (PEARL, DIRECTORIAL, BRANCHING, CYCLICAL, PORTAL)
-- **6 new showcase templates** (3 directorial, 3 cyclical)
+- **21 verified templates total** (12 showcase, 5 persona, 3 convergence, 1 comprehensive convergence)
 - **Robust JSON extraction** (bracket-depth matching replaces greedy regex in response parser)
 - **Arousal decay system** (exponential decay prevents emotional saturation at 1.0)
 - **Dialog entity anchoring** (explicit character roster prevents LLM hallucinating unrelated speakers)
@@ -505,6 +511,11 @@ Broad accessibility and ecosystem.
 - **Mars Mission Portal template** (first verified portal template — backward reasoning from 2031 to 2026, ADPRS envelopes in template config, dialog enabled)
 - **Castaway Colony template** (first full-mechanism showcase — all 19 mechanisms including 7 previously unverified: M1, M2, M4, M5, M6, M9, M18)
 - **ADPRS production pipeline** (per-entity waveform gating in dialog synthesis, shadow evaluation persistence to metadata, cross-run warm-start fitting from shared DB)
+- **QuantitativeStateEngine** (deterministic resource propagation — O2, power, thermal, population, etc. — per entity per timepoint, integrated into e2e_runner)
+- **Outcome-level convergence** (role stability, knowledge convergence, outcome similarity — beyond structural edge Jaccard)
+- **21 verified templates** (all 5 temporal modes, all persona categories, all convergence tiers — 100% pass rate, Feb 13 2026)
+- **Voice distinctiveness scoring** (anti-hedging, few-shot character voice examples, post-synthesis validation scoring 0.82–1.00)
+- **Training data variance fix** (entity-specific energy costs, event-derived importance, full knowledge extraction — replaces zero-variance pre-fix data)
 
 **What's missing:** External integrations, production containerization (Dockerfile/Compose), distributed execution. Development containerization exists via `claude-container.sh`.
 

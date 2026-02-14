@@ -147,9 +147,9 @@ def validate_behavioral_inertia(entity: Entity, context: Dict) -> Dict:
     return {"valid": True, "message": "Behavioral inertia satisfied"}
 
 @Validator.register("biological_constraints", "ERROR")
-@track_mechanism("M4", "physics_validation")
+@track_mechanism("M4", "constraint_enforcement")
 def validate_biological_constraints(entity: Entity, context: Dict) -> Dict:
-    """Validate age-dependent capabilities"""
+    """Validate age-dependent capabilities and biological plausibility"""
     # Handle both Entity and EntityPopulation types
     from schemas import EntityPopulation  # Canonical location (breaks circular dep)
 
@@ -162,12 +162,30 @@ def validate_biological_constraints(entity: Entity, context: Dict) -> Dict:
         return {"valid": True, "message": "No age data available"}
 
     action = context.get("action", "")
+    violations = []
 
+    # Age-based constraint checks
     if age > 100 and "physical_labor" in action:
-        return {"valid": False, "message": f"Entity age {age} incompatible with physical labor"}
-    if age < 18 and age > 50 and "childbirth" in action:
-        return {"valid": False, "message": f"Entity age {age} incompatible with childbirth"}
+        violations.append(f"age {age} incompatible with physical labor")
+    if (age < 18 or age > 50) and "childbirth" in action:
+        violations.append(f"age {age} outside plausible childbirth range (18-50)")
+    if age < 5 and any(a in action for a in ["negotiate", "strategic_planning", "combat"]):
+        violations.append(f"age {age} incompatible with {action}")
+    if age > 80 and any(a in action for a in ["sprint", "heavy_lifting", "combat"]):
+        violations.append(f"age {age} incompatible with {action}")
 
+    # Resource constraint checks (if quantitative state available)
+    resource_state = context.get("resource_state", {})
+    for resource_name, value in resource_state.items():
+        constraint = context.get("resource_constraints", {}).get(resource_name)
+        if constraint:
+            if "min" in constraint and value < constraint["min"]:
+                violations.append(f"{resource_name} ({value:.1f}) below minimum ({constraint['min']})")
+            if "max" in constraint and value > constraint["max"]:
+                violations.append(f"{resource_name} ({value:.1f}) above maximum ({constraint['max']})")
+
+    if violations:
+        return {"valid": False, "message": f"Constraint violations: {'; '.join(violations)}"}
     return {"valid": True, "message": "Biological constraints satisfied"}
 
 @Validator.register("network_flow", "WARNING")

@@ -36,11 +36,17 @@ class EvaluationMetrics:
         result = validate_information_conservation(entity, context, self.store)
         return 1.0 if result["valid"] else 0.0
     
-    def biological_plausibility_score(self, entity: Entity, actions: List[str]) -> float:
-        """Constraint violation rate"""
+    def biological_plausibility_score(self, entity: Entity, actions: List[str],
+                                      resource_state: Dict = None,
+                                      resource_constraints: Dict = None) -> float:
+        """Constraint enforcement violation rate (M4)"""
         violations = 0
         for action in actions:
             context = {"action": action}
+            if resource_state:
+                context["resource_state"] = resource_state
+            if resource_constraints:
+                context["resource_constraints"] = resource_constraints
             result = validate_biological_constraints(entity, context)
             if not result["valid"]:
                 violations += 1

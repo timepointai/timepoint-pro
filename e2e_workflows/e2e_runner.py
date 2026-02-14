@@ -799,6 +799,9 @@ class FullE2EWorkflowRunner:
                 # Step 2: Generate initial scene
                 scene_result = self._generate_initial_scene(config, run_id)
 
+                # Step 2.4: Initialize Quantitative State Engine (QSE)
+                self._initialize_qse(config, scene_result)
+
                 # Step 2.5: Initialize baseline tensors (NEW - Phase 11 Architecture Pivot)
                 self._initialize_baseline_tensors(scene_result, run_id)
 
@@ -1209,6 +1212,35 @@ class FullE2EWorkflowRunner:
             )
 
             return result
+
+    def _initialize_qse(self, config, scene_result: Dict) -> None:
+        """
+        Step 2.4: Initialize Quantitative State Engine for deterministic resource propagation.
+
+        Loads resource definitions from template's quantitative_tracking field
+        and initializes per-entity resource state.
+        """
+        from workflows.quantitative_state import QuantitativeStateEngine
+
+        self._qse = QuantitativeStateEngine()
+
+        # Load from template config (reads quantitative_tracking field)
+        template_config = config.metadata if config.metadata else {}
+        self._qse.load_from_template(template_config)
+
+        if not self._qse.is_active:
+            # Also try loading from the config object directly
+            if hasattr(config, 'to_dict'):
+                self._qse.load_from_template(config.to_dict())
+
+        # Initialize per-entity resource state
+        if self._qse.is_active:
+            entities = scene_result.get("entities", [])
+            for entity in entities:
+                entity_config = getattr(entity, 'entity_metadata', {}).get('key_state_variables', {})
+                self._qse.initialize_entity(entity.entity_id, entity_config)
+            print(f"  [QSE] Initialized {len(self._qse.resource_definitions)} tracked resources "
+                  f"for {len(entities)} entities")
 
     def _initialize_baseline_tensors(
         self, scene_result: Dict, run_id: str
@@ -1901,10 +1933,29 @@ class FullE2EWorkflowRunner:
                         )
                         context["next_event"] = event_desc
 
+                    # Inject quantitative state into context for LLM
+                    if hasattr(self, '_qse') and self._qse and self._qse.is_active:
+                        context["resource_state"] = self._qse.get_state_summary()
+
                     next_timepoint = temporal_agent.generate_next_timepoint(
                         current_timepoint,
                         context=context
                     )
+
+                    # Propagate quantitative state (deterministic, not LLM-generated)
+                    if hasattr(self, '_qse') and self._qse and self._qse.is_active:
+                        entity_ids = next_timepoint.entities_present or []
+                        qse_result = self._qse.propagate(
+                            timepoint_id=next_timepoint.timepoint_id,
+                            entity_ids=entity_ids
+                        )
+                        # Store resource state in timepoint metadata
+                        if not hasattr(next_timepoint, 'metadata') or next_timepoint.metadata is None:
+                            next_timepoint.metadata = {}
+                        if isinstance(next_timepoint.metadata, dict):
+                            next_timepoint.metadata["resource_state"] = qse_result.global_resources
+                        if qse_result.triggered_events:
+                            print(f"    [QSE] Resource events: {qse_result.triggered_events}")
 
                     # Save to database (temp DB for workflow)
                     store.save_timepoint(next_timepoint)

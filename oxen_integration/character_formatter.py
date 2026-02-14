@@ -416,8 +416,8 @@ Respond with:
             # M3: Exposure Events
             "exposure_events": exposure_list,
 
-            # M4: Physics Validation (embodied in physical/cognitive tensors)
-            "physics_validated": True,
+            # M4: Constraint Enforcement (biological + resource constraints)
+            "constraints_enforced": True,
 
             # M5: Query Resolution
             "query_driven": getattr(entity, 'query_count', 0) > 0,
@@ -705,8 +705,8 @@ Respond with:
         if entity_id in exposure_events and len(exposure_events[entity_id]) > 0:
             mechanisms.append("M3_exposure_events")
 
-        # M4: Physics validation (always validated)
-        mechanisms.append("M4_physics_validation")
+        # M4: Constraint enforcement (always validated)
+        mechanisms.append("M4_constraint_enforcement")
 
         # M5: Query resolution (if entity has been queried)
         if getattr(entity, 'query_count', 0) > 0:

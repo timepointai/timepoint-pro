@@ -397,7 +397,7 @@ class CompanyConfig(BaseModel):
     @field_validator('resolution')
     @classmethod
     def validate_resolution(cls, v):
-        valid_resolutions = {"year", "quarter", "month", "day", "hour", "minute", "second"}
+        valid_resolutions = {"year", "quarter", "month", "week", "day", "hour", "minute", "second"}
         if v not in valid_resolutions:
             raise ValueError(f"Invalid resolution. Must be one of: {valid_resolutions}")
         return v

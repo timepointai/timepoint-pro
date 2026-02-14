@@ -393,7 +393,7 @@ Each entity carries a multi-dimensional cognitive and physical tensor, compresse
 | M5 | `synthesize_response` | 6 | Lazy resolution on-demand synthesis |
 | M9 | `detect_entity_gap` | 6 | Missing entity auto-detection |
 | M2 | `progressive_training_check` | 4 | Entity quality improvement tracking |
-| M4 | `validate_biological_constraints` | 4 | Physics/biology constraint validation |
+| M4 | `validate_biological_constraints` | 4 | Constraint enforcement (biological/structural) |
 | M6 | `create_baseline_tensor` | 4 | Initial tensor creation |
 | M6 | `populate_tensor_llm_guided` | 4 | LLM-guided tensor population |
 | M1+M17 | `determine_fidelity_temporal_strategy` | 2 | Joint fidelity + temporal planning |

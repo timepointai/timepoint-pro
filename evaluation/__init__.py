@@ -19,6 +19,9 @@ from evaluation.convergence import (
     graph_similarity,
     compute_convergence,
     find_divergence_points,
+    extract_outcome_summary,
+    outcome_similarity,
+    compute_outcome_convergence,
 )
 
 __all__ = [
@@ -28,4 +31,7 @@ __all__ = [
     "graph_similarity",
     "compute_convergence",
     "find_divergence_points",
+    "extract_outcome_summary",
+    "outcome_similarity",
+    "compute_outcome_convergence",
 ]

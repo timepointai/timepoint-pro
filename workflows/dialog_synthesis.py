@@ -552,6 +552,166 @@ def _derive_speaking_style(personality_traits: List[str], archetype_id: str = ""
     return style
 
 
+def _generate_voice_examples(speaking_style: Dict[str, str], character_id: str) -> List[str]:
+    """
+    Generate 2-3 few-shot example lines showing how a character with this
+    specific speaking style combination should sound.
+
+    These examples are injected prominently into the dialog prompt so the LLM
+    has concrete models for each character's voice, rather than abstract JSON
+    descriptors that get buried among other instructions.
+
+    Args:
+        speaking_style: Dict with verbosity, formality, tone, vocabulary, speech_pattern
+        character_id: Character name for logging context
+
+    Returns:
+        List of 2-3 example dialog lines demonstrating the voice
+    """
+    verbosity = speaking_style.get("verbosity", "moderate")
+    formality = speaking_style.get("formality", "neutral")
+    tone = speaking_style.get("tone", "neutral")
+    vocabulary = speaking_style.get("vocabulary", "general")
+    speech_pattern = speaking_style.get("speech_pattern", "direct")
+
+    # Build examples from the combination of style axes.
+    # We use a lookup keyed on (verbosity, tone) as the primary axes,
+    # then modulate by formality, vocabulary, and speech_pattern.
+
+    # --- Base examples by verbosity x tone ---
+    base_examples = {
+        ("terse", "cold"): [
+            "The data doesn't support that.",
+            "Show me the numbers.",
+            "Unacceptable. Next.",
+        ],
+        ("terse", "warm"): [
+            "Hey, good work on this.",
+            "I trust your call.",
+            "Let's make it happen.",
+        ],
+        ("terse", "neutral"): [
+            "Noted. Move on.",
+            "What's the timeline?",
+            "Fine. Proceed.",
+        ],
+        ("terse", "passionate"): [
+            "This matters. Do it now.",
+            "We can't afford to lose this!",
+            "No more delays.",
+        ],
+        ("verbose", "cold"): [
+            "If you examine the quarterly projections, you'll notice the variance exceeds acceptable thresholds by a considerable margin.",
+            "I've reviewed every contingency. None of them address the fundamental structural problem.",
+            "Let me be precise: the current trajectory leads to a 40% shortfall, and sentiment won't change that.",
+        ],
+        ("verbose", "warm"): [
+            "I really think if we take the time to look at this from everyone's perspective, we'll find something that works for the whole team.",
+            "You know, what I love about this approach is how it brings together so many different ideas we've been kicking around.",
+            "Let me share something that might help — I went through a similar situation a few years back.",
+        ],
+        ("verbose", "neutral"): [
+            "There are several factors to consider here, including the timeline, the resource allocation, and the stakeholder expectations.",
+            "Let me walk through the analysis step by step so we're all on the same page.",
+            "The situation is more nuanced than it appears at first glance, and I think it warrants a thorough discussion.",
+        ],
+        ("verbose", "passionate"): [
+            "This is exactly the kind of opportunity that comes once in a generation, and we would be fools to let it slip through our fingers!",
+            "I've spent months building this case, and every single data point confirms what I've been saying from the start.",
+            "We are standing at a crossroads, and the choice we make today will define everything that follows.",
+        ],
+        ("moderate", "cold"): [
+            "The proposal has structural flaws. I've outlined them in the memo.",
+            "That's a risk we shouldn't take. The downside is asymmetric.",
+            "I'll need the revised figures by Thursday. No extensions.",
+        ],
+        ("moderate", "warm"): [
+            "I think we're onto something good here. Let's keep pushing.",
+            "That's a really thoughtful point — it changes how I see the timeline.",
+            "I appreciate everyone's effort. Let's figure this out together.",
+        ],
+        ("moderate", "neutral"): [
+            "We should evaluate both options before committing.",
+            "The report raises some questions we need to address.",
+            "Let's table that for now and revisit after the review.",
+        ],
+        ("moderate", "passionate"): [
+            "This is our shot. We need to go all in.",
+            "I believe in this team. We can make this work.",
+            "The competition isn't sleeping — neither should we.",
+        ],
+    }
+
+    examples = list(base_examples.get(
+        (verbosity, tone),
+        base_examples.get((verbosity, "neutral"), [
+            "We should discuss this further.",
+            "What are the next steps?",
+            "Let me think about that.",
+        ])
+    ))
+
+    # --- Modulate by formality ---
+    if formality == "formal" and verbosity != "terse":
+        # Replace contractions and add formal markers
+        examples = [_formalize_example(ex) for ex in examples]
+    elif formality == "casual":
+        # Add casual markers
+        examples = [_casualize_example(ex) for ex in examples]
+
+    # --- Modulate by vocabulary ---
+    vocab_additions = {
+        "technical": "Frame responses using technical terminology, metrics, and data references.",
+        "philosophical": "Frame responses using abstract reasoning, analogies, and first-principles thinking.",
+        "business": "Frame responses using business language: ROI, runway, market position, deliverables.",
+        "general": "",
+    }
+
+    # --- Modulate by speech_pattern: swap one example ---
+    pattern_example = {
+        "questioning": "But have we stress-tested that assumption?",
+        "commanding": "Here's what we're doing. No debate.",
+        "elaborate": "It reminds me of what happened at the Henderson project — same dynamics, different stakes.",
+        "direct": "",
+    }
+
+    swap = pattern_example.get(speech_pattern, "")
+    if swap and len(examples) >= 3:
+        examples[2] = swap
+
+    return examples[:3]
+
+
+def _formalize_example(text: str) -> str:
+    """Apply light formalization to an example line."""
+    replacements = [
+        ("we're", "we are"), ("I've", "I have"), ("don't", "do not"),
+        ("can't", "cannot"), ("won't", "will not"), ("Let's", "Let us"),
+        ("let's", "let us"), ("I'm", "I am"), ("it's", "it is"),
+        ("isn't", "is not"), ("wasn't", "was not"), ("shouldn't", "should not"),
+        ("wouldn't", "would not"),
+    ]
+    for old, new in replacements:
+        text = text.replace(old, new)
+    return text
+
+
+def _casualize_example(text: str) -> str:
+    """Apply light casualization to an example line."""
+    replacements = [
+        ("I believe", "I think"), ("We should", "We gotta"),
+        ("Let us", "Let's"), ("do not", "don't"),
+        ("cannot", "can't"), ("will not", "won't"),
+    ]
+    for old, new in replacements:
+        text = text.replace(old, new)
+    # Add casual opener occasionally
+    if not text.startswith(("Look", "Hey", "Yeah", "So")):
+        # Only for moderate/verbose
+        pass
+    return text
+
+
 def extract_knowledge_references(content: str) -> List[str]:
     """
     DEPRECATED: Naive capitalization-based extraction.
@@ -829,6 +989,68 @@ def _derive_dialog_params_from_persona(
     return params
 
 
+def _check_voice_distinctiveness(turns: List[Dict]) -> float:
+    """
+    Check how distinct character voices are across dialog turns by detecting
+    common hedging patterns that indicate the LLM is generating generic,
+    interchangeable voices instead of differentiated ones.
+
+    Counts how many turns start with generic hedging phrases. If more than
+    30% of turns use the same hedging openers, logs a warning.
+
+    Args:
+        turns: List of dialog turn dicts with 'speaker' and 'content' keys
+
+    Returns:
+        Distinctiveness score from 0.0 (all identical hedging) to 1.0 (all distinct).
+        Score is calculated as 1.0 - (hedging_turns / total_turns).
+    """
+    if not turns:
+        return 1.0
+
+    HEDGING_PATTERNS = [
+        "i understand",
+        "that's a valid point",
+        "i see your point",
+        "i agree, but",
+        "you raise a good",
+        "i appreciate your",
+        "that's a fair",
+        "i hear what you",
+        "you make a good",
+        "with all due respect",
+        "i understand your concerns",
+        "that's a great point",
+        "you're right, but",
+        "i take your point",
+    ]
+
+    total_turns = len(turns)
+    hedging_turns = 0
+
+    for turn in turns:
+        content = turn.get("content", "").strip().lower()
+        if any(content.startswith(pattern) for pattern in HEDGING_PATTERNS):
+            hedging_turns += 1
+
+    hedging_ratio = hedging_turns / total_turns if total_turns > 0 else 0.0
+    distinctiveness = 1.0 - hedging_ratio
+
+    if hedging_ratio > 0.3:
+        logger.warning(
+            f"[M11] Low voice distinctiveness: {hedging_turns}/{total_turns} turns "
+            f"({hedging_ratio:.0%}) start with generic hedging patterns. "
+            f"Score: {distinctiveness:.2f}. Characters may sound too similar."
+        )
+    else:
+        logger.info(
+            f"[M11] Voice distinctiveness score: {distinctiveness:.2f} "
+            f"({hedging_turns}/{total_turns} hedging turns)"
+        )
+
+    return distinctiveness
+
+
 @track_mechanism("M11", "dialog_synthesis")
 def synthesize_dialog(
     entities: List[Entity],
@@ -1034,10 +1256,34 @@ def synthesize_dialog(
     entity_names = [ctx["id"] for ctx in participants_context]
     entity_name_list = ", ".join(entity_names)
 
+    # Build character-specific voice example blocks (promoted out of JSON)
+    voice_example_blocks = []
+    for ctx in participants_context:
+        char_id = ctx["id"]
+        style = ctx.get("speaking_style", {})
+        examples = _generate_voice_examples(style, char_id)
+        style_summary = f'{style.get("verbosity", "moderate")} / {style.get("formality", "neutral")} / {style.get("tone", "neutral")} / {style.get("vocabulary", "general")} / {style.get("speech_pattern", "direct")}'
+        example_lines = "\n".join(f'      "{ex}"' for ex in examples)
+        voice_example_blocks.append(
+            f"   {char_id} [{style_summary}]:\n{example_lines}"
+        )
+    voice_examples_text = "\n\n".join(voice_example_blocks)
+
     prompt = f"""Generate a realistic conversation between these {len(participants_context)} characters: {entity_name_list}.
 
 IMPORTANT: ONLY use the character IDs listed below as speakers. Do NOT invent or substitute other characters.
 The speakers MUST be exactly: {entity_name_list}
+
+============================================================
+CHARACTER VOICE GUIDE (HIGHEST PRIORITY - READ THIS FIRST)
+============================================================
+Each character below has a distinct voice. Study these examples BEFORE writing any dialog.
+Every line a character speaks MUST sound like these examples — same sentence length, same tone, same vocabulary level.
+
+{voice_examples_text}
+
+CRITICAL: Each character must sound distinct. NEVER use generic hedging like "I understand your concerns, but..." or "That's a valid point, however..." or "I see your point, but...". Characters with "terse" verbosity use SHORT sentences (under 12 words). Characters with "cold" tone do NOT acknowledge others' feelings. Characters with "commanding" speech_pattern give orders, not suggestions. Characters with "warm" tone do NOT use clinical or detached phrasing.
+============================================================
 
 PARTICIPANTS:
 {participants_json}
@@ -1072,17 +1318,10 @@ CRITICAL INSTRUCTIONS:
    - Show personality through what they emphasize
 
 6. VOICE DIFFERENTIATION (CRITICAL - Each character MUST sound distinct):
-   Use the speaking_style field for each participant:
-   - verbosity: terse = short, clipped sentences | verbose = elaborate, detailed explanations
-   - formality: casual = contractions, informal words | formal = proper grammar, honorifics
-   - tone: warm = encouraging, supportive | cold = detached, clinical | passionate = emphatic, emotional
-   - vocabulary: technical = jargon, data | philosophical = abstract, conceptual | business = metrics, strategy
-   - speech_pattern: questioning = asks clarifying questions | commanding = directives, decisions | elaborate = storytelling
-
-   EXAMPLES of distinct voices:
-   - Terse + formal + cold: "The numbers don't support this. We proceed as planned."
-   - Verbose + casual + warm: "Look, I really think we've got something special here, and if we just take a moment to consider all the possibilities..."
-   - Commanding + business + passionate: "This is our moment! I need everyone focused on the Q4 targets. No excuses."
+   Refer to the CHARACTER VOICE GUIDE above. Each character's lines must match their
+   demonstrated style. If two characters have different speaking styles, their dialog
+   lines must be OBVIOUSLY different in sentence length, word choice, and tone.
+   DO NOT let characters converge toward a shared "polite professional" voice.
 
 7. SPECIFICITY IN DECISIONS (CRITICAL - Make dialog concrete, not generic):
    When characters discuss decisions, plans, or situations, they MUST use SPECIFIC details:
@@ -1201,6 +1440,10 @@ Generate 8-12 dialog turns showing realistic interaction given these constraints
             turn_dict['timestamp'] = turn_dict['timestamp'].isoformat()
         turns_data.append(turn_dict)
 
+    # Check voice distinctiveness and log warning if characters sound too similar
+    voice_score = _check_voice_distinctiveness(turns_data)
+    print(f"    [M11] Voice distinctiveness score: {voice_score:.2f}")
+
     # Persist emotional state updates (fixes emotional_valence/arousal staying at 0.0)
     if coupled_cognitives:
         emotional_updates = _persist_emotional_state_updates(
@@ -1212,10 +1455,10 @@ Generate 8-12 dialog turns showing realistic interaction given these constraints
         if emotional_updates > 0:
             print(f"    [M11] Updated emotional state for {emotional_updates} entities after dialog")
 
-        # BACKPROP SYNC: Copy CognitiveTensor → TTMTensor after dialog
-        # This enables learning from dialog interactions - emotional changes persist to tensor
+        # STATE SYNC: Copy CognitiveTensor → TTMTensor after dialog
+        # Emotional/cognitive changes from dialog persist to the entity's tensor representation
         from schemas import CognitiveTensor
-        backprop_count = 0
+        sync_count = 0
         for entity in entities:
             # Get the updated cognitive state from entity metadata
             updated_cog_data = entity.entity_metadata.get("cognitive_tensor", {})
@@ -1223,12 +1466,12 @@ Generate 8-12 dialog turns showing realistic interaction given these constraints
                 try:
                     updated_cognitive = CognitiveTensor(**updated_cog_data)
                     if _sync_cognitive_to_ttm(entity, updated_cognitive, store=store):
-                        backprop_count += 1
+                        sync_count += 1
                 except Exception as e:
-                    logger.warning(f"[SYNC] Failed backprop for {entity.entity_id}: {e}")
+                    logger.warning(f"[SYNC] Failed Cog→TTM sync for {entity.entity_id}: {e}")
 
-        if backprop_count > 0:
-            print(f"    [SYNC] Backprop Cog→TTM for {backprop_count} entities (tensor learning)")
+        if sync_count > 0:
+            print(f"    [SYNC] Cog→TTM for {sync_count} entities (state propagation)")
 
     return Dialog(
         dialog_id=f"dialog_{timepoint.timepoint_id}_{'_'.join([e.entity_id for e in entities])}",

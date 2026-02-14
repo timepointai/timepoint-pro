@@ -24,7 +24,7 @@ MECHANISMS = {
     "M1": {"name": "Heterogeneous Fidelity (Entity Lifecycle)", "category": "Workflow & Temporal"},
     "M2": {"name": "Progressive Training", "category": "Workflow & Temporal"},
     "M3": {"name": "Exposure Event Tracking", "category": "Special Entity Types"},
-    "M4": {"name": "Physics Validation", "category": "Entity State & Validation"},
+    "M4": {"name": "Constraint Enforcement", "category": "Entity State & Validation"},
     "M5": {"name": "Query Resolution with Lazy Elevation", "category": "Query Interface"},
     "M6": {"name": "TTM Tensor Compression", "category": "Entity State & Validation"},
     "M7": {"name": "Causal Temporal Chains", "category": "Workflow & Temporal"},

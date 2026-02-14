@@ -1,10 +1,15 @@
 """
-Parallel tensor trainer using asyncio workers.
+Parallel tensor refinement using asyncio workers.
 
-Trains multiple tensors concurrently with collision-free
+Refines multiple tensors concurrently with collision-free
 job acquisition through the JobQueue.
 
-Phase 2: Parallel Training Infrastructure
+Tensor refinement applies stochastic perturbation to explore
+the state space. This is NOT gradient-based training — there is
+no loss function or backpropagation. Maturity tracks how many
+refinement cycles a tensor has undergone, not optimization convergence.
+
+Phase 2: Parallel Refinement Infrastructure
 """
 
 import asyncio
@@ -44,13 +49,17 @@ class TrainingResult:
 
 class ParallelTensorTrainer:
     """
-    Trains multiple tensors concurrently using asyncio workers.
+    Refines multiple tensors concurrently using asyncio workers.
+
+    Applies stochastic perturbation to tensor state vectors to explore
+    the representation space. This is state-space exploration, not
+    gradient-based optimization — there is no loss function.
 
     Features:
     - Configurable worker pool size
     - Collision-free job acquisition via JobQueue
     - Progress callbacks for monitoring
-    - Maturity tracking and convergence
+    - Maturity tracking (cycle count, not convergence)
 
     Example:
         trainer = ParallelTensorTrainer(tensor_db, max_workers=4)
@@ -246,9 +255,8 @@ class ParallelTensorTrainer:
         cycles = 0
 
         while current_maturity < target_maturity and cycles < max_cycles:
-            # Simulate training step (actual backprop would go here)
-            # For now, we add small noise and increase maturity
-            tensor = await self._training_step(tensor)
+            # Stochastic perturbation step (state-space exploration, not gradient-based)
+            tensor = await self._refinement_step(tensor)
 
             cycles += 1
             # Maturity increases with diminishing returns
@@ -281,23 +289,26 @@ class ParallelTensorTrainer:
             duration_seconds=duration
         )
 
-    async def _training_step(self, tensor: TTMTensor) -> TTMTensor:
+    async def _refinement_step(self, tensor: TTMTensor) -> TTMTensor:
         """
-        Perform a single training step on a tensor.
+        Apply a single stochastic perturbation to a tensor.
 
-        Currently implements a simple noise-based training simulation.
-        In production, this would be actual gradient-based training.
+        This is state-space exploration via random noise injection,
+        NOT gradient-based training. There is no loss function,
+        no backpropagation, and no optimization objective.
+
+        Maturity tracks cycle count, not convergence to an optimum.
 
         Args:
-            tensor: TTMTensor to train
+            tensor: TTMTensor to perturb
 
         Returns:
-            Updated TTMTensor
+            Perturbed TTMTensor
         """
         # Extract current values
         context, biology, behavior = tensor.to_arrays()
 
-        # Apply small random perturbations (simulate gradient update)
+        # Apply small random perturbations (stochastic exploration)
         noise_scale = 0.01
         context = context + np.random.normal(0, noise_scale, context.shape)
         biology = biology + np.random.normal(0, noise_scale, biology.shape)

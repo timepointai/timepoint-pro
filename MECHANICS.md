@@ -506,7 +506,7 @@ An entity cannot know something without a recorded exposure event explaining how
 
 **Causal audit trail**: Exposure events form a DAG. Nodes are information items; edges are causal relationships. Walking the graph validates information accessibility and enables counterfactual reasoning ("if Jefferson hadn't received that letter...").
 
-## M4: Physics-Inspired Validation
+## M4: Constraint Enforcement
 
 Five validators enforce consistency using conservation-law metaphors:
 
@@ -528,7 +528,7 @@ def validate_information(entity, context):
 
 **Network Flow**: Information propagation respects relationship topology.
 
-**Castaway Colony example**: Physics validation enforces hard constraints — O2 consumption (6 crew x 0.84 kg/hour) determines the depletion timeline. Water purification capacity (18 L/day, degrading at 0.5 L/day) limits daily intake. The engineer can't repair the beacon without the power coupling from the debris field. Nobody survives outside during radiation storms (12 mSv/hour). These aren't narrative suggestions — they're constraint violations that block invalid states, the same way conservation laws work in physics simulations.
+**Castaway Colony example**: Constraint enforcement blocks invalid states -- for instance, the engineer can't repair the beacon without the power coupling from the debris field, and nobody survives outside during radiation storms. Note: specific numerical values (O2 rates, water capacity, radiation levels) that appear in simulation output are LLM-generated narrative, not computed by the engine. The engine enforces structural constraints (information conservation, energy budgets, behavioral inertia), not physics calculations.
 
 ## M19: Knowledge Extraction Agent
 
@@ -1392,7 +1392,7 @@ E2E mode is useful for validating that a specific template produces consistent c
 
 ---
 
-**Castaway Colony — Full Mechanism Showcase (February 2026)**: The `castaway_colony_branching` template exercises all 19 mechanisms in a single scenario. It is the first template to verify M1 (heterogeneous fidelity), M2 (progressive training), M4 (physics validation), M5 (lazy resolution), M6 (tensor compression), M9 (on-demand entities), and M18 (model selection) — seven mechanisms that previously had zero verified templates. 10 entities, 3 counterfactual branches, 90+ quantitative state variables, O(100,000) interaction paths.
+**Castaway Colony — Full Mechanism Showcase (February 2026)**: The `castaway_colony_branching` template exercises all 19 mechanisms in a single scenario. It is the first template to verify M1 (heterogeneous fidelity), M2 (progressive training), M4 (constraint enforcement), M5 (lazy resolution), M6 (tensor compression), M9 (on-demand entities), and M18 (model selection) — seven mechanisms that previously had zero verified templates. 10 entities, 3 counterfactual branches, O(100,000) interaction paths.
 
 **Implementation Status**: All 19 mechanisms implemented and verified. M19 (Knowledge Extraction Agent) added December 2025 to replace naive capitalization-based extraction with LLM-based semantic understanding. Convergence evaluation implemented with E2E testing mode and 3 convergence-optimized templates. Parallel execution (`--parallel N`) and free model support (`--free`, `--free-fast`) added December 2025. **Portal enhancements** added January 2026: `preserve_all_paths` (returns ALL paths), path divergence detection, `--portal-quick` mode (5 backward steps), fidelity template scaling, and **pivot point detection fix** (multi-strategy detection replacing broken `children_states` check).
 

@@ -113,35 +113,48 @@ class EntityEvolutionFormatter:
                 print(f"Warning: Context gathering failed for {entity.entity_id}: {e}")
                 context_section = ""
 
-        # FIX BUG #1: Reconstruct T0 knowledge state
-        # Initial knowledge has event_type="initial" and source="scene_initialization"
-        # They have timepoint_id="pre_tp_001" not "tp_001", so filter by event_type instead
+        # Reconstruct T0 knowledge state: everything the entity knew up to and including t0
         t0_exposures = [
             exp for exp in entity_exposures
-            if hasattr(exp, 'event_type') and exp.event_type == "initial"
-        ]
-        t0_knowledge = [exp.information for exp in t0_exposures if hasattr(exp, 'information')]
-
-        # FIX BUG #2: Reconstruct T1 knowledge state
-        # T1 knowledge = initial knowledge + any new knowledge from T0→T1 transition
-        # New knowledge would have timepoint_id=t1.timepoint_id
-        t1_exposures = [
-            exp for exp in entity_exposures
-            if hasattr(exp, 'event_type') and (
-                exp.event_type == "initial" or
-                (hasattr(exp, 'timepoint_id') and exp.timepoint_id == t1.timepoint_id)
+            if hasattr(exp, 'information') and (
+                (hasattr(exp, 'event_type') and exp.event_type == "initial") or
+                (hasattr(exp, 'timepoint_id') and exp.timepoint_id == t0.timepoint_id)
             )
         ]
-        t1_knowledge = [exp.information for exp in t1_exposures if hasattr(exp, 'information')]
+        t0_knowledge = [exp.information for exp in t0_exposures]
+
+        # Reconstruct T1 knowledge state: T0 knowledge + anything learned at T1
+        t1_exposures = [
+            exp for exp in entity_exposures
+            if hasattr(exp, 'information') and (
+                (hasattr(exp, 'event_type') and exp.event_type == "initial") or
+                (hasattr(exp, 'timepoint_id') and exp.timepoint_id in (t0.timepoint_id, t1.timepoint_id))
+            )
+        ]
+        t1_knowledge = [exp.information for exp in t1_exposures]
 
         # Calculate ACTUAL changes (ground truth from simulation)
         new_knowledge = [k for k in t1_knowledge if k not in t0_knowledge]
-        energy_cost = 5.0 + (len(t1.entities_present) * 2.0)
-        importance = getattr(t1, 'importance', 0.5)
 
-        # Get entity personality if available
-        personality_traits = getattr(entity, 'personality_traits', [0.0, 0.0, 0.0, 0.0, 0.0])
+        # Entity-specific energy cost based on actual cognitive state and activity
         entity_metadata = getattr(entity, 'entity_metadata', {})
+        base_energy = entity_metadata.get("energy_budget", 100.0)
+        cognitive_load = len(new_knowledge) * 5.0  # knowledge acquisition cost
+        social_cost = len(t1.entities_present) * 2.0  # social interaction overhead
+        energy_cost = 5.0 + cognitive_load + social_cost
+
+        # Derive importance from event characteristics, not a fixed constant
+        has_new_knowledge = len(new_knowledge) > 0
+        entity_count = len(t1.entities_present)
+        event_desc_len = len(getattr(t1, 'event_description', '') or '')
+        importance = min(1.0, (
+            (0.3 if has_new_knowledge else 0.0) +
+            min(0.3, entity_count * 0.06) +
+            min(0.4, event_desc_len / 500.0)
+        ))
+
+        # Get entity personality and state if available
+        personality_traits = getattr(entity, 'personality_traits', [0.0, 0.0, 0.0, 0.0, 0.0])
 
         # BUILD PROMPT: Rich Context + Entity State + Event + Question (NO ANSWER)
         prompt_parts = [
@@ -160,11 +173,15 @@ class EntityEvolutionFormatter:
         prompt_parts.append(f"Type: {entity.entity_type}")
         prompt_parts.append(f"Current Knowledge ({len(t0_knowledge)} items):")
         prompt_parts.append(f"{json.dumps(t0_knowledge[:5], indent=2) if t0_knowledge else '[]'}  {f'... and {len(t0_knowledge) - 5} more' if len(t0_knowledge) > 5 else ''}")
+        # Use actual entity cognitive state if available
+        current_energy = entity_metadata.get("energy_budget", 100.0)
+        current_valence = entity_metadata.get("emotional_valence", 0.0)
+        current_arousal = entity_metadata.get("emotional_arousal", 0.0)
         prompt_parts.append("")
-        prompt_parts.append("Current Energy: 100.0 (full cognitive capacity)")
+        prompt_parts.append(f"Current Energy: {current_energy:.1f}")
         prompt_parts.append("Current Emotional State:")
-        prompt_parts.append("  - Valence: 0.0 (neutral)")
-        prompt_parts.append("  - Arousal: 0.0 (calm)")
+        prompt_parts.append(f"  - Valence: {current_valence:.2f}")
+        prompt_parts.append(f"  - Arousal: {current_arousal:.2f}")
         prompt_parts.append("")
         prompt_parts.append(f"Personality: {personality_traits}")
         prompt_parts.append("")
@@ -199,9 +216,11 @@ class EntityEvolutionFormatter:
         prompt = "\n".join(prompt_parts)
 
         # BUILD COMPLETION: Actual outcome with reasoning (what model should learn to generate)
+        # Emotional deltas vary by entity personality and event importance
+        trait_valence_bias = sum(personality_traits[:3]) / max(len(personality_traits[:3]), 1) * 0.1
         emotional_delta = {
-            "valence": (importance - 0.5) * 0.2,
-            "arousal": importance * 0.3
+            "valence": (importance - 0.5) * 0.3 + trait_valence_bias,
+            "arousal": importance * 0.4 * (1.0 + (len(new_knowledge) * 0.1))
         }
 
         # Generate reasoning based on actual simulation data
@@ -230,13 +249,13 @@ class EntityEvolutionFormatter:
         completion = json.dumps({
             "new_knowledge_gained": new_knowledge,
             "knowledge_count": len(new_knowledge),
-            "energy_change": -energy_cost,
-            "remaining_energy": 100.0 - energy_cost,
+            "energy_change": round(-energy_cost, 1),
+            "remaining_energy": round(max(0.0, current_energy - energy_cost), 1),
             "emotional_change": {
-                "valence_delta": emotional_delta["valence"],
-                "arousal_delta": emotional_delta["arousal"],
-                "final_valence": 0.0 + emotional_delta["valence"],
-                "final_arousal": 0.0 + emotional_delta["arousal"]
+                "valence_delta": round(emotional_delta["valence"], 3),
+                "arousal_delta": round(emotional_delta["arousal"], 3),
+                "final_valence": round(current_valence + emotional_delta["valence"], 3),
+                "final_arousal": round(min(1.0, max(0.0, current_arousal + emotional_delta["arousal"])), 3)
             },
             "causal_reasoning": causal_reasoning,
             "mechanism_explanation": {
