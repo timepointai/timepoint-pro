@@ -303,18 +303,49 @@ def create_entity_training_workflow(llm_client: LLMClient, store: GraphStore):
         state["entity_populations"] = populations
         return state
 
+    def trigger_prospection_batch(state: WorkflowState) -> WorkflowState:
+        """Trigger prospection (M15) for eligible entities in the training batch."""
+        from prospection_triggers import trigger_prospection_for_entity, refine_tensor_from_prospection
+
+        timepoint_obj = state.get("timepoint_obj")
+        if not timepoint_obj:
+            return state
+
+        triggered = 0
+        for entity in state["entities"]:
+            try:
+                # Use empty config dict — should_trigger_prospection handles missing fields
+                prospective_state = trigger_prospection_for_entity(
+                    entity, timepoint_obj, llm_client, store, {}
+                )
+                if prospective_state:
+                    refine_tensor_from_prospection(entity, prospective_state)
+                    triggered += 1
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(
+                    f"[M15] Prospection failed for {entity.entity_id}: {e}"
+                )
+
+        if triggered > 0:
+            print(f"✨ Prospection triggered for {triggered}/{len(state['entities'])} entities")
+
+        return state
+
     workflow.add_node("load_graph", load_graph)
     workflow.add_node("populate_entities_parallel", populate_entities_parallel)
     workflow.add_node("aggregate_populations", aggregate_populations)
     workflow.add_node("validate_entities", validate_entities)
     workflow.add_node("compress_tensors", compress_tensors)
+    workflow.add_node("trigger_prospection_batch", trigger_prospection_batch)
     workflow.add_node("progressive_training_check", progressive_training_check)
 
     workflow.add_edge("load_graph", "populate_entities_parallel")
     workflow.add_edge("populate_entities_parallel", "aggregate_populations")
     workflow.add_edge("aggregate_populations", "validate_entities")
     workflow.add_edge("validate_entities", "compress_tensors")
-    workflow.add_edge("compress_tensors", "progressive_training_check")
+    workflow.add_edge("compress_tensors", "trigger_prospection_batch")
+    workflow.add_edge("trigger_prospection_batch", "progressive_training_check")
     workflow.add_edge("progressive_training_check", END)
 
     workflow.set_entry_point("load_graph")

@@ -329,6 +329,130 @@ def _call_llm_with_retry(llm_client: Any, prompt: str, max_retries: int = 3, ini
 
 
 # ============================================================================
+# Behavior Vector Decoder: Maps 8-dim behavior_vector → trait strings
+# ============================================================================
+
+def decode_behavior_vector_to_traits(
+    behavior: np.ndarray,
+    entity_metadata: Optional[Dict[str, Any]] = None
+) -> List[str]:
+    """
+    Decode an 8-dim behavior_vector into personality trait strings compatible
+    with _derive_speaking_style() in dialog_synthesis.py.
+
+    Dimensions:
+    [0] openness, [1] conscientiousness, [2] extraversion,
+    [3] agreeableness, [4] neuroticism, [5] risk tolerance,
+    [6] decision speed, [7] reserved (unused for traits)
+
+    Args:
+        behavior: 8-dim numpy array of behavior values (0.0-1.5 range)
+        entity_metadata: Optional entity metadata dict for role-based modifiers
+
+    Returns:
+        List of trait keyword strings recognized by the speaking style engine
+    """
+    traits = []
+
+    if len(behavior) < 7:
+        return ["determined", "principled"]
+
+    # Normalize to 0-1 range (training can push values above 1.0)
+    b = np.clip(behavior, 0.0, 1.5) / 1.5
+
+    # dim[0] openness
+    if b[0] > 0.7:
+        traits.extend(["creative", "intellectual"])
+    elif b[0] < 0.3:
+        traits.extend(["traditional", "practical"])
+
+    # dim[1] conscientiousness
+    if b[1] > 0.7:
+        traits.extend(["organized", "disciplined", "precise"])
+    elif b[1] < 0.3:
+        traits.extend(["casual", "relaxed"])
+
+    # dim[2] extraversion
+    if b[2] > 0.7:
+        traits.extend(["outgoing", "warm", "commanding"])
+    elif b[2] < 0.3:
+        traits.extend(["reserved", "quiet"])
+
+    # dim[3] agreeableness
+    if b[3] > 0.7:
+        traits.extend(["empathetic", "diplomatic"])
+    elif b[3] < 0.3:
+        traits.extend(["competitive", "cold", "stubborn"])
+
+    # dim[4] neuroticism
+    if b[4] > 0.7:
+        traits.extend(["anxious", "intense"])
+    elif b[4] < 0.3:
+        traits.extend(["stoic", "calm"])
+
+    # dim[5] risk tolerance
+    if b[5] > 0.7:
+        traits.append("risk-tolerant")
+    elif b[5] < 0.3:
+        traits.append("cautious")
+
+    # dim[6] decision speed
+    if b[6] > 0.7:
+        traits.append("decisive")
+    elif b[6] < 0.3:
+        traits.append("deliberate")
+
+    # Role-based modifiers from entity metadata
+    if entity_metadata:
+        role = entity_metadata.get("role", "").lower()
+        ROLE_VOCAB = {
+            "engineer": ["technical", "data-driven"],
+            "scientist": ["analytical", "data-driven"],
+            "doctor": ["empathetic", "precise"],
+            "medical": ["empathetic", "precise"],
+            "commander": ["authoritative", "leadership"],
+            "captain": ["authoritative", "leadership"],
+            "director": ["strategic", "results-oriented"],
+            "diplomat": ["diplomatic", "professional"],
+            "detective": ["analytical", "skeptical"],
+            "strategist": ["strategic", "analytical"],
+        }
+        for keyword, role_traits in ROLE_VOCAB.items():
+            if keyword in role:
+                for rt in role_traits:
+                    if rt not in traits:
+                        traits.append(rt)
+                break  # Only apply first matching role
+
+    # Fallback if no traits decoded (all values in mid-range)
+    if not traits:
+        traits = ["determined", "principled"]
+
+    return traits
+
+
+def decode_biology_vector_to_physical(biology: np.ndarray) -> Dict[str, float]:
+    """
+    Decode a 4-dim biology_vector back to physical_tensor metadata fields.
+
+    Dimensions: [0] age_normalized, [1] health_status, [2] comfort, [3] stamina
+
+    Args:
+        biology: 4-dim numpy array
+
+    Returns:
+        Dict with health_status and stamina fields for physical_tensor update
+    """
+    if len(biology) < 4:
+        return {}
+
+    return {
+        "health_status": float(np.clip(biology[1], 0.01, 1.0)),
+        "stamina": float(np.clip(biology[3], 0.01, 1.0)),
+    }
+
+
+# ============================================================================
 # Phase 1: Baseline Tensor Initialization (Instant, No LLM)
 # ============================================================================
 
@@ -466,6 +590,15 @@ def populate_tensor_llm_guided(
     # Create refined tensor
     refined_tensor = TTMTensor.from_arrays(context, biology, behavior)
 
+    # Decode behavior_vector → personality_traits (only if not already hand-authored)
+    existing_source = entity.entity_metadata.get("personality_source", "")
+    if existing_source not in ("template_entity_roster",):
+        decoded_traits = decode_behavior_vector_to_traits(behavior, entity.entity_metadata)
+        if decoded_traits:
+            entity.entity_metadata["personality_traits"] = decoded_traits
+            entity.entity_metadata["personality_source"] = "llm_population_decoded"
+            print(f"    [DECODE] {entity.entity_id} traits from behavior_vector: {decoded_traits}")
+
     # Compute maturity after population (should be higher but not operational yet)
     maturity = compute_tensor_maturity(refined_tensor, entity, training_complete=False)
     entity.tensor_maturity = maturity
@@ -536,7 +669,59 @@ Expected format:
         print(f"  ⚠️  Loop 1 (metadata) failed for {entity.entity_id}: {e}")
         # Continue with baseline values on failure
 
+    # Auto-generate voice_guide and speech_examples (only if not hand-authored)
+    if not entity.entity_metadata.get("voice_guide"):
+        _generate_voice_metadata_from_llm(entity, llm_client)
+
     return context, biology, behavior
+
+
+def _generate_voice_metadata_from_llm(entity: Entity, llm_client: Any) -> None:
+    """
+    Generate voice_guide and speech_examples via LLM for entities without
+    hand-authored voice data. Uses the entity's role, description, and
+    background to produce distinctive voice characteristics.
+
+    Stores results in entity.entity_metadata with voice_guide_source marker.
+    """
+    metadata = entity.entity_metadata
+    role = metadata.get("role", "unknown")
+    description = metadata.get("description", "")
+    background = metadata.get("background", "")
+
+    prompt = f"""Generate a distinctive voice profile for this character.
+
+Character: {entity.entity_id}
+Role: {role}
+Description: {description}
+Background: {background}
+
+Create a voice_guide and 3 speech_examples that capture how this specific character talks.
+The voice should be DISTINCTIVE — not generic professional speak.
+
+IMPORTANT: Return ONLY valid JSON with NO explanation, NO markdown, NO preamble.
+Expected format:
+{{"voice_guide": {{"sentence_length": "short and clipped" or "long compound sentences" or "varies widely", "verbal_tics": ["list of 1-3 habitual phrases or filler words"], "never_says": ["list of 1-2 words/phrases this character would never use"], "disagreement_style": "how they push back (e.g., 'cites data', 'goes silent', 'raises voice')", "specificity_anchors": ["types of specific details they reference, e.g., 'percentages', 'historical precedents'"]}}, "speech_examples": ["example line 1 in character voice", "example line 2 showing different emotion", "example line 3 showing their expertise"]}}
+"""
+
+    try:
+        result = _call_llm_with_retry(llm_client, prompt, max_retries=2)
+
+        voice_guide = result.get("voice_guide")
+        speech_examples = result.get("speech_examples")
+
+        if voice_guide and isinstance(voice_guide, dict):
+            entity.entity_metadata["voice_guide"] = voice_guide
+            entity.entity_metadata["voice_guide_source"] = "llm_population"
+            print(f"    [VOICE] Generated voice_guide for {entity.entity_id}")
+
+        if speech_examples and isinstance(speech_examples, list):
+            entity.entity_metadata["speech_examples"] = speech_examples[:3]
+            print(f"    [VOICE] Generated {len(speech_examples[:3])} speech_examples for {entity.entity_id}")
+
+    except Exception as e:
+        print(f"  ⚠️  Voice metadata generation failed for {entity.entity_id}: {e}")
+        # Not critical — dialog synthesis has its own fallback chain
 
 
 def _population_loop_graph(
@@ -865,6 +1050,22 @@ def train_tensor_to_maturity(
         # Recompute maturity
         maturity = compute_tensor_maturity(trained_tensor, entity, training_complete=(cycle == max_training_cycles - 1))
         entity.tensor_maturity = maturity
+
+        # Decode trained behavior_vector → personality_traits
+        existing_source = entity.entity_metadata.get("personality_source", "")
+        if existing_source not in ("template_entity_roster",):
+            decoded_traits = decode_behavior_vector_to_traits(behavior, entity.entity_metadata)
+            if decoded_traits:
+                entity.entity_metadata["personality_traits"] = decoded_traits
+                entity.entity_metadata["personality_source"] = "tensor_decoded"
+
+        # Decode biology_vector → update physical_tensor metadata
+        physical_updates = decode_biology_vector_to_physical(biology)
+        if physical_updates:
+            physical_tensor = entity.entity_metadata.get("physical_tensor", {})
+            if physical_tensor:
+                physical_tensor.update(physical_updates)
+                entity.entity_metadata["physical_tensor"] = physical_tensor
 
         # Save progress
         store.save_entity(entity)

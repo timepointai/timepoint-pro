@@ -2537,24 +2537,35 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                             self._persist_tensor_to_db(entity, w_id, run_id)
 
                             print(f"       ✓ Populated (maturity: {maturity:.3f})")
+
+                            # Log decoded personality traits from behavior_vector
+                            if entity.entity_metadata.get("personality_source") == "llm_population_decoded":
+                                decoded = entity.entity_metadata.get("personality_traits", [])
+                                print(f"       [DECODE] Personality traits: {decoded}")
+
                         except Exception as e:
                             print(f"       ⚠️  Population failed: {e}")
                     else:
                         # Entity already populated or doesn't need population
                         print(f"     ✓ {entity.entity_id}: Already populated, skipping LLM call")
 
-                    # Optional prospection (M15) - triggered conditionally
-                    try:
-                        from prospection_triggers import trigger_prospection_for_entity, refine_tensor_from_prospection
-                        prospective_state = trigger_prospection_for_entity(
-                            entity, first_timepoint, llm, store, config
+                # Batch parallel prospection (M15) for all entities in this layer
+                try:
+                    import asyncio
+                    from prospection_triggers import trigger_prospection_parallel
+                    prospection_results = asyncio.run(
+                        trigger_prospection_parallel(
+                            layer_entities, first_timepoint, llm, store, config
                         )
-                        if prospective_state:
-                            # Optionally refine tensor from prospection
-                            refine_tensor_from_prospection(entity, prospective_state)
-                            store.save_entity(entity)
-                    except Exception as e:
-                        print(f"       ⚠️  Prospection failed: {e}")
+                    )
+                    # Save entities that were refined by prospection
+                    for eid, ps in prospection_results.items():
+                        if ps is not None:
+                            entity_obj = next((e for e in layer_entities if e.entity_id == eid), None)
+                            if entity_obj:
+                                store.save_entity(entity_obj)
+                except Exception as e:
+                    print(f"     ⚠️  Parallel prospection failed: {e}")
 
                 # Train entities in this layer (using first timepoint as context)
                 first_timepoint = timepoints[0] if timepoints else None
@@ -2864,6 +2875,11 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
 
                     # Synthesize dialog (this invokes M11)
                     # Entities should now have tensors from ANDOS layer-by-layer training
+                    # Get QSE resource state if active
+                    qse_state = None
+                    if hasattr(self, '_qse') and self._qse and self._qse.is_active:
+                        qse_state = self._qse.get_state_summary()
+
                     dialog = synthesize_dialog(
                         dialog_participants,
                         timepoint,
@@ -2872,7 +2888,9 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                         store,
                         run_id=run_id,
                         animism_level=animism_level,
-                        prior_dialog_beats=prior_dialog_beats if prior_dialog_beats else None
+                        prior_dialog_beats=prior_dialog_beats if prior_dialog_beats else None,
+                        qse_state=qse_state,
+                        voice_mixer=getattr(self, '_voice_mixer', None)
                     )
 
                     # Save dialog to store

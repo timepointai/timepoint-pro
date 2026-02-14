@@ -106,22 +106,74 @@
       "sarah_okafor": {
         "type": "human",
         "role": "Mission Commander. Experienced astronaut, politically pressured by NASA leadership to maintain schedule. Ultimately responsible for crew safety decisions.",
-        "initial_knowledge": ["mission_parameters", "crew_capabilities", "nasa_political_pressure"]
+        "initial_knowledge": ["mission_parameters", "crew_capabilities", "nasa_political_pressure"],
+        "personality_traits": ["authoritative", "warm", "decisive", "diplomatic", "empathetic", "leadership"],
+        "voice_guide": {
+          "sentence_length": "moderate (12-20 words)",
+          "verbal_tics": ["Look,", "Here's the reality:", "Bottom line —"],
+          "never_says": ["I'm not sure", "maybe we should", "what do you think"],
+          "disagreement_style": "reframes as crew-impact, pulls rank when pushed",
+          "specificity_anchors": ["crew safety margins", "mission timeline dates", "NASA directives"]
+        },
+        "speech_examples": [
+          "I've read the report. We're not launching until I'm satisfied my crew comes home.",
+          "Look, I hear you on the budget, Webb. But I'm the one signing the crew risk acceptance.",
+          "Everyone stop. Raj, give me the failure probability. A number, not a feeling."
+        ]
       },
       "raj_mehta": {
         "type": "human",
         "role": "Flight Engineer. Brilliant systems analyst, conflict-averse personality. Detects problems early but hesitates to escalate concerns through the chain of command.",
-        "initial_knowledge": ["flight_systems_status", "engineering_specifications", "anomaly_detection_protocols"]
+        "initial_knowledge": ["flight_systems_status", "engineering_specifications", "anomaly_detection_protocols"],
+        "personality_traits": ["analytical", "reserved", "cautious", "technical", "conflict-averse", "precise"],
+        "voice_guide": {
+          "sentence_length": "moderate-long (15-25 words), heavy use of conditionals",
+          "verbal_tics": ["If I'm reading this correctly,", "The data suggests —", "I could be wrong, but"],
+          "never_says": ["absolutely", "no question", "we must", "I demand"],
+          "disagreement_style": "buries disagreement in caveats and conditionals, defers to authority",
+          "specificity_anchors": ["sensor readings", "test cycle numbers", "spec tolerances"]
+        },
+        "speech_examples": [
+          "If I'm reading the pressure data correctly, we're seeing a 3.2% drift from the spec envelope. It might be within tolerance, but I'd want another test cycle.",
+          "I flagged this in the T-minus-90 review. I mean, it's in the report — page 14, I think.",
+          "I don't want to overstep, Commander, but the redundancy numbers don't add up the way Houston says they do."
+        ]
       },
       "lin_zhang": {
         "type": "human",
         "role": "Systems Engineer. Detected ALSS anomalies during testing but was overruled by schedule pressure. Holds critical technical knowledge about the oxygen generator design flaw.",
-        "initial_knowledge": ["alss_design_specifications", "oxygen_generator_test_results", "system_redundancy_architecture"]
+        "initial_knowledge": ["alss_design_specifications", "oxygen_generator_test_results", "system_redundancy_architecture"],
+        "personality_traits": ["technical", "precise", "frustrated", "data-driven", "stubborn", "intense"],
+        "voice_guide": {
+          "sentence_length": "long (18-30 words), packed with technical detail",
+          "verbal_tics": ["Let me be clear:", "The test data shows —", "I ran those numbers three times."],
+          "never_says": ["I see your point", "that's fair", "let's compromise", "both sides have merit"],
+          "disagreement_style": "direct confrontation with data citations, gets louder when overruled",
+          "specificity_anchors": ["O2 generator failure rates", "ALSS test run numbers", "redundancy architecture specs"]
+        },
+        "speech_examples": [
+          "Let me be clear: the oxygen generator failed in 4 of 11 extended-duration test runs. That's a 36% failure rate, and no amount of schedule pressure changes the chemistry.",
+          "I submitted the anomaly report on March 8th. It was marked 'reviewed' on March 9th. Nobody called me. Nobody.",
+          "You want me to sign off on a system I've told you is broken? Put that in writing, Webb. Put your name on it."
+        ]
       },
       "thomas_webb": {
         "type": "human",
         "role": "Mission Director (ground). Prioritized schedule and budget over safety margins. Made key decisions to reduce crew size and accept simplified life support systems.",
-        "initial_knowledge": ["budget_constraints", "schedule_milestones", "stakeholder_expectations"]
+        "initial_knowledge": ["budget_constraints", "schedule_milestones", "stakeholder_expectations"],
+        "personality_traits": ["strategic", "results-oriented", "pragmatic", "commanding", "cold", "business"],
+        "voice_guide": {
+          "sentence_length": "short-moderate (8-15 words), clipped and businesslike",
+          "verbal_tics": ["Let's be clear about something.", "The schedule is the schedule.", "That's not my call to make."],
+          "never_says": ["I feel", "perhaps", "I wonder if", "let me think about that"],
+          "disagreement_style": "dismisses with budget/schedule facts, redirects to deliverables",
+          "specificity_anchors": ["budget figures in dollars", "launch window dates", "Congressional review deadlines"]
+        },
+        "speech_examples": [
+          "We've burned $2.3 billion and the Senate review is in 47 days. There is no delay option.",
+          "Zhang, your anomaly report was reviewed and dispositioned. That process exists for a reason.",
+          "I need a launch-commit decision by Friday. Not opinions. A decision."
+        ]
       }
     }
   },
