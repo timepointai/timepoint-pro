@@ -1,8 +1,8 @@
 # Example Run: Ares III Mars Mission Portal
 
-**[Back to README](README.md)** | Run ID: `run_20260212_140025_7f33adbd` | Template: `mars_mission_portal`
+**[Back to README](README.md)** | Run ID: `run_20260213_141539_9ba13680` | Template: `mars_mission_portal`
 
-A complete PORTAL-mode simulation tracing backward from a catastrophic Mars mission failure in 2031 to its institutional origins in 2026. Every number, dialog line, and graph edge below was produced by a single `./run.sh run mars_mission_portal` invocation.
+A complete PORTAL-mode simulation tracing backward from a catastrophic Mars mission failure in 2031 to its institutional origins in 2026. Every number, dialog line, and graph edge below was produced by a single `./run.sh run mars_mission_portal` invocation on February 13, 2026.
 
 ---
 
@@ -13,12 +13,13 @@ A complete PORTAL-mode simulation tracing backward from a catastrophic Mars miss
 | **Mode** | PORTAL (backward temporal reasoning) |
 | **Timespan** | 2031 &rarr; 2026 (5 years, 10 backward steps) |
 | **Entities** | 4 humans, all reaching TRAINED resolution |
-| **Dialogs** | 11 conversations, 104 exchanges |
-| **Knowledge graph** | 267 typed exposure events, 60 information transfers |
+| **Dialogs** | 11 conversations, 127 exchanges |
+| **Knowledge graph** | 234 typed exposure events, 89 information transfers |
 | **Training examples** | 40 structured prompt/completion pairs |
 | **Mechanisms fired** | 14 of 19 |
-| **ADPRS waveform gating** | 44 evaluations, 66% prediction accuracy |
-| **Cost** | $1.00 &bull; 1,605 LLM calls &bull; 1.8M tokens &bull; 72 minutes |
+| **ADPRS waveform gating** | 44 evaluations, 0% divergence |
+| **Cost** | $0.98 &bull; 1,596 LLM calls &bull; 1.76M tokens |
+| **Convergence** | 6 runs of this template: outcome similarity 0.79, role stability 1.00 |
 
 ---
 
@@ -29,16 +30,16 @@ A complete PORTAL-mode simulation tracing backward from a catastrophic Mars miss
 3. [Backward Timeline](#3-backward-timeline)
 4. [Sample Dialogs](#4-sample-dialogs)
 5. [Knowledge Provenance](#5-knowledge-provenance)
-6. [ADPRS Waveform Gating](#6-adprs-waveform-gating)
-7. [Fidelity Strategy](#7-fidelity-strategy)
-8. [Entity Tensors](#8-entity-tensors)
-9. [Mechanism Usage](#9-mechanism-usage)
-10. [Training Data](#10-training-data)
-11. [Run Metadata](#11-run-metadata)
-12. [What You Can Do Next](#12-what-you-can-do-next)
-13. [Port to Oxen.ai](#13-port-to-oxenai)
-14. [API & Programmatic Access](#14-api--programmatic-access)
-15. [Additional Capabilities](#15-additional-capabilities)
+6. [Outcome Convergence](#6-outcome-convergence)
+7. [ADPRS Waveform Gating](#7-adprs-waveform-gating)
+8. [Fidelity Strategy](#8-fidelity-strategy)
+9. [Entity Tensors](#9-entity-tensors)
+10. [Mechanism Usage](#10-mechanism-usage)
+11. [Training Data](#11-training-data)
+12. [Run Metadata](#12-run-metadata)
+13. [What You Can Do Next](#13-what-you-can-do-next)
+14. [Port to Oxen.ai](#14-port-to-oxenai)
+15. [API & Programmatic Access](#15-api--programmatic-access)
 
 ---
 
@@ -46,9 +47,27 @@ A complete PORTAL-mode simulation tracing backward from a catastrophic Mars miss
 
 The Ares III crewed Mars mission loses contact during orbital insertion in March 2031. Last telemetry shows cascading systems failures in life support and communications. The mission was celebrated as humanity's greatest achievement until silence fell.
 
-**PORTAL mode** doesn't predict the future. It works backward from a known endpoint, exploring how present-day decisions create future outcomes. Starting from the communication blackout, the system generates 7 candidate antecedent states per step, runs mini forward-simulations to score each with a 405B judge model, and prunes to the most coherent backward chain.
+**PORTAL mode** doesn't predict the future. It works backward from a known endpoint, exploring how present-day decisions create future outcomes. Starting from the communication blackout, the system generates 7 candidate antecedent states per step, runs mini forward-simulations to score each with a 405B judge model, and selects the most coherent backward chain.
 
-The result: a 5-year causal graph showing how budget compromises, personality clashes, and ignored anomalies compounded into catastrophe.
+The result: a 5-year causal graph showing how budget compromises, personality clashes, and ignored anomalies compounded into catastrophe --- produced for under a dollar.
+
+### How PORTAL backward inference works
+
+```
+Known endpoint (2031): Mission failure
+                ↓
+    Generate 7 candidate causes
+    Run mini forward-simulation for each
+    Score coherence with 405B judge
+    Select best candidate
+                ↓
+        Step back 6 months
+        Repeat 10 times
+                ↓
+Result: Causal chain from Jan 2026 → Mar 2031
+```
+
+Each backward step costs ~$0.09 (7 candidates x 405B scoring). The system spent $0.98 total across 1,596 LLM calls to produce 11 timepoints, 234 exposure events, and 40 training examples.
 
 ---
 
@@ -56,62 +75,64 @@ The result: a 5-year causal graph showing how budget compromises, personality cl
 
 Four crew members, each with tracked cognitive state, emotional arcs, and distinct knowledge bases. All defined in the template's `entity_roster` and carried through the full simulation.
 
-| Character | Role | Final Valence | Final Arousal | Final Energy | ANDOS Layer |
+| Character | Role | Final Valence | Final Arousal | Final Energy | Exposure Events |
 |-----------|------|:---:|:---:|:---:|:---:|
-| **Sarah Okafor** | Mission Commander. Experienced, politically pressured by NASA leadership. | +0.68 | 0.53 | 119.5 | 3 |
-| **Raj Mehta** | Flight Engineer. Brilliant systems analyst, conflict-averse. | +0.08 | 0.64 | 131.5 | 2 |
-| **Lin Zhang** | Systems Engineer. Detected ALSS anomalies, was overruled. | -0.34 | 0.57 | 149.5 | 1 |
-| **Thomas Webb** | Mission Director (ground). Prioritized schedule over safety. | -0.16 | 0.58 | 149.4 | 0 |
+| **Sarah Okafor** | Mission Commander. Experienced, politically pressured by NASA leadership. | -0.02 | 0.55 | 131.4 | 60 |
+| **Raj Mehta** | Flight Engineer. Analyzes systems and crew dynamics, conflict-averse. | +0.78 | 0.60 | 99.3 | 59 |
+| **Lin Zhang** | Systems Engineer. Detected ALSS anomalies, fought to be heard. | +0.53 | 0.76 | 131.3 | 54 |
+| **Thomas Webb** | Mission Director (ground). Prioritized schedule over safety. | -0.36 | 0.70 | 149.4 | 61 |
 
-**Emotional arcs**: Okafor maintains positive valence (leadership optimism) but moderate arousal. Zhang's valence drops to -0.34 (frustration at being overruled). Mehta's arousal is highest at 0.64 (accumulated stress from conflict avoidance). Webb stays near-neutral but his arousal climbs as schedule pressure mounts.
+**Emotional arcs**: Webb's valence drops to -0.36 (frustration from mounting schedule pressure) while his arousal climbs to 0.70 (highest among the cast). Zhang's positive valence (+0.53) reflects vindication as her concerns prove valid. Mehta's energy is lowest at 99.3 --- the conflict-averse intermediary depletes fastest. Okafor is near-neutral (-0.02), pulled between leadership optimism and growing unease.
+
+Each entity received 3 initial knowledge items from `scene_initialization` and accumulated 51--58 additional items through dialog-driven exposure events across 11 timepoints.
 
 ---
 
 ## 3. Backward Timeline
 
-Portal mode traces backward from the 2031 failure. Each step was selected from 7 candidates scored by simulation judging. The fidelity schedule escalates as the timeline approaches the origin:
+Portal mode traces backward from the 2031 failure. Each step was selected from 7 candidates scored by simulation judging (best coherence: 0.818). All 4 entities are present at every timepoint.
 
 ```
-Step   Year     Fidelity        Event
- 0     2031     dialog          Ares III loses contact during orbital insertion
- 1     Jul 30   tensor_only     Webb contracts simplified life support; known O2 flaw ignored
- 2     Jan 30   tensor_only     Zhang detects O2 generator flaw; Webb ignores due to schedule
- 3     Jul 29   tensor_only     Zhang finds critical flaw; Webb won't allocate resources
- 4     Jan 29   scene           Okafor under NASA pressure; allocates $10M contingency
- 5     Jul 28   scene           Zhang detects flaw in routine review; shares with Mehta
- 6     Jan 28   scene           Okafor allocates $1M for life support upgrades
- 7     Jul 27   graph           Zhang presents flaw to Okafor; Mehta detects comms anomaly
- 8     Jan 27   graph           Okafor prioritizes safety; minor flaw fixed before launch
- 9     Jul 26   dialog          Zhang + Mehta detect flaw; Webb dismissive; Okafor intervenes
-10     Jan 26   dialog          Zhang + Mehta identify redundancy architecture flaw; Webb unaware
+Step   Year     Event
+ 0     Mar 31   Ares III loses contact during orbital insertion --- cascading life support + comms failure
+ 1     Jul 30   Critical software bug discovered in mission control; Zhang identified it, Webb patches with workaround
+ 2     Jan 30   Zhang detects oxygen generator anomalies; Webb diverts resources elsewhere
+ 3     Jul 29   Zhang + Mehta develop contingency plan for O2 system; Webb refuses to allocate resources
+ 4     Jan 29   Simulation exercise reveals O2 risks; Webb negotiates to reduce crew size
+ 5     Jul 28   Zhang + Mehta reveal critical design flaw in O2 system; Webb torn between fix and schedule
+ 6     Jan 28   Mehta raises life support concerns to Webb, is rebuffed; Zhang investigates independently
+ 7     Jul 27   Zhang's O2 flaw finding validated by independent review; Webb resists design changes
+ 8     Jan 27   Okafor secures additional resources from NASA; Zhang begins thorough O2 testing
+ 9     Jul 26   Zhang convinces Mehta to investigate O2 flaw despite schedule; Webb suspects crew size compromise
+10     Jan 26   Mehta discovers flaw in O2 generator engineering specs; Webb downplays significance
 ```
 
-The causal chain shows a repeating pattern: Zhang identifies technical risks, Webb dismisses them under budget/schedule pressure, and Okafor tries to mediate. The institutional failure isn't any single decision --- it's the accumulation of small compromises.
+The causal chain reveals a repeating pattern: Zhang identifies technical risks, Webb dismisses them under budget/schedule pressure, Mehta mediates, and Okafor tries to secure resources from above. The institutional failure isn't any single decision --- it's the accumulation of small compromises over 5 years.
 
 <details>
-<summary><b>Full timeline descriptions</b></summary>
+<summary><b>Full timeline descriptions (LLM-generated)</b></summary>
 
-**Step 0 (March 2031)**: Ares III crewed Mars mission loses contact during orbital insertion. Last telemetry shows cascading systems failures in life support and communications. The mission was celebrated as humanity's greatest achievement until silence fell.
+**Step 0 (March 2031)**: Ares III crewed Mars mission loses contact during orbital insertion in March 2031. Last telemetry shows cascading systems failures in life support and communications. The mission was celebrated as humanity's greatest achievement until silence fell. Trace backward to understand how this disaster was built, decision by decision.
 
-**Step 1 (July 2030)**: Thomas Webb makes a deal with a private contractor to provide a simplified life support system, citing concerns about the mission's budget and schedule. However, the contractor's system has a known flaw in the oxygen generator's design, which Lin Zhang detects but is unable to address due to the contract's terms. Meanwhile, Raj Mehta detects anomalies in the communication systems, but his concerns are dismissed by Webb.
+**Step 1 (July 2030)**: A critical software bug is discovered in the Ares III mission control system, which Lin Zhang had previously identified but was unable to fix due to resource constraints. Thomas Webb orders a temporary workaround, but Raj Mehta warns that the fix may not be reliable. Meanwhile, Sarah Okafor begins to question the mission's overall safety margin.
 
-**Step 2 (January 2030)**: Lin Zhang detects a flaw in the oxygen generator's design specifications, which she reports to Thomas Webb. However, Webb decides to ignore the flaw due to the mission's tight schedule and the need to meet the budget constraints. Meanwhile, Raj Mehta begins to analyze the communication systems, but his findings are not yet conclusive.
+**Step 2 (January 2030)**: Lin Zhang detects anomalies in the oxygen generator test results, but is unable to investigate further due to resource constraints. Thomas Webb, prioritizing the schedule, decides to allocate resources to other areas of the mission. Raj Mehta, aware of the anomalies, begins to question the safety margin. Sarah Okafor, concerned about the lack of resources, starts to feel uneasy about the mission's overall safety.
 
-**Step 3 (July 2029)**: Lin Zhang is tasked with analyzing the oxygen generator's design specifications. She detects a critical flaw, but Thomas Webb is hesitant to allocate additional resources to address the issue. Raj Mehta is working on analyzing the communication systems, but his findings are not yet conclusive.
+**Step 3 (July 2029)**: Lin Zhang and Raj Mehta collaborate to develop a contingency plan for the oxygen generator system, but Thomas Webb decides not to allocate resources to implement the plan. Sarah Okafor is unaware of the plan's existence.
 
-**Step 4 (January 2029)**: Sarah Okafor, under pressure from NASA's leadership to meet the scheduled launch date, decides to prioritize safety margins, allocating an additional $10 million from the mission's contingency fund to address potential system anomalies. Meanwhile, Lin Zhang detects a critical flaw in the oxygen generator.
+**Step 4 (January 2029)**: Lin Zhang and Raj Mehta participate in a simulation exercise to test the crew's response to emergencies. They identify potential risks and weaknesses in the oxygen generator system, which informs their contingency planning. Meanwhile, Thomas Webb is negotiating with stakeholders to reduce the crew size, which may impact the availability of personnel for the contingency plan.
 
-**Step 5 (July 2028)**: Lin Zhang detects a critical flaw in the oxygen generator's design specifications during a routine review. She brings her concerns to Raj Mehta, who begins analyzing the communication systems to determine if there are any related issues. Meanwhile, Sarah Okafor is under pressure from NASA's leadership to maintain the mission's schedule.
+**Step 5 (July 2028)**: Lin Zhang and Raj Mehta conduct an in-depth analysis of the oxygen generator system's test results, revealing a critical design flaw. They present their findings to Thomas Webb, who is torn between addressing the issue and meeting the tight schedule. Sarah Okafor is focused on crew training, unaware of the potential risks.
 
-**Step 6 (January 2028)**: Sarah Okafor decides to prioritize the crew's safety over the mission's schedule, allocating an additional $1 million to improve the life support systems. Lin Zhang is tasked with overseeing the upgrades, which gives her more time to review the oxygen generator design specifications.
+**Step 6 (January 2028)**: Raj Mehta presents his concerns about the life support system to Thomas Webb, but is met with resistance. Lin Zhang begins to secretly investigate the oxygen generator design. Sarah Okafor focuses on crew training, emphasizing emergency response procedures.
 
-**Step 7 (July 2027)**: Lin Zhang discovers a critical flaw in the oxygen generator design specifications. She presents her findings to Sarah Okafor, who recognizes the potential risks to the crew. Meanwhile, Raj Mehta detects an anomaly in the communication systems, which he shares with Lin. Thomas Webb is under pressure from stakeholders to meet the original mission schedule.
+**Step 7 (July 2027)**: Systems Engineer Lin Zhang is tasked with reviewing the oxygen generator design. She detects a critical flaw, and her concerns are validated by an independent review team. However, Mission Director Thomas Webb is under pressure to meet the schedule and resists making changes. Meanwhile, Raj Mehta starts to notice a trend of minor anomalies in the life support system.
 
-**Step 8 (January 2027)**: Sarah Okafor decides to prioritize crew safety over the mission schedule, allocating additional resources to the life support systems. Meanwhile, Lin Zhang discovers a minor flaw in the oxygen generator design specifications, which she reports to Raj Mehta. Raj begins working on a fix, and the issue is ultimately addressed before the mission launches.
+**Step 8 (January 2027)**: Sarah Okafor convinces NASA leadership to allocate additional resources to the Ares III mission's life support system. This allows Lin Zhang to conduct more thorough testing of the oxygen generator design, which eventually reveals the critical flaw. Thomas Webb is dealing with the consequences of a recent equipment failure, which has delayed the mission by 1 week.
 
-**Step 9 (July 2026)**: Lin Zhang and Raj Mehta detect a minor flaw in the oxygen generator design specifications. They report the concern to Thomas Webb, who is initially dismissive of the issue. Sarah Okafor intervenes, prioritizing crew safety and allocating additional resources to the life support systems.
+**Step 9 (July 2026)**: Lin Zhang convinces Raj Mehta to help her investigate a suspected flaw in the oxygen generator design, despite the mission's tight schedule and budget constraints. Meanwhile, Thomas Webb begins to suspect that the crew size reduction may have compromised the mission's safety margins.
 
-**Step 10 (January 2026)**: Lin Zhang and Raj Mehta collaborate on a detailed analysis of the oxygen generator design specifications. They identify a potential flaw in the system's redundancy architecture and begin developing a contingency plan. Meanwhile, Thomas Webb remains focused on meeting the scheduled launch date and is unaware of the potential problem.
+**Step 10 (January 2026)**: Raj Mehta discovers a critical flaw in the engineering specifications for the oxygen generator design. He reports his findings to Lin Zhang, who recognizes the potential implications for the mission. Thomas Webb is informed but downplays the significance of the flaw, citing the need to meet schedule milestones. Sarah Okafor must balance the need for caution with the pressure to maintain the mission timeline.
 
 </details>
 
@@ -119,293 +140,345 @@ The causal chain shows a repeating pattern: Zhang identifies technical risks, We
 
 ## 4. Sample Dialogs
 
-Every timepoint generates a multi-party dialog with tracked emotional tones, confidence scores, and knowledge references. All 4 characters participate in every conversation. Here are two representative exchanges.
+Every timepoint generates a multi-party dialog with tracked confidence scores and knowledge references. All 4 characters participate in every conversation. 11 dialogs total, 127 turns, 89 information transfers.
 
-### Dialog at tp_004 (January 2029) --- 13 turns, 7 knowledge transfers
+### Dialog at tp_001_2030 --- 12 turns, 5 knowledge transfers
 
-> **Raj Mehta** *(neutral, 0.9)*: Alright, let's review our current situation. We have a narrow window to make adjustments to the life support systems before orbital insertion.
+> **Raj Mehta** *(conf 0.8)*: We need to evaluate both options for the Ares III mission control system.
 >
-> **Lin Zhang** *(concerned, 1.0)*: I strongly believe that upgrading the oxygen generators should be prioritized, considering the 23% chance of failure within the first 6 months of operation.
+> **Sarah Okafor** *(conf 0.7)*: I agree, but we also need to consider the crew member strengths and weaknesses.
 >
-> **Sarah Okafor** *(cautious, 0.8)*: I agree with Lin, but we also need to consider the time constraints and the potential risks of delaying the mission. We should weigh the risks and benefits of every decision.
+> **Thomas Webb** *(cautious, conf 0.9)*: Budget constraints are a major concern for this mission. We can't afford to make mistakes.
 >
-> **Thomas Webb** *(practical, 1.0)*: I understand your concerns, but we also need to consider the budget constraints. Upgrading the oxygen generators would cost around $2.5 million. We should discuss the EuroSpace design and make a decision within the next 48 hours.
+> **Lin Zhang** *(concerned, conf 0.8)*: I've identified a potential risk in the safety protocols. We need to address it before proceeding.
 >
-> **Lin Zhang** *(passionate, 1.0)*: I understand the budget concerns, but I still believe that upgrading the oxygen generators is crucial for the crew's safety. We should also consider the long-term benefits of investing in a reliable life support system.
->
-> **Sarah Okafor** *(firm, 0.8)*: I think we're all forgetting that we have to prioritize crew safety. We should focus on immediate challenges and make decisions based on available information.
->
-> **Raj Mehta** *(thoughtful, 0.8)*: I agree with Sarah. We should also consider adjusting resource allocation to free up more funds for life support systems.
->
-> **Thomas Webb** *(resolute, 0.9)*: I think we've covered all the points. Let's summarize our concerns and make a plan. We'll discuss the EuroSpace design and make a decision within the next 48 hours.
->
-> **Lin Zhang** *(cooperative, 1.0)*: I'll start reviewing the EuroSpace design and provide feedback within the next 24 hours. Let's work together to make a decision that prioritizes crew safety and mission objectives.
->
-> **Sarah Okafor** *(collaborative, 0.8)*: I'll work with Raj to review the budget and resource allocation. We'll identify areas where we can adjust to free up more funds for life support systems.
->
-> **Thomas Webb** *(firm, 0.9)*: Let's reconvene in 48 hours to discuss our findings and make a decision. Remember, our priority is crew safety and mission success.
->
-> **Raj Mehta** *(thoughtful, 0.8)*: I'll make sure to review the crew's strengths and weaknesses and provide feedback on how to optimize team performance.
->
-> **Lin Zhang** *(cooperative, 1.0)*: Let's work together to ensure the success of this mission.
+> **Raj Mehta** *(conf 0.8)*: I concur with Lin. Safety protocols should be our top priority.
 
-Context flags applied: `physical_states`, `emotional_states`, `body_mind_coupling`, `relationship_context`
+*(+7 more turns...)*
 
-<details>
-<summary><b>Dialog at tp_006 (January 2028) --- 8 turns, 8 knowledge transfers</b></summary>
+### Dialog at tp_003_2029 --- 12 turns, 10 knowledge transfers
 
-> **Sarah Okafor** *(0.9)*: Alright, let's review our current situation. We have a narrow window to make adjustments to the life support systems before orbital insertion. Lin, can you walk us through the oxygen generator upgrades?
+> **Thomas Webb** *(conf 0.8)*: We need to review the budget constraints and resource allocation before the next meeting.
 >
-> **Lin Zhang** *(0.95)*: Yes, of course. The oxygen generators have a 23% chance of failure within the first six months of operation. I strongly believe that upgrading them should be prioritized, considering the risks and costs associated with failure.
+> **Sarah Okafor** *(conf 0.8)*: I agree, but we also need to consider the crew member strengths and weaknesses for the Ares III mission.
 >
-> **Raj Mehta** *(0.8)*: I understand the concerns, but we also need to consider the time constraints and the potential risks of delaying the mission. Can we discuss the EuroSpace design and its potential benefits?
+> **Raj Mehta** *(conf 0.8)*: I concur with Sarah. We should evaluate both options for the Ares III mission control system and consider the implications for the crew.
 >
-> **Thomas Webb** *(0.85)*: I agree that we need to weigh the risks and benefits of every decision. However, I also think we should focus on immediate challenges and make decisions based on available information. Can we discuss the budget constraints and resource allocation?
+> **Lin Zhang** *(conf 0.9)*: I've identified a potential risk in the safety protocols. We need to address this before the next meeting.
 >
-> **Sarah Okafor** *(0.9)*: I think we should consider adjusting resource allocation to free up more funds for life support systems. We can discuss the specifics, but I believe it's essential to prioritize crew safety.
->
-> **Lin Zhang** *(0.85)*: I agree with Sarah. Adjusting resource allocation could be a potential solution. However, we also need to consider the potential risks and consequences of delaying the mission.
->
-> **Raj Mehta** *(0.8)*: I think we're getting closer to a decision. Can we summarize the key points and make a plan?
->
-> **Thomas Webb** *(0.85)*: I agree. Let's summarize the key points and make a decision within the next 48 hours. We'll discuss the EuroSpace design and its potential benefits, as well as the budget constraints and resource allocation.
+> **Thomas Webb** *(conf 0.8)*: Let's table the discussion about the Ares III mission until after the review.
 
-</details>
+*(+7 more turns...)*
+
+Context flags applied per dialog: `physical_states`, `emotional_states`, `body_mind_coupling`, `relationship_context`, `knowledge_provenance`, `temporal_awareness`
 
 ---
 
 ## 5. Knowledge Provenance
 
-The system tracks **267 typed exposure events** across the simulation. Every fact an entity knows has a source, a timestamp, and a confidence score. Entities can't know things without a tracked exposure event --- anachronisms are structurally prevented.
+The system tracks **234 typed exposure events** across the simulation. Every fact an entity knows has a source, a timestamp, and a confidence score. Entities can't know things without a tracked exposure event --- anachronisms are structurally prevented.
 
-### Event distribution
+### Event distribution by timepoint
 
-| Entity | Initial | tp_000 | tp_001 | tp_002 | tp_003 | tp_004 | tp_005 | tp_006 | tp_007 | tp_008 | tp_009 | tp_010 | **Total** |
-|--------|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| lin_zhang | 3 | 7 | 4 | 6 | 4 | 7 | 5 | 2 | 4 | 9 | 7 | 6 | **64** |
-| raj_mehta | 3 | 6 | 6 | 6 | 6 | 8 | 6 | 5 | 5 | 9 | 8 | 8 | **76** |
-| sarah_okafor | 3 | 6 | 5 | 4 | 6 | 6 | 5 | 4 | 4 | 10 | 8 | 6 | **67** |
-| thomas_webb | 3 | 5 | 3 | 5 | 5 | 6 | 5 | 4 | 5 | 5 | 7 | 7 | **60** |
+| Timepoint | Events | Key content |
+|-----------|:------:|-------------|
+| pre_tp_001 (initial) | 12 | Scene initialization: mission objectives, safety protocols, budget constraints |
+| tp_000 (2031) | 24 | Mission failure debrief: systems failures, crew status, communication loss |
+| tp_001 (Jul 2030) | 33 | Software bug discovery, workaround debate, safety margin questions |
+| tp_002 (Jan 2030) | 27 | O2 anomaly detection, resource diversion, growing unease |
+| tp_003 (Jul 2029) | 36 | Contingency planning, resource refusal, information asymmetry |
+| tp_004 (Jan 2029) | 15 | Simulation exercise, risk identification, crew size negotiations |
+| tp_005 (Jul 2028) | 18 | Design flaw revealed, schedule vs safety tension |
+| tp_006 (Jan 2028) | 3 | Mehta rebuffed, Zhang's independent investigation |
+| tp_008 (Jan 2027) | 24 | NASA resource allocation, thorough O2 testing begins |
+| tp_009 (Jul 2026) | 27 | Zhang-Mehta collaboration, Webb's crew size concerns |
+| tp_010 (Jan 2026) | 15 | Engineering spec flaw discovered, Webb downplays |
 
-### Sample exposure events
+### Exposure events by entity
+
+| Entity | Total Events | Unique Sources | Role Pattern |
+|--------|:---:|:---:|---|
+| thomas_webb | 61 | 4 | Receives most information but acts on least |
+| sarah_okafor | 60 | 4 | Relay node: connects NASA leadership to crew concerns |
+| raj_mehta | 59 | 4 | Intermediary: receives from all parties, mediates |
+| lin_zhang | 54 | 4 | Source node: generates technical findings, receives least |
+
+### Sample exposure chain
 
 ```
-[tp_001_2030] raj_mehta <- sarah_okafor (told, conf=0.8):
-  "Adjusting resource allocation to free up more funds for life support systems is a potential solution."
+[pre_tp_001] lin_zhang <- scene_initialization (initial, conf=1.0):
+  "Spacecraft systems and performance metrics"
 
-[tp_004_2029] lin_zhang <- raj_mehta (told, conf=0.8):
-  "Adjusting resource allocation to free up more funds for life support systems could be a
-   potential solution to budget constraints."
+[tp_000_2031] raj_mehta <- sarah_okafor (told, conf=0.8):
+  "The team needs to review the mission objectives and timelines."
 
-[tp_007_2027] thomas_webb <- raj_mehta (told, conf=0.7):
-  "The EuroSpace design is a potential alternative life support system."
+[tp_001_2030] lin_zhang <- sarah_okafor (told, conf=0.8):
+  "We need to evaluate both options for the Ares III mission control system."
 
-[tp_009_2026] sarah_okafor <- raj_mehta (told, conf=1.0):
-  "Raj Mehta agrees with Sarah that crew safety should be prioritized and mission objectives
-   and timelines reviewed."
+[tp_003_2029] thomas_webb <- lin_zhang (told, conf=0.9):
+  "I've identified a potential risk in the safety protocols."
 
-[tp_010_2026] thomas_webb <- lin_zhang (told, conf=0.8):
-  "The team needs to weigh the risks and benefits of every decision."
+[tp_009_2026] raj_mehta <- lin_zhang (told, conf=0.8):
+  "We should review the mission objectives and timelines before making any decisions."
 ```
 
-Raj Mehta accumulates the most exposure events (76) despite being "conflict-averse" --- his role as intermediary means he receives information from all parties. Thomas Webb has the fewest (60), consistent with his tendency to dismiss concerns.
+Thomas Webb accumulates the most exposure events (61) but has the lowest valence (-0.36) --- he receives the information but his schedule-first disposition causes him to dismiss critical findings. Lin Zhang has the fewest events (54) but the highest confidence scores, consistent with her role as the primary technical source.
 
 ---
 
-## 6. ADPRS Waveform Gating
+## 6. Outcome Convergence
+
+This is where things get interesting. Running the same template multiple times with the same LLM produces different surface-level details but converges on the same structural outcomes. This is the core evidence that the simulation captures something real about institutional dynamics, not just random LLM output.
+
+### 6 runs of `mars_mission_portal`
+
+| Run | Date | Cost | Exposure Events | Dialogs | Timepoints |
+|-----|------|:----:|:---:|:---:|:---:|
+| `946db667` | Feb 6 | $0.52 | 225 | 11 | 11 |
+| `3ba043b2` | Feb 9 | $0.51 | 201 | 10 | 11 |
+| `baae2120` | Feb 11 | $0.91 | 238 | 11 | 11 |
+| `7d55d9c6` | Feb 11 | $0.38 | 174 | 6 | 6 |
+| `7f33adbd` | Feb 12 | $1.00 | 267 | 11 | 11 |
+| **`9ba13680`** | **Feb 13** | **$0.98** | **234** | **11** | **11** |
+
+### Convergence metrics (computed across 3+ comparable runs)
+
+| Metric | Score | What it measures |
+|--------|:-----:|-----------------|
+| **Outcome similarity** | **0.79** | Do runs reach the same conclusions? (role assignments, event sequences, knowledge discovery) |
+| **Role stability** | **1.00** | Do the same characters play the same structural roles? (Zhang=source, Webb=blocker, Mehta=relay, Okafor=authority) |
+| **Knowledge convergence** | **0.60** | Do the same facts get discovered? (O2 flaw, budget constraints, crew dynamics) |
+| **Structural similarity** | **0.57** | Do the same causal edges appear? (Jaccard over temporal + knowledge edges) |
+
+**What this means**: Role stability is 1.00 --- across every run, Zhang identifies the technical problem, Webb dismisses it, Mehta mediates, Okafor tries to intervene from above. The characters aren't randomly assigned to narrative roles; the simulation's knowledge provenance and personality parameters drive them to the same structural positions every time.
+
+Outcome similarity at 0.79 means the runs agree on *what happens* (catastrophe built from institutional dysfunction) even when the specific dialog lines, exposure events, and edge structures differ. Structural similarity is lower (0.57) because there are many valid causal paths to the same outcome --- which is exactly what you'd expect from a real organizational failure.
+
+### How convergence is computed
+
+```python
+from evaluation.convergence import compute_outcome_convergence
+
+results = compute_outcome_convergence("mars_mission_portal", min_runs=3)
+# Returns: outcome_mean_similarity, structural_mean_similarity,
+#          knowledge_convergence, role_stability
+```
+
+The system extracts outcome summaries from each run (`extract_outcome_summary()`), computes pairwise similarity (`outcome_similarity()`), and reports both structural (edge Jaccard) and outcome-level (role + knowledge + event hash) convergence. Structural convergence measures whether the same graph edges appear; outcome convergence measures whether the same *things happen*.
+
+---
+
+## 7. ADPRS Waveform Gating
 
 The ADPRS (Attack, Decay, Peak, Release, Sustain) waveform scheduler evaluates each entity's cognitive activation (&phi;) at each timepoint and maps it to a resolution band. Entities in lower bands skip LLM dialog calls --- their trajectory snapshots are recorded but no tokens are spent.
 
 ### Shadow evaluation results
 
-| Entity | &phi; Range | Predicted Band | Actual Level | Divergent? |
+| Entity | &phi; Value | Predicted Band | Actual Level | Divergent? |
 |--------|:-----------:|:--------------:|:------------:|:----------:|
-| sarah_okafor | 0.610 -- 0.700 | dialog | dialog | Never |
-| raj_mehta | 0.671 -- 0.739 | dialog | dialog | Never |
-| lin_zhang | 0.571 -- 0.591 | graph | dialog | **Always** |
-| thomas_webb | 0.576 -- 0.701 | graph/dialog | dialog | At tp_007--tp_010 |
+| sarah_okafor | 0.776 | dialog | dialog | Never |
+| thomas_webb | 0.741 | dialog | dialog | Never |
+| raj_mehta | 0.733 | dialog | dialog | Never |
+| lin_zhang | 0.702 | dialog | dialog | Never |
 
-**Overall**: 44 evaluations, 15 divergent (34%), mean divergence 0.34 bands.
+**Overall**: 44 evaluations, 0 divergent (0%), mean continuous divergence 0.038 bands.
 
-Lin Zhang's &phi; consistently places her in the `graph` band (0.571--0.591), but the adaptive system elevated her to `dialog` in every timepoint because her contributions were deemed essential to the backward chain. This is the ADPRS shadow system working as designed --- tracking where predictions diverge from actual needs so future envelope fits improve.
+All four entities stayed in the `dialog` band throughout --- this is expected for a PORTAL template where every character is structurally important to the backward chain. The ADPRS system confirmed this: none were demoted to cheaper resolution levels.
 
-### Fitted ADPRS envelopes (per entity)
+Lin Zhang's &phi; (0.702) is the lowest, barely above the dialog threshold. In a larger simulation with peripheral characters, the ADPRS system would gate low-&phi; entities to `tensor_only` or `graph` bands, saving tokens on characters who don't drive the narrative.
 
-| Entity | A | D | P | R | S | Baseline | Residual | Converged |
-|--------|---|---|---|---|---|----------|----------|:---------:|
-| sarah_okafor | 1.0 | 31.5B | 7.607 | 0.0 | 0.007 | 0.776 | 0.00117 | Yes |
-| raj_mehta | 1.0 | 31.5B | 2.386 | 0.0 | 0.011 | 0.733 | 0.00097 | Yes |
-| lin_zhang | 1.0 | 31.5B | 2.367 | 0.0 | 0.017 | 0.702 | 0.00020 | Yes |
-| thomas_webb | 1.0 | 31.5B | 2.653 | 0.0 | 0.031 | 0.741 | 0.00104 | Yes |
+### Fitted ADPRS envelopes
 
-All envelopes converged via `curve_fit`. Okafor's high P value (7.607) indicates a sharp activation peak --- consistent with her role as commander making decisive interventions. Zhang's lowest residual (0.00020) shows the most predictable activation pattern.
+The shadow report includes fitted envelope parameters for each entity, computed via `scipy.optimize.curve_fit`:
+
+| Entity | Baseline &phi; | Continuous Divergence | Converged |
+|--------|:---------:|:---:|:---:|
+| sarah_okafor | 0.776 | 0.076 | Yes |
+| thomas_webb | 0.741 | 0.041 | Yes |
+| raj_mehta | 0.733 | 0.033 | Yes |
+| lin_zhang | 0.702 | 0.002 | Yes |
+
+Zhang's near-zero divergence (0.002) means the ADPRS system predicts her activation level almost perfectly --- her engagement pattern is the most consistent across timepoints. Okafor's higher divergence (0.076) reflects her role as commander: her activation spikes when she intervenes and drops when delegating.
 
 ---
 
-## 7. Fidelity Strategy
+## 8. Fidelity Strategy
 
 The system plans a fidelity budget before execution, then adapts during the run. The gap between planned and actual reveals where the scenario demanded more detail than expected.
 
-### Planned schedule
-
-```
-Timepoint:   1    2    3    4    5    6    7    8    9    10
-Fidelity:  tensor tensor tensor scene scene scene graph graph dialog dialog
-Steps:       6    6    6    6    6    6    6    6    6    6
-```
-
-### Actual outcome
-
-All 4 entities were elevated to `trained` resolution (maximum). The adaptive threshold of 0.75 triggered upgrades as the portal backward reasoning required full entity context at every step.
+### Planned vs. actual
 
 | Metric | Planned | Actual |
 |--------|---------|--------|
-| Token budget | 30,000 | 1,804,171 |
-| Budget compliance | -- | 60.14x over (soft budget mode) |
-| Resolution distribution | tensor/scene/graph/dialog mix | All `trained` |
-| Cost estimate | $0.067 | $1.00 |
+| Fidelity schedule | tensor &rarr; scene &rarr; graph &rarr; dialog | All `trained` |
+| Token budget | 30,000 | 1,762,921 |
+| Budget compliance | -- | 58.8x over (soft budget mode) |
+| Resolution distribution | mixed | All entities at `trained` |
+| Cost estimate | $0.067 | $0.983 |
 
-This demonstrates the soft budget mode working as intended: the system spent what the scenario required rather than truncating quality to hit a token cap.
+### Resolution escalation
+
+The planner starts conservative:
+```
+Timepoint:   1      2      3      4      5      6      7      8      9      10
+Planned:   tensor tensor tensor scene  scene  scene  graph  graph  dialog dialog
+```
+
+But the adaptive threshold (0.75) triggered upgrades at every step --- PORTAL backward reasoning requires full entity context to score candidate antecedents. All 4 entities were elevated to `trained` resolution (maximum fidelity, ~50k tokens each).
+
+This demonstrates soft budget mode working as intended: the system spent what the scenario required rather than truncating quality to hit a token cap. For cost-sensitive use, switch to hard budget mode: `./run.sh run --budget 0.50 mars_mission_portal`
 
 ---
 
-## 8. Entity Tensors
+## 9. Entity Tensors
 
-Each entity carries a multi-dimensional cognitive and physical tensor, compressed via PCA/SVD, with ADPRS envelope metadata. These are the final states after 11 timepoints of simulation.
+Each entity carries a multi-dimensional cognitive and physical state tensor, updated at every timepoint. These are the final states after 11 timepoints of simulation.
 
 <details>
-<summary><b>Thomas Webb --- cognitive tensor</b></summary>
+<summary><b>Thomas Webb --- cognitive tensor (final state)</b></summary>
 
 ```json
 {
   "knowledge_state": [
-    "Mission objectives and timelines",
+    "Mission timelines and milestones",
     "Budget constraints and resource allocation",
-    "Pressure from NASA and stakeholders"
+    "NASA's expectations and priorities"
   ],
-  "emotional_valence": -0.16,
-  "emotional_arousal": 0.584,
-  "energy_budget": 149.44,
-  "decision_confidence": 0.26,
-  "patience_threshold": 26.5,
+  "emotional_valence": -0.36,
+  "emotional_arousal": 0.70,
+  "energy_budget": 149.4,
+  "decision_confidence": 0.285,
   "risk_tolerance": 0.26,
   "social_engagement": 0.25
 }
 ```
 
-**Physical**: Age 35, health 1.0, pain 0.0, fever 36.5, full mobility/stamina/sensory acuity.
-**Compressed (PCA)**: `[0.1, 0.5, 0.15, 1.5, 0.26, 0.265, 0.26, 0.25]`
-**Tensor maturity**: 0.790 | **ANDOS layer**: 0
+Webb's low confidence (0.285) and negative valence (-0.36) reflect mounting pressure. His energy remains high (149.4) --- he's not doing the technical work, just blocking it.
 
 </details>
 
 <details>
-<summary><b>Lin Zhang --- cognitive tensor</b></summary>
+<summary><b>Lin Zhang --- cognitive tensor (final state)</b></summary>
 
 ```json
 {
   "knowledge_state": [
-    "Spacecraft systems and potential failure points",
-    "Concerns about mission safety and risk",
-    "Personal frustration with being overruled"
+    "Spacecraft systems and performance metrics",
+    "Crew member concerns and feedback",
+    "Safety protocols and procedures"
   ],
-  "emotional_valence": -0.34,
-  "emotional_arousal": 0.570,
-  "energy_budget": 149.46,
+  "emotional_valence": 0.53,
+  "emotional_arousal": 0.76,
+  "energy_budget": 131.3,
   "decision_confidence": 0.52,
-  "patience_threshold": 53.0,
   "risk_tolerance": 0.51,
-  "social_engagement": 0.5
+  "social_engagement": 0.50
 }
 ```
 
-**Physical**: Age 35, health 1.0, pain 0.0, fever 36.5, full mobility/stamina/sensory acuity.
-**Compressed (PCA)**: `[0.1, 0.5, 0.15, 1.5, 0.52, 0.53, 0.51, 0.5]`
-**Tensor maturity**: 0.788 | **ANDOS layer**: 1
+Zhang has the highest arousal (0.76) and highest decision confidence (0.52) --- she's the most activated character, driven by technical conviction.
 
 </details>
 
 <details>
-<summary><b>Raj Mehta --- cognitive tensor</b></summary>
+<summary><b>Raj Mehta --- cognitive tensor (final state)</b></summary>
 
 ```json
 {
   "knowledge_state": [
     "Spacecraft systems and operations",
-    "Crew dynamics and potential conflicts",
-    "Personal concerns about mission safety"
+    "Crew member personalities and dynamics",
+    "Potential risks and contingency plans"
   ],
-  "emotional_valence": 0.08,
-  "emotional_arousal": 0.643,
-  "energy_budget": 131.52,
+  "emotional_valence": 0.78,
+  "emotional_arousal": 0.60,
+  "energy_budget": 99.3,
   "decision_confidence": 0.46,
-  "patience_threshold": 45.0,
   "risk_tolerance": 0.43,
   "social_engagement": 0.44
 }
 ```
 
-**Physical**: Age 35, health 1.0, pain 0.0, fever 36.5, full mobility/stamina/sensory acuity.
-**Compressed (PCA)**: `[0.0, 0.55, 0.264, 1.32, 0.46, 0.45, 0.43, 0.44]`
-**Tensor maturity**: 0.758 | **ANDOS layer**: 2
+Mehta has the highest valence (+0.78) but lowest energy (99.3) --- the cost of mediating between Zhang and Webb. His knowledge uniquely includes "crew member personalities and dynamics" --- he's the social-awareness node.
 
 </details>
 
 <details>
-<summary><b>Sarah Okafor --- cognitive tensor</b></summary>
+<summary><b>Sarah Okafor --- cognitive tensor (final state)</b></summary>
 
 ```json
 {
   "knowledge_state": [
     "Mission objectives and timelines",
     "Crew member strengths and weaknesses",
-    "NASA's expectations and budget constraints"
+    "NASA's expectations and priorities"
   ],
-  "emotional_valence": 0.68,
-  "emotional_arousal": 0.530,
-  "energy_budget": 119.50,
+  "emotional_valence": -0.02,
+  "emotional_arousal": 0.55,
+  "energy_budget": 131.4,
   "decision_confidence": 0.41,
-  "patience_threshold": 41.5,
   "risk_tolerance": 0.41,
-  "social_engagement": 0.4
+  "social_engagement": 0.40
 }
 ```
 
-**Physical**: Age 35, health 1.0, pain 0.0, fever 36.5, full mobility/stamina/sensory acuity.
-**Compressed (PCA)**: `[0.1, 0.75, 0.24, 1.2, 0.41, 0.415, 0.41, 0.4]`
-**Tensor maturity**: 0.773 | **ANDOS layer**: 3
+Okafor's near-zero valence (-0.02) is the commander's burden: pulled between optimism and realism. Her knowledge overlaps with Webb's ("NASA's expectations") but includes "crew member strengths and weaknesses" that he lacks.
 
 </details>
 
 ---
 
-## 9. Mechanism Usage
+## 10. Mechanism Usage
 
 14 of the 19 available mechanisms fired during this run. The counts below show which subsystems did the most work.
 
-| Mechanism | Function | Calls | Description |
+| Mechanism | Function | Calls | What it does |
 |-----------|----------|:-----:|-------------|
-| M3 | `_build_knowledge_from_exposures` | 44 | Knowledge graph construction from exposure events |
-| M8 | `couple_pain_to_cognition` | 44 | Embodied state &rarr; cognitive state coupling |
-| M11 | `synthesize_dialog` | 11 | Multi-party contextual conversation generation |
-| M19 | `extract_knowledge_from_dialog` | 11 | Post-dialog knowledge extraction and exposure event creation |
-| M6 | `compress` | 8 | Tensor compression (PCA/SVD 8D vectors) |
-| M5 | `synthesize_response` | 6 | Lazy resolution on-demand synthesis |
-| M9 | `detect_entity_gap` | 6 | Missing entity auto-detection |
+| M3 | `_build_knowledge_from_exposures` | 44 | Build knowledge graph from exposure events (4 entities x 11 timepoints) |
+| M8 | `couple_pain_to_cognition` | 44 | Physical state &rarr; cognitive state coupling (embodied cognition) |
+| M11 | `synthesize_dialog` | 11 | Multi-party contextual conversation generation (one per timepoint) |
+| M19 | `extract_knowledge_from_dialog` | 11 | Post-dialog knowledge extraction, creating new exposure events |
+| M6 | `compress` | 8 | Tensor compression via PCA/SVD into 8D vectors |
+| M5 | `synthesize_response` | 6 | On-demand resolution elevation (lazy fidelity) |
+| M9 | `detect_entity_gap` | 6 | Missing entity auto-detection in scenes |
 | M2 | `progressive_training_check` | 4 | Entity quality improvement tracking |
-| M4 | `validate_biological_constraints` | 4 | Constraint enforcement (biological/structural) |
-| M6 | `create_baseline_tensor` | 4 | Initial tensor creation |
-| M6 | `populate_tensor_llm_guided` | 4 | LLM-guided tensor population |
-| M1+M17 | `determine_fidelity_temporal_strategy` | 2 | Joint fidelity + temporal planning |
-| M1 | `assign_resolutions` | 1 | Initial resolution level assignment |
-| M1 | `build_graph` | 1 | Relationship graph construction |
-| M17 | `orchestrate` | 1 | Portal orchestration |
+| M4 | `validate_biological_constraints` | 4 | Constraint enforcement (resource + biological validation) |
+| M6 | `create_baseline_tensor` | 4 | Initial tensor creation for each entity |
+| M6 | `populate_tensor_llm_guided` | 4 | LLM-guided tensor population with personality/knowledge |
+| M1+M17 | `determine_fidelity_temporal_strategy` | 2 | Joint fidelity + temporal mode planning |
+| M1 | `assign_resolutions` / `build_graph` | 2 | Resolution assignment and relationship graph construction |
+| M17 | `orchestrate` | 1 | Portal backward orchestration (10 steps, 7 candidates each) |
 
-M3 and M8 dominate because they fire once per entity per timepoint (4 entities x 11 timepoints = 44). M11 and M19 fire once per timepoint (11 dialogs, each followed by knowledge extraction).
+### Mechanism interaction chain
+
+```
+M17 (portal orchestrate)
+ └─ generates 7 candidates per step, scores with 405B judge
+     └─ M1+M17 (fidelity+temporal planning)
+         └─ M6 (create tensors) → M6 (populate via LLM) → M6 (compress)
+             └─ M3 (build knowledge from exposures)
+                 └─ M8 (couple physical → cognitive state)
+                     └─ M11 (synthesize dialog)
+                         └─ M19 (extract knowledge from dialog)
+                             └─ M3 (update knowledge graph) → loop
+```
+
+### LLM call distribution
+
+| Call Type | Count | Model | Purpose |
+|-----------|:-----:|-------|---------|
+| context_relevance_scoring | 40 | Llama 3.1 70B | Score relevance of context for entity states |
+| causal_chain_summary | 36 | Llama 3.1 70B | Summarize causal chains for backward inference |
+| score_relevance | 18 | Llama 3.1 70B | Score candidate antecedent relevance |
+| generate_structured | 15 | Llama 3.1 70B | Generate structured entity/timepoint data |
+| generate_dialog | 11 | Llama 3.1 70B | Multi-party dialog synthesis |
+| portal_simulation_judging | -- | Llama 3.1 405B | Judge 7 candidates per backward step |
+
+**107 of 122 logged calls** used Llama 3.1 70B (standard workhorse). **12 calls** used Llama 3.1 405B (portal simulation judging --- the most expensive per-call operation). M18 (intelligent model selection) routed each call to the optimal model for the action type.
 
 ---
 
-## 10. Training Data
+## 11. Training Data
 
 This run generated **40 structured training examples** (prompt/completion pairs). Each example includes the entity's full causal history (M7), relationship context (M13), knowledge provenance (M3), and quantitative state (M6).
 
@@ -415,62 +488,61 @@ This run generated **40 structured training examples** (prompt/completion pairs)
 === CAUSAL HISTORY (M7) ===
 Timeline leading to current moment (3 events):
   tp_000_2031: Ares III loses contact during orbital insertion...
-  tp_001_2030: Webb contracts simplified life support...
-  tp_002_2030: Zhang detects O2 generator flaw...
+  tp_001_2030: Software bug discovered in mission control system...
+  tp_002_2030: Zhang detects O2 generator anomalies...
 
 === RELATIONSHIP CONTEXT (M13) ===
 Relationships with entities present:
-  lin_zhang: tense (trust: 0.45, alignment: 0.30)
+  lin_zhang: collaborative (trust: 0.65, alignment: 0.55)
   sarah_okafor: cooperative (trust: 0.70, alignment: 0.60)
-  raj_mehta: cautious (trust: 0.55, alignment: 0.40)
+  thomas_webb: tense (trust: 0.40, alignment: 0.30)
 
 === KNOWLEDGE PROVENANCE (M3) ===
 Primary sources: scene_initialization (3 items), lin_zhang (2 items)
 Learning modes: experienced (70%), told (30%)
-Recent: "oxygen generators have 23% failure rate" (from lin_zhang, conf: 0.95)
+Recent: "oxygen generator has critical design flaw" (from lin_zhang, conf: 0.9)
 
 === ENTITY STATE (M6) ===
-thomas_webb at T0:
-  Physical: Age 35, energy 149/100
-  Cognitive: 3 knowledge items, 0.26 decision confidence
-  Emotional: Valence -0.16, Arousal 0.58
+raj_mehta at T0:
+  Physical: Age 35, energy 99/100
+  Cognitive: 3 knowledge items, 0.46 decision confidence
+  Emotional: Valence +0.78, Arousal 0.60
 
 === PREDICTION TASK ===
 Predict: new knowledge, energy change, emotional impact, causal reasoning.
 ```
 
-### Mean energy dynamics
+### Training data quality (post-fix)
 
-Mean energy change per example: **-13.0** (entities gradually expend energy across the simulation).
+The training data formatter was fixed on Feb 13, 2026 to produce varied, entity-specific data:
+
+| Metric | Before fix | After fix |
+|--------|-----------|-----------|
+| Energy values | 89.0 (constant) | 99.3--149.4 (entity-specific) |
+| Arousal values | 0.15 (constant) | 0.55--0.76 (entity-specific) |
+| Knowledge arrays | `[]` (always empty) | 3 items per entity (sourced from exposure events) |
 
 ---
 
-## 11. Run Metadata
+## 12. Run Metadata
 
 <details>
-<summary><b>Full run record (32 fields)</b></summary>
+<summary><b>Full run record</b></summary>
 
 | Field | Value |
 |-------|-------|
-| run_id | `run_20260212_140025_7f33adbd` |
+| run_id | `run_20260213_141539_9ba13680` |
 | template_id | `mars_mission_portal` |
-| started_at | 2026-02-12T14:00:25 |
-| completed_at | 2026-02-12T15:12:15 |
+| started_at | 2026-02-13T14:15:39 |
+| completed_at | 2026-02-13T18:34:45 |
 | causal_mode | portal |
-| max_entities | 4 |
-| max_timepoints | 10 |
 | entities_created | 4 |
 | timepoints_created | 11 |
 | training_examples | 40 |
-| cost_usd | $1.002 |
-| llm_calls | 1,605 |
-| tokens_used | 1,804,171 |
-| duration_seconds | 4,309.5 |
+| cost_usd | $0.983 |
+| llm_calls | 1,596 |
+| tokens_used | 1,762,921 |
 | status | completed |
-| schema_version | 2.0 |
-| actual_tokens_used | 1,804,171 |
-| token_budget_compliance | 60.14 |
-| fidelity_efficiency_score | 8.31e-06 |
 | fidelity_distribution | `{"trained": 4}` |
 | narrative_exports | markdown, json, pdf |
 
@@ -480,52 +552,59 @@ Mean energy change per example: **-13.0** (entities gradually expend energy acro
 
 ```
 datasets/mars_mission_portal/
-  narrative_20260212_151215.markdown   15,208 bytes
-  narrative_20260212_151215.json       76,268 bytes
-  narrative_20260212_151215.pdf         5,109 bytes
-  shadow_report.json                    3,900 bytes
+  narrative_20260213_183447.markdown   11,979 bytes
+  narrative_20260213_183447.json       74,386 bytes
+  narrative_20260213_183447.pdf         5,377 bytes
+  shadow_report.json                   13,923 bytes
 ```
 
 ### Models used
 
-All inference via OpenRouter, MIT/Apache-licensed models only:
+All inference via OpenRouter. MIT/Apache 2.0/Llama-licensed models only --- all permit commercial synthetic data generation.
 
-| Model | Role |
-|-------|------|
-| Llama 4 Scout | Scene parsing, dialog synthesis |
-| DeepSeek R1 | Quantitative state propagation |
-| Qwen 2.5 72B | Knowledge extraction, entity state |
-| Llama 3.1 405B | Portal simulation judging (7 candidates per step) |
+| Model | License | Role | Calls |
+|-------|---------|------|:-----:|
+| Llama 3.1 70B Instruct | Llama | Entity population, dialog synthesis, knowledge extraction, relevance scoring | 107 |
+| Llama 3.1 405B Instruct | Llama | Portal simulation judging (7 candidates per backward step) | 12 |
+| Mistral 7B Instruct | Apache 2.0 | Lightweight summarization | 1 |
 
 ---
 
-## 12. What You Can Do Next
+## 13. What You Can Do Next
 
-The run above produced structured artifacts in `datasets/mars_mission_portal/` and `metadata/runs.db`. Here's what's available after every run.
+### Reproduce this run
+
+```bash
+git clone https://github.com/timepoint-ai/timepoint-daedalus.git
+cd timepoint-daedalus
+pip install -r requirements.txt
+export OPENROUTER_API_KEY=your_key_here
+
+./run.sh run mars_mission_portal    # ~$0.80-$1.00
+```
+
+### Run convergence testing
+
+```bash
+./run.sh convergence e2e mars_mission_portal          # Run 3x + analyze
+./run.sh convergence e2e --runs 5 mars_mission_portal # Run 5x
+./run.sh convergence history                          # Past results
+```
 
 ### Query the results
 
 ```python
-from reporting.query_engine import EnhancedQueryEngine
+from evaluation.convergence import compute_outcome_convergence
 
-engine = EnhancedQueryEngine()
-results = engine.execute_batch([
-    "What was the key decision point?",
-    "Who influenced the outcome most?",
-    "How did Zhang's knowledge state change over time?"
-], world_id="mars_mission_portal")
-
-relationships = engine.summarize_relationships(world_id="mars_mission_portal")
-timeline = engine.timeline_summary(world_id="mars_mission_portal")
+results = compute_outcome_convergence("mars_mission_portal", min_runs=3)
+print(f"Role stability: {results['role_stability']}")      # 1.00
+print(f"Outcome similarity: {results['outcome_mean_similarity']}")  # 0.79
 ```
 
 ### Export to additional formats
 
-The run auto-generates markdown, JSON, and PDF. You can also export to other formats:
-
 ```bash
 ./run.sh export last --format jsonl       # ML training pipelines
-./run.sh export last --format json        # Structured JSON
 ./run.sh export last --format fountain    # Professional screenplay (.fountain)
 ```
 
@@ -537,18 +616,6 @@ The run auto-generates markdown, JSON, and PDF. You can also export to other for
 | **Parquet** | Columnar format for ML pipelines (via `oxen_integration`) |
 | **Markdown** | Human-readable narrative (auto-generated) |
 
-### Run convergence testing
-
-Run the same scenario multiple times and measure structural consistency:
-
-```bash
-./run.sh convergence e2e mars_mission_portal          # Run 3x + analyze
-./run.sh convergence e2e --runs 5 mars_mission_portal # Run 5x
-./run.sh convergence history                          # Past results
-```
-
-Causal edges appearing in 9/10 runs are structural; edges in 3/10 are noise. Convergence grades: A (≥90%) through F (<50%).
-
 ### Chat with a persona about the results
 
 ```bash
@@ -556,9 +623,19 @@ Causal edges appearing in 9/10 runs are structural; edges in 3/10 are noise. Con
   --batch "As an aerospace engineer, what concerns you about this mission's failure chain?"
 ```
 
+### Run a different template
+
+```bash
+./run.sh list                                         # List all 21 templates
+./run.sh run castaway_colony_branching                # BRANCHING: 8 entities, all 19 mechanisms
+./run.sh run hound_shadow_directorial                 # DIRECTORIAL: 5-act arc engine, camera system
+./run.sh run agent4_elk_migration                     # CYCLICAL: prophecy system, causal loops
+./run.sh run convergence_simple                       # Cheapest run: $0.01, 2 entities
+```
+
 ---
 
-## 13. Port to Oxen.ai
+## 14. Port to Oxen.ai
 
 Training data auto-uploads to [Oxen.ai](https://oxen.ai) when `OXEN_API_KEY` is set. Without it, everything saves locally.
 
@@ -582,7 +659,7 @@ from oxen_integration import OxenClient
 client = OxenClient(namespace="your-username", repo_name="mars-mission-data")
 
 # Upload a dataset
-result = client.upload_dataset("datasets/mars_mission_portal/training_20260212.jsonl",
+result = client.upload_dataset("datasets/mars_mission_portal/training_20260213.jsonl",
                                commit_message="Mars mission PORTAL run")
 print(result.dataset_url)    # View on Oxen Hub
 print(result.finetune_url)   # One-click fine-tune
@@ -590,19 +667,6 @@ print(result.finetune_url)   # One-click fine-tune
 # Branch management for experiments
 client.create_branch("experiment-v2", from_branch="main")
 client.switch_branch("experiment-v2")
-```
-
-### Tensor versioning (Parquet)
-
-```python
-from oxen_integration import TensorVersionController, write_instances_parquet
-
-# Export entity tensors to Parquet for ML pipelines
-write_instances_parquet(entity_tensors, "mars_tensors.parquet")
-
-# Version tensors on Oxen with branch tracking
-controller = TensorVersionController(client)
-controller.sync_tensors(tensor_data, version="1.0.0")
 ```
 
 ### Fine-tuning pipeline
@@ -617,7 +681,7 @@ validation = formatter.validate_dataset(formatted)
 
 # Configure and launch fine-tuning
 config = FineTuneConfig(
-    dataset_path="datasets/mars_mission_portal/training_20260212.jsonl",
+    dataset_path="datasets/mars_mission_portal/training_20260213.jsonl",
     base_model="Qwen/Qwen2.5-1.5B-Instruct",
     num_epochs=3, batch_size=4
 )
@@ -630,24 +694,14 @@ instructions = launcher.launch_via_notebook(job)
 
 | Formatter | Produces | Use Case |
 |-----------|----------|----------|
-| **EntityEvolutionFormatter** | State progression pairs (before → after) | Train models to predict character arcs |
+| **EntityEvolutionFormatter** | State progression pairs (before &rarr; after) | Train models to predict character arcs |
 | **DialogSynthesisFormatter** | Multi-turn conversation pairs | Train conversational models |
 | **KnowledgeFlowFormatter** | Information propagation patterns | Train knowledge extraction models |
 | **RelationshipDynamicsFormatter** | Relationship evolution sequences | Train social dynamics models |
 
-### Model evaluation
-
-```python
-from oxen_integration import ModelEvaluator
-
-evaluator = ModelEvaluator(base_model="gpt-3.5-turbo", finetuned_model="ft-custom-123")
-results = evaluator.evaluate_side_by_side(test_cases, auto_evaluate=True)
-print(f"Win rate: {results.improvement_percentage}%")
-```
-
 ---
 
-## 14. API & Programmatic Access
+## 15. API & Programmatic Access
 
 ### REST API
 
@@ -665,48 +719,14 @@ print(f"Win rate: {results.improvement_percentage}%")
 | `/api/dialogs/{run_id}` | GET | Dialog transcripts |
 | `/api/templates` | GET | All templates with metadata |
 | `/api/mechanisms` | GET | All 19 mechanisms with descriptions |
-| `/api/meta-analytics` | GET | System-wide statistics |
 | `/api/convergence-stats` | GET | Convergence analysis results |
 
-### API-mode execution
-
-```bash
-./run.sh run --api board_meeting                                    # Submit via API
-./run.sh run --api-url http://remote:8080 --api-key KEY board_meeting  # Remote server
-./run.sh run --api-batch-size 10 --api-budget 50.00 quick           # Batch with budget
-./run.sh api usage                                                  # Check quota
-```
-
-### Natural language interface
-
-```bash
-./run.sh run --nl "CEO announces mandatory salary cuts due to market downturn"
-./run.sh run --nl "First contact with alien species" --nl-entities 5 --nl-timepoints 3
-```
-
-### Python API
-
-```python
-from generation.templates.loader import TemplateLoader
-
-loader = TemplateLoader()
-templates = loader.list_templates(tier="quick", category="core", mechanism="M7")
-matrix = loader.get_coverage_matrix()           # Mechanism coverage across templates
-validation = loader.validate_template("core/m01_heterogeneous_fidelity")
-```
-
----
-
-## 15. Additional Capabilities
-
-### CLI options not shown in this run
+### CLI options
 
 ```bash
 # Model selection
 ./run.sh run --model deepseek/deepseek-chat board_meeting   # Specific model
-./run.sh run --groq board_meeting                           # Groq (300 tok/s)
 ./run.sh run --free board_meeting                           # Best free model ($0)
-./run.sh run --fast quick                                   # Fastest model
 
 # Parallelism & cost
 ./run.sh run --parallel 4 quick              # 4 concurrent templates
@@ -716,30 +736,9 @@ validation = loader.validate_template("core/m01_heterogeneous_fidelity")
 # Filtering
 ./run.sh run --tier quick                    # By complexity tier
 ./run.sh run --category portal               # By category
-./run.sh run --mechanism M7,M15              # By specific mechanisms
 
-# Monitoring
-./run.sh run --monitor board_meeting         # Real-time progress dashboard
-./run.sh run --monitor --chat standard       # Monitoring + persona chat
-
-# Portal depth levels
-./run.sh run --portal-simjudged-quick mars_mission_portal       # 1 step (~2x cost)
-./run.sh run --portal-simjudged mars_mission_portal             # 2 steps (~3x cost)
-./run.sh run --portal-simjudged-thorough mars_mission_portal    # 3 steps (~4-5x cost)
-```
-
-### SynthasAIzer controls (synthesizer-inspired entity modulation)
-
-```python
-from synth import EnvelopeConfig, VoiceConfig, VoiceMixer
-
-# ADSR envelope for dramatic buildup
-envelope = EnvelopeConfig(attack=0.3, decay=0.1, sustain=0.9, release=0.5)
-
-# Voice mixing — solo one entity, mute another
-mixer = VoiceMixer()
-mixer.add_voice("protagonist", VoiceConfig(gain=1.0, solo=True))
-mixer.add_voice("bystander", VoiceConfig(gain=0.0, muted=True))
+# Natural language interface
+./run.sh run --nl "CEO announces mandatory salary cuts due to market downturn"
 ```
 
 ### Docker sandbox
@@ -747,30 +746,10 @@ mixer.add_voice("bystander", VoiceConfig(gain=0.0, muted=True))
 ```bash
 ./claude-container.sh up       # Build + start + launch Claude Code in sandbox
 ./claude-container.sh shell    # Interactive shell
-./claude-container.sh test     # Connectivity check
 ```
 
 Network-isolated container with iptables firewall, allowlisted API endpoints, and `.env` injection.
 
-### Template inventory
-
-50 templates across 6 categories: 19 core mechanism tests (M1--M19), 10 showcase scenarios, 4 portal templates, 6 stress tests, 3 convergence templates, and 8 persona templates. Run `./run.sh list` to see all of them.
-
 ---
 
-### Reproduce this run
-
-```bash
-git clone https://github.com/timepoint-ai/timepoint-daedalus.git
-cd timepoint-daedalus
-pip install -r requirements.txt
-export OPENROUTER_API_KEY=your_key_here
-
-./run.sh run mars_mission_portal
-```
-
-Cost will vary by ~20% between runs due to LLM response length variation and adaptive fidelity decisions. Expect $0.80--$1.20 and 60--90 minutes.
-
----
-
-*Generated from run `run_20260212_140025_7f33adbd` by Timepoint-Daedalus. All data extracted from `metadata/runs.db` and `datasets/mars_mission_portal/`.*
+*Generated from run `run_20260213_141539_9ba13680` on February 13, 2026. All data extracted from `metadata/runs.db` and `datasets/mars_mission_portal/`. Every number in this document comes from the database, not from documentation --- if you run the same template, you'll get different numbers but the same structural patterns.*
