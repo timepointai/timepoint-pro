@@ -86,18 +86,29 @@ def should_trigger_prospection(
 
     # Check 5: Personality-driven prospection
     personality_traits = entity.entity_metadata.get("personality_traits", [])
-    if len(personality_traits) >= 5:
-        # Big Five: Conscientiousness (index 2) and Neuroticism (index 3)
-        conscientiousness = personality_traits[2] if len(personality_traits) > 2 else 0.5
-        neuroticism = personality_traits[3] if len(personality_traits) > 3 else 0.5
+    if personality_traits:
+        # Handle both string traits (from decoder) and numeric Big Five values
+        if isinstance(personality_traits[0], str):
+            # String trait keywords — check for planning/anxiety indicators
+            planning_traits = {"organized", "disciplined", "precise", "strategic", "analytical"}
+            anxiety_traits = {"anxious", "intense"}
+            trait_set = set(personality_traits)
+            if trait_set & planning_traits:
+                return True
+            if trait_set & anxiety_traits:
+                return True
+        elif len(personality_traits) >= 5:
+            # Numeric Big Five: Conscientiousness (index 2) and Neuroticism (index 3)
+            conscientiousness = personality_traits[2] if len(personality_traits) > 2 else 0.5
+            neuroticism = personality_traits[3] if len(personality_traits) > 3 else 0.5
 
-        # High conscientiousness → forward planning
-        if conscientiousness > 0.75:
-            return True
+            # High conscientiousness → forward planning
+            if conscientiousness > 0.75:
+                return True
 
-        # High neuroticism → anxiety-driven prospection
-        if neuroticism > 0.75:
-            return True
+            # High neuroticism → anxiety-driven prospection
+            if neuroticism > 0.75:
+                return True
 
     # Check 6: Metadata flag (LLM or manual override)
     if entity.entity_metadata.get("needs_prospection", False):
