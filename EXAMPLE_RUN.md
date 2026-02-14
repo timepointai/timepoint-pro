@@ -1,6 +1,6 @@
 # Example Run: Ares III Mars Mission Portal
 
-**[Back to README](README.md)** | Run ID: `run_20260213_141539_9ba13680` | Template: `mars_mission_portal`
+**[Back to README](README.md)** | **[Full Dialog Transcript (127 turns)](EXAMPLE_DIALOGS.md)** | Run ID: `run_20260213_141539_9ba13680` | Template: `mars_mission_portal`
 
 A complete PORTAL-mode simulation tracing backward from a catastrophic Mars mission failure in 2031 to its institutional origins in 2026. Every number, dialog line, and graph edge below was produced by a single `./run.sh run mars_mission_portal` invocation on February 13, 2026.
 
