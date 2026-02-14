@@ -13,6 +13,8 @@ Key architectural principle:
 - NEW: Prospection is OPTIONAL, triggered contextually based on configuration
 """
 
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional, Any
 from schemas import Entity, Timepoint, ProspectiveState
 from storage import GraphStore
@@ -338,3 +340,62 @@ def refine_tensor_from_prospection(
     })
 
     print(f"  ✨ Refined {entity.entity_id} tensor from prospection (anxiety: {prospective_state.anxiety_level:.2f})")
+
+
+async def trigger_prospection_parallel(
+    entities: List[Entity],
+    timepoint: Timepoint,
+    llm_client: Any,
+    store: GraphStore,
+    config: Dict[str, Any],
+    max_concurrent: int = 4
+) -> Dict[str, Optional[ProspectiveState]]:
+    """
+    Trigger prospection for multiple entities concurrently.
+
+    Uses asyncio.Semaphore + ThreadPoolExecutor to run up to max_concurrent
+    prospection calls in parallel (same pattern as training/parallel_trainer.py).
+
+    Args:
+        entities: List of entities to process
+        timepoint: Current timepoint
+        llm_client: LLM client for generation
+        store: GraphStore for persistence
+        config: Simulation configuration
+        max_concurrent: Maximum concurrent prospection calls (default 4)
+
+    Returns:
+        Dict mapping entity_id → ProspectiveState (or None if not triggered/failed)
+    """
+    semaphore = asyncio.Semaphore(max_concurrent)
+    results: Dict[str, Optional[ProspectiveState]] = {}
+
+    async def process_entity(entity: Entity) -> tuple:
+        async with semaphore:
+            loop = asyncio.get_event_loop()
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                try:
+                    prospective_state = await loop.run_in_executor(
+                        executor,
+                        lambda: trigger_prospection_for_entity(
+                            entity, timepoint, llm_client, store, config
+                        )
+                    )
+                    if prospective_state:
+                        # Refine tensor from prospection result
+                        refine_tensor_from_prospection(entity, prospective_state)
+                    return entity.entity_id, prospective_state
+                except Exception as e:
+                    print(f"  ⚠️  Parallel prospection failed for {entity.entity_id}: {e}")
+                    return entity.entity_id, None
+
+    tasks = [process_entity(entity) for entity in entities]
+    completed = await asyncio.gather(*tasks)
+
+    for entity_id, state in completed:
+        results[entity_id] = state
+
+    triggered = sum(1 for v in results.values() if v is not None)
+    print(f"  [M15] Parallel prospection: {triggered}/{len(entities)} entities triggered")
+
+    return results

@@ -306,6 +306,18 @@ def _sync_ttm_to_cognitive(entity: Entity) -> Optional['CognitiveTensor']:
         tensor_dict = json.loads(entity.tensor)
         context = np.array(msgspec.msgpack.decode(base64.b64decode(tensor_dict["context_vector"])))
 
+        # Decode behavior_vector → personality_traits (last-chance fallback)
+        # Only if entity still has no decoded traits at dialog time
+        existing_source = entity.entity_metadata.get("personality_source", "")
+        if existing_source not in ("template_entity_roster", "llm_population_decoded", "tensor_decoded"):
+            behavior = np.array(msgspec.msgpack.decode(base64.b64decode(tensor_dict["behavior_vector"])))
+            from tensor_initialization import decode_behavior_vector_to_traits
+            decoded_traits = decode_behavior_vector_to_traits(behavior, entity.entity_metadata)
+            if decoded_traits:
+                entity.entity_metadata["personality_traits"] = decoded_traits
+                entity.entity_metadata["personality_source"] = "sync_decoded"
+                logger.info(f"[SYNC] Decoded behavior_vector → traits for {entity.entity_id}: {decoded_traits}")
+
         # Extract values from context_vector
         # [0]=knowledge, [1]=valence, [2]=arousal, [3]=energy, [4]=confidence, [5]=patience, [6]=risk, [7]=social
         ttm_valence = context[1]  # 0-1 scale
@@ -550,6 +562,69 @@ def _derive_speaking_style(personality_traits: List[str], archetype_id: str = ""
         style["formality"] = "formal"
 
     return style
+
+
+def _infer_personality_from_role(role: str) -> List[str]:
+    """
+    Infer personality traits from a role description when explicit traits are absent.
+
+    Three-tier fallback: explicit traits (caller checks first) -> role inference -> hardcoded default.
+
+    Args:
+        role: Role description text (e.g. "Flight Engineer. Conflict-averse personality.")
+
+    Returns:
+        List of 4-6 inferred personality trait strings.
+    """
+    if not role:
+        return ["determined", "principled"]
+
+    role_lower = role.lower()
+    traits = []
+
+    # Role keyword -> trait mappings
+    ROLE_TRAIT_MAP = {
+        # Technical roles
+        "engineer": ["analytical", "technical", "precise"],
+        "scientist": ["analytical", "data-driven", "intellectual"],
+        "analyst": ["analytical", "data-driven", "reserved"],
+        "researcher": ["intellectual", "curious", "precise"],
+        # Leadership roles
+        "director": ["commanding", "strategic", "results-oriented"],
+        "commander": ["authoritative", "decisive", "leadership"],
+        "captain": ["authoritative", "decisive", "leadership"],
+        "manager": ["pragmatic", "strategic", "professional"],
+        "executive": ["commanding", "business", "results-oriented"],
+        "president": ["commanding", "diplomatic", "strategic"],
+        # Personality descriptors in role text
+        "conflict-averse": ["reserved", "cautious", "diplomatic"],
+        "cautious": ["cautious", "reserved", "analytical"],
+        "aggressive": ["intense", "commanding", "stubborn"],
+        "diplomatic": ["diplomatic", "warm", "professional"],
+        # Domain modifiers
+        "military": ["stoic", "commanding", "laconic"],
+        "medical": ["empathetic", "precise", "professional"],
+        "political": ["diplomatic", "strategic", "calculating"],
+        "financial": ["pragmatic", "business", "data-driven"],
+    }
+
+    for keyword, keyword_traits in ROLE_TRAIT_MAP.items():
+        if keyword in role_lower:
+            traits.extend(keyword_traits)
+
+    # Deduplicate while preserving order
+    seen = set()
+    unique_traits = []
+    for t in traits:
+        if t not in seen:
+            seen.add(t)
+            unique_traits.append(t)
+
+    if len(unique_traits) >= 3:
+        return unique_traits[:6]
+
+    # Hardcoded default fallback
+    return ["determined", "principled"]
 
 
 def _generate_voice_examples(speaking_style: Dict[str, str], character_id: str) -> List[str]:
@@ -989,66 +1064,379 @@ def _derive_dialog_params_from_persona(
     return params
 
 
+def _compute_dialog_structure(participants_context: List[Dict]) -> Dict[str, any]:
+    """
+    Compute dynamic dialog structure parameters based on participant state.
+
+    Replaces static "8-12 dialog turns" with context-sensitive parameters.
+
+    Args:
+        participants_context: List of participant context dicts with emotional_state
+
+    Returns:
+        Dict with turn_count_range, silent_allowed, ending_mode, high_conflict
+    """
+    n = len(participants_context)
+
+    # Compute average emotional state
+    avg_arousal = 0.0
+    avg_valence = 0.0
+    for ctx in participants_context:
+        emo = ctx.get("emotional_state", {})
+        avg_arousal += emo.get("arousal", 0.3)
+        avg_valence += emo.get("valence", 0.0)
+    if n > 0:
+        avg_arousal /= n
+        avg_valence /= n
+
+    high_conflict = avg_arousal > 0.6 and avg_valence < -0.1
+
+    # Turn count: more participants and higher conflict = more turns
+    base_turns = 6 + n
+    if high_conflict:
+        base_turns += 3
+    min_turns = max(6, base_turns - 2)
+    max_turns = min(16, base_turns + 3)
+
+    # Silent allowed: with >3 participants, some can be observers
+    silent_allowed = n > 3
+
+    # Ending mode based on emotional state
+    if avg_valence < -0.3:
+        ending_mode = "unresolved_tension"
+    elif avg_arousal > 0.7:
+        ending_mode = "interrupted"
+    else:
+        ending_mode = "natural_pause"
+
+    return {
+        "turn_count_range": (min_turns, max_turns),
+        "silent_allowed": silent_allowed,
+        "ending_mode": ending_mode,
+        "high_conflict": high_conflict,
+    }
+
+
+def _compute_temporal_mood(
+    timepoint: 'Timepoint',
+    timeline: List[Dict],
+    participant_anxiety: Optional[Dict[str, float]] = None
+) -> str:
+    """
+    Map timeline position to emotional register for dialog tone.
+
+    Args:
+        timepoint: Current timepoint being generated
+        timeline: Full list of timepoint dicts for position context
+        participant_anxiety: Optional dict of entity_id → anxiety_level from prospection
+
+    Returns:
+        String instruction block describing the temporal mood register.
+    """
+    event_desc = (timepoint.event_description or "").lower()
+    n_timepoints = len(timeline) if timeline else 1
+    # Determine position as fraction through the timeline
+    position = 0.5
+    if timeline and n_timepoints > 1:
+        for i, tp in enumerate(timeline):
+            tp_desc = tp.get("event_description", "")
+            if tp_desc == timepoint.event_description:
+                position = i / (n_timepoints - 1)
+                break
+
+    # Disaster keywords
+    disaster_words = ["failure", "explosion", "breach", "collapse", "death",
+                      "emergency", "critical", "catastroph", "disaster", "crisis"]
+    is_disaster = any(w in event_desc for w in disaster_words)
+
+    if is_disaster:
+        mood = ("CRISIS. This is NOT a calm meeting. Characters shout, blame, panic. "
+                "Short urgent sentences. People talk over each other. "
+                "Someone may refuse to speak. Raw emotion overrides professionalism.")
+    elif position < 0.25:
+        mood = ("EARLY STAGE. Professional optimism with seeds of doubt. "
+                "Characters are polite but small fractures are visible. "
+                "One character may voice a concern that others dismiss.")
+    elif position < 0.6:
+        mood = ("TENSION BUILDING. 'I told you so' energy. Trust fraying between characters. "
+                "References to earlier decisions that now look wrong. "
+                "Politeness is strained. Someone is holding back anger.")
+    else:
+        mood = ("LATE STAGE. Heavy. Characters reference earlier decisions with regret or defensiveness. "
+                "Relationships are damaged. Some characters are resigned, others are digging in. "
+                "The weight of consequences is felt in every exchange.")
+
+    # Apply anxiety modifier from prospection data
+    if participant_anxiety:
+        anxiety_values = list(participant_anxiety.values())
+        avg_anxiety = sum(anxiety_values) / len(anxiety_values) if anxiety_values else 0.0
+        if avg_anxiety > 0.7:
+            mood += (" CRISIS-LEVEL ANXIETY. Characters are visibly stressed — voices crack, "
+                     "hands shake, decisions feel desperate. Fear of failure pervades every exchange.")
+        elif avg_anxiety > 0.4:
+            mood += (" UNDERLYING TENSION. Characters carry unspoken worries. "
+                     "Pauses are loaded. Someone deflects when pressed about the future.")
+
+    return mood
+
+
 def _check_voice_distinctiveness(turns: List[Dict]) -> float:
     """
-    Check how distinct character voices are across dialog turns by detecting
-    common hedging patterns that indicate the LLM is generating generic,
-    interchangeable voices instead of differentiated ones.
-
-    Counts how many turns start with generic hedging phrases. If more than
-    30% of turns use the same hedging openers, logs a warning.
+    Multi-dimensional voice distinctiveness metric across 4 axes (equal weight):
+    1. Hedging opener ratio (banned opener detection)
+    2. Per-speaker sentence length variance
+    3. Vocabulary overlap (Jaccard distance between speakers)
+    4. Turn distribution uniformity (anti-round-robin)
 
     Args:
         turns: List of dialog turn dicts with 'speaker' and 'content' keys
 
     Returns:
-        Distinctiveness score from 0.0 (all identical hedging) to 1.0 (all distinct).
-        Score is calculated as 1.0 - (hedging_turns / total_turns).
+        Distinctiveness score from 0.0 (identical voices) to 1.0 (fully distinct).
     """
-    if not turns:
+    if not turns or len(turns) < 2:
         return 1.0
 
     HEDGING_PATTERNS = [
-        "i understand",
-        "that's a valid point",
-        "i see your point",
-        "i agree, but",
-        "you raise a good",
-        "i appreciate your",
-        "that's a fair",
-        "i hear what you",
-        "you make a good",
-        "with all due respect",
-        "i understand your concerns",
-        "that's a great point",
-        "you're right, but",
-        "i take your point",
+        "i understand", "that's a valid point", "i see your point",
+        "i agree,", "i agree.", "you raise a good", "i appreciate your",
+        "that's a fair", "i hear what you", "you make a good",
+        "with all due respect", "i understand your concerns",
+        "that's a great point", "you're right, but", "i take your point",
     ]
 
     total_turns = len(turns)
-    hedging_turns = 0
 
+    # --- Axis 1: Hedging opener ratio ---
+    hedging_turns = 0
     for turn in turns:
         content = turn.get("content", "").strip().lower()
         if any(content.startswith(pattern) for pattern in HEDGING_PATTERNS):
             hedging_turns += 1
+    hedging_score = 1.0 - (hedging_turns / total_turns)
 
-    hedging_ratio = hedging_turns / total_turns if total_turns > 0 else 0.0
-    distinctiveness = 1.0 - hedging_ratio
+    # --- Axis 2: Per-speaker sentence length variance ---
+    speaker_avg_lengths = {}
+    for turn in turns:
+        speaker = turn.get("speaker", "unknown")
+        content = turn.get("content", "")
+        words = content.split()
+        speaker_avg_lengths.setdefault(speaker, []).append(len(words))
 
-    if hedging_ratio > 0.3:
+    if len(speaker_avg_lengths) >= 2:
+        avg_per_speaker = [sum(lengths) / len(lengths) for lengths in speaker_avg_lengths.values()]
+        length_spread = max(avg_per_speaker) - min(avg_per_speaker)
+        # Score: spread of 8+ words apart = 1.0, 0 = 0.0
+        length_score = min(1.0, length_spread / 8.0)
+    else:
+        length_score = 0.5
+
+    # --- Axis 3: Vocabulary overlap (Jaccard distance) ---
+    speaker_vocabs = {}
+    for turn in turns:
+        speaker = turn.get("speaker", "unknown")
+        content = turn.get("content", "").lower()
+        words = set(w.strip(".,!?;:'\"()") for w in content.split() if len(w) > 3)
+        speaker_vocabs.setdefault(speaker, set()).update(words)
+
+    if len(speaker_vocabs) >= 2:
+        speakers = list(speaker_vocabs.keys())
+        jaccard_distances = []
+        for i in range(len(speakers)):
+            for j in range(i + 1, len(speakers)):
+                vocab_a = speaker_vocabs[speakers[i]]
+                vocab_b = speaker_vocabs[speakers[j]]
+                union = vocab_a | vocab_b
+                intersection = vocab_a & vocab_b
+                if union:
+                    jaccard_distances.append(1.0 - len(intersection) / len(union))
+                else:
+                    jaccard_distances.append(0.5)
+        vocab_score = sum(jaccard_distances) / len(jaccard_distances) if jaccard_distances else 0.5
+    else:
+        vocab_score = 0.5
+
+    # --- Axis 4: Turn distribution uniformity (anti-round-robin) ---
+    speaker_turn_counts = {}
+    for turn in turns:
+        speaker = turn.get("speaker", "unknown")
+        speaker_turn_counts[speaker] = speaker_turn_counts.get(speaker, 0) + 1
+
+    if len(speaker_turn_counts) >= 2:
+        counts = list(speaker_turn_counts.values())
+        # Check for round-robin: if all speakers have equal turns, score is low
+        mean_count = sum(counts) / len(counts)
+        variance = sum((c - mean_count) ** 2 for c in counts) / len(counts)
+        cv = (variance ** 0.5) / mean_count if mean_count > 0 else 0
+        # CV > 0.3 = good variation, CV = 0 = perfect round-robin
+        distribution_score = min(1.0, cv / 0.3)
+    else:
+        distribution_score = 0.5
+
+    # Equal weight across 4 axes
+    distinctiveness = (hedging_score + length_score + vocab_score + distribution_score) / 4.0
+
+    if distinctiveness < 0.5:
         logger.warning(
-            f"[M11] Low voice distinctiveness: {hedging_turns}/{total_turns} turns "
-            f"({hedging_ratio:.0%}) start with generic hedging patterns. "
-            f"Score: {distinctiveness:.2f}. Characters may sound too similar."
+            f"[M11] Low voice distinctiveness: {distinctiveness:.2f} "
+            f"(hedging={hedging_score:.2f}, length_spread={length_score:.2f}, "
+            f"vocab={vocab_score:.2f}, distribution={distribution_score:.2f})"
         )
     else:
         logger.info(
-            f"[M11] Voice distinctiveness score: {distinctiveness:.2f} "
-            f"({hedging_turns}/{total_turns} hedging turns)"
+            f"[M11] Voice distinctiveness: {distinctiveness:.2f} "
+            f"(hedging={hedging_score:.2f}, length_spread={length_score:.2f}, "
+            f"vocab={vocab_score:.2f}, distribution={distribution_score:.2f})"
         )
 
     return distinctiveness
+
+
+def _evaluate_dialog_quality(turns: List[Dict]) -> Dict:
+    """
+    Post-generation quality evaluation for rejection sampling.
+
+    Runs 5 quality checks and returns pass/fail with repair notes:
+    1. Banned opener count (max 1 allowed)
+    2. Round-robin pattern detection
+    3. Turn length coefficient of variation (must be > 0.3)
+    4. Consensus ratio (must be < 40%)
+    5. Per-speaker sentence length spread (must be > 8 words apart)
+
+    Args:
+        turns: List of dialog turn dicts with 'speaker' and 'content' keys
+
+    Returns:
+        Dict with 'score' (0.0-1.0), 'passed' (bool), 'failures' (list of strings),
+        'repair_notes' (string for prompt injection on retry)
+    """
+    if not turns or len(turns) < 2:
+        return {"score": 1.0, "passed": True, "failures": [], "repair_notes": ""}
+
+    BANNED_OPENERS = [
+        "i agree,", "i agree.", "that's a valid point", "i understand your concerns",
+        "i see your point", "you raise a good point", "that's a great point",
+        "i appreciate your", "that's a fair", "i hear what you",
+        "you make a good", "with all due respect", "you're right, but",
+        "i take your point",
+    ]
+
+    CONSENSUS_PHRASES = [
+        "i agree", "you're right", "that's true", "absolutely",
+        "exactly", "good point", "fair enough", "i concur",
+        "makes sense", "i think so too",
+    ]
+
+    failures = []
+    checks_passed = 0
+    total_checks = 5
+
+    # --- Check 1: Banned opener count ---
+    banned_count = 0
+    for turn in turns:
+        content = turn.get("content", "").strip().lower()
+        if any(content.startswith(opener) for opener in BANNED_OPENERS):
+            banned_count += 1
+    if banned_count <= 1:
+        checks_passed += 1
+    else:
+        failures.append(f"banned_openers:{banned_count}")
+
+    # --- Check 2: Round-robin pattern detection ---
+    speakers = [turn.get("speaker", "") for turn in turns]
+    if len(speakers) >= 4:
+        # Check if speakers repeat in exact same order
+        unique_speakers = []
+        for s in speakers:
+            if s not in unique_speakers:
+                unique_speakers.append(s)
+        n_unique = len(unique_speakers)
+        if n_unique >= 2:
+            is_round_robin = True
+            for i in range(len(speakers)):
+                if speakers[i] != unique_speakers[i % n_unique]:
+                    is_round_robin = False
+                    break
+            if not is_round_robin:
+                checks_passed += 1
+            else:
+                failures.append("round_robin_pattern")
+        else:
+            checks_passed += 1
+    else:
+        checks_passed += 1
+
+    # --- Check 3: Turn length coefficient of variation ---
+    turn_lengths = [len(turn.get("content", "").split()) for turn in turns]
+    if turn_lengths:
+        mean_len = sum(turn_lengths) / len(turn_lengths)
+        if mean_len > 0:
+            variance = sum((l - mean_len) ** 2 for l in turn_lengths) / len(turn_lengths)
+            cv = (variance ** 0.5) / mean_len
+            if cv > 0.3:
+                checks_passed += 1
+            else:
+                failures.append(f"low_turn_length_cv:{cv:.2f}")
+        else:
+            checks_passed += 1
+    else:
+        checks_passed += 1
+
+    # --- Check 4: Consensus ratio ---
+    consensus_count = 0
+    for turn in turns:
+        content = turn.get("content", "").strip().lower()
+        if any(phrase in content for phrase in CONSENSUS_PHRASES):
+            consensus_count += 1
+    consensus_ratio = consensus_count / len(turns) if turns else 0
+    if consensus_ratio < 0.4:
+        checks_passed += 1
+    else:
+        failures.append(f"high_consensus:{consensus_ratio:.0%}")
+
+    # --- Check 5: Per-speaker sentence length spread ---
+    speaker_avg_lengths = {}
+    for turn in turns:
+        speaker = turn.get("speaker", "unknown")
+        word_count = len(turn.get("content", "").split())
+        speaker_avg_lengths.setdefault(speaker, []).append(word_count)
+
+    if len(speaker_avg_lengths) >= 2:
+        avgs = [sum(lengths) / len(lengths) for lengths in speaker_avg_lengths.values()]
+        spread = max(avgs) - min(avgs)
+        if spread > 8:
+            checks_passed += 1
+        else:
+            failures.append(f"low_length_spread:{spread:.1f}")
+    else:
+        checks_passed += 1
+
+    score = checks_passed / total_checks
+
+    # Build repair notes for retry prompt
+    repair_notes = ""
+    if failures:
+        repair_parts = []
+        if any("banned_openers" in f for f in failures):
+            repair_parts.append("REMOVE all hedging openers like 'I agree', 'That's a valid point'. Characters must respond with substance, not acknowledgment.")
+        if "round_robin_pattern" in failures:
+            repair_parts.append("BREAK the round-robin speaker order. Some characters speak multiple times in a row. Others stay silent for several turns.")
+        if any("low_turn_length_cv" in f for f in failures):
+            repair_parts.append("VARY turn lengths dramatically. Mix 5-word interruptions with 40-word monologues.")
+        if any("high_consensus" in f for f in failures):
+            repair_parts.append("REDUCE agreement. Characters must push back, disagree, or ignore each other's points instead of constantly agreeing.")
+        if any("low_length_spread" in f for f in failures):
+            repair_parts.append("DIFFERENTIATE speaking lengths between characters. The terse character uses 8-word sentences. The verbose character uses 25-word sentences.")
+        repair_notes = "\n".join(repair_parts)
+
+    passed = score >= 0.6 or len(failures) < 2
+
+    return {
+        "score": score,
+        "passed": passed,
+        "failures": failures,
+        "repair_notes": repair_notes,
+    }
 
 
 @track_mechanism("M11", "dialog_synthesis")
@@ -1060,9 +1448,13 @@ def synthesize_dialog(
     store: Optional['GraphStore'] = None,
     run_id: Optional[str] = None,
     animism_level: int = 0,
-    prior_dialog_beats: Optional[List[str]] = None
+    prior_dialog_beats: Optional[List[str]] = None,
+    qse_state: Optional[Dict] = None,
+    voice_mixer: Optional['VoiceMixer'] = None
 ) -> Dialog:
     """Generate conversation with full physical/emotional/temporal context"""
+    # Attach QSE state to function for prompt builder access
+    synthesize_dialog._qse_state = qse_state
 
     # Sanitize timeline to ensure all datetime objects are converted to strings
     sanitized_timeline = []
@@ -1080,6 +1472,15 @@ def synthesize_dialog(
     entities, excluded_ids = _filter_dialog_participants(entities, animism_level)
     if excluded_ids:
         print(f"    [M11] Excluded {len(excluded_ids)} entities from dialog (animism_level={animism_level}): {', '.join(excluded_ids)}")
+
+    # Apply VoiceMixer filtering (mute/solo)
+    if voice_mixer:
+        all_ids = [e.entity_id for e in entities]
+        active_ids = voice_mixer.get_active_entity_ids(all_ids)
+        mixer_excluded = [eid for eid in all_ids if eid not in active_ids]
+        if mixer_excluded:
+            entities = [e for e in entities if e.entity_id in active_ids]
+            print(f"    [M11] VoiceMixer excluded {len(mixer_excluded)} entities: {', '.join(mixer_excluded)}")
 
     # Build comprehensive context for each participant
     participants_context = []
@@ -1140,6 +1541,46 @@ def synthesize_dialog(
         # Build knowledge from exposure events (M3 → M11 connection)
         knowledge_from_exposures = _build_knowledge_from_exposures(entity, store=store, limit=20)
 
+        # Retrieve ProspectiveState (M15 → M11 connection)
+        prospection_context = None
+        if entity.entity_metadata.get("has_prospection") and store:
+            try:
+                prospective_states = store.get_prospective_states_for_entity(entity.entity_id)
+                if prospective_states:
+                    ps = prospective_states[0]  # Most recent
+                    # Parse expectations (stored as JSON string)
+                    expectations = []
+                    if ps.expectations:
+                        if isinstance(ps.expectations, str):
+                            try:
+                                expectations = json.loads(ps.expectations)
+                            except (json.JSONDecodeError, TypeError):
+                                expectations = [ps.expectations]
+                        elif isinstance(ps.expectations, list):
+                            expectations = ps.expectations
+
+                    # Parse contingency_plans
+                    contingency_plans = {}
+                    if ps.contingency_plans:
+                        if isinstance(ps.contingency_plans, str):
+                            try:
+                                contingency_plans = json.loads(ps.contingency_plans)
+                            except (json.JSONDecodeError, TypeError):
+                                contingency_plans = {}
+                        elif isinstance(ps.contingency_plans, dict):
+                            contingency_plans = ps.contingency_plans
+
+                    prospection_context = {
+                        "expectations": expectations,
+                        "anxiety_level": ps.anxiety_level,
+                        "forecast_confidence": ps.forecast_confidence,
+                        "contingency_plans": contingency_plans,
+                    }
+                    logger.info(f"[M15→M11] Loaded prospection for {entity.entity_id}: "
+                               f"anxiety={ps.anxiety_level:.2f}, expectations={len(expectations)}")
+            except Exception as e:
+                logger.warning(f"[M15→M11] Failed to load prospection for {entity.entity_id}: {e}")
+
         participant_ctx = {
             "id": entity.entity_id,
 
@@ -1147,13 +1588,22 @@ def synthesize_dialog(
             "knowledge": knowledge_from_exposures,
             "beliefs": coupled_cognitive.decision_confidence,  # Using confidence as belief proxy
 
-            # Personality & Goals
-            "personality_traits": entity.entity_metadata.get("personality_traits", ["determined", "principled"]),
+            # Personality & Goals (three-tier: explicit -> role inference -> default)
+            "personality_traits": (
+                entity.entity_metadata.get("personality_traits")
+                or _infer_personality_from_role(entity.entity_metadata.get("role", ""))
+            ),
             "current_goals": entity.entity_metadata.get("current_goals", ["serve_country"]),
+
+            # Voice differentiation data (from template roster or LLM-generated)
+            "voice_guide": entity.entity_metadata.get("voice_guide"),
+            "speech_examples": entity.entity_metadata.get("speech_examples"),
+            "voice_gain": voice_mixer.get_entity_weight(entity.entity_id) if voice_mixer else 1.0,
 
             # Speaking Style (derived from personality for voice differentiation)
             "speaking_style": _derive_speaking_style(
-                entity.entity_metadata.get("personality_traits", []),
+                entity.entity_metadata.get("personality_traits")
+                or _infer_personality_from_role(entity.entity_metadata.get("role", "")),
                 entity.entity_metadata.get("archetype_id", "")
             ),
 
@@ -1205,6 +1655,10 @@ def synthesize_dialog(
                 for other_id, rel in relationship_states.items()
             }
         }
+
+        # Add prospection context if available (M15 → M11)
+        if prospection_context:
+            participant_ctx["prospection"] = prospection_context
 
         # Derive dialog behavior params from persona + emotional state
         participant_ctx["dialog_behavior"] = _derive_dialog_params_from_persona(
@@ -1261,29 +1715,168 @@ def synthesize_dialog(
     for ctx in participants_context:
         char_id = ctx["id"]
         style = ctx.get("speaking_style", {})
-        examples = _generate_voice_examples(style, char_id)
+        voice_guide = ctx.get("voice_guide")
+        speech_examples = ctx.get("speech_examples")
+
+        # Use per-character speech_examples if available, else fall back to style-grid
+        if speech_examples:
+            examples = speech_examples[:3]
+        else:
+            examples = _generate_voice_examples(style, char_id)
+
         style_summary = f'{style.get("verbosity", "moderate")} / {style.get("formality", "neutral")} / {style.get("tone", "neutral")} / {style.get("vocabulary", "general")} / {style.get("speech_pattern", "direct")}'
         example_lines = "\n".join(f'      "{ex}"' for ex in examples)
+
+        # Build voice constraint block from voice_guide if available
+        constraint_lines = ""
+        if voice_guide:
+            constraints = []
+            if voice_guide.get("sentence_length"):
+                constraints.append(f"Sentence length: {voice_guide['sentence_length']}")
+            if voice_guide.get("verbal_tics"):
+                constraints.append(f"Often starts with: {', '.join(voice_guide['verbal_tics'])}")
+            if voice_guide.get("never_says"):
+                constraints.append(f"NEVER says: {', '.join(voice_guide['never_says'])}")
+            if voice_guide.get("disagreement_style"):
+                constraints.append(f"When disagreeing: {voice_guide['disagreement_style']}")
+            if voice_guide.get("specificity_anchors"):
+                constraints.append(f"Cites: {', '.join(voice_guide['specificity_anchors'])}")
+            if constraints:
+                constraint_lines = "\n      " + "\n      ".join(constraints)
+
         voice_example_blocks.append(
-            f"   {char_id} [{style_summary}]:\n{example_lines}"
+            f"   {char_id} [{style_summary}]:\n{example_lines}{constraint_lines}"
         )
     voice_examples_text = "\n\n".join(voice_example_blocks)
+
+    # Compute dynamic dialog structure and temporal mood
+    dialog_structure = _compute_dialog_structure(participants_context)
+
+    # Build participant anxiety map from prospection contexts
+    participant_anxiety = {}
+    for ctx in participants_context:
+        prosp = ctx.get("prospection")
+        if prosp and "anxiety_level" in prosp:
+            participant_anxiety[ctx["id"]] = prosp["anxiety_level"]
+
+    temporal_mood = _compute_temporal_mood(timepoint, timeline, participant_anxiety=participant_anxiety or None)
+    min_turns, max_turns = dialog_structure["turn_count_range"]
+
+    # Build structure instructions
+    structure_instructions = f"Generate {min_turns}-{max_turns} dialog turns."
+    if dialog_structure["silent_allowed"]:
+        structure_instructions += " Not every character must speak in every exchange — some may observe silently."
+    if dialog_structure["high_conflict"]:
+        structure_instructions += " This is a HIGH CONFLICT scene. Characters interrupt, talk over each other, and leave things unresolved."
+    if dialog_structure["ending_mode"] == "unresolved_tension":
+        structure_instructions += " END the dialog with unresolved tension — no neat wrap-up, no 'let's reconvene' closure."
+    elif dialog_structure["ending_mode"] == "interrupted":
+        structure_instructions += " END the dialog abruptly — an interruption, alarm, or someone walking out."
+
+    # Build QSE resource state block if available
+    qse_block = ""
+    if hasattr(synthesize_dialog, '_qse_state') and synthesize_dialog._qse_state:
+        qse_lines = []
+        for resource_name, resource_data in synthesize_dialog._qse_state.items():
+            value = resource_data.get("value", "?")
+            unit = resource_data.get("unit", "")
+            critical = resource_data.get("critical", False)
+            marker = " *** CRITICAL ***" if critical else ""
+            qse_lines.append(f"   - {resource_name}: {value} {unit}{marker}")
+        if qse_lines:
+            qse_block = "\n\nRESOURCE STATE (QUANTITATIVE — characters MUST cite these exact numbers):\n" + "\n".join(qse_lines)
+
+    # Build CHARACTER EXPECTATIONS block from prospection data (M15 → M11)
+    prospection_block = ""
+    prospection_lines = []
+    for ctx in participants_context:
+        prosp = ctx.get("prospection")
+        if prosp and prosp.get("expectations"):
+            char_id = ctx["id"]
+            expectations = prosp["expectations"]
+            anxiety = prosp.get("anxiety_level", 0.0)
+            confidence = prosp.get("forecast_confidence", 0.5)
+
+            # Summarize expectations
+            if isinstance(expectations, list):
+                exp_summary = "; ".join(
+                    str(e.get("description", e) if isinstance(e, dict) else e)
+                    for e in expectations[:3]
+                )
+            else:
+                exp_summary = str(expectations)[:150]
+
+            anxiety_label = "high" if anxiety > 0.7 else "moderate" if anxiety > 0.4 else "low"
+            prospection_lines.append(
+                f"   - {char_id}: Expects: {exp_summary}. "
+                f"Anxiety: {anxiety_label} ({anxiety:.1f}). "
+                f"Forecast confidence: {confidence:.1f}."
+            )
+
+    if prospection_lines:
+        prospection_block = (
+            "\n\nCHARACTER EXPECTATIONS (from prospection):\n"
+            "Characters should reference these concerns in dialog — they are actively thinking about these issues.\n"
+            + "\n".join(prospection_lines)
+        )
 
     prompt = f"""Generate a realistic conversation between these {len(participants_context)} characters: {entity_name_list}.
 
 IMPORTANT: ONLY use the character IDs listed below as speakers. Do NOT invent or substitute other characters.
 The speakers MUST be exactly: {entity_name_list}
 
-============================================================
-CHARACTER VOICE GUIDE (HIGHEST PRIORITY - READ THIS FIRST)
-============================================================
+================================================================
+TIER 1: MANDATORY RULES (violations = generation failure)
+================================================================
+
+CHARACTER VOICE GUIDE:
 Each character below has a distinct voice. Study these examples BEFORE writing any dialog.
 Every line a character speaks MUST sound like these examples — same sentence length, same tone, same vocabulary level.
 
 {voice_examples_text}
 
-CRITICAL: Each character must sound distinct. NEVER use generic hedging like "I understand your concerns, but..." or "That's a valid point, however..." or "I see your point, but...". Characters with "terse" verbosity use SHORT sentences (under 12 words). Characters with "cold" tone do NOT acknowledge others' feelings. Characters with "commanding" speech_pattern give orders, not suggestions. Characters with "warm" tone do NOT use clinical or detached phrasing.
-============================================================
+BANNED OPENERS (NEVER use these to start any character's line):
+- "I agree, ..." / "I agree, but ..." / "I agree, we should ..."
+- "That's a valid point" / "That's a great point" / "That's a fair point"
+- "I understand your concerns" / "I understand, but ..."
+- "I see your point" / "I hear what you're saying"
+- "You raise a good point" / "You make a good point"
+- "I appreciate your perspective" / "With all due respect"
+- "You're right, but ..." / "I take your point"
+If a character's role says they RESIST or DISAGREE, they MUST actually resist in dialog — not soften it with hedging.
+
+DIALOG STRUCTURE RULES:
+- {structure_instructions}
+- Do NOT cycle through speakers in round-robin order. Some characters speak 3 times, others speak once.
+- Vary turn length: some turns are 1 sentence, others are 3-4 sentences. Mix short punchy exchanges with longer monologues.
+- Allow interruptions (one character cuts off another mid-thought).
+
+================================================================
+TIER 2: IMPORTANT CONTEXT
+================================================================
+
+TEMPORAL MOOD:
+{temporal_mood}
+
+CONFLICT AND SPECIFICITY:
+When characters discuss decisions or situations, they MUST use SPECIFIC details:
+- NUMBERS: exact figures, percentages, dates, dollar amounts
+- NAMES: specific people, systems, protocols, locations
+- TRADE-OFFS: what was sacrificed for what was gained
+- CONSEQUENCES: concrete outcomes, not vague abstractions
+BAD: "We need more funding to grow."
+GOOD: "We need $4M by March to hit 50 enterprise customers before Acme launches their competing product."
+{qse_block}
+{prospection_block}
+
+TEMPORAL FRESHNESS:
+- Each timepoint is a DIFFERENT moment in time. Reflect NEW developments, not rehashes.
+- BUILD ON previous discussions — don't repeat them.
+- Reference the SPECIFIC timepoint_context event.
+
+================================================================
+TIER 3: REFERENCE INFORMATION
+================================================================
 
 PARTICIPANTS:
 {participants_json}
@@ -1291,67 +1884,25 @@ PARTICIPANTS:
 SCENE CONTEXT:
 {scene_json}
 
-CRITICAL INSTRUCTIONS:
-1. Physical state affects participation:
-   - High pain → shorter responses, irritable tone, may leave early
-   - Low stamina → less engaged, seeking to end conversation
-   - Poor health → reduced verbal complexity
+Physical/emotional state effects:
+- High pain → shorter responses, irritable tone, may leave early
+- Negative valence → pessimistic, critical, withdrawn
+- High arousal + negative valence → confrontational, agitated
+- Low energy → brief responses, less elaboration
 
-2. Emotional state affects tone:
-   - Negative valence → pessimistic, critical, withdrawn
-   - High arousal + negative valence → confrontational, agitated
-   - Low energy → brief responses, less elaboration
-
-3. Relationship dynamics:
-   - Low alignment → disagreements, challenges
-   - High shared knowledge → references to past discussions
-   - Low trust → guarded statements, diplomatic language
-
-4. Temporal awareness:
-   - Reference recent experiences naturally
-   - React to timepoint context (inauguration, meeting, etc.)
-   - Show anticipation/anxiety about future if present
-
-5. Knowledge constraints:
-   - ONLY reference information in knowledge list
-   - Create exposure opportunities (one person tells another new info)
-   - Show personality through what they emphasize
-
-6. VOICE DIFFERENTIATION (CRITICAL - Each character MUST sound distinct):
-   Refer to the CHARACTER VOICE GUIDE above. Each character's lines must match their
-   demonstrated style. If two characters have different speaking styles, their dialog
-   lines must be OBVIOUSLY different in sentence length, word choice, and tone.
-   DO NOT let characters converge toward a shared "polite professional" voice.
-
-7. SPECIFICITY IN DECISIONS (CRITICAL - Make dialog concrete, not generic):
-   When characters discuss decisions, plans, or situations, they MUST use SPECIFIC details:
-   - NUMBERS: "$2.3M runway", "47 customers", "18-month timeline", "3 board seats"
-   - NAMES: Specific people, companies, products, locations (make them up if needed)
-   - TRADE-OFFS: Explicitly state what was sacrificed for what was gained
-   - ALTERNATIVES: Reference other options considered and why they were rejected
-   - CONSEQUENCES: Concrete outcomes, not vague "it worked out"
-
-   BAD (generic): "We need more funding to grow."
-   GOOD (specific): "We need $4M by March to hit 50 enterprise customers before Acme launches their competing product."
-
-   BAD (generic): "The partnership didn't work out."
-   GOOD (specific): "DataCorp backed out when they saw our 23% churn rate. We've got 60 days to fix retention or lose the Sequoia term sheet."
-
-8. TEMPORAL FRESHNESS (CRITICAL - Avoid repeating the same beats):
-   - Each timepoint represents a DIFFERENT moment in time. The conversation should reflect NEW developments, not rehash previous discussions.
-   - If a character's recent_experiences reference prior conversations, BUILD ON those — don't repeat them verbatim.
-   - Introduce NEW concerns, NEW information, NEW tensions appropriate to this specific moment in the timeline.
-   - Characters should reference the SPECIFIC timepoint_context event, not generic recurring themes.
-   - Avoid these repetitive patterns: repeating the same statistics, restating the same ultimatums, recycling the same metaphors across timepoints.
+Knowledge constraints:
+- ONLY reference information in knowledge list
+- Create exposure opportunities (one character reveals info to another)
+- Show personality through what they emphasize
 """
 
     # Add prior beats avoidance if available
     if prior_dialog_beats:
         beats_list = "\n".join(f"   - {beat}" for beat in prior_dialog_beats[-5:])
         prompt += f"""
-   BEATS ALREADY COVERED (Do NOT repeat these — advance the narrative):
+BEATS ALREADY COVERED (Do NOT repeat these — advance the narrative):
 {beats_list}
-   You MUST introduce NEW developments beyond these. Repeating these beats is a failure.
+You MUST introduce NEW developments beyond these. Repeating these beats is a failure.
 """
 
     # Add non-human entity voice rules if any non-human participants
@@ -1366,17 +1917,11 @@ CRITICAL INSTRUCTIONS:
             voice_rules.append(f"   - {ctx['id']}: {mode}")
         rules_text = "\n".join(voice_rules)
         prompt += f"""
-9. NON-HUMAN ENTITY VOICE RULES:
-   The following entities are NOT human. They must NOT speak with human dialog patterns.
-   Instead, use the specified narration mode for each:
+NON-HUMAN ENTITY VOICE RULES:
+The following entities are NOT human. They must NOT speak with human dialog patterns.
+Instead, use the specified narration mode for each:
 {rules_text}
-   Format non-human "speech" as narrated action or environmental description, NOT quoted dialog.
-   Example (environment): *The biosphere's humidity sensors trigger a cascade of moisture warnings across the habitat modules.*
-   Example (animal): *The colony's lab rat freezes, whiskers twitching, then bolts toward the ventilation shaft.*
-"""
-
-    prompt += """
-Generate 8-12 dialog turns showing realistic interaction given these constraints.
+Format non-human "speech" as narrated action or environmental description, NOT quoted dialog.
 """
 
     # Generate dialog with structured output
@@ -1386,6 +1931,38 @@ Generate 8-12 dialog turns showing realistic interaction given these constraints
         prompt=prompt,
         max_tokens=6000
     )
+
+    # Rejection sampling: evaluate quality and retry once if needed
+    initial_turns = []
+    for turn in dialog_data.turns:
+        turn_dict = turn.dict() if hasattr(turn, 'dict') else turn.model_dump()
+        initial_turns.append(turn_dict)
+
+    quality = _evaluate_dialog_quality(initial_turns)
+    if not quality["passed"]:
+        print(f"    [M11] Dialog quality check FAILED (score={quality['score']:.2f}, "
+              f"failures={quality['failures']}). Retrying with repair notes...")
+        repair_prompt = prompt + f"""
+
+REPAIR INSTRUCTIONS (previous generation failed quality checks):
+{quality['repair_notes']}
+
+These fixes are MANDATORY. The previous generation was rejected for violating these rules.
+"""
+        dialog_data = llm.generate_dialog(
+            prompt=repair_prompt,
+            max_tokens=6000
+        )
+        # Re-evaluate after retry (log only, don't retry again)
+        retry_turns = []
+        for turn in dialog_data.turns:
+            turn_dict = turn.dict() if hasattr(turn, 'dict') else turn.model_dump()
+            retry_turns.append(turn_dict)
+        retry_quality = _evaluate_dialog_quality(retry_turns)
+        print(f"    [M11] Retry quality: score={retry_quality['score']:.2f}, "
+              f"failures={retry_quality['failures']}")
+    else:
+        print(f"    [M11] Dialog quality check passed (score={quality['score']:.2f})")
 
     # Create ExposureEvents using M19 Knowledge Extraction Agent (LLM-based)
     exposure_events_created = 0

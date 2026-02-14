@@ -386,15 +386,25 @@ class PortalStrategy:
             role = info.get("role", "")
             initial_knowledge = info.get("initial_knowledge", [])
 
+            metadata = {
+                "name": entity_id.replace("_", " ").title(),
+                "role": role,
+                "initial_knowledge": initial_knowledge,
+                "source": "template_entity_roster"
+            }
+
+            # Propagate voice differentiation data from roster into entity metadata
+            if "personality_traits" in info:
+                metadata["personality_traits"] = info["personality_traits"]
+            if "voice_guide" in info:
+                metadata["voice_guide"] = info["voice_guide"]
+            if "speech_examples" in info:
+                metadata["speech_examples"] = info["speech_examples"]
+
             entities.append(Entity(
                 entity_id=entity_id,
                 entity_type=entity_type,
-                entity_metadata={
-                    "name": entity_id.replace("_", " ").title(),
-                    "role": role,
-                    "initial_knowledge": initial_knowledge,
-                    "source": "template_entity_roster"
-                }
+                entity_metadata=metadata
             ))
         return entities
 
