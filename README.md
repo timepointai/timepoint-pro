@@ -1,10 +1,18 @@
 # Timepoint Daedalus
 
-**Social network simulation engine that renders queryable meaning graphs, not prose.** See what a single run actually produces: **[complete example run with every output artifact &rarr;](EXAMPLE_RUN.md)**
+
+### tl;dr 
+
+Vibe code complex social network simulations, like "Simulate the day before the Declaration of Independence." or "Simulate a colony on Mars, exploring a new zone for the first time on a 10 day trip." Ask your coding agent to pull the repo, setup OPENROUTER_API_KEY in .env and you are ready to go. 
+
+
+# Summary 
+
+**Timepoint Daedalus is highly-parameterized synthetic social network simulator that renders queryable meaning graphs.** See what a single run actually produces: **[complete example run with every output artifact &rarr;](EXAMPLE_RUN.md)**
 
 Any frontier LLM can generate a plausible story about a crew crash-landing on an alien planet. 
 
-Timepoint simulates the entire social graph, across "timepoints" which, if you are experienced in social network simulation, is similar to ticks or timestamps:
+Timepoint simulates the entire social graph, across "timepoints" which, if you are experienced in social network simulation, is similar to ticks or timestamps, but allows for a novel variable-depth information resolution across time, which in turn allows for **physics-based forecasting of social network behaviors.**
 
 ```
 - n Timepoints / steps rendered 
@@ -18,9 +26,6 @@ Timepoint simulates the entire social graph, across "timepoints" which, if you a
 
 The output is a structured computational artifact — typed graph edges with provenance, auditable causal chains, quantitative state you can propagate and query. Not a narrative summary. The difference matters when you need to test how a decision propagates through a social network, fine-tune downstream models on causal reasoning, or trace how information flows between entities over time.
 
-### tl;dr 
-
-Vibe code complex social network simulations, like "Simulate the day before the Declaration of Independence." or "Simulate a colony on Mars, exploring a new zone for the first time on a 10 day trip." Ask your coding agent to pull the repo, setup OPENROUTER_API_KEY in .env and you are ready to go. 
 
 
 ### INTRO WRITTEN BY A HUMAN
@@ -158,13 +163,13 @@ PORTAL doesn't predict the future—it maps the decision landscape backward:
 |--------|-------|
 | Backward steps | 10 (2031 → 2026), each with 7 candidates simulation-judged by 405B |
 | Pivot points | 94 detected across 10 divergent paths |
-| Dialogs | 10 conversations, 97 exchanges, 4 characters |
+| Dialogs | 10 conversations, 93 exchanges, 4 characters |
 | Mechanisms activated | 14 of 19 in a single run |
-| Emotional tracking | Character arcs over 5 years of reconstructed history (valence range: -0.66 to +0.85) |
+| Emotional tracking | Character arcs over 5 years of reconstructed history (valence range: -0.34 to +0.48) |
 | Resilience | Recovered from DNS failures and truncated API responses via automatic retry |
-| Cost | $0.51–$0.98 per run | 873–1,596 LLM calls |
+| Cost | $0.38–$0.99 per run | 873–1,584 LLM calls |
 
-The system doesn't just find *a* path — it explores a search space of ~700 candidate antecedents (7 candidates x 10 steps x 10 paths), runs mini forward-simulations to score each, and prunes to the most coherent backward chain (best path coherence: 0.809). The output is a queryable meaning graph with knowledge provenance, not a narrative paragraph.
+The system doesn't just find *a* path — it explores a search space of ~700 candidate antecedents (7 candidates x 10 steps x 10 paths), runs mini forward-simulations to score each, and prunes to the most coherent backward chain (best path coherence: 0.827). The output is a queryable meaning graph with knowledge provenance, not a narrative paragraph.
 
 ---
 
@@ -391,10 +396,10 @@ All 21 catalog templates verified in a single test session with real LLM calls. 
 | vc_pitch_strategies | DIRECTORIAL | $0.30 | 4 | 16 | 60 |
 | vc_pitch_roadshow | DIRECTORIAL | $0.06 | 5 | 7 | 12 |
 | agent4_elk_migration | CYCLICAL | $0.20 | 4 | 15 | 56 |
-| mars_mission_portal | PORTAL | $0.98 | 4 | 11 | 40 |
+| mars_mission_portal | PORTAL | $0.99 | 4 | 11 | 40 |
 | agent3_litigation_portal | PORTAL | $0.69 | 4 | 9 | 0 |
 | agent1_regulatory_stress | PORTAL | $0.43 | 4 | 6 | 0 |
-| **TOTALS** | | **$4.09** | **94** | **169** | **515** |
+| **TOTALS** | | **$4.10** | **94** | **169** | **515** |
 
 Key quality signals across all runs:
 - **Voice distinctiveness**: 0.82–1.00 across all dialogs (zero hedging patterns detected)
@@ -402,8 +407,8 @@ Key quality signals across all runs:
 - **Knowledge extraction**: Active across all templates, producing typed exposure events
 - **QSE resource tracking**: Verified with 4–5 tracked resources per template (O2, power, thermal, herd population, vegetation biomass, etc.)
 - **CYCLICAL prophecy resolution**: 5 paths, 5 cycles, prophecy fulfillment 0.15, best coherence 0.727
-- **PORTAL backward inference**: 10 steps with 7 candidates each, simulation-judged, best coherence 0.818
-- **Outcome convergence**: mars_mission_portal across 3 runs: outcome_similarity=0.79, role_stability=1.00
+- **PORTAL backward inference**: 10 steps with 7 candidates each, simulation-judged, best coherence 0.827
+- **Outcome convergence**: mars_mission_portal across 7 runs: outcome_similarity=0.79, role_stability=1.00
 
 ### Cost and licensing
 
@@ -415,7 +420,7 @@ Heterogeneous fidelity (M1) + tensor compression (M6) + intelligent model select
 | Heterogeneous fidelity | ~2.5M | ~$25 |
 | With TTM compression | ~250k | ~$2.50 |
 
-Real-world costs: $0.01–$0.30 for standard templates, $0.30–$1.00 for comprehensive templates. The VC Pitch Branching template generates 60 training examples across 16 timepoints with 4 entities for $0.30. All 21 templates verified in a single test run: $4.09 total, 6,279 LLM calls, 94 entities, 169 timepoints, 515 training examples.
+Real-world costs: $0.01–$0.30 for standard templates, $0.30–$1.00 for comprehensive templates. The VC Pitch Branching template generates 60 training examples across 16 timepoints with 4 entities for $0.30. All 21 templates verified in a single test run: $4.10 total, 6,279 LLM calls, 94 entities, 169 timepoints, 515 training examples.
 
 All 10 models in the pipeline—Llama 3.1/4, Qwen 2.5, DeepSeek, Mistral—carry MIT, Apache 2.0, or Llama/Qwen community licenses. **Commercial synthetic data generation is explicitly permitted.** The pipeline deliberately excludes models with restrictive output ownership clauses.
 
