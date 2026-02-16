@@ -92,9 +92,12 @@ def test_m6_tensor_compression():
         # Test 3: Test tensor compression with M6 mechanism
         print("\n[3/4] Testing tensor compression (M6 mechanism)...")
 
-        # Parse the tensor and get the context vector as float array
+        # Parse the tensor and decode base64+msgpack to get the context vector as float array
+        import base64
+        import msgspec
         tensor_data = json.loads(test_entity.tensor)
-        context_array = np.array(tensor_data['context_vector'], dtype=np.float64)
+        context_bytes = base64.b64decode(tensor_data['context_vector'])
+        context_array = np.array(msgspec.msgpack.decode(context_bytes), dtype=np.float64)
 
         # This should trigger M6 mechanism via @track_mechanism decorator
         compressed_pca = TensorCompressor.compress(context_array, "pca", n_components=4)
