@@ -131,7 +131,7 @@ def test_circadian_validation():
         event_description="Afternoon work session"
     )
 
-    result = validate_circadian_activity(entity, "work", timepoint_afternoon, {"circadian_config": config})
+    result = validate_circadian_activity(entity, {"activity": "work", "timepoint": timepoint_afternoon, "circadian_config": config})
     print(f"  Work at 2:00 PM: {result['message']}")
     assert result["valid"], f"Afternoon work should be valid, got: {result}"
 
@@ -142,12 +142,12 @@ def test_circadian_validation():
         event_description="Late night work session"
     )
 
-    result = validate_circadian_activity(entity, "work", timepoint_night, {"circadian_config": config})
+    result = validate_circadian_activity(entity, {"activity": "work", "timepoint": timepoint_night, "circadian_config": config})
     print(f"  Work at 3:00 AM: {result['message']}")
     assert result["valid"] == False or "unusual" in result["message"].lower(), f"Night work should be flagged, got: {result}"
 
     # Test highly implausible activity (social at 4 AM)
-    result = validate_circadian_activity(entity, "social", timepoint_night, {"circadian_config": config})
+    result = validate_circadian_activity(entity, {"activity": "social", "timepoint": timepoint_night, "circadian_config": config})
     print(f"  Social at 3:00 AM: {result['message']}")
     assert result["valid"] == False or "unusual" in result["message"].lower(), f"Night social should be flagged, got: {result}"
 
