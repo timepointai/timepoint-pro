@@ -26,7 +26,7 @@ def test_m14_mechanism_integration():
     """Test that M14 (Circadian Patterns) fires during E2E execution with hospital_crisis template."""
 
     # Initialize services
-    llm = LLMClient()
+    llm = LLMClient(api_key=os.getenv("OPENROUTER_API_KEY"))
     store = GraphStore("sqlite:///:memory:")
 
     # Initialize tracking
@@ -56,8 +56,8 @@ def test_m14_mechanism_integration():
 
     try:
         # Run orchestrator
-        orchestrator = OrchestratorAgent(llm, store, context=config.metadata or {})
-        result = orchestrator.orchestrate_scene(config.scenario_description)
+        orchestrator = OrchestratorAgent(llm, store)
+        result = orchestrator.orchestrate(config.scenario_description, context=config.metadata or {})
 
         # Check if M14 fired
         conn = sqlite3.connect("metadata/runs.db")
