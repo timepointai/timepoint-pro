@@ -1,0 +1,133 @@
+{
+  "scenario_description": "A pilgrim visits Fushimi Inari Shrine for guidance. The shrine building itself (centuries-old wood structure) has consciousness and memory of countless visitors. Inari Okami, the fox deity, manifests to offer wisdom. A white fox messenger observes and communicates. All three non-human entities have rich internal states: the shrine remembers prayers, the deity processes worshiper intent, the fox evaluates sincerity. Demonstrates M16 with full animistic entity modeling\u2014consciousness vectors, spiritual power metrics, and non-verbal communication patterns for buildings, spirits, and animals.",
+  "world_id": "kami_shrine",
+  "entities": {
+    "count": 4,
+    "types": [
+      "human",
+      "building",
+      "kami",
+      "animal"
+    ],
+    "initial_resolution": "trained",
+    "animism_level": 6,
+    "envelope": {
+      "attack": 0.4,
+      "decay": 0.1,
+      "sustain": 0.7,
+      "release": 0.5
+    }
+  },
+  "timepoints": {
+    "count": 1,
+    "start_time": null,
+    "resolution": "minute",
+    "before_count": 0,
+    "after_count": 0
+  },
+  "temporal": {
+    "mode": "pearl",
+    "narrative_arc": null,
+    "dramatic_tension": 0.5,
+    "cycle_length": null,
+    "prophecy_accuracy": 0.5,
+    "enable_counterfactuals": false,
+    "portal_description": null,
+    "portal_year": null,
+    "origin_year": null,
+    "backward_steps": 15,
+    "exploration_mode": "adaptive",
+    "oscillation_complexity_threshold": 10,
+    "candidate_antecedents_per_step": 3,
+    "path_count": 5,
+    "coherence_threshold": 0.7,
+    "checkpoint_interval": 3,
+    "llm_scoring_weight": 0.3,
+    "historical_precedent_weight": 0.2,
+    "causal_necessity_weight": 0.3,
+    "entity_capability_weight": 0.2,
+    "max_backtrack_depth": 3,
+    "portal_relaxation_enabled": true,
+    "use_simulation_judging": false,
+    "simulation_forward_steps": 2,
+    "simulation_max_entities": 5,
+    "simulation_include_dialog": false,
+    "judge_model": "meta-llama/llama-3.1-405b-instruct",
+    "judge_temperature": 0.3,
+    "simulation_cache_results": true,
+    "fidelity_planning_mode": "hybrid",
+    "token_budget_mode": "soft",
+    "token_budget": 50000.0,
+    "fidelity_template": "balanced",
+    "custom_fidelity_schedule": null,
+    "custom_temporal_steps": null
+  },
+  "outputs": {
+    "formats": [
+      "jsonl",
+      "json"
+    ],
+    "include_dialogs": true,
+    "include_relationships": true,
+    "include_knowledge_flow": true,
+    "export_ml_dataset": true,
+    "generate_narrative_exports": true,
+    "narrative_export_formats": [
+      "markdown",
+      "json",
+      "pdf"
+    ],
+    "narrative_detail_level": "summary",
+    "enhance_narrative_with_llm": true
+  },
+  "variations": {
+    "enabled": false,
+    "count": 1,
+    "strategies": [
+      "vary_personalities"
+    ],
+    "deduplication_threshold": 0.9
+  },
+  "metadata": {
+    "mechanisms_featured": [
+      "M16_animistic_entities_full_spectrum"
+    ],
+    "animistic_entities": {
+      "shrine_building": {
+        "consciousness": 0.7,
+        "memory_depth": "centuries",
+        "spiritual_power": 0.9
+      },
+      "inari_okami": {
+        "consciousness": 1.0,
+        "domain": "rice_prosperity_foxes",
+        "manifestation_strength": 0.95
+      },
+      "white_fox": {
+        "consciousness": 0.8,
+        "can_speak": true,
+        "divine_messenger": true
+      }
+    },
+    "animism_level_description": "Full animism (level 6): buildings, spirits, animals all possess consciousness and agency"
+  },
+  "economic_scenario": null,
+  "founder_profiles": null,
+  "max_cost_usd": null,
+  "enable_checkpoints": true,
+  "checkpoint_interval": 10,
+  "patch": {
+    "name": "Spirit Gate",
+    "category": "mystical",
+    "tags": [
+      "animism",
+      "shrine",
+      "kami",
+      "ritual",
+      "spiritual"
+    ],
+    "author": "timepoint-daedalus",
+    "version": "1.0",
+    "description": "Animistic entities with consciousness interact in a sacred space"
+  }
+}

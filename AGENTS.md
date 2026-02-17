@@ -42,7 +42,7 @@ Strategies share a common interface: `run(config) -> List[Path]`. Each path cont
 
 ## Key Commands
 ```bash
-./run.sh list                    # List all 15 templates
+./run.sh list                    # List all 21 templates
 ./run.sh run board_meeting       # Run single template
 ./run.sh run --category core     # Run by category
 ./run.sh quick                   # Quick tier tests
@@ -167,7 +167,7 @@ All 5 portal scoring methods now use real LLM-based evaluation instead of hardco
 - `workflows/portal_strategy.py`: **Entity context enrichment** — Enriched entity_summary in antecedent generation prompt with roles, descriptions, knowledge items, and personality traits. Previously only listed entity IDs. Added rule #6 requiring antecedent narratives to feature the specific named entities, preventing drift to generic corporate/startup framing.
 
 ### Mars Mission Portal Template
-- `generation/templates/showcase/mars_mission_portal.json`: Portal mode template. Backward reasoning from failed Mars mission (2031) to origins (2026). 4 entities, 10 backward steps, simulation-judged with 405B judge model. First verified portal template. ADPRS envelopes configured in template JSON (`adprs_envelopes` array), `simulation_include_dialog: true`.
+- `generation/templates/showcase/mars_mission_portal.json`: Portal mode template. Backward reasoning from failed Mars mission (2031) to origins (2026). 4 entities, 10 backward steps, 3 candidates per step, simulation-judged with 405B judge model. First verified portal template. ADPRS envelopes configured in template JSON (`adprs_envelopes` array), `simulation_include_dialog: false` (mini-sim dialogs disabled for cost efficiency).
 - `generation/templates/catalog.json`: Added `showcase/mars_mission_portal` entry, `portal` and `space` patch categories.
 - `run.sh`: Added `mars_mission_portal` to SHOWCASE_TEMPLATES array and dispatch case.
 

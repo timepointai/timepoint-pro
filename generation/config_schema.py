@@ -572,7 +572,7 @@ class TemporalConfig(BaseModel):
         description="How should token budget be enforced? hard | soft | max | adaptive | orchestrator | user"
     )
     token_budget: Optional[float] = Field(
-        default=15000,
+        default=100000,
         description="Total token budget for simulation (if budget_mode requires it)"
     )
     fidelity_template: str = Field(

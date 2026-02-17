@@ -1,0 +1,129 @@
+{
+  "scenario_description": "Sherlock Holmes has 24 hours to predict where criminal mastermind Moriarty will strike next. Holmes explicitly models Moriarty's planning process: generates prospective states for multiple time horizons (6h, 12h, 24h), considers Moriarty's resource constraints, anticipates decision branches, and evaluates contingency plans. Demonstrates M15 where Holmes's cognitive_tensor includes prospection_ability=0.95 and theory_of_mind=0.9. System generates detailed ProspectiveState objects: expected knowledge Moriarty will have, likely emotional states, predicted action sequences, and anxiety levels about being predicted.",
+  "world_id": "detective_prospection",
+  "patch": {
+    "name": "Mind Palace",
+    "category": "mystery",
+    "tags": ["detective", "prospection", "strategic", "prediction", "sherlock"],
+    "author": "timepoint-daedalus",
+    "version": "1.0",
+    "description": "Strategic prospection where a master detective models an adversary's future actions"
+  },
+  "entities": {
+    "count": 2,
+    "types": [
+      "human"
+    ],
+    "initial_resolution": "trained",
+    "animism_level": 3,
+    "envelope": {
+      "attack": 0.25,
+      "decay": 0.15,
+      "sustain": 0.75,
+      "release": 0.25
+    }
+  },
+  "timepoints": {
+    "count": 2,
+    "start_time": null,
+    "resolution": "hour",
+    "before_count": 0,
+    "after_count": 0
+  },
+  "temporal": {
+    "mode": "pearl",
+    "narrative_arc": null,
+    "dramatic_tension": 0.5,
+    "cycle_length": null,
+    "prophecy_accuracy": 0.5,
+    "enable_counterfactuals": false,
+    "portal_description": null,
+    "portal_year": null,
+    "origin_year": null,
+    "backward_steps": 15,
+    "exploration_mode": "adaptive",
+    "oscillation_complexity_threshold": 10,
+    "candidate_antecedents_per_step": 3,
+    "path_count": 5,
+    "coherence_threshold": 0.7,
+    "checkpoint_interval": 3,
+    "llm_scoring_weight": 0.3,
+    "historical_precedent_weight": 0.2,
+    "causal_necessity_weight": 0.3,
+    "entity_capability_weight": 0.2,
+    "max_backtrack_depth": 3,
+    "portal_relaxation_enabled": true,
+    "use_simulation_judging": false,
+    "simulation_forward_steps": 2,
+    "simulation_max_entities": 5,
+    "simulation_include_dialog": false,
+    "judge_model": "meta-llama/llama-3.1-405b-instruct",
+    "judge_temperature": 0.3,
+    "simulation_cache_results": true,
+    "fidelity_planning_mode": "hybrid",
+    "token_budget_mode": "soft",
+    "token_budget": 50000.0,
+    "fidelity_template": "balanced",
+    "custom_fidelity_schedule": null,
+    "custom_temporal_steps": null
+  },
+  "outputs": {
+    "formats": [
+      "jsonl",
+      "json"
+    ],
+    "include_dialogs": true,
+    "include_relationships": true,
+    "include_knowledge_flow": true,
+    "export_ml_dataset": true,
+    "generate_narrative_exports": true,
+    "narrative_export_formats": [
+      "markdown",
+      "json",
+      "pdf"
+    ],
+    "narrative_detail_level": "summary",
+    "enhance_narrative_with_llm": true
+  },
+  "variations": {
+    "enabled": false,
+    "count": 1,
+    "strategies": [
+      "vary_personalities"
+    ],
+    "deduplication_threshold": 0.9
+  },
+  "metadata": {
+    "mechanisms_featured": [
+      "M15_entity_prospection_strategic"
+    ],
+    "prospection_config": {
+      "modeling_entity": "sherlock_holmes",
+      "target_entity": "moriarty",
+      "time_horizons": [
+        "6h",
+        "12h",
+        "24h"
+      ],
+      "prospection_ability": 0.95,
+      "theory_of_mind": 0.9
+    },
+    "cognitive_traits": {
+      "sherlock_holmes": {
+        "prospection_ability": 0.95,
+        "theory_of_mind": 0.9,
+        "pattern_recognition": 0.98
+      },
+      "moriarty": {
+        "strategic_planning": 0.96,
+        "deception_skill": 0.92,
+        "counter_modeling": 0.88
+      }
+    }
+  },
+  "economic_scenario": null,
+  "founder_profiles": null,
+  "max_cost_usd": null,
+  "enable_checkpoints": true,
+  "checkpoint_interval": 10
+}
