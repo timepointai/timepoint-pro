@@ -1,0 +1,144 @@
+{
+  "scenario_description": "Three-day pitch roadshow across California. Monday in Los Angeles: founders meet Alex Martinez at Maverick Ventures (entertainment tech focused). Founder A emphasizes Company's content generation capabilities: 'Game studios spend $2M on dialog trees. We generate branching narratives with modal causality for $100K.' Alex is intrigued by the animistic entities (M16) for NPC AI in games. \n\nWednesday in San Francisco: first meeting with Jennifer Park at Sequoia (enterprise AI focused). Founder B leads: 'Enterprises need synthetic training data for proprietary LLMs. We enable vertical fine-tuning datasets at 95% cost reduction.' Jennifer asks about SOC2, enterprise SLAs, and sales cycle. Founder A explains ANDOS layer-by-layer training for deterministic outputs enterprises require. \n\nThursday in San Francisco: meeting with David Chen at a16z (developer tools focused). Technical deep-dive: Founder A walks through the 17 mechanisms, query engine, fault tolerance. David gets excited about the developer experience: 'This is Terraform for simulation.' Founders realize they found the right positioning. \n\nTrack 7 timepoints: (1) LA pitch with Alex, (2) Travel to SF / debrief, (3) Sequoia pitch with Jennifer, (4) Post-meeting founder discussion on positioning, (5) a16z pitch with David, (6) Founder synthesis: which narrative resonated?, (7) Follow-up strategy. Demonstrates M3 (knowledge accumulation: each meeting informs the next), M13 (multi-entity synthesis: three VCs with different thesis lenses), M10 (scene atmospheres: LA creative vs SF analytical), M7 (causal chains: positioning evolution across meetings).",
+  "world_id": "vc_pitch_roadshow",
+  "entities": {
+    "count": 5,
+    "types": [
+      "human"
+    ],
+    "initial_resolution": "dialog",
+    "animism_level": 0,
+    "envelope": {
+      "attack": 0.15,
+      "decay": 0.1,
+      "sustain": 0.75,
+      "release": 0.3
+    }
+  },
+  "timepoints": {
+    "count": 7,
+    "start_time": null,
+    "resolution": "hour",
+    "before_count": 0,
+    "after_count": 0
+  },
+  "temporal": {
+    "mode": "pearl",
+    "narrative_arc": null,
+    "dramatic_tension": 0.5,
+    "cycle_length": null,
+    "prophecy_accuracy": 0.5,
+    "enable_counterfactuals": false,
+    "portal_description": null,
+    "portal_year": null,
+    "origin_year": null,
+    "backward_steps": 15,
+    "exploration_mode": "adaptive",
+    "oscillation_complexity_threshold": 10,
+    "candidate_antecedents_per_step": 3,
+    "path_count": 5,
+    "coherence_threshold": 0.7,
+    "checkpoint_interval": 3,
+    "llm_scoring_weight": 0.3,
+    "historical_precedent_weight": 0.2,
+    "causal_necessity_weight": 0.3,
+    "entity_capability_weight": 0.2,
+    "max_backtrack_depth": 3,
+    "portal_relaxation_enabled": true,
+    "use_simulation_judging": false,
+    "simulation_forward_steps": 2,
+    "simulation_max_entities": 5,
+    "simulation_include_dialog": false,
+    "judge_model": "meta-llama/llama-3.1-405b-instruct",
+    "judge_temperature": 0.3,
+    "simulation_cache_results": true,
+    "fidelity_planning_mode": "hybrid",
+    "token_budget_mode": "soft",
+    "token_budget": 128000.0,
+    "fidelity_template": "balanced",
+    "custom_fidelity_schedule": null,
+    "custom_temporal_steps": null
+  },
+  "outputs": {
+    "formats": [
+      "jsonl",
+      "json",
+      "markdown"
+    ],
+    "include_dialogs": true,
+    "include_relationships": true,
+    "include_knowledge_flow": true,
+    "export_ml_dataset": true,
+    "generate_narrative_exports": true,
+    "narrative_export_formats": [
+      "markdown",
+      "json",
+      "pdf"
+    ],
+    "narrative_detail_level": "summary",
+    "enhance_narrative_with_llm": true
+  },
+  "variations": {
+    "enabled": false,
+    "count": 1,
+    "strategies": [
+      "vary_personalities"
+    ],
+    "deduplication_threshold": 0.9
+  },
+  "metadata": {
+    "pitch_type": "roadshow_pre_seed",
+    "vc_firms": [
+      {
+        "name": "Maverick Ventures",
+        "location": "LA",
+        "focus": "entertainment_tech",
+        "partner": "Alex Martinez"
+      },
+      {
+        "name": "Sequoia Capital",
+        "location": "SF",
+        "focus": "enterprise_ai",
+        "partner": "Jennifer Park"
+      },
+      {
+        "name": "Andreessen Horowitz",
+        "location": "SF",
+        "focus": "developer_tools",
+        "partner": "David Chen"
+      }
+    ],
+    "narrative_evolution": {
+      "la_angle": "content_generation_for_games",
+      "sf_enterprise_angle": "vertical_saas_training_data",
+      "sf_developer_angle": "terraform_for_simulation"
+    },
+    "mechanisms_featured": [
+      "M3_knowledge_propagation_across_meetings",
+      "M7_causal_chains_learning_curve",
+      "M10_scene_atmosphere_la_vs_sf",
+      "M11_dialog_synthesis_pitch_variations",
+      "M13_multi_entity_synthesis_vc_perspectives"
+    ],
+    "key_insight": "Developer tools positioning resonated most (David @ a16z)"
+  },
+  "economic_scenario": null,
+  "founder_profiles": null,
+  "max_cost_usd": null,
+  "enable_checkpoints": true,
+  "checkpoint_interval": 10,
+  "patch": {
+    "name": "Road Show",
+    "category": "corporate",
+    "tags": [
+      "startup",
+      "pitch",
+      "multi-meeting",
+      "roadshow",
+      "persistence"
+    ],
+    "author": "timepoint-daedalus",
+    "version": "1.0",
+    "description": "Multi-meeting VC roadshow tracking relationship evolution"
+  }
+}

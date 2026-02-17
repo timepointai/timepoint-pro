@@ -61,7 +61,7 @@ python run_all_mechanism_tests.py --nl "detective interrogates 3 witnesses about
 
 ### Template-Based Mode
 ```bash
-# List all 15 templates
+# List all 21 templates
 ./run.sh list
 
 # Run a single template
@@ -412,8 +412,9 @@ showcase/hound_shadow_directorial        comprehensive  showcase     M17, M10, M
 showcase/mars_mission_portal             comprehensive  showcase     M17, M3, M7 +3
 convergence/simple                       quick          convergence  M7, M11
 convergence/standard                     standard       convergence  M7, M11, M13
+... (14 more)
 --------------------------------------------------------------------------------
-Total: 15 templates
+Total: 21 templates
 ```
 
 ---

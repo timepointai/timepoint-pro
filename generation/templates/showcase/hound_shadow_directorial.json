@@ -1,0 +1,132 @@
+{
+  "scenario_description": "A detective investigates a series of murders on the fog-shrouded moors, each victim bearing strange hound bite marks. The narrative follows classical dramatic structure: rising action (discovery and investigation), climax (confrontation with the supernatural hound), falling action (revelation and resolution). Unlike Pearl causality, events occur to serve narrative beats\u2014the detective finds crucial clues at dramatically appropriate moments, the hound appears when tension peaks. Track 15 timepoints with M17 (directorial causality), M10 (moor atmosphere as narrative force), M14 (night/fog affecting visibility and mood), M11 (dramatic dialog revelations), and M8 (fear affecting cognition).",
+  "world_id": "hound_shadow_directorial",
+  "entities": {
+    "count": 5,
+    "types": [
+      "human",
+      "animal",
+      "building"
+    ],
+    "initial_resolution": "dialog",
+    "animism_level": 4,
+    "envelope": {
+      "attack": 0.3,
+      "decay": 0.1,
+      "sustain": 0.8,
+      "release": 0.6
+    }
+  },
+  "timepoints": {
+    "count": 15,
+    "start_time": null,
+    "resolution": "hour",
+    "before_count": 0,
+    "after_count": 0
+  },
+  "temporal": {
+    "mode": "directorial",
+    "narrative_arc": "rising_action",
+    "dramatic_tension": 0.7,
+    "cycle_length": null,
+    "prophecy_accuracy": 0.5,
+    "enable_counterfactuals": false,
+    "portal_description": null,
+    "portal_year": null,
+    "origin_year": null,
+    "backward_steps": 15,
+    "exploration_mode": "adaptive",
+    "oscillation_complexity_threshold": 10,
+    "candidate_antecedents_per_step": 3,
+    "path_count": 5,
+    "coherence_threshold": 0.7,
+    "checkpoint_interval": 3,
+    "llm_scoring_weight": 0.3,
+    "historical_precedent_weight": 0.2,
+    "causal_necessity_weight": 0.3,
+    "entity_capability_weight": 0.2,
+    "max_backtrack_depth": 3,
+    "portal_relaxation_enabled": true,
+    "use_simulation_judging": false,
+    "simulation_forward_steps": 2,
+    "simulation_max_entities": 5,
+    "simulation_include_dialog": false,
+    "judge_model": "meta-llama/llama-3.1-405b-instruct",
+    "judge_temperature": 0.3,
+    "simulation_cache_results": true,
+    "fidelity_planning_mode": "hybrid",
+    "token_budget_mode": "soft",
+    "token_budget": 128000.0,
+    "fidelity_template": "balanced",
+    "custom_fidelity_schedule": null,
+    "custom_temporal_steps": null
+  },
+  "outputs": {
+    "formats": [
+      "jsonl",
+      "markdown"
+    ],
+    "include_dialogs": true,
+    "include_relationships": true,
+    "include_knowledge_flow": true,
+    "export_ml_dataset": true,
+    "generate_narrative_exports": true,
+    "narrative_export_formats": [
+      "markdown",
+      "json",
+      "pdf"
+    ],
+    "narrative_detail_level": "summary",
+    "enhance_narrative_with_llm": true
+  },
+  "variations": {
+    "enabled": false,
+    "count": 1,
+    "strategies": [
+      "vary_personalities"
+    ],
+    "deduplication_threshold": 0.9
+  },
+  "metadata": {
+    "character_focus": "detective",
+    "narrative_structure": "classical_three_act",
+    "mechanisms_featured": [
+      "M17_modal_causality_directorial",
+      "M10_atmospheric_entities",
+      "M14_circadian_fog_patterns",
+      "M11_dramatic_dialog",
+      "M8_fear_embodiment",
+      "M16_animistic_moor",
+      "M13_relationship_tension",
+      "M15_dread_prospection"
+    ],
+    "temporal_depth": 15,
+    "expected_training_examples": 70,
+    "narrative_beats": [
+      "t01_arrival_on_moor",
+      "t05_first_hound_sighting",
+      "t08_rising_dread",
+      "t11_climax_confrontation",
+      "t15_resolution"
+    ]
+  },
+  "economic_scenario": null,
+  "founder_profiles": null,
+  "max_cost_usd": null,
+  "enable_checkpoints": true,
+  "checkpoint_interval": 10,
+  "patch": {
+    "name": "Baskerville Moors",
+    "category": "mystery",
+    "tags": [
+      "gothic",
+      "atmosphere",
+      "directorial",
+      "horror",
+      "detective"
+    ],
+    "author": "timepoint-daedalus",
+    "version": "1.0",
+    "description": "Gothic mystery with directorial causality serving narrative tension"
+  }
+}

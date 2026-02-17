@@ -1,0 +1,133 @@
+{
+  "scenario_description": "Pre-seed pitch meeting at prominent Silicon Valley VC firm. Founder A (CEO, former Stanford AI researcher) and Founder B (COO, ex-OpenAI product lead) pitch Company: a temporal knowledge graph system enabling 95% cost reduction for AI training data generation through adaptive fidelity and modal causality. \n\nThe pitch deck emphasizes: (1) Problem: LLM training data costs $500K-5M per dataset, (2) Solution: Company generates queryable temporal simulations with tensor compression achieving 200 tokens vs 50K tokens, (3) Traction: 3 design partners testing (game studio, VR company, education tech), (4) Market: $25B AI training data market growing 40% YoY, (5) Team: Founder A published 12 papers on temporal reasoning, Founder B scaled OpenAI's data pipeline to 10M users, (6) Ask: $2M pre-seed at $12M cap for 12 months runway. \n\nJennifer Park (VC Partner, enterprise AI focused) leads the meeting with associate David Kim. Jennifer immediately probes: 'Why now? OpenAI and Anthropic generate their own training data.' Founder A pivots to horizontal applications: character AI, simulation games, educational content. Jennifer counters: 'What's your moat against big labs?' Founder B highlights the 17 mechanisms (animistic entities, modal causality, prospection) as defensible IP. David asks about unit economics: 'If customers pay $5K/dataset and your cost is $250, that's 95% margin but low ACV\u2014how do you scale?' Founder A explains vertical expansion strategy. \n\nTrack 5 timepoints: (1) Pitch opening + product demo, (2) Traction deep-dive, (3) Competitive moat discussion, (4) Business model questions, (5) Closing ask and next steps. Demonstrates M11 (rich negotiation dialog), M15 (VC prospection: Jennifer models probability of Series A success), M7 (causal chains: traction \u2192 credibility \u2192 valuation leverage), and M13 (relationship evolution: skepticism \u2192 cautious interest).",
+  "world_id": "vc_pitch_pearl",
+  "entities": {
+    "count": 4,
+    "types": [
+      "human"
+    ],
+    "initial_resolution": "dialog",
+    "animism_level": 0,
+    "envelope": {
+      "attack": 0.2,
+      "decay": 0.1,
+      "sustain": 0.85,
+      "release": 0.2
+    }
+  },
+  "timepoints": {
+    "count": 5,
+    "start_time": null,
+    "resolution": "minute",
+    "before_count": 0,
+    "after_count": 0
+  },
+  "temporal": {
+    "mode": "pearl",
+    "narrative_arc": null,
+    "dramatic_tension": 0.5,
+    "cycle_length": null,
+    "prophecy_accuracy": 0.5,
+    "enable_counterfactuals": false,
+    "portal_description": null,
+    "portal_year": null,
+    "origin_year": null,
+    "backward_steps": 15,
+    "exploration_mode": "adaptive",
+    "oscillation_complexity_threshold": 10,
+    "candidate_antecedents_per_step": 3,
+    "path_count": 5,
+    "coherence_threshold": 0.7,
+    "checkpoint_interval": 3,
+    "llm_scoring_weight": 0.3,
+    "historical_precedent_weight": 0.2,
+    "causal_necessity_weight": 0.3,
+    "entity_capability_weight": 0.2,
+    "max_backtrack_depth": 3,
+    "portal_relaxation_enabled": true,
+    "use_simulation_judging": false,
+    "simulation_forward_steps": 2,
+    "simulation_max_entities": 5,
+    "simulation_include_dialog": false,
+    "judge_model": "meta-llama/llama-3.1-405b-instruct",
+    "judge_temperature": 0.3,
+    "simulation_cache_results": true,
+    "fidelity_planning_mode": "hybrid",
+    "token_budget_mode": "soft",
+    "token_budget": 80000.0,
+    "fidelity_template": "balanced",
+    "custom_fidelity_schedule": null,
+    "custom_temporal_steps": null
+  },
+  "outputs": {
+    "formats": [
+      "jsonl",
+      "json"
+    ],
+    "include_dialogs": true,
+    "include_relationships": true,
+    "include_knowledge_flow": true,
+    "export_ml_dataset": true,
+    "generate_narrative_exports": true,
+    "narrative_export_formats": [
+      "markdown",
+      "json",
+      "pdf"
+    ],
+    "narrative_detail_level": "summary",
+    "enhance_narrative_with_llm": true
+  },
+  "variations": {
+    "enabled": false,
+    "count": 1,
+    "strategies": [
+      "vary_personalities"
+    ],
+    "deduplication_threshold": 0.9
+  },
+  "metadata": {
+    "pitch_type": "pre_seed",
+    "ask_amount_usd": 2000000,
+    "pre_money_valuation_usd": 10000000,
+    "mechanisms_featured": [
+      "M7_causal_chains_pitch_flow",
+      "M11_dialog_synthesis_negotiation",
+      "M15_prospection_vc_risk_modeling",
+      "M13_relationship_evolution"
+    ],
+    "pitch_deck_highlights": {
+      "problem": "LLM training data costs $500K-5M per dataset",
+      "solution": "95% cost reduction via adaptive fidelity + tensor compression",
+      "traction": "3 design partners (game studio, VR, edtech)",
+      "market_size_usd": 25000000000,
+      "team": "Founder A (Stanford AI PhD, 12 papers), Founder B (ex-OpenAI)",
+      "runway_months": 12
+    },
+    "vc_concerns": [
+      "market_timing_why_now",
+      "competitive_moat_vs_big_labs",
+      "unit_economics_low_acv",
+      "technical_risk_17_mechanisms",
+      "go_to_market_strategy"
+    ]
+  },
+  "economic_scenario": null,
+  "founder_profiles": null,
+  "max_cost_usd": null,
+  "enable_checkpoints": true,
+  "checkpoint_interval": 10,
+  "patch": {
+    "name": "Pitch Perfect",
+    "category": "corporate",
+    "tags": [
+      "startup",
+      "pitch",
+      "negotiation",
+      "investment",
+      "pearl"
+    ],
+    "author": "timepoint-daedalus",
+    "version": "1.0",
+    "description": "Pre-seed pitch with pearl causality tracking investment dynamics"
+  }
+}

@@ -71,7 +71,7 @@
     "simulation_cache_results": true,
     "fidelity_planning_mode": "hybrid",
     "token_budget_mode": "soft",
-    "token_budget": 30000.0,
+    "token_budget": 200000.0,
     "fidelity_template": "balanced",
     "custom_fidelity_schedule": null,
     "custom_temporal_steps": null

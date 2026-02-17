@@ -1,0 +1,102 @@
+{
+  "scenario_description": "Simulate the 1790 Compromise Dinner between Jefferson, Hamilton, and Madison",
+  "world_id": "jefferson_dinner",
+  "patch": {
+    "name": "Founding Fathers",
+    "category": "historical",
+    "tags": ["politics", "negotiation", "founding-fathers", "compromise"],
+    "author": "timepoint-daedalus",
+    "version": "1.0",
+    "description": "Historic political deliberation where fundamental decisions shape a nation"
+  },
+  "entities": {
+    "count": 3,
+    "types": [
+      "human"
+    ],
+    "initial_resolution": "tensor_only",
+    "animism_level": 0,
+    "envelope": {
+      "attack": 0.3,
+      "decay": 0.15,
+      "sustain": 0.85,
+      "release": 0.3
+    }
+  },
+  "timepoints": {
+    "count": 1,
+    "start_time": null,
+    "resolution": "hour",
+    "before_count": 2,
+    "after_count": 2
+  },
+  "temporal": {
+    "mode": "pearl",
+    "narrative_arc": null,
+    "dramatic_tension": 0.5,
+    "cycle_length": null,
+    "prophecy_accuracy": 0.5,
+    "enable_counterfactuals": false,
+    "portal_description": null,
+    "portal_year": null,
+    "origin_year": null,
+    "backward_steps": 15,
+    "exploration_mode": "adaptive",
+    "oscillation_complexity_threshold": 10,
+    "candidate_antecedents_per_step": 3,
+    "path_count": 5,
+    "coherence_threshold": 0.7,
+    "checkpoint_interval": 3,
+    "llm_scoring_weight": 0.3,
+    "historical_precedent_weight": 0.2,
+    "causal_necessity_weight": 0.3,
+    "entity_capability_weight": 0.2,
+    "max_backtrack_depth": 3,
+    "portal_relaxation_enabled": true,
+    "use_simulation_judging": false,
+    "simulation_forward_steps": 2,
+    "simulation_max_entities": 5,
+    "simulation_include_dialog": false,
+    "judge_model": "meta-llama/llama-3.1-405b-instruct",
+    "judge_temperature": 0.3,
+    "simulation_cache_results": true,
+    "fidelity_planning_mode": "hybrid",
+    "token_budget_mode": "soft",
+    "token_budget": 50000.0,
+    "fidelity_template": "balanced",
+    "custom_fidelity_schedule": null,
+    "custom_temporal_steps": null
+  },
+  "outputs": {
+    "formats": [
+      "json",
+      "markdown"
+    ],
+    "include_dialogs": true,
+    "include_relationships": true,
+    "include_knowledge_flow": true,
+    "export_ml_dataset": false,
+    "generate_narrative_exports": true,
+    "narrative_export_formats": [
+      "markdown",
+      "json",
+      "pdf"
+    ],
+    "narrative_detail_level": "summary",
+    "enhance_narrative_with_llm": true
+  },
+  "variations": {
+    "enabled": false,
+    "count": 1,
+    "strategies": [
+      "vary_personalities"
+    ],
+    "deduplication_threshold": 0.9
+  },
+  "metadata": {},
+  "economic_scenario": null,
+  "founder_profiles": null,
+  "max_cost_usd": null,
+  "enable_checkpoints": true,
+  "checkpoint_interval": 10
+}

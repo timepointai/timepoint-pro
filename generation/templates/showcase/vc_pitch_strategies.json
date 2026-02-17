@@ -1,0 +1,145 @@
+{
+  "scenario_description": "Parallel timelines exploring pitch strategy selection. In each timeline, Founder A (CEO) and Founder B (COO) pitch Company to Jennifer Park (VC Partner) and David Kim (Associate), but their strategic framing varies dramatically: \n\n**Timeline A (Technical Pitch)**: Founder A leads with the architecture. 'We've solved a fundamental problem in AI: tensor compression for temporal knowledge graphs. Our TTM mechanism achieves 97% compression ratio\u201450,000 tokens down to 200\u2014while preserving queryability. No one else has modal causality with BRANCHING and CYCLICAL modes.' She walks through the 17 mechanisms, ANDOS layer-by-layer training, fault tolerance architecture. David (technical associate) is impressed: 'This is legitimate research.' But Jennifer pushes back: 'I invest in businesses, not papers. Who pays for this?' The pitch feels academic. Jennifer is skeptical about commercial viability. \n\n**Timeline B (Business Pitch)**: Founder B leads with market size. 'AI training data is a $25B market growing 40% annually. Our customers\u2014game studios, VR companies, edtech\u2014spend $2M on content generation. We deliver the same outcome for $100K. That's 95% cost reduction with 20x margin. Unit economics: $5K ACV, $250 COGS, 24-month payback. We're targeting $10M ARR in 18 months.' He shows the Excel model. Jennifer loves the numbers: 'Now we're talking. What's your GTM motion?' They spend 30 minutes on sales strategy. Jennifer is excited about the business model but wants to see traction first. \n\n**Timeline C (Vision Pitch)**: Founder A paints the future. 'Every company will need temporal AI. Today, LLMs are stateless\u2014they don't understand causality, time, or consequences. We're creating a new category: Temporal AI Infrastructure. Think of us as Snowflake for simulation, or Databricks for causal reasoning. In 5 years, every enterprise will run temporal simulations for planning, training, compliance. We're not just a tool; we're the foundation layer for the next generation of AI that understands *when* things happen and *why*.' Jennifer leans in: 'That's a generational bet. Do you have the team to build category-defining infrastructure?' The pitch becomes about founder ambition and vision scale. \n\nTrack 9 timepoints: 2 before pitch start + 1 pitch beginning + 6 divergent (2 per timeline). Demonstrates M12 (alternate histories: same meeting, different strategies), M10 (scene atmosphere analysis: technical vs business vs visionary mood), M15 (VC prospection: Jennifer evaluates founder judgment through strategy choice), M17 (directorial mode for dramatic comparison of outcomes).",
+  "world_id": "vc_pitch_strategies",
+  "entities": {
+    "count": 4,
+    "types": [
+      "human"
+    ],
+    "initial_resolution": "trained",
+    "animism_level": 0,
+    "envelope": {
+      "attack": 0.2,
+      "decay": 0.15,
+      "sustain": 0.8,
+      "release": 0.2
+    }
+  },
+  "timepoints": {
+    "count": 1,
+    "start_time": null,
+    "resolution": "minute",
+    "before_count": 2,
+    "after_count": 6
+  },
+  "temporal": {
+    "mode": "branching",
+    "narrative_arc": null,
+    "dramatic_tension": 0.5,
+    "cycle_length": null,
+    "prophecy_accuracy": 0.5,
+    "enable_counterfactuals": true,
+    "portal_description": null,
+    "portal_year": null,
+    "origin_year": null,
+    "backward_steps": 15,
+    "exploration_mode": "adaptive",
+    "oscillation_complexity_threshold": 10,
+    "candidate_antecedents_per_step": 3,
+    "path_count": 5,
+    "coherence_threshold": 0.7,
+    "checkpoint_interval": 3,
+    "llm_scoring_weight": 0.3,
+    "historical_precedent_weight": 0.2,
+    "causal_necessity_weight": 0.3,
+    "entity_capability_weight": 0.2,
+    "max_backtrack_depth": 3,
+    "portal_relaxation_enabled": true,
+    "use_simulation_judging": false,
+    "simulation_forward_steps": 2,
+    "simulation_max_entities": 5,
+    "simulation_include_dialog": false,
+    "judge_model": "meta-llama/llama-3.1-405b-instruct",
+    "judge_temperature": 0.3,
+    "simulation_cache_results": true,
+    "fidelity_planning_mode": "hybrid",
+    "token_budget_mode": "soft",
+    "token_budget": 128000.0,
+    "fidelity_template": "balanced",
+    "custom_fidelity_schedule": null,
+    "custom_temporal_steps": null
+  },
+  "outputs": {
+    "formats": [
+      "jsonl",
+      "json"
+    ],
+    "include_dialogs": true,
+    "include_relationships": true,
+    "include_knowledge_flow": true,
+    "export_ml_dataset": true,
+    "generate_narrative_exports": true,
+    "narrative_export_formats": [
+      "markdown",
+      "json",
+      "pdf"
+    ],
+    "narrative_detail_level": "summary",
+    "enhance_narrative_with_llm": true
+  },
+  "variations": {
+    "enabled": false,
+    "count": 1,
+    "strategies": [
+      "vary_personalities"
+    ],
+    "deduplication_threshold": 0.9
+  },
+  "metadata": {
+    "pitch_type": "strategy_comparison",
+    "timelines": [
+      {
+        "id": "timeline_a_technical",
+        "lead": "sarah_ceo",
+        "focus": "ml_ai_innovation_17_mechanisms",
+        "vc_response": "impressed_technically_skeptical_commercially",
+        "outcome": "request_for_more_traction",
+        "probability_of_term_sheet": 0.25
+      },
+      {
+        "id": "timeline_b_business",
+        "lead": "marcus_coo",
+        "focus": "market_size_unit_economics_gtm",
+        "vc_response": "excited_about_numbers_wants_validation",
+        "outcome": "conditional_yes_pending_first_customers",
+        "probability_of_term_sheet": 0.65
+      },
+      {
+        "id": "timeline_c_vision",
+        "lead": "sarah_ceo",
+        "focus": "temporal_ai_category_creation",
+        "vc_response": "intrigued_by_ambition_evaluating_founder_caliber",
+        "outcome": "long_discussion_on_team_and_roadmap",
+        "probability_of_term_sheet": 0.45
+      }
+    ],
+    "mechanisms_featured": [
+      "M12_alternate_histories_strategy_selection",
+      "M10_scene_atmosphere_technical_vs_business_vs_vision",
+      "M11_dialog_synthesis_strategic_framing",
+      "M15_prospection_vc_evaluates_founder_judgment",
+      "M17_modal_causality_directorial_comparison"
+    ],
+    "strategic_insight": "Business pitch (timeline B) yields highest term sheet probability (65%)",
+    "meta_lesson": "VCs invest in businesses, not technology or vision alone\u2014need market validation"
+  },
+  "economic_scenario": null,
+  "founder_profiles": null,
+  "max_cost_usd": null,
+  "enable_checkpoints": true,
+  "checkpoint_interval": 10,
+  "patch": {
+    "name": "Strategy Matrix",
+    "category": "corporate",
+    "tags": [
+      "startup",
+      "pitch",
+      "strategy",
+      "negotiation",
+      "variants"
+    ],
+    "author": "timepoint-daedalus",
+    "version": "1.0",
+    "description": "Multiple negotiation strategies exploring different approaches"
+  }
+}

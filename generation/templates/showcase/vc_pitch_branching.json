@@ -1,0 +1,161 @@
+{
+  "scenario_description": "High-stakes pitch meeting at tier-1 VC. Founder A and Founder B have 45 minutes to convince Jennifer Park (Partner) and David Kim (Associate) to invest $2M in Company. The pitch goes well until minute 30, when Jennifer leans forward and asks the critical question: 'Your tech is impressive, but I need to see traction. What's your MRR?' \n\nThis is the branching point. The timeline splits into 4 distinct futures: \n\n**Branch A (Strong Traction)**: Founder A confidently answers '$50K MRR across 5 enterprise customers, 300% month-over-month growth.' Jennifer's eyes light up. She asks about unit economics, customer concentration, retention. Founder A has the data. David pulls up the model: 'If they maintain this growth, they hit $1M ARR in 6 months.' Jennifer offers a term sheet on the spot: $2M at $15M post. They close in 2 weeks. \n\n**Branch B (Weak Traction)**: Founder A hesitates. 'We're pre-revenue, focused on product-market fit.' Jennifer's body language shifts. 'So no paying customers?' Founder B tries to recover: 'We have 20 beta users giving feedback.' Jennifer: 'Call us when you have $10K MRR. Too early for us.' The meeting ends cordially but the deal is dead. They leave with polite rejection. \n\n**Branch C (Honest Pivot)**: Founder A takes a breath. 'We have 3 pilots generating qualitative feedback but no revenue yet. However, what we learned is fascinating...' She pivots to the design partner insights: game studios want NPC AI, VR companies want scenario generation. Jennifer appreciates the honesty and strategic thinking. 'This sounds more like a developer platform than vertical SaaS. Have you considered positioning as Stripe for simulations?' This opens a new strategic conversation. Jennifer offers $1.5M at $10M post with milestone-based second tranche. They negotiate for 3 weeks. \n\n**Branch D (Competitive FOMO)**: As Founder A starts to answer, David's phone buzzes. He glances down, then whispers to Jennifer. She reads: 'Competitor just raised $10M Series A from Sequoia for similar simulation tech.' Jennifer's entire demeanor changes. Suddenly the question isn't 'Should we invest?' but 'How do we move fast enough to win this deal?' She offers $2.5M at $15M post, 'take it or leave it in 48 hours.' The founders feel the power dynamic invert. \n\nTrack 12 timepoints: 3 before critical question + 1 branching moment + 8 after (2 per branch). Demonstrates M12 (counterfactual branching: 4 distinct futures from one decision), M15 (prospection: both sides modeling outcomes), M8 (embodied stress: Founder A's heart rate, Founder B's sweating affecting pitch performance), M17 (BRANCHING mode causality), M11 (dialog variations across branches).",
+  "world_id": "vc_pitch_branching",
+  "entities": {
+    "count": 5,
+    "types": [
+      "human",
+      "abstract"
+    ],
+    "initial_resolution": "trained",
+    "animism_level": 2,
+    "envelope": {
+      "attack": 0.2,
+      "decay": 0.1,
+      "sustain": 0.8,
+      "release": 0.25
+    }
+  },
+  "timepoints": {
+    "count": 1,
+    "start_time": null,
+    "resolution": "minute",
+    "before_count": 3,
+    "after_count": 8
+  },
+  "temporal": {
+    "mode": "branching",
+    "narrative_arc": null,
+    "dramatic_tension": 0.5,
+    "cycle_length": null,
+    "prophecy_accuracy": 0.5,
+    "enable_counterfactuals": true,
+    "portal_description": null,
+    "portal_year": null,
+    "origin_year": null,
+    "backward_steps": 15,
+    "exploration_mode": "adaptive",
+    "oscillation_complexity_threshold": 10,
+    "candidate_antecedents_per_step": 3,
+    "path_count": 5,
+    "coherence_threshold": 0.7,
+    "checkpoint_interval": 3,
+    "llm_scoring_weight": 0.3,
+    "historical_precedent_weight": 0.2,
+    "causal_necessity_weight": 0.3,
+    "entity_capability_weight": 0.2,
+    "max_backtrack_depth": 3,
+    "portal_relaxation_enabled": true,
+    "use_simulation_judging": false,
+    "simulation_forward_steps": 2,
+    "simulation_max_entities": 5,
+    "simulation_include_dialog": false,
+    "judge_model": "meta-llama/llama-3.1-405b-instruct",
+    "judge_temperature": 0.3,
+    "simulation_cache_results": true,
+    "fidelity_planning_mode": "hybrid",
+    "token_budget_mode": "soft",
+    "token_budget": 128000.0,
+    "fidelity_template": "balanced",
+    "custom_fidelity_schedule": null,
+    "custom_temporal_steps": null
+  },
+  "outputs": {
+    "formats": [
+      "jsonl",
+      "json"
+    ],
+    "include_dialogs": true,
+    "include_relationships": true,
+    "include_knowledge_flow": true,
+    "export_ml_dataset": true,
+    "generate_narrative_exports": true,
+    "narrative_export_formats": [
+      "markdown",
+      "json",
+      "pdf"
+    ],
+    "narrative_detail_level": "summary",
+    "enhance_narrative_with_llm": true
+  },
+  "variations": {
+    "enabled": false,
+    "count": 1,
+    "strategies": [
+      "vary_personalities"
+    ],
+    "deduplication_threshold": 0.9
+  },
+  "metadata": {
+    "pitch_type": "branching_outcomes",
+    "critical_question": "What is your traction / MRR?",
+    "branches": [
+      {
+        "id": "branch_a_strong",
+        "answer": "$50K MRR, 300% MoM growth",
+        "outcome": "term_sheet_$2M_at_$15M_post",
+        "probability": 0.15,
+        "close_time_weeks": 2
+      },
+      {
+        "id": "branch_b_weak",
+        "answer": "Pre-revenue, 20 beta users",
+        "outcome": "polite_pass_too_early",
+        "probability": 0.4,
+        "close_time_weeks": 0
+      },
+      {
+        "id": "branch_c_honest_pivot",
+        "answer": "3 pilots, pivoting to developer platform",
+        "outcome": "term_sheet_$1.5M_at_$10M_post_with_milestones",
+        "probability": 0.3,
+        "close_time_weeks": 3
+      },
+      {
+        "id": "branch_d_competitive_fomo",
+        "answer": "Mid-answer, competitor raises $10M",
+        "outcome": "aggressive_term_sheet_$2.5M_at_$15M_post_48h_expiry",
+        "probability": 0.15,
+        "close_time_weeks": 1
+      }
+    ],
+    "mechanisms_featured": [
+      "M12_counterfactual_branching_negotiation",
+      "M15_prospection_both_sides_modeling",
+      "M8_embodied_stress_pitch_performance",
+      "M17_modal_causality_branching",
+      "M11_dialog_variations_across_branches",
+      "M13_relationship_outcomes_trust_vs_fomo"
+    ],
+    "stress_markers": {
+      "sarah_ceo": {
+        "heart_rate": 110,
+        "cortisol_level": "elevated",
+        "decision_quality_modifier": 0.85
+      },
+      "marcus_coo": {
+        "perspiration": "visible",
+        "voice_steadiness": 0.75
+      }
+    }
+  },
+  "economic_scenario": null,
+  "founder_profiles": null,
+  "max_cost_usd": null,
+  "enable_checkpoints": true,
+  "checkpoint_interval": 10,
+  "patch": {
+    "name": "Fork in the Road",
+    "category": "corporate",
+    "tags": [
+      "startup",
+      "pitch",
+      "counterfactual",
+      "branching",
+      "decision"
+    ],
+    "author": "timepoint-daedalus",
+    "version": "1.0",
+    "description": "Pre-seed pitch exploring counterfactual decision branches"
+  }
+}

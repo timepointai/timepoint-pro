@@ -1,19 +1,3 @@
-timepoint contingent / temporal context dependent / proception dependent
-
-just barely touching the light of the universe
-
-clockchain - mention it - Grokipedia of temporal history, complete with attributable causal chains
-
-discovering the truth about time and causal chains
-
-synthetic data order of magnitude easier for framework
-
-novel factors like proception
-
-portal mode
-
-
-
 # Timepoint Daedalus Alpha
 
 **Synthetic time travel through social simulation.**
@@ -52,7 +36,7 @@ Define a scenario -> generate typed social graph -> propagate states -> explore 
 Flagship examples:
 | Template                    | Mode      | Key Feature                          | Entities | Timepoints | Training Examples | Cost   |
 |-----------------------------|-----------|--------------------------------------|----------|------------|-------------------|--------|
-| mars_mission_portal         | PORTAL    | Backward reasoning from 2031 failure | 4        | 11         | 40                | ~$0.68 |
+| mars_mission_portal         | PORTAL    | Backward reasoning from 2031 failure | 4        | 11         | 40                | ~$0.49 |
 | castaway_colony_branching   | BRANCHING | Counterfactual survival strategies   | 8        | 16         | 120               | ~$0.35 |
 | vc_pitch_branching          | BRANCHING | Investor reactions across pitches    | 5        | 16         | 60                | ~$0.30 |
 
@@ -73,7 +57,7 @@ In the immersive VR future, these simulations become *places you visit*. Timepoi
 | CYCLICAL    | Future constrains past             | Mythic loops, generational sagas      | agent4_elk_migration         |
 | DIRECTORIAL | Dramatic tension drives events     | Story arcs                            | hound_shadow_directorial     |
 
-PORTAL stands out: explores hundreds of candidate backward steps, scores coherence with frontier models, delivers a queryable graph of pivots and constraints.
+PORTAL stands out: generates candidate antecedent states at each backward step, scores coherence with frontier models, delivers a queryable graph of pivots and constraints.
 
 ## Technical Foundations
 - **Per-character dialog generation** --- Each character generates dialog turns via independent LLM calls with persona-derived generation parameters (temperature, top_p, max_tokens from entity state). A LangGraph steering agent selects speakers, manages narrative arc, and can suppress or end dialog. Replaces single-call generation that produced identical character voices.
