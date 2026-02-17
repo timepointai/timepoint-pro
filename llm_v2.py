@@ -949,6 +949,77 @@ Return ONLY a single valid JSON object. Do NOT add markdown formatting or multip
         legacy = LegacyClient(self.api_key, self.base_url)
         return legacy.generate_dialog(prompt, max_tokens, model)
 
+    def generate_single_turn(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        persona_params: 'PersonaParams',
+        model: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Generate ONE dialog turn with persona-derived generation parameters.
+
+        Uses PersonaParams (from synth.params2persona) to set temperature,
+        top_p, max_tokens, frequency_penalty, presence_penalty per-character.
+
+        Args:
+            system_prompt: System instructions for this character
+            user_prompt: Turn generation prompt with context
+            persona_params: PersonaParams with per-character generation settings
+            model: Override model (uses default if None)
+
+        Returns:
+            Dict with 'content', 'emotional_tone', 'knowledge_references'
+        """
+        import json
+
+        if self.use_centralized_service:
+            response = self.service.call(
+                system=system_prompt,
+                user=user_prompt,
+                temperature=persona_params.temperature,
+                max_tokens=persona_params.max_tokens,
+                model=model,
+                call_type="generate_single_turn",
+                top_p=persona_params.top_p,
+                frequency_penalty=persona_params.frequency_penalty,
+                presence_penalty=persona_params.presence_penalty,
+            )
+
+            if not response.success:
+                return {
+                    "content": "...",
+                    "emotional_tone": "uncertain",
+                    "knowledge_references": [],
+                }
+
+            # Try to parse as JSON first (structured output)
+            content = response.content.strip()
+            try:
+                parsed = json.loads(content)
+                if isinstance(parsed, dict) and "content" in parsed:
+                    return {
+                        "content": parsed.get("content", content),
+                        "emotional_tone": parsed.get("emotional_tone"),
+                        "knowledge_references": parsed.get("knowledge_references", []),
+                    }
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+            # Raw text response — treat as dialog content
+            return {
+                "content": content,
+                "emotional_tone": None,
+                "knowledge_references": [],
+            }
+        else:
+            # Legacy fallback
+            return {
+                "content": "...",
+                "emotional_tone": None,
+                "knowledge_references": [],
+            }
+
     def _heuristic_relevance_score(self, query: str, knowledge_item: str) -> float:
         """Fallback heuristic relevance scoring"""
         query_words = set(query.lower().split())

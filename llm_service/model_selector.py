@@ -73,6 +73,9 @@ class ActionType(Enum):
     # Dialog operations
     DIALOG_SYNTHESIS = auto()          # Generate conversations
     DIALOG_CONTINUATION = auto()       # Continue existing dialog
+    DIALOG_SINGLE_TURN = auto()        # Generate ONE character turn (per-turn mode)
+    DIALOG_STEERING = auto()           # Steering agent: select next speaker, manage narrative
+    DIALOG_QUALITY_SEMANTIC = auto()   # Semantic quality evaluation of dialog
 
     # Temporal operations
     TEMPORAL_REASONING = auto()        # Causal chain reasoning
@@ -497,6 +500,24 @@ ACTION_REQUIREMENTS: Dict[ActionType, Dict[str, Any]] = {
         "required": {ModelCapability.DIALOG_GENERATION},
         "preferred": {ModelCapability.LARGE_CONTEXT},
         "min_context_tokens": 32768,
+    },
+
+    ActionType.DIALOG_SINGLE_TURN: {
+        "required": {ModelCapability.DIALOG_GENERATION},
+        "preferred": {ModelCapability.HIGH_QUALITY, ModelCapability.INSTRUCTION_FOLLOWING},
+        "min_context_tokens": 8192,
+    },
+
+    ActionType.DIALOG_STEERING: {
+        "required": {ModelCapability.STRUCTURED_JSON, ModelCapability.LOGICAL_REASONING},
+        "preferred": {ModelCapability.HIGH_QUALITY, ModelCapability.CAUSAL_REASONING},
+        "min_context_tokens": 32768,
+    },
+
+    ActionType.DIALOG_QUALITY_SEMANTIC: {
+        "required": {ModelCapability.STRUCTURED_JSON, ModelCapability.LOGICAL_REASONING},
+        "preferred": {ModelCapability.HIGH_QUALITY},
+        "min_context_tokens": 16384,
     },
 
     # Temporal reasoning needs strong causal models

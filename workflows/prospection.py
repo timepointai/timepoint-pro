@@ -12,10 +12,14 @@ Contains:
 """
 
 from typing import List, Dict, Optional
+from datetime import datetime
 import uuid
+import logging
 
 from schemas import Entity, ProspectiveState, Expectation
 from metadata.tracking import track_mechanism
+
+logger = logging.getLogger(__name__)
 
 
 def compute_anxiety_from_expectations(expectations: List[Expectation]) -> float:
@@ -298,6 +302,284 @@ def update_forecast_accuracy(
     modified_entity.entity_metadata = modified_metadata
 
     return modified_entity
+
+
+@track_mechanism("M15", "episodic_memory_generation")
+def generate_episodic_memory(
+    entity: Entity,
+    dialog: 'Dialog',
+    llm: 'LLMClient',
+    store: Optional['GraphStore'] = None,
+) -> List[Dict]:
+    """
+    Post-dialog: generate personality-filtered memory of this conversation.
+
+    Each entity remembers the dialog differently based on their personality,
+    emotional state, and what was personally relevant to them. This creates
+    divergent episodic memories that influence future dialog.
+
+    Args:
+        entity: The entity generating the memory
+        dialog: The completed dialog
+        llm: LLM client for generation
+        store: Optional graph store
+
+    Returns:
+        List of episodic memory dicts with dialog_id, summary, emotional_residue, salience
+    """
+    import json as _json
+
+    # Parse dialog turns
+    turns = dialog.turns
+    if isinstance(turns, str):
+        try:
+            turns = _json.loads(turns)
+        except (ValueError, TypeError):
+            turns = []
+
+    if not turns:
+        return []
+
+    # Build dialog summary for prompt
+    turns_text = "\n".join(
+        f"  {t.get('speaker', '?')}: {t.get('content', '')[:150]}"
+        for t in turns[:12]
+    )
+
+    personality = entity.entity_metadata.get("personality_traits", [])
+    personality_text = ", ".join(str(t) for t in personality[:5]) if personality else "no explicit traits"
+
+    system_prompt = (
+        "You generate episodic memories from a character's perspective. "
+        "The memory should be filtered through their personality — "
+        "what they noticed, what stuck with them, what they felt. "
+        "Return ONLY valid JSON."
+    )
+    user_prompt = f"""CHARACTER: {entity.entity_id}
+PERSONALITY: {personality_text}
+
+DIALOG:
+{turns_text}
+
+Generate 1-3 episodic memories from {entity.entity_id}'s perspective.
+Focus on what THEY found important, not an objective summary.
+
+Return JSON array:
+[{{"summary": "what they remember", "emotional_residue": "feeling left over", "salience": 0.0-1.0}}]"""
+
+    try:
+        response = llm.service.call(
+            system=system_prompt,
+            user=user_prompt,
+            temperature=0.5,
+            max_tokens=400,
+            call_type="entity_enrichment",
+        )
+
+        if response.success:
+            memories = _json.loads(response.content)
+            if isinstance(memories, list):
+                for mem in memories:
+                    mem["dialog_id"] = dialog.dialog_id
+                return memories[:3]
+    except Exception as e:
+        logger.warning(f"Episodic memory generation failed for {entity.entity_id}: {e}")
+
+    # Fallback: simple summary
+    return [{
+        "dialog_id": dialog.dialog_id,
+        "summary": f"Participated in conversation at {dialog.timepoint_id}",
+        "emotional_residue": "neutral",
+        "salience": 0.3,
+    }]
+
+
+@track_mechanism("M15", "rumination_update")
+def update_rumination_topics(
+    entity: Entity,
+    prospective_state: 'ProspectiveState',
+    dialog_turns: List[Dict],
+    llm: 'LLMClient',
+) -> List[Dict]:
+    """
+    Update recurring concerns. Resolved topics decay; unresolved intensify.
+
+    Rumination tracks what an entity keeps thinking about across dialogs.
+    Topics that get addressed in dialog lose intensity. Topics that
+    remain unresolved gain intensity.
+
+    Args:
+        entity: The entity
+        prospective_state: Current prospective state with existing rumination_topics
+        dialog_turns: Dialog turns just completed
+        llm: LLM client
+
+    Returns:
+        Updated list of rumination topic dicts
+    """
+    import json as _json
+
+    # Load existing topics
+    existing_topics = []
+    if prospective_state.rumination_topics:
+        raw = prospective_state.rumination_topics
+        if isinstance(raw, str):
+            try:
+                existing_topics = _json.loads(raw)
+            except (ValueError, TypeError):
+                existing_topics = []
+        elif isinstance(raw, list):
+            existing_topics = raw
+
+    # Get entity's turns from dialog
+    entity_turns = [
+        t.get("content", "") for t in dialog_turns
+        if t.get("speaker") == entity.entity_id
+    ]
+    dialog_content = " ".join(entity_turns)
+
+    # Update existing topics
+    updated_topics = []
+    for topic in existing_topics:
+        topic_text = topic.get("topic", "")
+        intensity = topic.get("intensity", 0.5)
+        recurrence = topic.get("recurrence_count", 0)
+
+        # Check if topic was addressed in dialog
+        if topic_text.lower() in dialog_content.lower():
+            # Topic addressed — reduce intensity
+            intensity = max(0.0, intensity - 0.2)
+        else:
+            # Topic unresolved — increase intensity (rumination)
+            intensity = min(1.0, intensity + 0.1)
+            recurrence += 1
+
+        # Drop topics with very low intensity
+        if intensity > 0.05:
+            updated_topics.append({
+                "topic": topic_text,
+                "intensity": round(intensity, 2),
+                "first_appeared": topic.get("first_appeared", datetime.utcnow().isoformat()),
+                "recurrence_count": recurrence,
+            })
+
+    # Try to identify new topics from dialog
+    if entity_turns and llm:
+        try:
+            system_prompt = "Identify recurring concerns from a character's dialog. Return JSON array."
+            user_prompt = f"""CHARACTER: {entity.entity_id}
+THEIR DIALOG LINES:
+{chr(10).join(f'  "{t}"' for t in entity_turns[:5])}
+
+EXISTING CONCERNS: {', '.join(t['topic'] for t in updated_topics) or 'none'}
+
+Identify 0-2 NEW concerns (not already listed) this character seems worried about.
+Return JSON: [{{"topic": "concern", "intensity": 0.3-0.7}}]"""
+
+            response = llm.service.call(
+                system=system_prompt,
+                user=user_prompt,
+                temperature=0.3,
+                max_tokens=200,
+                call_type="entity_enrichment",
+            )
+
+            if response.success:
+                new_topics = _json.loads(response.content)
+                if isinstance(new_topics, list):
+                    for nt in new_topics[:2]:
+                        updated_topics.append({
+                            "topic": nt.get("topic", "unknown concern"),
+                            "intensity": nt.get("intensity", 0.4),
+                            "first_appeared": datetime.utcnow().isoformat(),
+                            "recurrence_count": 0,
+                        })
+        except Exception as e:
+            logger.debug(f"New topic identification failed: {e}")
+
+    return updated_topics[:10]  # Cap at 10 topics
+
+
+@track_mechanism("M15", "proception_to_knowledge")
+def generate_knowledge_from_proception(
+    entity: Entity,
+    prospective_state: 'ProspectiveState',
+    store: Optional['GraphStore'] = None,
+) -> int:
+    """
+    Proception generates knowledge items -> M3 exposure events.
+
+    Converts an entity's expectations and ruminations into knowledge items
+    that can be referenced in future dialogs.
+
+    Args:
+        entity: The entity
+        prospective_state: Prospective state with expectations/ruminations
+        store: Graph store for saving exposure events
+
+    Returns:
+        Number of exposure events created
+    """
+    import json as _json
+
+    if not store:
+        return 0
+
+    events_created = 0
+
+    # Convert expectations to knowledge
+    expectations = prospective_state.expectations
+    if isinstance(expectations, str):
+        try:
+            expectations = _json.loads(expectations)
+        except (ValueError, TypeError):
+            expectations = []
+
+    if isinstance(expectations, list):
+        for exp in expectations[:5]:
+            if isinstance(exp, dict):
+                predicted = exp.get("predicted_event", "")
+                probability = exp.get("subjective_probability", 0.5)
+                if predicted and probability > 0.3:
+                    from workflows.dialog_synthesis import create_exposure_event
+                    create_exposure_event(
+                        entity_id=entity.entity_id,
+                        information=f"Expects: {predicted} (confidence: {probability:.0%})",
+                        source="self_prospection",
+                        event_type="expectation",
+                        timestamp=datetime.utcnow(),
+                        confidence=probability,
+                        store=store,
+                    )
+                    events_created += 1
+
+    # Convert rumination topics to knowledge
+    rumination = prospective_state.rumination_topics
+    if isinstance(rumination, str):
+        try:
+            rumination = _json.loads(rumination)
+        except (ValueError, TypeError):
+            rumination = []
+
+    if isinstance(rumination, list):
+        for topic in rumination:
+            if isinstance(topic, dict) and topic.get("intensity", 0) > 0.5:
+                from workflows.dialog_synthesis import create_exposure_event
+                create_exposure_event(
+                    entity_id=entity.entity_id,
+                    information=f"Preoccupied with: {topic.get('topic', 'unknown')}",
+                    source="self_rumination",
+                    event_type="concern",
+                    timestamp=datetime.utcnow(),
+                    confidence=0.7,
+                    store=store,
+                )
+                events_created += 1
+
+    if events_created > 0:
+        logger.info(f"[M15→M3] Generated {events_created} knowledge items from proception for {entity.entity_id}")
+
+    return events_created
 
 
 def get_relevant_history_for_prospection(entity: Entity, timepoint: 'Timepoint',

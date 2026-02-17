@@ -1,6 +1,6 @@
 # schemas.py - SQLModel schemas serving as ORM, validation, and API spec
 from sqlmodel import SQLModel, Field, JSON, Column
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, TypedDict
 from datetime import datetime
 from enum import Enum
 import numpy as np
@@ -362,6 +362,43 @@ class DialogData(BaseModel):
 
 
 # ============================================================================
+# Dialog Steering State (Per-Turn Dialog Generation)
+# ============================================================================
+
+class DialogState(TypedDict, total=False):
+    """
+    State object for LangGraph-based per-turn dialog generation.
+
+    Flows through steering_node -> character_node -> quality_gate_node.
+    Contains all context needed for independent per-character LLM calls.
+    """
+    turns: List[Dict[str, Any]]
+    active_speakers: List[str]
+    fourth_wall_contexts: Dict[str, Any]
+    persona_params: Dict[str, Any]
+    current_speaker: Optional[str]
+    narrative_goals: List[str]
+    narrative_progress: Dict[str, bool]
+    mood_register: str
+    proception_states: Dict[str, Dict[str, Any]]
+    suppressed_impulses: Dict[str, List[str]]
+    withheld_knowledge: Dict[str, List[Dict]]
+    turn_count: int
+    max_turns: int
+    dialog_structure: Dict[str, Any]
+    quality_failures: List[str]
+    steering_model: Optional[str]
+    character_model: Optional[str]
+    quality_gate_model: Optional[str]
+    run_quality_per_turn: bool
+    timepoint_id: str
+    run_id: Optional[str]
+    # Injected dependencies (not serializable, passed through state)
+    llm: Any  # LLMClient
+    store: Any  # GraphStore
+
+
+# ============================================================================
 # Knowledge Extraction (M19 - LLM-based knowledge item extraction)
 # ============================================================================
 
@@ -514,6 +551,17 @@ class ProspectiveState(SQLModel, table=True):
     contingency_plans: str = Field(sa_column=Column(JSON), default_factory=dict)  # Dict[str, List[str]]
     anxiety_level: float = 0.0  # 0.0-1.0
     forecast_confidence: float = 1.0  # Overall confidence in forecasting ability
+
+    # Extended proception fields (backward-compatible, all have defaults)
+    withheld_knowledge: str = Field(default="[]", sa_column=Column(JSON))
+    # [{content, reason, withheld_from}]
+    suppressed_impulses: str = Field(default="[]", sa_column=Column(JSON))
+    # [{impulse, context, suppressed_by: "self"|"steering"|"social_norm"}]
+    episodic_memory: str = Field(default="[]", sa_column=Column(JSON))
+    # [{dialog_id, summary, emotional_residue, salience}]
+    rumination_topics: str = Field(default="[]", sa_column=Column(JSON))
+    # [{topic, intensity, first_appeared, recurrence_count}]
+
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_updated: datetime = Field(default_factory=datetime.utcnow)
 

@@ -708,7 +708,7 @@ Individual entity behavior is synthesized in context of scene-level state—a he
 
 ## M11: Dialog Synthesis
 
-Dialog generation incorporates full context:
+Dialog generation uses **per-character turn generation**: each character produces dialog turns via independent LLM calls with persona-derived generation parameters, coordinated by a LangGraph steering agent.
 
 ```python
 DialogTurn:
@@ -720,9 +720,58 @@ DialogTurn:
     physical_state_influence: str    # How body state affects speech
 ```
 
+**Architecture**: Three LangGraph nodes form the dialog loop:
+1. **Steering node** — Selects next speaker, evaluates narrative progress, injects mood shifts, can suppress speakers or end dialog. Uses all back-layer contexts and proception states to make informed decisions about conversation flow.
+2. **Character node** — Generates ONE dialog turn for the selected speaker using character-specific `PersonaParams` (temperature, top_p, max_tokens derived from entity state) and `FourthWallContext` (two-layer context separating voice-shaping information from dialog content).
+3. **Quality gate node** — Runs surface heuristics (banned openers, round-robin, turn length CV, consensus ratio, length spread) as cheap pre-filter, then semantic evaluation via frontier model if surface checks pass.
+
+```
+steering → character → quality_gate → conditional
+                                        ├→ steering (continue)
+                                        ├→ END (complete)
+                                        └→ character (retry)
+```
+
+When `use_per_turn=False`, the system falls through to the legacy single-call implementation for backward compatibility.
+
 **Validation**: Dialog is checked for knowledge consistency (can speaker know this?), relationship consistency (would they say this to this person?), and realism (physical/emotional constraints on speech).
 
 **ADPRS Waveform Gating**: When entities have fitted ADPRS envelopes, the waveform scheduler evaluates each entity's resolution band per timepoint. Entities in TENSOR or SCENE bands are excluded from dialog participant selection (their trajectory snapshots are still recorded for fitting). If fewer than 2 eligible entities remain, dialog is skipped entirely. This gates M11 LLM calls based on per-entity cognitive activation predictions, reducing cost without losing trajectory data. Shadow evaluation runs post-hoc to track divergence between ADPRS predictions and actual resolution. See [SYNTH.md](SYNTH.md) for ADPRS specification.
+
+### Params2Persona: Entity State → LLM Parameters
+
+Each character's LLM call uses generation parameters derived from their current cognitive state (`synth/params2persona.py`):
+
+| Parameter | Source | Effect |
+|-----------|--------|--------|
+| `temperature` | arousal × energy | High arousal → varied output (~1.1); low energy → constrained (~0.4) |
+| `top_p` | arousal | Agitated characters focus vocabulary (lower top_p) |
+| `max_tokens` | turn position × energy | Later turns + low energy → shorter responses |
+| `frequency_penalty` | behavior_vector[5] | Vocabulary richness index |
+| `presence_penalty` | behavior_vector[6] | Novelty seeking index |
+
+ADPRS phi scales all parameters: low phi (entity not cognitively active) constrains all values toward their minimums.
+
+### Fourth Wall Context (Two-Layer Separation)
+
+Each character receives a structured two-layer context (`workflows/dialog_context.py`):
+
+- **Back Layer** (shapes voice, NOT expressed in dialog): true emotional state, withheld knowledge, suppressed impulses, anxiety level, ADPRS band/phi, steering directives. The LLM uses this to modulate *how* the character speaks.
+- **Front Layer** (character's actual knowledge): knowledge items (filtered by resolution level and causal ancestry), natural-language relationship descriptions, presented emotional state, physical state, scene context. Dialog content is drawn from here.
+
+Knowledge limits scale with entity resolution: TENSOR=5 items, SCENE=8, GRAPH=12, DIALOG=16, TRAINED=20.
+
+### PORTAL Knowledge Stripping
+
+In PORTAL mode, characters only know things from timepoints causally upstream of their current position. `filter_knowledge_by_causal_time()` walks the `Timepoint.causal_parent` chain to build a set of ancestor timepoint IDs, then strips any knowledge items from causally inaccessible timepoints. `strip_backwards_emotions()` removes items referencing future events emotionally (characters can't fear events that haven't happened in their timeline). In non-PORTAL modes, these filters are no-ops.
+
+### Semantic Quality Gates
+
+Three levels of quality evaluation, all required:
+
+1. **Per-dialog**: Surface heuristics (5 checks: banned openers, round-robin, turn length CV, consensus ratio, length spread) as cheap pre-filter. If surface passes, frontier model evaluates narrative advancement, conflict specificity, and voice distinctiveness (scores 0.0-1.0 each).
+2. **Cross-dialog**: Checks that each dialog advances beyond prior beats (not recycling the same developments).
+3. **Full-run**: Called once after all dialogs. Evaluates narrative coherence, character consistency, and thematic development across the complete dialog sequence.
 
 ### Tensor Synchronization in Dialog
 
@@ -734,16 +783,14 @@ Before dialog synthesis, the system syncs TTMTensor → CognitiveTensor to ensur
 
 This enables emotional evolution across dialogs—entities accumulate emotional state changes throughout the simulation rather than resetting to defaults.
 
-### Voice Differentiation: persona2params Pipeline
+### Voice Differentiation Pipeline
 
 Dialog synthesis includes a multi-stage voice differentiation pipeline:
 
 1. **`entity_metadata` → `personality_traits`**: Template defines traits per entity (e.g., `["analytical", "reserved", "pragmatic"]`)
 2. **`personality_traits` → `_derive_speaking_style()`**: Maps traits to concrete speaking patterns: verbosity (terse/moderate/verbose), formality (casual/neutral/formal), tone (warm/neutral/cold/passionate), vocabulary (simple/technical/philosophical/business), speech_pattern (direct/elaborate/questioning/commanding)
 3. **`speaking_style` × `emotional_state` → `_derive_dialog_params_from_persona()`**: Combines current emotional state (valence, arousal) and energy level with speaking style to produce per-turn behavior parameters: turn length, interruption frequency, conversational focus
-4. **All of the above → dialog prompt**: Injected as structured context per participant, enabling the LLM to produce distinct voices without explicit style instructions per character
-
-The LLM handles the emotion-to-parameters mapping intuitively well. The pipeline is deliberately thin—it provides the right metadata at the right moment and trusts the LLM to interpret it.
+4. **All of the above → `PersonaParams` → per-character LLM call**: Each character's turn uses independently computed temperature, top_p, max_tokens, frequency_penalty, and presence_penalty from their entity state
 
 ### Entity Type Filtering (Animism-Aware Dialog)
 
@@ -752,11 +799,9 @@ Non-human entities (animals, buildings, environments, abstracts) are filtered fr
 - **Buildings/environments**: Environmental narration (sensory descriptions felt by occupants)
 - **Abstracts**: Collective consciousness (emergent sentiment, atmospheric shift)
 
-This prevents the bug where environment entities like `kepler_442b` spoke with human dialog patterns ("I think we should...") and instead produces narrated environmental presence ("*The biosphere's humidity sensors trigger a cascade of moisture warnings across the habitat modules.*").
-
 ### Temporal Freshness (Beat Avoidance)
 
-Dialog synthesis accepts `prior_dialog_beats`—a rolling list of speaker+content summaries from previous dialogs in the same run. These beats are listed in the prompt with explicit "Do NOT repeat" instruction, forcing the LLM to advance the narrative rather than recycling the same beats ("72 hours to fix life support") across every timepoint.
+Dialog synthesis accepts `prior_dialog_beats`—a rolling list of speaker+content summaries from previous dialogs in the same run. These beats are listed in the prompt with explicit "Do NOT repeat" instruction, forcing the LLM to advance the narrative rather than recycling the same beats across every timepoint. Cross-dialog semantic evaluation reinforces this: the quality gate checks that each new dialog actually advances beyond prior beats.
 
 ## M13: Multi-Entity Synthesis
 
@@ -777,9 +822,9 @@ def detect_contradictions(entities, timepoint):
     # Find belief conflicts between entities
 ```
 
-## M15: Entity Prospection
+## M15: Entity Prospection (Extended Inner Life)
 
-Entities model their own futures, and those models influence present behavior:
+Entities model their own futures, and those models influence present behavior. Post-dialog proception extends this with episodic memory, rumination, and suppressed inner states.
 
 ```python
 ProspectiveState:
@@ -788,9 +833,24 @@ ProspectiveState:
     expectations: List[Expectation]
     contingency_plans: Dict[str, List[Action]]
     anxiety_level: float
+    # Extended proception (post-dialog)
+    withheld_knowledge: List[Dict]       # What they chose not to say
+    suppressed_impulses: List[Dict]      # What they wanted to do but held back
+    episodic_memory: List[Dict]          # Personality-filtered dialog memories
+    rumination_topics: List[Dict]        # Recurring concerns (decay/intensify)
 ```
 
 A founder considering a pivot doesn't just react to current state—they simulate consequences (imperfectly, with bias) and act on those simulations. This captures planning, anxiety, and anticipatory behavior.
+
+### Post-Dialog Proception
+
+After every dialog, `trigger_post_dialog_proception()` updates each participant's inner life:
+
+1. **Episodic memory** (`generate_episodic_memory`): LLM generates personality-filtered memories of the conversation. Each entity remembers differently based on what was personally relevant to them.
+2. **Rumination** (`update_rumination_topics`): Recurring concerns tracked across dialogs. Topics addressed in dialog lose intensity; unresolved topics intensify. New concerns identified from dialog content.
+3. **Withheld knowledge**: What the character knew but chose not to say (from steering agent decisions). Persists across dialogs and feeds back into the Fourth Wall back layer.
+4. **Suppressed impulses**: What the character wanted to do but held back (from steering agent and social norms). Feeds into future dialog tension.
+5. **Knowledge generation** (`generate_knowledge_from_proception`): Expectations and high-intensity rumination topics generate M3 exposure events, making inner life accessible in future dialogs.
 
 ## M16: Animistic Entity Extension
 

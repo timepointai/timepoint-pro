@@ -18,10 +18,31 @@
 | **ADPRS Phase 2** | Cold/Warm Fitting + Harmonic Extension | **COMPLETE** | 38 unit tests, 6 integration |
 | **ADPRS Phase 3** | Shadow Evaluation + Waveform Scheduling | **COMPLETE** | 36 unit tests, 12 integration |
 | **ADPRS Production** | Pipeline Integration + Cross-Run Warm-Start | **COMPLETE** | Wired into e2e_runner |
+| **Params2Persona** | Entity State → LLM Generation Parameters | **COMPLETE** | Per-turn dialog integration |
 
 **Total ADPRS tests: 142** (124 unit + 18 integration), all passing.
 
 ### What's Implemented
+
+**Params2Persona** (`params2persona.py`):
+```python
+from synth.params2persona import PersonaParams, compute_persona_params
+
+# Compute per-character LLM parameters from entity state
+params = compute_persona_params(
+    entity=entity,
+    cognitive=coupled_cognitive,     # After pain/illness coupling
+    turn_position=3,                 # Current turn in dialog
+    max_turns=10,
+    adprs_envelope=envelope,         # Optional ADPRS fidelity scaling
+    evaluation_time=timepoint.timestamp,
+)
+# params.temperature  → 0.3-1.2 (arousal × energy)
+# params.top_p        → 0.7-0.98 (arousal → focused sampling)
+# params.max_tokens   → 50-500 (energy + turn position → fatigue curve)
+# params.frequency_penalty → 0.0-0.8 (behavior_vector vocabulary richness)
+# params.presence_penalty  → 0.0-0.6 (behavior_vector novelty seeking)
+```
 
 **Original `synth/` modules** (`envelope.py`, `voice.py`, `events.py`):
 ```python
@@ -948,6 +969,7 @@ The SynthasAIzer paradigm provides:
 3. **Patch system** for template organization
 4. **Event emission** for monitoring and visualization
 5. **ADPRS waveforms** for continuous fidelity control — fitted per-entity envelopes that map cognitive activation to resolution bands, with per-entity LLM gating in production dialog synthesis, shadow evaluation persistence, and cross-run warm-start fitting (142 tests, WSR > 0.7)
+6. **Params2Persona** for per-character LLM parameter derivation — maps entity tensor state (arousal, energy, behavior vector) + ADPRS phi to concrete generation parameters (temperature, top_p, max_tokens, frequency_penalty, presence_penalty) per dialog turn, enabling voice differentiation at the generation level
 
 All features are:
 - Optional (backward compatible)

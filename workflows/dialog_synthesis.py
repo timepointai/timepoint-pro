@@ -1450,9 +1450,23 @@ def synthesize_dialog(
     animism_level: int = 0,
     prior_dialog_beats: Optional[List[str]] = None,
     qse_state: Optional[Dict] = None,
-    voice_mixer: Optional['VoiceMixer'] = None
+    voice_mixer: Optional['VoiceMixer'] = None,
+    # NEW: Per-turn dialog generation kwargs (all optional, backward-compatible)
+    use_per_turn: bool = True,
+    steering_model: Optional[str] = None,
+    character_model: Optional[str] = None,
+    quality_gate_model: Optional[str] = None,
+    run_quality_per_turn: bool = False,
+    adprs_envelopes: Optional[Dict[str, 'ADPRSEnvelope']] = None,
 ) -> Dialog:
-    """Generate conversation with full physical/emotional/temporal context"""
+    """Generate conversation with full physical/emotional/temporal context.
+
+    When use_per_turn=True (default), uses LangGraph-based per-character
+    turn generation with independent LLM calls per character.
+
+    When use_per_turn=False, falls through to existing single-call
+    implementation for backward compatibility.
+    """
     # Attach QSE state to function for prompt builder access
     synthesize_dialog._qse_state = qse_state
 
@@ -1683,6 +1697,244 @@ def synthesize_dialog(
             duration_seconds=0,
             information_transfer_count=0
         )
+
+    # =====================================================================
+    # PER-TURN DIALOG GENERATION (LangGraph-based)
+    # =====================================================================
+    if use_per_turn:
+        print(f"    [M11] Using per-turn dialog generation for {len(entities)} entities")
+
+        from synth.params2persona import compute_persona_params
+        from workflows.dialog_context import build_fourth_wall_context, FourthWallContext
+        from workflows.dialog_steering import run_dialog_graph
+
+        # Build FourthWallContext and PersonaParams for each entity
+        fourth_wall_contexts = {}
+        persona_params = {}
+        dialog_structure = _compute_dialog_structure(participants_context)
+        min_turns, max_turns_val = dialog_structure["turn_count_range"]
+
+        for entity in entities:
+            if entity.entity_id not in coupled_cognitives:
+                continue
+
+            coupled_cog = coupled_cognitives[entity.entity_id]
+
+            # Get physical tensor
+            physical_data = entity.entity_metadata.get("physical_tensor", {})
+            physical = None
+            if physical_data and 'age' in physical_data:
+                try:
+                    from schemas import PhysicalTensor
+                    physical = PhysicalTensor(**physical_data)
+                except Exception:
+                    continue
+            else:
+                continue
+
+            # Get ADPRS envelope if available
+            entity_envelope = None
+            if adprs_envelopes:
+                entity_envelope = adprs_envelopes.get(entity.entity_id)
+
+            # Get proception state if available
+            proception_state = None
+            if entity.entity_metadata.get("has_prospection") and store:
+                try:
+                    ps_list = store.get_prospective_states_for_entity(entity.entity_id)
+                    if ps_list:
+                        proception_state = ps_list[0]
+                except Exception:
+                    pass
+
+            # Build fourth wall context
+            ctx = build_fourth_wall_context(
+                entity=entity,
+                coupled_cognitive=coupled_cog,
+                physical=physical,
+                timepoint=timepoint,
+                timeline=timeline,
+                other_entities=[e for e in entities if e.entity_id != entity.entity_id],
+                store=store,
+                proception_state=proception_state,
+                adprs_envelope=entity_envelope,
+                knowledge_limit=20,
+            )
+
+            # Compute persona params for initial turn
+            params = compute_persona_params(
+                entity=entity,
+                cognitive=coupled_cog,
+                turn_position=0,
+                max_turns=max_turns_val,
+                adprs_envelope=entity_envelope,
+                evaluation_time=timepoint.timestamp if hasattr(timepoint.timestamp, 'tzinfo') else None,
+            )
+            ctx.persona_params = params
+
+            fourth_wall_contexts[entity.entity_id] = ctx
+            persona_params[entity.entity_id] = params
+
+        # Build narrative goals from participant context
+        narrative_goals = []
+        for ctx in participants_context:
+            goals = ctx.get("current_goals", [])
+            if goals:
+                narrative_goals.extend(goals[:2])
+
+        # Build proception states dict for steering
+        proception_states_dict = {}
+        for ctx in participants_context:
+            prosp = ctx.get("prospection")
+            if prosp:
+                proception_states_dict[ctx["id"]] = prosp
+
+        # Build initial DialogState
+        from schemas import DialogState
+
+        initial_state: DialogState = {
+            "turns": [],
+            "active_speakers": [e.entity_id for e in entities if e.entity_id in fourth_wall_contexts],
+            "fourth_wall_contexts": fourth_wall_contexts,
+            "persona_params": persona_params,
+            "current_speaker": None,
+            "narrative_goals": narrative_goals[:6],
+            "narrative_progress": {g: False for g in narrative_goals[:6]},
+            "mood_register": "neutral",
+            "proception_states": proception_states_dict,
+            "suppressed_impulses": {},
+            "withheld_knowledge": {},
+            "turn_count": 0,
+            "max_turns": max_turns_val,
+            "dialog_structure": dialog_structure,
+            "quality_failures": [],
+            "steering_model": steering_model,
+            "character_model": character_model,
+            "quality_gate_model": quality_gate_model,
+            "run_quality_per_turn": run_quality_per_turn,
+            "timepoint_id": timepoint.timepoint_id,
+            "run_id": run_id,
+            "llm": llm,
+            "store": store,
+        }
+
+        # Run dialog graph
+        final_state = run_dialog_graph(initial_state)
+
+        # Extract turns from final state
+        turns_data = final_state.get("turns", [])
+
+        # Ensure turns have required fields
+        for turn in turns_data:
+            if "timestamp" not in turn:
+                turn["timestamp"] = datetime.utcnow().isoformat()
+            if "confidence" not in turn:
+                turn["confidence"] = 0.9
+
+        print(f"    [M11] Per-turn dialog generated: {len(turns_data)} turns")
+
+        # Run quality check on per-turn output
+        quality = _evaluate_dialog_quality(turns_data)
+        print(f"    [M11] Dialog quality check: score={quality['score']:.2f}, "
+              f"passed={quality['passed']}, failures={quality.get('failures', [])}")
+
+        # Check voice distinctiveness
+        if turns_data:
+            voice_score = _check_voice_distinctiveness(turns_data)
+            print(f"    [M11] Voice distinctiveness score: {voice_score:.2f}")
+
+        # Post-dialog proception for each participant
+        from prospection_triggers import trigger_post_dialog_proception
+
+        # Build preliminary dialog object for proception
+        dialog_obj = Dialog(
+            dialog_id=f"dialog_{timepoint.timepoint_id}_{'_'.join([e.entity_id for e in entities])}",
+            timepoint_id=timepoint.timepoint_id,
+            participants=json.dumps([e.entity_id for e in entities]),
+            turns=json.dumps(turns_data),
+            context_used=json.dumps({
+                "per_turn_generation": True,
+                "physical_states_applied": True,
+                "emotional_states_applied": True,
+                "body_mind_coupling_applied": True,
+            }),
+            duration_seconds=len(turns_data) * 10,
+            information_transfer_count=len(turns_data),
+            run_id=run_id,
+        )
+
+        for entity in entities:
+            if entity.entity_id in fourth_wall_contexts:
+                suppressed = final_state.get("suppressed_impulses", {}).get(entity.entity_id, [])
+                withheld = final_state.get("withheld_knowledge", {}).get(entity.entity_id, [])
+                trigger_post_dialog_proception(
+                    entity=entity,
+                    dialog=dialog_obj,
+                    timepoint=timepoint,
+                    llm=llm,
+                    store=store,
+                    suppressed_impulses=[{"impulse": s, "context": dialog_obj.dialog_id, "suppressed_by": "steering"} for s in suppressed] if suppressed else None,
+                    withheld_knowledge=withheld if withheld else None,
+                )
+
+        # Create ExposureEvents using M19 Knowledge Extraction Agent (LLM-based)
+        exposure_events_created = 0
+        if store and turns_data:
+            try:
+                from workflows.knowledge_extraction import (
+                    extract_knowledge_from_dialog,
+                    create_exposure_events_from_knowledge,
+                )
+
+                extraction_result = extract_knowledge_from_dialog(
+                    dialog_turns=turns_data,
+                    entities=entities,
+                    timepoint=timepoint,
+                    llm=llm,
+                    store=store,
+                    dialog_id=dialog_obj.dialog_id,
+                )
+
+                exposure_events_created = create_exposure_events_from_knowledge(
+                    extraction_result=extraction_result,
+                    timepoint=timepoint,
+                    store=store,
+                )
+                print(f"    [M19→M3] Created {exposure_events_created} exposure events")
+            except Exception as e:
+                logger.warning(f"[M19] Knowledge extraction failed: {e}")
+
+        # Persist emotional state updates
+        if coupled_cognitives:
+            emotional_updates = _persist_emotional_state_updates(
+                entities=entities,
+                dialog_turns=turns_data,
+                coupled_cognitives=coupled_cognitives,
+                store=store,
+            )
+            if emotional_updates > 0:
+                print(f"    [M11] Updated emotional state for {emotional_updates} entities")
+
+            # STATE SYNC: CognitiveTensor → TTMTensor
+            from schemas import CognitiveTensor
+            sync_count = 0
+            for entity in entities:
+                updated_cog_data = entity.entity_metadata.get("cognitive_tensor", {})
+                if updated_cog_data:
+                    try:
+                        updated_cognitive = CognitiveTensor(**updated_cog_data)
+                        if _sync_cognitive_to_ttm(entity, updated_cognitive, store=store):
+                            sync_count += 1
+                    except Exception as e:
+                        logger.warning(f"[SYNC] Failed Cog→TTM sync for {entity.entity_id}: {e}")
+            if sync_count > 0:
+                print(f"    [SYNC] Cog→TTM for {sync_count} entities")
+
+        return dialog_obj
+
+    # =====================================================================
+    # LEGACY SINGLE-CALL DIALOG GENERATION (use_per_turn=False)
+    # =====================================================================
 
     # Build scene context
     scene_context = {

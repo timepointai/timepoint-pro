@@ -353,6 +353,146 @@ def refine_tensor_from_prospection(
     print(f"  ✨ Refined {entity.entity_id} tensor from prospection (anxiety: {prospective_state.anxiety_level:.2f})")
 
 
+def trigger_post_dialog_proception(
+    entity: Entity,
+    dialog: 'Dialog',
+    timepoint: Timepoint,
+    llm: Any,
+    store: GraphStore,
+    suppressed_impulses: Optional[List[Dict]] = None,
+    withheld_knowledge: Optional[List[Dict]] = None,
+) -> Optional[ProspectiveState]:
+    """
+    Trigger post-dialog proception for an entity.
+
+    Called after every dialog. Updates:
+    - withheld_knowledge (what the character chose not to say)
+    - suppressed_impulses (what the character wanted to do but didn't)
+    - episodic_memory (personality-filtered memory of the dialog)
+    - rumination_topics (recurring concerns, updated by dialog)
+
+    Args:
+        entity: Entity to process
+        dialog: Completed dialog
+        timepoint: Current timepoint
+        llm: LLM client
+        store: GraphStore for persistence
+        suppressed_impulses: Impulses suppressed during dialog (from steering agent)
+        withheld_knowledge: Knowledge withheld during dialog
+
+    Returns:
+        Updated ProspectiveState, or None on failure
+    """
+    import json
+
+    from workflows.prospection import (
+        generate_episodic_memory,
+        update_rumination_topics,
+        generate_knowledge_from_proception,
+    )
+
+    try:
+        # Get or create prospective state
+        prospective_state = None
+        if store:
+            states = store.get_prospective_states_for_entity(entity.entity_id)
+            if states:
+                prospective_state = states[0]
+
+        if not prospective_state:
+            import uuid
+            prospective_state = ProspectiveState(
+                prospective_id=f"prospect_{entity.entity_id}_{timepoint.timepoint_id}_{uuid.uuid4().hex[:8]}",
+                entity_id=entity.entity_id,
+                timepoint_id=timepoint.timepoint_id,
+            )
+
+        # Parse dialog turns
+        turns = dialog.turns
+        if isinstance(turns, str):
+            try:
+                turns = json.loads(turns)
+            except (json.JSONDecodeError, TypeError):
+                turns = []
+
+        # 1. Generate episodic memory
+        episodic_memories = generate_episodic_memory(entity, dialog, llm, store)
+        existing_memories = []
+        if prospective_state.episodic_memory:
+            raw = prospective_state.episodic_memory
+            if isinstance(raw, str):
+                try:
+                    existing_memories = json.loads(raw)
+                except (json.JSONDecodeError, TypeError):
+                    existing_memories = []
+            elif isinstance(raw, list):
+                existing_memories = raw
+        existing_memories.extend(episodic_memories)
+        # Keep only most recent 20 memories
+        prospective_state.episodic_memory = json.dumps(existing_memories[-20:])
+
+        # 2. Update rumination topics
+        updated_topics = update_rumination_topics(entity, prospective_state, turns, llm)
+        prospective_state.rumination_topics = json.dumps(updated_topics)
+
+        # 3. Update withheld knowledge (from steering agent decisions)
+        if withheld_knowledge:
+            existing_withheld = []
+            if prospective_state.withheld_knowledge:
+                raw = prospective_state.withheld_knowledge
+                if isinstance(raw, str):
+                    try:
+                        existing_withheld = json.loads(raw)
+                    except (json.JSONDecodeError, TypeError):
+                        existing_withheld = []
+                elif isinstance(raw, list):
+                    existing_withheld = raw
+            existing_withheld.extend(withheld_knowledge)
+            prospective_state.withheld_knowledge = json.dumps(existing_withheld[-10:])
+
+        # 4. Update suppressed impulses
+        if suppressed_impulses:
+            existing_suppressed = []
+            if prospective_state.suppressed_impulses:
+                raw = prospective_state.suppressed_impulses
+                if isinstance(raw, str):
+                    try:
+                        existing_suppressed = json.loads(raw)
+                    except (json.JSONDecodeError, TypeError):
+                        existing_suppressed = []
+                elif isinstance(raw, list):
+                    existing_suppressed = raw
+            # Format suppressed impulses
+            for si in suppressed_impulses:
+                if isinstance(si, str):
+                    existing_suppressed.append({
+                        "impulse": si,
+                        "context": dialog.dialog_id,
+                        "suppressed_by": "steering",
+                    })
+                elif isinstance(si, dict):
+                    existing_suppressed.append(si)
+            prospective_state.suppressed_impulses = json.dumps(existing_suppressed[-10:])
+
+        # 5. Generate knowledge from proception -> M3 exposure events
+        generate_knowledge_from_proception(entity, prospective_state, store)
+
+        # Save updated state
+        prospective_state.last_updated = __import__('datetime').datetime.utcnow()
+        if store:
+            store.save_prospective_state(prospective_state)
+
+        print(f"  [M15] Post-dialog proception for {entity.entity_id}: "
+              f"memories={len(episodic_memories)}, "
+              f"topics={len(updated_topics)}")
+
+        return prospective_state
+
+    except Exception as e:
+        print(f"  ⚠️  Post-dialog proception failed for {entity.entity_id}: {e}")
+        return None
+
+
 async def trigger_prospection_parallel(
     entities: List[Entity],
     timepoint: Timepoint,

@@ -2880,6 +2880,19 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                     if hasattr(self, '_qse') and self._qse and self._qse.is_active:
                         qse_state = self._qse.get_state_summary()
 
+                    # Build ADPRS envelopes for per-turn generation if waveform schedule available
+                    per_turn_envelopes = None
+                    if waveform_schedule:
+                        from synth.fidelity_envelope import ADPRSEnvelope
+                        per_turn_envelopes = {}
+                        for dp in dialog_participants:
+                            envelope_data = dp.entity_metadata.get("adprs_envelope")
+                            if envelope_data and isinstance(envelope_data, dict):
+                                try:
+                                    per_turn_envelopes[dp.entity_id] = ADPRSEnvelope.from_metadata_dict(envelope_data)
+                                except Exception:
+                                    pass
+
                     dialog = synthesize_dialog(
                         dialog_participants,
                         timepoint,
@@ -2890,7 +2903,11 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                         animism_level=animism_level,
                         prior_dialog_beats=prior_dialog_beats if prior_dialog_beats else None,
                         qse_state=qse_state,
-                        voice_mixer=getattr(self, '_voice_mixer', None)
+                        voice_mixer=getattr(self, '_voice_mixer', None),
+                        # Per-turn dialog generation kwargs
+                        use_per_turn=getattr(self, '_use_per_turn_dialog', True),
+                        steering_model=getattr(self, '_steering_model', None),
+                        adprs_envelopes=per_turn_envelopes if per_turn_envelopes else None,
                     )
 
                     # Save dialog to store
