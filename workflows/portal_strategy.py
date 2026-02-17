@@ -1520,8 +1520,35 @@ Focus on: forward coherence, dialog realism, causal necessity, internal consiste
 
             # Collect results as they complete
             for future in as_completed(futures):
-                idx, result = future.result()
-                simulation_results[idx] = result
+                try:
+                    idx, result = future.result(timeout=120)
+                    simulation_results[idx] = result
+                except Exception as e:
+                    failed_idx = futures.get(future, -1)
+                    print(f"      ⚠️  Simulation {failed_idx+1} failed: {e}")
+                    if failed_idx >= 0:
+                        simulation_results[failed_idx] = {
+                            "states": [antecedents[failed_idx]],
+                            "dialogs": [],
+                            "coherence_metrics": {"coherence": 0.3},
+                            "simulation_narrative": f"Simulation failed: {e}",
+                            "emergent_events": [],
+                            "candidate_year": antecedents[failed_idx].year,
+                            "simulation_end_year": antecedents[failed_idx].year
+                        }
+
+        # Fill any remaining None slots (shouldn't happen but guard against it)
+        for i, r in enumerate(simulation_results):
+            if r is None:
+                simulation_results[i] = {
+                    "states": [antecedents[i]],
+                    "dialogs": [],
+                    "coherence_metrics": {"coherence": 0.1},
+                    "simulation_narrative": "Simulation did not produce results",
+                    "emergent_events": [],
+                    "candidate_year": antecedents[i].year,
+                    "simulation_end_year": antecedents[i].year
+                }
 
         # Judge all simulations
         print(f"    ⚖️  Judge LLM evaluating realism of {len(antecedents)} simulations...")
