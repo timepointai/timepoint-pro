@@ -1,5 +1,5 @@
 """
-LLM Service - Centralized LLM integration layer for Timepoint-Daedalus
+LLM Service - Centralized LLM integration layer for Timepoint-Pro
 
 This package provides a unified interface for LLM operations with:
 - Multiple provider support (Mirascope, custom OpenRouter, test providers)

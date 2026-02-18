@@ -1,5 +1,5 @@
 """
-Generation Infrastructure for Timepoint-Daedalus Phase 2
+Generation Infrastructure for Timepoint-Pro Phase 2
 
 This module provides synthetic data generation capabilities including:
 - World management and isolation

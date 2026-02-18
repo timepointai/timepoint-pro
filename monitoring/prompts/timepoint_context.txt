@@ -4,7 +4,7 @@ Timepoint is a stealth-mode startup founded by Sean McDonald in October 2024.
 
 Vision: Build AI systems that understand and reason about causal relationships through narrative simulation.
 
-Core Technology - Timepoint-Daedalus:
+Core Technology - Timepoint-Pro:
 A causal narrative simulation engine that generates realistic multi-entity interactions. The system models
 how entities (humans, organizations, objects) interact over time with realistic causality.
 

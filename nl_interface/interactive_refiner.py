@@ -475,7 +475,7 @@ class CLIRefiner:
         Returns:
             Final approved configuration
         """
-        print("\n=== Timepoint-Daedalus Configuration Refinement ===\n")
+        print("\n=== Timepoint-Pro Configuration Refinement ===\n")
         print(f"Description: {description}\n")
 
         # Start refinement

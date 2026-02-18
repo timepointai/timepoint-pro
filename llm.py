@@ -202,7 +202,7 @@ class OpenRouterClient:
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
             "HTTP-Referer": "https://github.com/your-repo",  # Optional
-            "X-Title": "Timepoint-Daedalus"  # Optional
+            "X-Title": "Timepoint-Pro"  # Optional
         }
 
         data = {

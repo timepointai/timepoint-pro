@@ -38,7 +38,7 @@ def generate_markdown_report(mode: str, results: Dict, output_dir: str = "report
     filename = f"{output_dir}/{mode}_report_{timestamp}.md"
 
     lines = [
-        f"# Timepoint-Daedalus {mode.upper()} Report",
+        f"# Timepoint-Pro {mode.upper()} Report",
         f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         "",
         "## Summary",

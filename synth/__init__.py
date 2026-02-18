@@ -1,5 +1,5 @@
 """
-SynthasAIzer: A Control Paradigm for Timepoint-Daedalus
+SynthasAIzer: A Control Paradigm for Timepoint-Pro
 
 Moog-inspired control layer for simulation configuration.
 See SYNTH.md for full specification.

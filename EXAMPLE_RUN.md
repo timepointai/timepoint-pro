@@ -490,8 +490,8 @@ All inference via OpenRouter. MIT/Apache 2.0/Llama-licensed models only --- all 
 ### Reproduce this run
 
 ```bash
-git clone https://github.com/timepoint-ai/timepoint-daedalus.git
-cd timepoint-daedalus
+git clone https://github.com/timepoint-ai/timepoint-pro.git
+cd timepoint-pro
 pip install -r requirements.txt
 export OPENROUTER_API_KEY=your_key_here
 

@@ -1,5 +1,5 @@
 """
-Reporting Infrastructure for Timepoint-Daedalus Phase 2
+Reporting Infrastructure for Timepoint-Pro Phase 2
 
 This module provides reporting and export capabilities including:
 - Enhanced query engine with batch execution

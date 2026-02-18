@@ -12,12 +12,12 @@
 # USAGE (from your Mac terminal, NOT inside the container):
 #
 #   # One-liner: inject your gh token and push
-#   GH_TOKEN=$(gh auth token) docker exec -e GH_TOKEN claude-daedalus \
-#       bash /Users/seanmcdonald/Documents/GitHub/timepoint-daedalus/bridge.sh
+#   GH_TOKEN=$(gh auth token) docker exec -e GH_TOKEN claude-pro \
+#       bash /Users/seanmcdonald/Documents/GitHub/timepoint-pro/bridge.sh
 #
 #   # Or if you have GH_TOKEN in .env, just:
-#   docker exec claude-daedalus \
-#       bash /Users/seanmcdonald/Documents/GitHub/timepoint-daedalus/bridge.sh
+#   docker exec claude-pro \
+#       bash /Users/seanmcdonald/Documents/GitHub/timepoint-pro/bridge.sh
 #
 # USAGE (from inside the container, if GH_TOKEN is set):
 #
@@ -35,7 +35,7 @@ if [[ -z "$TOKEN" ]]; then
     echo "ERROR: No GitHub token found."
     echo ""
     echo "From your Mac terminal, run:"
-    echo "  GH_TOKEN=\$(gh auth token) docker exec -e GH_TOKEN claude-daedalus \\"
+    echo "  GH_TOKEN=\$(gh auth token) docker exec -e GH_TOKEN claude-pro \\"
     echo "      bash $(pwd)/bridge.sh"
     echo ""
     echo "Or add GH_TOKEN=ghp_xxxxx to your .env and restart the container."

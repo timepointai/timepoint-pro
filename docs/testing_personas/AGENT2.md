@@ -47,7 +47,7 @@
 - 1:00 PM - 3:00 PM: Meetings. Design reviews, test readiness reviews, program status. He is required to attend these and resents the ones that are purely bureaucratic.
 - 3:00 PM - 6:00 PM: Second deep work block. Code reviews, simulation analysis, writing technical papers.
 - 6:30 PM: Home. Helps his daughter (age 5) with dinner and bedtime routine while his wife is on late call.
-- 8:30 PM: Personal technical work. Maintains an open-source astrodynamics library on GitHub (1,200 stars). Reads papers. Occasionally reviews Timepoint-Daedalus code on GitHub.
+- 8:30 PM: Personal technical work. Maintains an open-source astrodynamics library on GitHub (1,200 stars). Reads papers. Occasionally reviews Timepoint-Pro code on GitHub.
 - 10:30 PM: Sleep.
 
 **Tools currently in use:**
@@ -61,7 +61,7 @@
 - TEAMS (NASA diagnostic modeling, on some programs)
 - Jupyter notebooks (personal analysis and prototyping)
 
-**How he discovers new tools:** GitHub trending repos. arXiv papers with code links. Conference proceedings from AIAA, IEEE Aerospace, and INCOSE. His open-source astrodynamics community surfaces interesting tools. He has a personal RSS feed that monitors specific GitHub topics. He found Timepoint Daedalus through the GitHub repo directly.
+**How he discovers new tools:** GitHub trending repos. arXiv papers with code links. Conference proceedings from AIAA, IEEE Aerospace, and INCOSE. His open-source astrodynamics community surfaces interesting tools. He has a personal RSS feed that monitors specific GitHub topics. He found Timepoint Pro through the GitHub repo directly.
 
 **Meeting cadence and decision authority:** He leads a 6-person simulation team within a larger Mission Assurance group of 40. He has IRAD (Internal Research and Development) budget authority of $150K per year --- this is explicitly for evaluating new tools and methods. Production tool procurement goes through a separate channel that involves program management and contracts, but IRAD evaluations are entirely his call. If an IRAD evaluation demonstrates value, transitioning to program funding requires a Technical Interchange Meeting (TIM) with the program chief engineer.
 
@@ -69,7 +69,7 @@
 
 ---
 
-## Relationship with Timepoint Daedalus
+## Relationship with Timepoint Pro
 
 **What first attracted him:** The Castaway Colony template. He read the description --- "Six crew members crash-land on Kepler-442b and must choose between three survival strategies" with "90+ quantitative variables propagated across 5,100 steps (O2, food, hull, radiation)" --- and his immediate reaction was: this is a simplified version of the problem I work on every day. He cloned the repo the same evening and ran the template. The quantitative state propagation (O2 reserve hours decreasing from 336 to 192 across coordinated LLM calls) and the knowledge provenance system (who knows about the hull breach, when they learn about it, how that information propagates to the commander's decision-making) were directly relevant to his mission assurance work.
 
@@ -125,7 +125,7 @@ The secondary value is synthetic training data for internal ML models. His team 
 
 Raj Venkataraman builds spacecraft for a living, and he brings a spacecraft engineer's temperament to everything: define requirements first, test against requirements ruthlessly, document everything, trust nothing that has not been independently verified. He left Helion Aerospace after two years because the "move fast and break things" culture, which he admired in the abstract, produced anxiety he could not manage when "things" included hardware that people would ride into orbit. At Astralis, the pace is slower and the bureaucracy is thicker, but nobody ships a thruster valve that has not been tested to three times its rated duty cycle, and that suits him.
 
-He found Timepoint Daedalus at 10:47 PM on a Thursday, following a GitHub notification from someone who starred his astrodynamics library and also starred the Timepoint repo. He cloned it, read the README, read MECHANICS.md, and had the Castaway Colony template running by midnight. The quantitative state propagation was immediately recognizable to him --- this is what his team does in MATLAB, except Timepoint adds the dimension his MATLAB models cannot capture: the entity cognitive model. Who knows about the O2 leak? When did the commander learn about it? How does the engineer's stress level affect her repair time estimate? These are the questions his accident investigation analysis surfaces after every anomaly, and they are the questions his current simulation tools cannot answer.
+He found Timepoint Pro at 10:47 PM on a Thursday, following a GitHub notification from someone who starred his astrodynamics library and also starred the Timepoint repo. He cloned it, read the README, read MECHANICS.md, and had the Castaway Colony template running by midnight. The quantitative state propagation was immediately recognizable to him --- this is what his team does in MATLAB, except Timepoint adds the dimension his MATLAB models cannot capture: the entity cognitive model. Who knows about the O2 leak? When did the commander learn about it? How does the engineer's stress level affect her repair time estimate? These are the questions his accident investigation analysis surfaces after every anomaly, and they are the questions his current simulation tools cannot answer.
 
 But Raj is the kind of engineer who finds a tool's failure modes more informative than its successes. He immediately started probing the quantitative state propagation for drift, running the same scenario multiple times and diffing the numerical outputs. He found that the O2 depletion rate varied slightly between runs even at temperature=0, which he attributes to different model selections via M18 and different response parsing paths. This is not a dealbreaker --- his Monte Carlo tools produce distributions, not point estimates --- but it tells him that Timepoint's output should be treated as a scenario generator, not a simulator, and that distinction matters in his domain. A simulator must be validated. A scenario generator must be calibrated. He knows how to do both, but he needs to understand which one he is dealing with before he writes a requirements document.
 

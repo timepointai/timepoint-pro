@@ -1,6 +1,6 @@
 #!/bin/bash
 # clean-and-find-orphans.sh
-# Automated orphan file detection for timepoint-daedalus
+# Automated orphan file detection for timepoint-pro
 # Finds Python files not imported anywhere, unused test files, and outdated utilities
 
 set -euo pipefail
@@ -16,7 +16,7 @@ NC='\033[0m' # No Color
 REPORT_FILE="orphan_candidates_report.txt"
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "🔍 Timepoint-Daedalus Orphan File Detector"
+echo "🔍 Timepoint-Pro Orphan File Detector"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 

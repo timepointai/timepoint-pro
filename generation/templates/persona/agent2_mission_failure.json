@@ -5,7 +5,7 @@
     "name": "Mission Failure Branching",
     "category": "persona",
     "tags": ["aerospace", "branching", "hardware-failure", "crew-decision", "quantitative-state", "persona-agent2"],
-    "author": "timepoint-daedalus",
+    "author": "timepoint-pro",
     "version": "1.0",
     "description": "Cascading hardware failure with crew response branching and quantitative state propagation"
   },

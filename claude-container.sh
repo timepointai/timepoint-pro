@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# claude-container.sh - Containerized Claude Code for Timepoint Daedalus
+# claude-container.sh - Containerized Claude Code for Timepoint Pro
 #
 # Builds and manages a Docker sandbox for running Claude Code with
 # --dangerously-skip-permissions, following Anthropic's official devcontainer
@@ -27,8 +27,8 @@
 #   ./claude-container.sh destroy                # Remove container + image
 #
 # Environment variables (all optional, sensible defaults):
-#   CLAUDE_CONTAINER_NAME    Container name        (default: claude-daedalus)
-#   CLAUDE_IMAGE_NAME        Image name            (default: claude-daedalus-sandbox)
+#   CLAUDE_CONTAINER_NAME    Container name        (default: claude-pro)
+#   CLAUDE_IMAGE_NAME        Image name            (default: claude-pro-sandbox)
 #   CLAUDE_CODE_VERSION      Claude Code version   (default: latest)
 #   CLAUDE_EXTRA_DOMAINS     Extra allowed domains (space-separated)
 #   CLAUDE_NO_FIREWALL       Skip firewall setup   (default: false)
@@ -49,8 +49,8 @@ DEVCONTAINER_DIR="${SCRIPT_DIR}/.devcontainer"
 PROJECT_DIR="${SCRIPT_DIR}"
 
 # Parameterized (override via environment)
-CONTAINER_NAME="${CLAUDE_CONTAINER_NAME:-claude-daedalus}"
-IMAGE_NAME="${CLAUDE_IMAGE_NAME:-claude-daedalus-sandbox}"
+CONTAINER_NAME="${CLAUDE_CONTAINER_NAME:-claude-pro}"
+IMAGE_NAME="${CLAUDE_IMAGE_NAME:-claude-pro-sandbox}"
 CLAUDE_CODE_VERSION="${CLAUDE_CODE_VERSION:-latest}"
 EXTRA_DOMAINS="${CLAUDE_EXTRA_DOMAINS:-}"
 NO_FIREWALL="${CLAUDE_NO_FIREWALL:-false}"
@@ -361,7 +361,7 @@ cmd_worktree() {
         echo ""
         echo "  Examples:"
         echo "    ./claude-container.sh worktree feature/auth"
-        echo "    ./claude-container.sh worktree fix/bug-123 ../daedalus-fix"
+        echo "    ./claude-container.sh worktree fix/bug-123 ../pro-fix"
         echo ""
         echo "  List existing worktrees:"
         echo "    ./claude-container.sh worktree --list"
@@ -708,11 +708,11 @@ QUICK START:
 
 PARALLEL AGENTS WITH WORKTREES:
     ./claude-container.sh worktree feature/new-mechanism
-    ./claude-container.sh claude -p "implement M20" --workdir ../daedalus-feature-new-mechanism
+    ./claude-container.sh claude -p "implement M20" --workdir ../pro-feature-new-mechanism
 
 ENVIRONMENT VARIABLES:
-    CLAUDE_CONTAINER_NAME    Container name        (default: claude-daedalus)
-    CLAUDE_IMAGE_NAME        Image name            (default: claude-daedalus-sandbox)
+    CLAUDE_CONTAINER_NAME    Container name        (default: claude-pro)
+    CLAUDE_IMAGE_NAME        Image name            (default: claude-pro-sandbox)
     CLAUDE_CODE_VERSION      Claude Code version   (default: latest)
     CLAUDE_EXTRA_DOMAINS     Extra allowed domains (space-separated)
     CLAUDE_NO_FIREWALL       Skip firewall setup   (set to "true")

@@ -1,4 +1,4 @@
-# Competitive Analysis: Timepoint Daedalus Comparables
+# Competitive Analysis: Timepoint Pro Comparables
 
 **February 2026**
 
@@ -6,7 +6,7 @@
 
 ## Positioning Statement
 
-Timepoint Daedalus is a **structured temporal simulation engine** that uses LLMs to produce queryable meaning graphs with causal provenance — not prose. It sits at the intersection of agent-based simulation, synthetic data generation, and causal reasoning without belonging cleanly to any one category.
+Timepoint Pro is a **structured temporal simulation engine** that uses LLMs to produce queryable meaning graphs with causal provenance — not prose. It sits at the intersection of agent-based simulation, synthetic data generation, and causal reasoning without belonging cleanly to any one category.
 
 No single project is a direct competitor. Many projects overlap with different facets.
 
@@ -20,7 +20,7 @@ No single project is a direct competitor. Many projects overlap with different f
 
 Generative social simulation using Game Master / Player Agent architecture from tabletop RPGs. Agents act in natural language; a GM resolves outcomes. Modular components for memory, observation, planning, actuation.
 
-**"Timepoint Daedalus is like Concordia because"** both use LLMs to simulate multi-agent interactions with composable architectural components and emergent social dynamics.
+**"Timepoint Pro is like Concordia because"** both use LLMs to simulate multi-agent interactions with composable architectural components and emergent social dynamics.
 
 **Key differences:**
 - Concordia produces prose narratives. Timepoint produces structured meaning graphs with typed edges and provenance.
@@ -39,7 +39,7 @@ Generative social simulation using Game Master / Player Agent architecture from 
 
 25 ChatGPT agents in a Sims-like sandbox town. Memory architecture with importance scoring, reflection, retrieval. The paper that launched LLM-based agent simulation.
 
-**"Timepoint Daedalus is like Generative Agents because"** both simulate entities with memory, personality, and social interaction using LLMs, tracking what agents know.
+**"Timepoint Pro is like Generative Agents because"** both simulate entities with memory, personality, and social interaction using LLMs, tracking what agents know.
 
 **Key differences:**
 - Social sandbox vs. causal simulation engine.
@@ -58,7 +58,7 @@ Generative social simulation using Game Master / Player Agent architecture from 
 
 Scalable social media simulator — up to 1 million agents on Twitter/Reddit-like platforms. 23 action types. Studies information spread, group polarization, herd behavior.
 
-**"Timepoint Daedalus is like OASIS because"** both simulate large numbers of entities with LLM-driven behavior to study emergent social dynamics.
+**"Timepoint Pro is like OASIS because"** both simulate large numbers of entities with LLM-driven behavior to study emergent social dynamics.
 
 **Key differences:**
 - Breadth (1M agents, macro phenomena) vs. depth (10-20 entities, full causal chains).
@@ -76,7 +76,7 @@ Scalable social media simulator — up to 1 million agents on Twitter/Reddit-lik
 
 LLM multi-agent simulation of World Wars. Country agents make strategic decisions; secretary agents verify logical consistency. Includes counterfactual analysis. Simulates WWI, WWII, Warring States Period.
 
-**"Timepoint Daedalus is like WarAgent because"** both support counterfactual reasoning, multi-agent decision simulation, and causal chain tracking.
+**"Timepoint Pro is like WarAgent because"** both support counterfactual reasoning, multi-agent decision simulation, and causal chain tracking.
 
 **Key differences:**
 - Domain-specific (geopolitical conflict) vs. domain-agnostic (VC pitches, Mars missions, castaway colonies, mysteries).
@@ -94,7 +94,7 @@ LLM multi-agent simulation of World Wars. Country agents make strategic decision
 
 Creative writing sandbox for LLMs. Mirrors real-world scenarios in structured virtual settings. Vector databases, memory/event retrieval, semantic net traversal.
 
-**"Timepoint Daedalus is like WorldSim because"** both use LLMs to create structured virtual worlds with entity behavior and event tracking.
+**"Timepoint Pro is like WorldSim because"** both use LLMs to create structured virtual worlds with entity behavior and event tracking.
 
 **Key differences:**
 - Creative sandbox producing narrative vs. structured computational artifacts (typed graph edges, quantitative state, training data).
@@ -112,7 +112,7 @@ Creative writing sandbox for LLMs. Mirrors real-world scenarios in structured vi
 
 Framework for deploying multiple LLM agents in custom environments. Task-solving and simulation modes. Classroom scenarios, debate settings, game environments.
 
-**"Timepoint Daedalus is like AgentVerse because"** both deploy multiple LLM agents in simulated environments with emergent behavior and custom scenario definition.
+**"Timepoint Pro is like AgentVerse because"** both deploy multiple LLM agents in simulated environments with emergent behavior and custom scenario definition.
 
 **Key differences:**
 - General multi-agent deployment framework vs. temporal reasoning engine with specific causal infrastructure.
@@ -129,7 +129,7 @@ Framework for deploying multiple LLM agents in custom environments. Task-solving
 
 Python library for generating synthetic tabular, relational, and time-series data. GaussianCopula, CTGAN. Multi-table relational data with key relationships. Quality evaluation tools.
 
-**"Timepoint Daedalus is like SDV because"** both generate structured synthetic data preserving relational properties for ML training pipelines.
+**"Timepoint Pro is like SDV because"** both generate structured synthetic data preserving relational properties for ML training pipelines.
 
 **Key differences:**
 - Learns distributions from real datasets vs. generates from causal simulation — each example has causal ancestry, not just statistical properties.
@@ -148,7 +148,7 @@ Python library for generating synthetic tabular, relational, and time-series dat
 
 Framework for serving and evaluating LLM routers. Routes queries to cheaper or more expensive models based on complexity. Reduces costs by up to 85% while maintaining 95% GPT-4 performance.
 
-**"Timepoint Daedalus is like RouteLLM because"** both perform intelligent multi-model routing to optimize cost and quality.
+**"Timepoint Pro is like RouteLLM because"** both perform intelligent multi-model routing to optimize cost and quality.
 
 **Key differences:**
 - Routes individual queries by complexity (strong vs. weak model). Timepoint's M18 routes 16 action categories to 10 models by 15 capability dimensions.
@@ -165,7 +165,7 @@ Framework for serving and evaluating LLM routers. Routes queries to cheaper or m
 
 Co-authoring dynamic plots with LLM-based character simulation. Writers define "abstract acts" transformed into character action sequences. Mediates between authorial intent and emergent character behavior.
 
-**"Timepoint Daedalus is like StoryVerse because"** both use LLM-driven character simulation with structured narrative planning. Timepoint's DIRECTORIAL mode (five-act arc, camera system, dramatic irony detection) is philosophically similar.
+**"Timepoint Pro is like StoryVerse because"** both use LLM-driven character simulation with structured narrative planning. Timepoint's DIRECTORIAL mode (five-act arc, camera system, dramatic irony detection) is philosophically similar.
 
 **Key differences:**
 - Interactive fiction co-authoring vs. structured temporal simulation with training data output.
@@ -183,7 +183,7 @@ Co-authoring dynamic plots with LLM-based character simulation. Writers define "
 
 Formal framework integrating temporal logic, causal modeling, and probabilistic inference. Allen's interval algebra for temporal reasoning. Designed as a reasoning layer to complement LLMs.
 
-**"Timepoint Daedalus is like T-CPDL because"** both address temporal-causal reasoning that LLMs alone cannot reliably perform, maintaining structured representations alongside LLM generation.
+**"Timepoint Pro is like T-CPDL because"** both address temporal-causal reasoning that LLMs alone cannot reliably perform, maintaining structured representations alongside LLM generation.
 
 **Key differences:**
 - Formal logic system with mathematical guarantees vs. engineering framework that generates runnable artifacts.
@@ -201,7 +201,7 @@ Formal framework integrating temporal logic, causal modeling, and probabilistic 
 
 Iterative framework combining LLMs with graph falsification for causal discovery. Constructs DAGs from domain knowledge, subjects them to data-driven falsification, returns to LLM for refinement. Assigns confidence scores.
 
-**"Timepoint Daedalus is like CausalFusion because"** both use LLMs to construct and reason about causal graphs, iterate between generation and validation, and assign confidence to causal relationships.
+**"Timepoint Pro is like CausalFusion because"** both use LLMs to construct and reason about causal graphs, iterate between generation and validation, and assign confidence to causal relationships.
 
 **Key differences:**
 - Causal discovery from observational data (finding the "true" graph) vs. causal simulation (generating graphs as structured artifacts).
@@ -212,7 +212,7 @@ Iterative framework combining LLMs with graph falsification for causal discovery
 
 ---
 
-## Where Timepoint Daedalus Has No Competition
+## Where Timepoint Pro Has No Competition
 
 These capabilities are unique — no comparable project offers them:
 

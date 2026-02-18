@@ -2,7 +2,7 @@
 """
 test_e2e_autopilot.py - End-to-End Autopilot Test Suite
 
-Comprehensive E2E tests that validate the entire Timepoint-Daedalus system
+Comprehensive E2E tests that validate the entire Timepoint-Pro system
 from end to end, including:
 
 - Full workflow execution with real LLM integration

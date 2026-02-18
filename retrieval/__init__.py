@@ -1,5 +1,5 @@
 """
-Retrieval package for Timepoint-Daedalus tensor RAG.
+Retrieval package for Timepoint-Pro tensor RAG.
 
 Phase 3: Retrieval System Implementation
 
