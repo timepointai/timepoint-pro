@@ -1,5 +1,5 @@
 """
-Natural Language Interface for Timepoint-Daedalus (Sprint 3)
+Natural Language Interface for Timepoint-Pro (Sprint 3)
 
 Convert natural language descriptions into validated simulation configurations,
 enabling zero-code simulation generation.

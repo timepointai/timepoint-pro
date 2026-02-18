@@ -1,5 +1,5 @@
 #!/bin/bash
-# Timepoint Daedalus - Network Firewall for Claude Code Sandbox
+# Timepoint Pro - Network Firewall for Claude Code Sandbox
 # Based on Anthropic's official init-firewall.sh:
 # https://github.com/anthropics/claude-code/blob/main/.devcontainer/init-firewall.sh
 #

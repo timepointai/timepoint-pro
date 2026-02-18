@@ -1,5 +1,5 @@
 """
-Access control for Timepoint-Daedalus tensor system.
+Access control for Timepoint-Pro tensor system.
 
 This module provides:
 - Permission enforcement for tensor read/write/fork operations

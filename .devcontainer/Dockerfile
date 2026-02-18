@@ -1,4 +1,4 @@
-# Timepoint Daedalus - Claude Code Sandbox Container
+# Timepoint Pro - Claude Code Sandbox Container
 # Based on Anthropic's official devcontainer pattern:
 # https://github.com/anthropics/claude-code/blob/main/.devcontainer/Dockerfile
 #

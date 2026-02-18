@@ -170,7 +170,7 @@ class CoverageMatrix:
         """
         report = []
         report.append("=" * 80)
-        report.append("TIMEPOINT-DAEDALUS COVERAGE REPORT")
+        report.append("TIMEPOINT-PRO COVERAGE REPORT")
         report.append("=" * 80)
         report.append("")
 
@@ -248,7 +248,7 @@ class CoverageMatrix:
         Generate markdown formatted report.
         """
         report = []
-        report.append("# Timepoint-Daedalus Coverage Report")
+        report.append("# Timepoint-Pro Coverage Report")
         report.append("")
         report.append(f"**Generated**: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}")
         report.append("")

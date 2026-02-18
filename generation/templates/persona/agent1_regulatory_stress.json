@@ -5,7 +5,7 @@
     "name": "Regulatory Stress Portal",
     "category": "persona",
     "tags": ["finance", "regulatory", "portal", "stress-testing", "audit-trail", "persona-agent1"],
-    "author": "timepoint-daedalus",
+    "author": "timepoint-pro",
     "version": "1.0",
     "description": "PORTAL backward reasoning from adverse portfolio outcome to root cause for regulatory audit"
   },

@@ -1,5 +1,5 @@
 """
-Public API for Timepoint-Daedalus tensor system.
+Public API for Timepoint-Pro tensor system.
 
 Provides RESTful access to:
 - Tensor CRUD operations

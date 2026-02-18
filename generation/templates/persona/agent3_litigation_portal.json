@@ -5,7 +5,7 @@
     "name": "Litigation Discovery Portal",
     "category": "persona",
     "tags": ["legal", "portal", "knowledge-provenance", "information-asymmetry", "trade-secrets", "backward-reasoning", "persona-agent3"],
-    "author": "timepoint-daedalus",
+    "author": "timepoint-pro",
     "version": "1.0",
     "description": "PORTAL backward reasoning from a $47M trade secret verdict to the chain of decisions that made it inevitable"
   },

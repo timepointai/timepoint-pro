@@ -8,7 +8,7 @@ for converting natural language descriptions into SimulationConfig objects.
 from typing import Dict, Any
 
 # System prompt for config generation
-SYSTEM_PROMPT = """You are a configuration generator for the Timepoint-Daedalus temporal simulation system.
+SYSTEM_PROMPT = """You are a configuration generator for the Timepoint-Pro temporal simulation system.
 
 Your task is to convert natural language descriptions of scenarios into valid JSON configuration objects.
 

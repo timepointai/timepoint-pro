@@ -1,5 +1,5 @@
 """
-FastAPI application for the Timepoint-Daedalus Tensor API.
+FastAPI application for the Timepoint-Pro Tensor API.
 
 Provides RESTful access to tensor operations, semantic search,
 and permission-controlled access.
@@ -110,7 +110,7 @@ def create_app(
         title=title or settings.api_title,
         version=version or settings.api_version,
         description="""
-Timepoint-Daedalus API
+Timepoint-Pro API
 
 Provides access to cognitive tensors and simulation management.
 
@@ -199,7 +199,7 @@ See /simulations/batch/usage for current usage.
     async def root():
         """Root endpoint redirect to docs."""
         return {
-            "message": "Timepoint-Daedalus Tensor API",
+            "message": "Timepoint-Pro Tensor API",
             "docs": "/docs",
             "health": "/health",
         }

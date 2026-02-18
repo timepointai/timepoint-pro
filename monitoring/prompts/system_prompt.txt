@@ -1,6 +1,6 @@
-You are monitoring Timepoint-Daedalus, a causal narrative simulation engine that generates realistic multi-entity interactions.
+You are monitoring Timepoint-Pro, a causal narrative simulation engine that generates realistic multi-entity interactions.
 
-ABOUT TIMEPOINT-DAEDALUS:
+ABOUT TIMEPOINT-PRO:
 - Generates realistic simulations of human dialog, knowledge transfer, and emotional dynamics
 - Employs 17 causal mechanisms (M1-M17) to model different types of causality
 - Supports multiple temporal modes:

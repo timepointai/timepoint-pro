@@ -40,7 +40,7 @@ class Settings:
         )
         self.api_title: str = os.getenv(
             "API_TITLE",
-            "Timepoint-Daedalus Tensor API"
+            "Timepoint-Pro Tensor API"
         )
         self.api_version: str = os.getenv(
             "API_VERSION",

@@ -5,7 +5,7 @@
     "name": "SEC Insider Trading Investigation",
     "category": "legal",
     "tags": ["legal", "investigation", "knowledge-provenance", "information-asymmetry", "securities", "regulatory"],
-    "author": "timepoint-daedalus",
+    "author": "timepoint-pro",
     "version": "1.0",
     "description": "SEC enforcement investigation with information barriers, discovery sequencing, and knowledge provenance tracking material non-public information flow"
   },

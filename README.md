@@ -1,4 +1,4 @@
-# Timepoint Daedalus Alpha
+# Timepoint Pro Alpha
 
 **Synthetic time travel through social simulation.**
 
@@ -21,8 +21,8 @@ Costs: $0.15--$1.00 per run. All 21 templates verified Feb 16, 2026.
 
 ## Quick Start
 ```bash
-git clone https://github.com/timepoint-ai/timepoint-daedalus.git
-cd timepoint-daedalus
+git clone https://github.com/timepoint-ai/timepoint-pro.git
+cd timepoint-pro
 pip install -r requirements.txt
 export OPENROUTER_API_KEY=your_key
 ./run.sh list                            # All templates

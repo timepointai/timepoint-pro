@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-conftest.py - Shared pytest configuration and fixtures for Timepoint-Daedalus
+conftest.py - Shared pytest configuration and fixtures for Timepoint-Pro
 
 Provides:
 - Common fixtures for all test types (unit/integration/system/e2e)

@@ -1,5 +1,5 @@
 """
-Timepoint Daedalus API Client SDK.
+Timepoint Pro API Client SDK.
 
 Python client for submitting simulations and batches via the REST API.
 Provides a convenient interface for the batch submission and usage quota APIs.
@@ -214,7 +214,7 @@ class RateLimitError(TimePointAPIError):
 
 class TimePointClient:
     """
-    Client for the Timepoint Daedalus API.
+    Client for the Timepoint Pro API.
 
     Provides methods for batch submission, status tracking, and usage monitoring.
 

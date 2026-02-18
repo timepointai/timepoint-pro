@@ -1,5 +1,5 @@
 {
-  "name": "Timepoint Daedalus - Claude Code Sandbox",
+  "name": "Timepoint Pro - Claude Code Sandbox",
   "build": {
     "dockerfile": "Dockerfile",
     "args": {
@@ -30,7 +30,7 @@
   },
   "remoteUser": "claude",
   "mounts": [
-    "source=daedalus-bashhistory-${devcontainerId},target=/commandhistory,type=volume"
+    "source=pro-bashhistory-${devcontainerId},target=/commandhistory,type=volume"
   ],
   "containerEnv": {
     "NODE_OPTIONS": "--max-old-space-size=4096",

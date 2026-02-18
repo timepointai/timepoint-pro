@@ -1,5 +1,5 @@
 """
-Training package for Timepoint-Daedalus tensor training.
+Training package for Timepoint-Pro tensor training.
 
 Phase 2: Parallel Training Infrastructure
 

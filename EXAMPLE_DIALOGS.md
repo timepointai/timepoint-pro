@@ -671,5 +671,5 @@ Each dialog is produced by:
 
 ---
 
-*Generated from run `run_20260217_074855_c7661141` by Timepoint-Daedalus on February 17, 2026*
+*Generated from run `run_20260217_074855_c7661141` by Timepoint-Pro on February 17, 2026*
 *[Back to Example Run](EXAMPLE_RUN.md) | [Back to README](README.md)*

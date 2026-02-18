@@ -5,7 +5,7 @@
     "name": "Litigation Discovery Forward",
     "category": "persona",
     "tags": ["legal", "forward", "knowledge-provenance", "information-asymmetry", "discovery", "persona-agent3"],
-    "author": "timepoint-daedalus",
+    "author": "timepoint-pro",
     "version": "1.0",
     "description": "FORWARD mode litigation with enforced information asymmetry through discovery timeline"
   },

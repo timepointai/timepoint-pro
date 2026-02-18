@@ -466,7 +466,7 @@ class TestE2EFullStack:
 
 @pytest.mark.integration
 class TestE2EIntegrationWithExistingSystem:
-    """Integration tests with existing Timepoint-Daedalus system"""
+    """Integration tests with existing Timepoint-Pro system"""
 
     def test_nl_generated_config_structure_matches_system(self):
         """Test NL-generated configs match expected system structure"""

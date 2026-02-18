@@ -1,5 +1,5 @@
 """
-Oxen.ai integration for Timepoint-Daedalus.
+Oxen.ai integration for Timepoint-Pro.
 
 This module provides optional integration with Oxen.ai for:
 - Dataset storage and versioning

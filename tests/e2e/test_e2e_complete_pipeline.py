@@ -1,7 +1,7 @@
 """
 Complete E2E Pipeline Test: All Sprints Integrated
 
-Tests the COMPLETE Timepoint-Daedalus pipeline:
+Tests the COMPLETE Timepoint-Pro pipeline:
 - Sprint 3: Natural Language → Config
 - Orchestrator: Config → Simulation
 - Sprint 1: Query Interface (query simulation data)
@@ -418,7 +418,7 @@ class TestCompleteE2EPipeline:
         print("  ✅ Sprint 3: Natural Language Interface")
         print("  ✅ Orchestrator: Simulation Engine")
         print("\n" + "="*70)
-        print("TIMEPOINT-DAEDALUS COMPLETE INTEGRATION: SUCCESS")
+        print("TIMEPOINT-PRO COMPLETE INTEGRATION: SUCCESS")
         print("="*70 + "\n")
 
 

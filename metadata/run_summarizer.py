@@ -159,7 +159,7 @@ class RunSummarizer:
         Returns:
             Structured prompt for LLM summary generation
         """
-        prompt = f"""You are summarizing a temporal simulation run from the Timepoint-Daedalus system.
+        prompt = f"""You are summarizing a temporal simulation run from the Timepoint-Pro system.
 
 Generate a concise 3-5 sentence summary that captures:
 1. What was simulated (template/scenario)

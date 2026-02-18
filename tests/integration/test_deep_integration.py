@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-test_deep_integration.py - Deep Integration Tests for Timepoint-Daedalus
+test_deep_integration.py - Deep Integration Tests for Timepoint-Pro
 
 These tests perform comprehensive end-to-end validation with real LLM calls,
 testing the full system capabilities including:
