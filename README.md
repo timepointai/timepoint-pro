@@ -36,7 +36,7 @@ Define a scenario -> generate typed social graph -> propagate states -> explore 
 Flagship examples:
 | Template                    | Mode      | Key Feature                          | Entities | Timepoints | Training Examples | Cost   |
 |-----------------------------|-----------|--------------------------------------|----------|------------|-------------------|--------|
-| mars_mission_portal         | PORTAL    | Backward reasoning from 2031 failure | 4        | 11         | 40                | ~$0.49 |
+| mars_mission_portal         | PORTAL    | Backward reasoning from 2031 failure | 4        | 6          | 20                | ~$0.18 |
 | castaway_colony_branching   | BRANCHING | Counterfactual survival strategies   | 8        | 16         | 120               | ~$0.35 |
 | vc_pitch_branching          | BRANCHING | Investor reactions across pitches    | 5        | 16         | 60                | ~$0.30 |
 
