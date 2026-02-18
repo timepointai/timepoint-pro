@@ -159,7 +159,7 @@ def list_templates() -> List[str]:
 
     Example:
         templates = list_templates()
-        # ['board_meeting', 'jefferson_dinner', 'vc_pitch_pearl', ...]
+        # ['board_meeting', 'jefferson_dinner', 'vc_pitch_forward', ...]
 
     Note:
         This function now delegates to TemplateLoader for the new
@@ -253,7 +253,7 @@ class ResolutionLevel(str, Enum):
 
 class TemporalMode(str, Enum):
     """Temporal causality modes"""
-    PEARL = "pearl"
+    FORWARD = "forward"
     DIRECTORIAL = "directorial"
     NONLINEAR = "nonlinear"
     BRANCHING = "branching"
@@ -406,7 +406,7 @@ class CompanyConfig(BaseModel):
 class TemporalConfig(BaseModel):
     """Configuration for temporal causality mode"""
     mode: TemporalMode = Field(
-        default=TemporalMode.PEARL,
+        default=TemporalMode.FORWARD,
         description="Temporal causality mode"
     )
     # Directorial mode settings
@@ -769,7 +769,7 @@ class SimulationConfig(BaseModel):
             world_id="constitutional_convention",
             entities=EntityConfig(count=10, types=["human"]),
             timepoints=CompanyConfig(count=5, resolution="day"),
-            temporal=TemporalConfig(mode=TemporalMode.PEARL),
+            temporal=TemporalConfig(mode=TemporalMode.FORWARD),
             outputs=OutputConfig(formats=["json", "markdown"])
         )
     """
@@ -883,7 +883,7 @@ class SimulationConfig(BaseModel):
             # List available templates
             from generation.config_schema import list_templates
             available = list_templates()
-            # ['board_meeting', 'jefferson_dinner', 'vc_pitch_pearl', ...]
+            # ['board_meeting', 'jefferson_dinner', 'vc_pitch_forward', ...]
         """
         template_data = load_template(template_id)
         return cls(**template_data)

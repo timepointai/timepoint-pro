@@ -1,13 +1,13 @@
 {
-  "scenario_description": "Marcus Delgado-Washington (AGENT3) litigation discovery scenario. PEARL mode with emphasis on knowledge provenance and information asymmetry. A trade secret misappropriation case between a biotech startup (plaintiff) and a former employee who joined a competitor (defendant). The core question is who knew what when: when did the defendant access proprietary formulations, what did they take to the new employer, and when did the plaintiff discover the misappropriation? Four entities navigate the discovery timeline with structurally enforced information barriers. Plaintiff counsel cannot reference evidence not yet produced in discovery. Defense counsel knows about documents their client has not disclosed. The witness holds information neither side has obtained through formal mechanisms. The judge learns facts only through admitted exhibits and testimony.",
+  "scenario_description": "Marcus Delgado-Washington (AGENT3) litigation discovery scenario. FORWARD mode with emphasis on knowledge provenance and information asymmetry. A trade secret misappropriation case between a biotech startup (plaintiff) and a former employee who joined a competitor (defendant). The core question is who knew what when: when did the defendant access proprietary formulations, what did they take to the new employer, and when did the plaintiff discover the misappropriation? Four entities navigate the discovery timeline with structurally enforced information barriers. Plaintiff counsel cannot reference evidence not yet produced in discovery. Defense counsel knows about documents their client has not disclosed. The witness holds information neither side has obtained through formal mechanisms. The judge learns facts only through admitted exhibits and testimony.",
   "world_id": "agent3_litigation_discovery",
   "patch": {
-    "name": "Litigation Discovery Pearl",
+    "name": "Litigation Discovery Forward",
     "category": "persona",
-    "tags": ["legal", "pearl", "knowledge-provenance", "information-asymmetry", "discovery", "persona-agent3"],
+    "tags": ["legal", "forward", "knowledge-provenance", "information-asymmetry", "discovery", "persona-agent3"],
     "author": "timepoint-daedalus",
     "version": "1.0",
-    "description": "PEARL mode litigation with enforced information asymmetry through discovery timeline"
+    "description": "FORWARD mode litigation with enforced information asymmetry through discovery timeline"
   },
   "entities": {
     "count": 4,
@@ -29,7 +29,7 @@
     "after_count": 0
   },
   "temporal": {
-    "mode": "pearl",
+    "mode": "forward",
     "narrative_arc": null,
     "dramatic_tension": 0.6,
     "cycle_length": null,

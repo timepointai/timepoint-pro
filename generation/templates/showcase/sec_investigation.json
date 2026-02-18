@@ -29,7 +29,7 @@
     "after_count": 0
   },
   "temporal": {
-    "mode": "pearl",
+    "mode": "forward",
     "narrative_arc": null,
     "dramatic_tension": 0.7,
     "cycle_length": null,
