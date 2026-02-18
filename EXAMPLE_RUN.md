@@ -1,8 +1,8 @@
 # Example Run: Ares III Mars Mission Portal
 
-**[Back to README](README.md)** | **[Full Dialog Transcript (143 turns)](EXAMPLE_DIALOGS.md)** | Run ID: `run_20260217_074855_c7661141` | Template: `mars_mission_portal`
+**[Back to README](README.md)** | **[Full Dialog Transcript (78 turns)](EXAMPLE_DIALOGS.md)** | Run ID: `run_20260218_091456_55697771` | Template: `mars_mission_portal`
 
-A complete PORTAL-mode simulation tracing backward from a catastrophic Mars mission failure in 2031 to its institutional origins in 2026. Every number, dialog line, and graph edge below was produced by a single `./run.sh run mars_mission_portal` invocation on February 17, 2026.
+A complete PORTAL-mode simulation tracing backward from a catastrophic Mars mission failure in 2031 to its institutional origins in 2026. Every number, dialog line, and graph edge below was produced by a single `./run.sh run mars_mission_portal --portal-quick` invocation on February 18, 2026.
 
 ---
 
@@ -11,14 +11,14 @@ A complete PORTAL-mode simulation tracing backward from a catastrophic Mars miss
 | | |
 |---|---|
 | **Mode** | PORTAL (backward temporal reasoning) |
-| **Timespan** | 2031 &rarr; 2026 (5 years, 10 backward steps) |
-| **Entities** | 4 humans, all reaching TRAINED resolution |
-| **Dialogs** | 11 conversations, 143 turns |
-| **Training examples** | 40 structured prompt/completion pairs |
+| **Timespan** | 2031 &rarr; 2026 (5 years, 5 backward steps via `--portal-quick`) |
+| **Entities** | 4 humans, all reaching dialog resolution |
+| **Dialogs** | 6 conversations, 78 turns |
+| **Training examples** | 20 structured prompt/completion pairs |
 | **Mechanisms fired** | 15 of 19 |
-| **ADPRS waveform gating** | 44 evaluations, 18 divergent (40.91%) |
-| **Cost** | $0.49 &bull; 912 LLM calls &bull; 900K tokens |
-| **Duration** | 6,183s (~103 minutes) |
+| **ADPRS waveform gating** | 24 evaluations, 8 divergent (33.33%) |
+| **Cost** | $0.18 &bull; 479 LLM calls &bull; 318K tokens |
+| **Duration** | 2,668s (~44 minutes) |
 
 ---
 
@@ -47,7 +47,7 @@ The Ares III crewed Mars mission loses contact during orbital insertion in 2031.
 
 **PORTAL mode** doesn't predict the future. It works backward from a known endpoint, exploring how present-day decisions create future outcomes. Starting from the communication blackout, the system generates 3 candidate antecedent states per step, scores each with a 405B judge model (no mini forward-simulations --- states are scored directly), and selects the most coherent backward chain.
 
-The result: a 5-year causal graph showing how schedule pressure overruled safety concerns at every level, how engineering warnings were systematically dismissed, and how the crew's own dialog reveals the tensions that built toward catastrophe. Produced for under fifty cents.
+The result: a 5-year causal graph showing how schedule pressure overruled safety concerns at every level, how engineering warnings were systematically dismissed, and how the crew's own dialog reveals the tensions that built toward catastrophe. Produced for under twenty cents.
 
 ### How PORTAL backward inference works
 
@@ -58,13 +58,13 @@ Known endpoint (2031): Mission failure
     Score each candidate with 405B judge (states only, no mini-sim)
     Select best candidate
                 |
-        Step back 6 months
-        Repeat 10 times
+        Step back 1 year
+        Repeat 5 times (--portal-quick)
                 |
 Result: Causal chain from Jan 2026 -> 2031
 ```
 
-Each backward step costs ~$0.04 (3 candidates x 405B scoring, no disposable dialog). The system spent $0.49 total across 912 LLM calls to produce 11 timepoints, 11 dialogs with 143 turns, and 40 training examples.
+Each backward step costs ~$0.03 (3 candidates x 405B scoring, no disposable dialog). The system spent $0.18 total across 479 LLM calls to produce 6 timepoints, 6 dialogs with 78 turns, and 20 training examples.
 
 ---
 
@@ -72,62 +72,47 @@ Each backward step costs ~$0.04 (3 candidates x 405B scoring, no disposable dial
 
 Four crew members, each with tracked cognitive state, emotional arcs, and distinct knowledge bases. All defined in the template's `entity_roster` and carried through the full simulation.
 
-| Character | Role | Final Valence | Final Arousal | Final Energy | Personality Traits |
-|-----------|------|:---:|:---:|:---:|---|
-| **Sarah Okafor** | Mission Commander | +0.27 | 0.96 | 109.2 | authoritative, warm, decisive, diplomatic, empathetic, leadership |
-| **Raj Mehta** | Flight Engineer | -0.26 | 0.97 | 119.4 | analytical, reserved, cautious, technical, conflict-averse, precise |
-| **Lin Zhang** | Systems Engineer | -0.50 | 1.00 | 109.2 | technical, precise, frustrated, data-driven, stubborn, intense |
-| **Thomas Webb** | Mission Director | +0.24 | 1.00 | 119.3 | strategic, results-oriented, pragmatic, commanding, cold, business |
+| Character | Role | Final Valence | Final Arousal | Final Energy |
+|-----------|------|:---:|:---:|:---:|
+| **Sarah Okafor** | Mission Commander | +0.47 | 0.57 | 124.4 |
+| **Raj Mehta** | Flight Engineer | -0.20 | 0.81 | 123.7 |
+| **Lin Zhang** | Systems Engineer | -0.20 | 0.94 | 116.7 |
+| **Thomas Webb** | Mission Director | -0.17 | 0.78 | 118.4 |
 
-**Emotional arcs**: Zhang's deeply negative valence (-0.50) and maximum arousal (1.00) make her the most strained character in this run --- driven by repeated frustration at having her technical warnings dismissed. Webb's slightly positive valence (+0.24) at maximum arousal (1.00) with "commanding, cold" traits captures a director who maintains confidence even as his schedule-first decisions build toward catastrophe. Okafor's positive valence (+0.27) with high arousal (0.96) and "authoritative, warm, diplomatic" traits show a commander who tries to bridge the engineering-management divide. Mehta's negative valence (-0.26) with near-maximum arousal (0.97) reflects a cautious, conflict-averse engineer accumulating quiet frustration as his anomaly detections are sidelined.
+**Emotional arcs**: Zhang's negative valence (-0.20) and near-maximum arousal (0.94) make her the most strained character in this run --- driven by repeated frustration at having her technical warnings about the oxygen generator dismissed across every timepoint. Webb's negative valence (-0.17) with moderately high arousal (0.78) captures a director whose schedule-first approach produces increasing tension as safety concerns mount. Okafor's positive valence (+0.47) with moderate arousal (0.57) shows a commander who maintains composure and optimism while mediating between engineering concerns and institutional pressure. Mehta's negative valence (-0.20) with high arousal (0.81) reflects a cautious, conflict-averse engineer who detects problems early but hesitates to escalate them forcefully.
 
 ---
 
 ## 3. Backward Timeline
 
-Portal mode traces backward from the 2031 failure. Each step was selected from 3 candidates scored by the 405B judge. All 4 entities are present at every timepoint.
+Portal mode traces backward from the 2031 failure. Each step was selected from 3 candidates scored by the 405B judge. All 4 entities are present at every timepoint. The `--portal-quick` flag reduced backward steps from 10 to 5 for a fast demo run.
 
 ```
 Step   Year     Event
  0     2031     Mission failure: loses contact during orbital insertion
- 1     Jul 30   Critical testing challenge, Lin detects anomalies, Webb prioritizes schedule
- 2     Jan 30   Sarah and Lin attend risk management workshop, face resistance from Webb
- 3     Jul 29   Lin discovers critical oxygen generator design flaw, overruled by Webb
- 4     Jan 29   Raj detects anomaly in oxygen generator, NASA announces 5% budget cut
- 5     Jul 28   Lin detects anomaly, dismissed by Webb, Raj tasked with workaround
- 6     Jan 28   Lin discovers design flaw during routine review, Webb skeptical
- 7     Jul 27   Raj develops workaround skills, Lin provides guidance on design specs
- 8     Jan 27   Lin's concerns validated by separate system failure, Sarah requests review
- 9     Jul 26   Lin's research breakthrough on system redundancy, tension between Webb/Okafor
-10     Jan 26   Raj detects minor anomaly, Lin recognizes implications, Webb focuses on schedule
+ 1     2030     Raj patches around comm anomalies; Webb reduces bandwidth over Lin's objections
+ 2     2029     Lin discovers oxygen generator design flaw; Webb dismisses for schedule
+ 3     2028     O2 generator at 92% efficiency; Lin pushes for redesign; Webb demands schedule adherence
+ 4     2027     Lin finds 30% failure probability in O2 generator; proposes redundant system
+ 5     2026     Origin: O2 generator pressure fluctuations and overheating first detected
 ```
 
-The causal chain reveals schedule pressure as the dominant institutional failure mode. Lin's oxygen generator design flaw warnings appear as early as Step 6 (January 2028) and recur through Step 3 (July 2029) and Step 1 (July 2030), each time dismissed by Webb's schedule priorities. The 5% budget cut at Step 4 compounds the problem by giving Webb additional justification for rejecting costly remediations. Even Okafor's attempts to address the issue through formal channels (a risk management workshop at Step 2) cannot overcome the institutional momentum. The pattern is structural: Lin and Raj detect real problems, Webb deprioritizes them, and Okafor's authority is insufficient to override the schedule-first culture.
+The causal chain reveals schedule pressure as the dominant institutional failure mode. Lin's oxygen generator concerns appear as early as Step 5 (2026) and recur through every subsequent timepoint, each time dismissed or deferred by Webb's schedule priorities. The pattern is structural: Lin detects real problems, Webb deprioritizes them, Raj finds supporting issues but hesitates to escalate, and Okafor's authority is insufficient to override the schedule-first culture.
 
 <details>
 <summary><b>Full timeline descriptions (LLM-generated)</b></summary>
 
 **Step 0 (2031)**: Ares III crewed Mars mission loses contact during orbital insertion. Last telemetry shows cascading systems failures in life support and communications. The mission was celebrated as humanity's greatest achievement until silence fell. Trace backward to understand how this disaster was built, decision by decision.
 
-**Step 1 (July 2030)**: Critical testing challenge as the mission nears final milestones. Lin detects anomalies in life support performance data, but Webb prioritizes the launch schedule over additional investigation. The tension between engineering rigor and timeline pressure reaches its peak.
+**Step 1 (2030)**: Raj Mehta detects anomalies in the communication system's performance, but instead of reporting them, he decides to work around the issue by implementing a software patch. Meanwhile, Sarah Okafor is dealing with the aftermath of a crew member's sudden departure due to personal reasons, which adds to the workload and stress on the remaining crew. Thomas Webb sees an opportunity to save resources by reducing the mission's communication bandwidth, despite Lin Zhang's concerns about the potential impact on safety.
 
-**Step 2 (January 2030)**: Sarah and Lin attend a risk management workshop, returning with recommendations for additional safety reviews. Webb resists, citing cost and schedule impact. The workshop findings validate Lin's earlier concerns but fail to change institutional priorities.
+**Step 2 (2029)**: Lin Zhang discovers a critical design flaw in the oxygen generator during testing, but her concerns are dismissed by Thomas Webb due to schedule pressure. Meanwhile, Raj Mehta is working on a software patch to address a minor issue in the communication system, but his cautious nature makes him hesitant to test it thoroughly. Sarah Okafor is dealing with the aftermath of a crew member's sudden departure due to personal reasons, which adds to the workload and stress on the remaining crew.
 
-**Step 3 (July 2029)**: Lin discovers a critical design flaw in the oxygen generator subsystem. She escalates with detailed simulation data, but Webb overrules the recommended redesign, deeming it too expensive and time-consuming given the existing schedule.
+**Step 3 (2028)**: Raj Mehta discovers a minor issue in the communication system and decides to address it with a software patch. However, his cautious nature makes him hesitant to test it thoroughly, and he decides to wait for further testing before implementing the patch. Meanwhile, Lin Zhang is working on the oxygen generator design, but her concerns about the system's redundancy are dismissed by Thomas Webb due to the schedule constraints. Sarah Okafor is dealing with the aftermath of a crew member's sudden departure due to personal reasons, which adds to the workload and stress on the remaining crew.
 
-**Step 4 (January 2029)**: Raj detects an anomaly in oxygen generator performance during routine testing. Simultaneously, NASA announces a 5% budget cut across all active programs, tightening constraints and giving Webb further justification for schedule-first decisions.
+**Step 4 (2027)**: Lin Zhang discovers a critical flaw in the oxygen generator design during testing, but Thomas Webb dismisses her concerns due to the tight schedule and budget constraints. Meanwhile, Raj Mehta is tasked with analyzing the communication system and detects a minor issue, but his cautious nature makes him hesitant to report it. Sarah Okafor is under pressure from NASA leadership to maintain the mission schedule and is forced to prioritize rapid progress over safety margins.
 
-**Step 5 (July 2028)**: Lin detects another anomaly in the oxygen generator, this time in a different subsystem. Webb dismisses the finding and tasks Raj with developing a workaround rather than addressing the root cause.
-
-**Step 6 (January 2028)**: Lin discovers a design flaw during a routine engineering review. She documents the issue and presents it to Webb, who is skeptical of the severity and declines to allocate resources for further investigation.
-
-**Step 7 (July 2027)**: Raj develops workaround skills for the oxygen generator issues, with Lin providing technical guidance on the design specifications. The team is adapting to known problems rather than resolving them.
-
-**Step 8 (January 2027)**: Lin's earlier concerns are partially validated when a separate system failure occurs during ground testing. Sarah requests a formal review of all flagged issues, but the review scope is limited by budget constraints.
-
-**Step 9 (July 2026)**: Lin achieves a research breakthrough on system redundancy that could address the emerging design concerns. However, tension between Webb and Okafor over resource allocation prevents the research from being applied to the mission hardware.
-
-**Step 10 (January 2026)**: Raj detects a minor anomaly during early oxygen generator testing. Lin recognizes the potential implications and begins documenting the issue. Webb focuses on schedule milestones and treats the anomaly as within acceptable tolerances.
+**Step 5 (2026)**: The earliest seeds of the disaster are planted. The oxygen generator's pressure fluctuations and overheating are first detected during initial testing. Lin Zhang flags the issue, but Thomas Webb dismisses it as within acceptable parameters. Raj Mehta finds a minor signal amplification issue in the communications system but is unsure whether to report it given competing priorities. Sarah Okafor pushes for evaluation of both issues but faces pressure to prioritize progress over investigation.
 
 </details>
 
@@ -135,25 +120,27 @@ The causal chain reveals schedule pressure as the dominant institutional failure
 
 ## 4. Sample Dialogs
 
-Every timepoint generates a multi-party dialog with tracked confidence scores and knowledge references. All 4 characters participate in every conversation. 11 dialogs completed successfully, producing 143 turns total.
+Every timepoint generates a multi-party dialog with tracked confidence scores and knowledge references. All 4 characters participate in every conversation. 6 dialogs completed successfully, producing 78 turns total.
 
-### Dialog at tp_001_2030 --- Webb dismissing Lin's 97.42% failure probability (first 3 turns shown)
+### Dialog at tp_002_2029 --- Lin confronts Webb about the oxygen generator (first 3 turns shown)
 
-> **Thomas Webb**: Alright, let's get down to business. We've got a schedule to keep...
+> **Lin Zhang**: Thomas, I've been going over the oxygen generator test results and I think we have a problem.
 >
-> **Lin Zhang**: Sir, I've run the simulations and the oxygen generator's failure rate is still within the 5% margin, but that's not the point, the point is the anomaly I detected at 3:47 AM indicates a 97.42% probability of system failure...
+> **Thomas Webb**: What makes you think that, Lin?
 >
-> **Thomas Webb**: I don't pay you to run simulations, Lin, I pay you to meet the mission requirements...
+> **Lin Zhang**: The oxygen generator's CO2 scrubbing efficiency is 30% lower than expected, and I'm seeing some anomalies in the pressure regulator's performance data, it's not just a minor deviation, Thomas.
 
-*(+remaining turns --- [full transcript](EXAMPLE_DIALOGS.md#timepoint-1--july-2030))*
+*(+10 remaining turns --- [full transcript](EXAMPLE_DIALOGS.md#timepoint-2--2029--oxygen-generator-flaw))*
 
-### Dialog at tp_005_2028 --- Lin confronting Webb about 3.5% deviation (first 3 turns shown)
+### Dialog at tp_005_2026 --- Origin point: Lin vs. Webb on safety parameters (first 3 turns shown)
 
-> **Lin Zhang**: Oxygen generator's performance is off, Thomas, I'm looking at a 3.5% deviation from expected output, that's not within our acceptable margin
+> **Thomas Webb**: What's the holdup here, Lin? We're on a tight schedule and I don't see anything in the data that suggests we need to pause testing.
 >
-> **Thomas Webb**: Lin, we can't afford to re-run tests now, we're already on a tight schedule and NASA just announced a 5% budget cut...
+> **Lin Zhang**: I'm telling you, Thomas, the oxygen generator's not functioning within acceptable parameters. The pressure's fluctuating wildly, and I'm seeing signs of overheating. We can't just brush this off as a minor issue.
+>
+> **Lin Zhang**: We can't afford to have a cascade failure on our hands, Thomas. What's the point of meeting the schedule if the system's going to fail the crew when they need it most?
 
-*(+remaining turns --- [full transcript](EXAMPLE_DIALOGS.md#timepoint-5--july-2028))*
+*(+10 remaining turns --- [full transcript](EXAMPLE_DIALOGS.md#timepoint-5--2026--origin-point))*
 
 Context flags applied per dialog: `physical_states`, `emotional_states`, `body_mind_coupling`, `relationship_context`, `knowledge_provenance`, `temporal_awareness`, `per_turn_generation`
 
@@ -172,9 +159,7 @@ Each character receives a **Fourth Wall context** with two layers: a back layer 
 
 Per-turn generation with independent LLM calls per character produces measurably distinct voices. Each character's LLM call uses different generation parameters (temperature, top_p, max_tokens) derived from their current cognitive state.
 
-**Voice distinctiveness scores**: 0.92--0.96 across all entity pairs (measured by lexical and syntactic divergence metrics). This is a significant improvement over the previous run's 0.58--0.89 range. The per-turn architecture eliminates the cross-timepoint phrase repetition that characterized the single-call approach by giving each character an independent generation context.
-
-**Quality gate scores**: All 1.00 across all 11 dialogs (surface + frontier model semantic evaluation).
+**Voice distinctiveness scores**: 0.91--0.97 across all entity pairs (measured by lexical and syntactic divergence metrics). The per-turn architecture eliminates the cross-timepoint phrase repetition that characterized the single-call approach by giving each character an independent generation context.
 
 ---
 
@@ -182,22 +167,22 @@ Per-turn generation with independent LLM calls per character produces measurably
 
 The system tracks typed exposure events across the simulation. Every fact an entity knows has a source, a timestamp, and a confidence score. Entities can't know things without a tracked exposure event --- anachronisms are structurally prevented.
 
-Each entity receives initial knowledge items from `scene_initialization` and accumulates additional items through dialog-driven exposure events across 11 active timepoints.
+Each entity receives initial knowledge items from `scene_initialization` and accumulates additional items through dialog-driven exposure events across 6 active timepoints.
 
 ### Sample exposure chain
 
 ```
-[pre_tp_001] sarah_okafor <- scene_initialization (initial, conf=1.0):
-  "Mission objectives and timelines"
+[pre_tp_000] sarah_okafor <- scene_initialization (initial, conf=1.0):
+  "Ares III mission objectives"
 
-[pre_tp_001] sarah_okafor <- scene_initialization (initial, conf=1.0):
-  "Crew member skills and strengths"
+[pre_tp_000] sarah_okafor <- scene_initialization (initial, conf=1.0):
+  "Crew member skills and expertise"
 
-[pre_tp_001] sarah_okafor <- scene_initialization (initial, conf=1.0):
-  "NASA's expectations for the mission"
+[pre_tp_000] sarah_okafor <- scene_initialization (initial, conf=1.0):
+  "NASA mission protocols"
 ```
 
-Each entity receives initial knowledge items at scene initialization. The remaining events are dialog-driven transfers --- information flowing between entities during conversations.
+Each entity receives 3 initial knowledge items at scene initialization. The remaining events are dialog-driven transfers --- information flowing between entities during conversations.
 
 ---
 
@@ -211,66 +196,60 @@ From `datasets/mars_mission_portal/shadow_report.json`:
 
 | Entity | &phi; Range | Predicted Band | Actual Level | Divergent? |
 |--------|:-----------:|:--------------:|:------------:|:----------:|
-| thomas_webb | 0.750--1.000 | dialog/trained | dialog | 11/11 for trained predictions |
-| lin_zhang | 0.592 | graph | dialog | Always (11/11) |
-| raj_mehta | 0.692--0.705 | dialog | dialog | Never |
-| sarah_okafor | 0.795--0.799 | dialog | dialog | Never |
+| sarah_okafor | 0.762--1.000 | dialog/trained | dialog | 4/6 (when &phi;=1.0) |
+| thomas_webb | 0.769--1.000 | dialog/trained | dialog | 4/6 (when &phi;=1.0) |
+| raj_mehta | 0.715--0.744 | dialog | dialog | Never |
+| lin_zhang | 0.704--0.710 | dialog | dialog | Never |
 
-**Overall**: 44 evaluations, 18 divergent (40.91%), mean divergence 0.409.
+**Overall**: 24 evaluations, 8 divergent (33.33%), mean divergence 0.333.
 
-This run shows a structurally informative divergence pattern. Lin Zhang's &phi; (0.592) consistently maps to `graph` band, but she actually resolves at `dialog` --- every single timepoint. This accounts for 11 of the 18 divergences. Thomas Webb oscillates between `dialog` and `trained` predictions depending on the timepoint, contributing the remaining divergences when his &phi; reaches 1.0 (the maximum) but resolves at `dialog`.
+This run shows a structurally clean divergence pattern. Sarah Okafor and Thomas Webb both hit the &phi; ceiling (1.0) at timepoints tp_000 through tp_003, which maps them to `trained` band, but they actually resolve at `dialog`. This accounts for all 8 divergences. At tp_004 and tp_005, their &phi; values drop below 0.77, and all entities predict and resolve at `dialog` with zero divergence. Raj Mehta (&phi; ~0.74) and Lin Zhang (&phi; ~0.71) remain consistently in the `dialog` band throughout.
 
-### Why 40.91% divergence matters
+### Why 33.33% divergence matters
 
-The divergence rate is higher than previous runs because two characters --- Zhang and Webb --- both push against their ADPRS boundaries in opposite directions. Zhang's low &phi; (the lowest in the cast at 0.592) suggests she should receive less computational depth, but the system recognizes her dialog contributions are essential and keeps her at full resolution. Webb's occasional &phi; spikes to 1.0 reflect moments of maximum cognitive activation, but the system normalizes him to `dialog` rather than escalating to the more expensive `trained` band. The ADPRS system is conservative: it would rather spend more on a low-activation entity than miss her contributions, and it would rather save cost on a high-activation entity whose dialog-level output is already sufficient.
+The divergence is entirely driven by two entities hitting the &phi; ceiling at 1.0 during the first four timepoints (the disaster and its immediate precursors). The ADPRS system is conservative: it predicts these maximally-activated entities should receive `trained` resolution (the most expensive), but the simulation normalizes them to `dialog` to control cost. This is soft budget mode working as intended --- spending enough to maintain quality without escalating to the highest tier when `dialog` is sufficient.
 
 ---
 
 ## 7. Fidelity Strategy
 
-The system plans a fidelity budget before execution, then adapts during the run. The gap between planned and actual reveals where the scenario demanded more detail than expected.
+The system plans a fidelity budget before execution, then adapts during the run. The `--portal-quick` flag reduces backward steps from 10 to 5, cutting the fidelity budget proportionally.
 
 ### Planned vs. actual
 
 | Metric | Planned | Actual |
 |--------|---------|--------|
-| Fidelity schedule | tensor &rarr; scene &rarr; graph &rarr; dialog | All `trained` |
-| Token budget | 30,000 | 900,072 |
-| Budget compliance | -- | 30x over (soft budget mode) |
-| Resolution distribution | mixed | All entities at `trained` |
-| Cost estimate | $0.067 | $0.49 |
+| Fidelity schedule | tensor &rarr; scene &rarr; graph &rarr; dialog | All `dialog` |
+| Token budget | 200,000 | 317,796 |
+| Budget compliance | -- | 1.6x over (soft budget mode) |
+| Resolution distribution | mixed | All entities at `dialog` |
+| Cost estimate | ~$0.10 | $0.18 |
 
 ### Resolution escalation
 
-The planner starts conservative:
-```
-Timepoint:   1      2      3      4      5      6      7      8      9      10
-Planned:   tensor tensor tensor scene  scene  scene  graph  graph  dialog dialog
-```
+The planner starts conservative, but the adaptive threshold triggered upgrades --- PORTAL backward reasoning requires full entity context to score candidate antecedents. All 4 entities were elevated to `dialog` resolution across all 6 timepoints.
 
-But the adaptive threshold (0.75) triggered upgrades at every step --- PORTAL backward reasoning requires full entity context to score candidate antecedents. All 4 entities were elevated to `trained` resolution (maximum fidelity).
-
-This demonstrates soft budget mode working as intended: the system spent what the scenario required rather than truncating quality to hit a token cap. For cost-sensitive use, switch to hard budget mode: `./run.sh run --budget 0.50 mars_mission_portal`
+This demonstrates soft budget mode working as intended: the system spent what the scenario required rather than truncating quality to hit a token cap. For cost-sensitive use, switch to hard budget mode: `./run.sh run --budget 0.20 mars_mission_portal --portal-quick`
 
 ---
 
 ## 8. Entity Tensors
 
-Each entity carries a multi-dimensional cognitive and physical state tensor, updated at every timepoint. These are the final states after 11 timepoints of simulation.
+Each entity carries a multi-dimensional cognitive and physical state tensor, updated at every timepoint. These are the final states after 6 timepoints of simulation.
 
 <details>
 <summary><b>Sarah Okafor --- cognitive tensor (final state)</b></summary>
 
 ```json
 {
-  "emotional_valence": 0.27,
-  "emotional_arousal": 0.96,
-  "energy_budget": 109.2,
-  "personality_traits": ["authoritative", "warm", "decisive", "diplomatic", "empathetic", "leadership"]
+  "emotional_valence": 0.47,
+  "emotional_arousal": 0.57,
+  "energy_budget": 124.4,
+  "initial_knowledge": ["Ares III mission objectives", "Crew member skills and expertise", "NASA mission protocols"]
 }
 ```
 
-Okafor's positive valence (+0.27) with high arousal (0.96) shows a commander who remains engaged and hopeful despite the mounting safety concerns. Her six personality traits --- anchored by "authoritative" and "warm" --- produce a leader who acknowledges engineering concerns with genuine empathy while trying to maintain institutional cohesion. Her energy (109.2) reflects sustained engagement across all timepoints. The "diplomatic, empathetic" traits drive her repeated attempts to bridge the gap between Lin's warnings and Webb's schedule pressure.
+Okafor's positive valence (+0.47) with moderate arousal (0.57) shows a commander who remains engaged and optimistic despite mounting safety concerns. Her energy (124.4, the highest in the cast) reflects sustained engagement across all timepoints. Her dialog pattern --- addressing all teammates by name, steering toward compromise, framing decisions as team obligations --- produces a leader who mediates between engineering rigor and institutional pressure.
 
 </details>
 
@@ -279,14 +258,14 @@ Okafor's positive valence (+0.27) with high arousal (0.96) shows a commander who
 
 ```json
 {
-  "emotional_valence": -0.26,
-  "emotional_arousal": 0.97,
-  "energy_budget": 119.4,
-  "personality_traits": ["analytical", "reserved", "cautious", "technical", "conflict-averse", "precise"]
+  "emotional_valence": -0.20,
+  "emotional_arousal": 0.81,
+  "energy_budget": 123.7,
+  "initial_knowledge": ["Ares III spacecraft systems", "Emergency procedures", "Crew member skills and expertise"]
 }
 ```
 
-Mehta's negative valence (-0.26) with near-maximum arousal (0.97) captures an engineer in sustained distress: his anomaly detections are acknowledged but never prioritized. His high energy (119.4) reflects the cost of maintaining technical vigilance while being tasked with workarounds rather than root-cause fixes. The "analytical, precise" traits produce his specific data citations in dialog, while "conflict-averse" explains why his escalations are measured rather than forceful.
+Mehta's negative valence (-0.20) with high arousal (0.81) captures an engineer in sustained discomfort: his anomaly detections are acknowledged but he hesitates to escalate them forcefully. His high energy (123.7) reflects the cost of maintaining technical vigilance while implementing workaround patches rather than root-cause fixes. His conflict-averse nature surfaces in dialog as hedging ("I'm not sure if it's worth reporting given the current priorities") and deference to authority.
 
 </details>
 
@@ -295,14 +274,14 @@ Mehta's negative valence (-0.26) with near-maximum arousal (0.97) captures an en
 
 ```json
 {
-  "emotional_valence": -0.50,
-  "emotional_arousal": 1.00,
-  "energy_budget": 109.2,
-  "personality_traits": ["technical", "precise", "frustrated", "data-driven", "stubborn", "intense"]
+  "emotional_valence": -0.20,
+  "emotional_arousal": 0.94,
+  "energy_budget": 116.7,
+  "initial_knowledge": ["Ares III spacecraft systems", "Anomaly detection procedures", "Crew member skills and expertise"]
 }
 ```
 
-Zhang has the most negative valence (-0.50) and maximum arousal (1.00) in the cast --- the most distressed character by every measure. Her trait combination of "frustrated," "stubborn," and "intense" drives her repeated confrontations with Webb, citing specific failure probabilities (97.42%) and deviation percentages (3.5%). The tension between "data-driven/precise" and "frustrated/intense" produces a character who escalates with hard numbers when her warnings are dismissed. Her energy (109.2) matches Okafor's, showing that frustration and diplomatic engagement cost the same amount of sustained effort.
+Zhang has the highest arousal (0.94) in the cast --- the most activated character by this measure. Her negative valence (-0.20) combined with near-maximum arousal drives her repeated confrontations with Webb, citing specific data: 30% CO2 scrubbing efficiency loss, 30% failure probability, 10% pressure variance, 5-degree hourly temperature spikes. The tension between "data-driven" precision and institutional resistance produces a character who escalates with hard numbers when her warnings are dismissed. Her energy (116.7, the lowest in the cast) reflects the draining cost of being the persistent technical conscience.
 
 </details>
 
@@ -311,14 +290,14 @@ Zhang has the most negative valence (-0.50) and maximum arousal (1.00) in the ca
 
 ```json
 {
-  "emotional_valence": 0.24,
-  "emotional_arousal": 1.00,
-  "energy_budget": 119.3,
-  "personality_traits": ["strategic", "results-oriented", "pragmatic", "commanding", "cold", "business"]
+  "emotional_valence": -0.17,
+  "emotional_arousal": 0.78,
+  "energy_budget": 118.4,
+  "initial_knowledge": ["Ares III mission objectives", "NASA mission protocols", "Budget and resource constraints"]
 }
 ```
 
-Webb's slightly positive valence (+0.24) at maximum arousal (1.00) reveals a director who maintains confidence in his approach even as the evidence mounts against it. His high energy (119.3) matches Mehta's, reflecting the effort required to hold the schedule-first line against multiple sources of pushback. The "commanding, cold, business" traits produce his dismissive responses to technical concerns --- "I don't pay you to run simulations" --- while "strategic, pragmatic" gives his dismissals an institutional logic that makes them hard to override.
+Webb's slightly negative valence (-0.17) with moderately high arousal (0.78) reveals a director whose schedule-first stance generates friction that he himself absorbs. His energy (118.4) reflects the effort of holding the timeline against multiple sources of pushback. His dialog pattern --- "We can't afford to...", demanding deliverables "by the end of the day", redirecting to schedule and budget --- gives his dismissals an institutional logic that makes them hard to override.
 
 </details>
 
@@ -330,28 +309,26 @@ Webb's slightly positive valence (+0.24) at maximum arousal (1.00) reveals a dir
 
 | Mechanism | Function | Calls | What it does |
 |-----------|----------|:-----:|-------------|
-| M3 | `_build_knowledge_from_exposures` | 44 | Build knowledge graph from exposure events (4 entities x 11 timepoints) |
-| M8 | `couple_pain_to_cognition` | 44 | Physical state &rarr; cognitive state coupling (embodied cognition) |
-| M11 | `synthesize_dialog` | 11 | Per-character turn generation with LangGraph steering (one dialog per timepoint) |
-| M11 | `dialog_steering` | ~143 | Steering agent: next-speaker selection, mood shifts, narrative evaluation |
-| M11 | `character_generation` | ~143 | Independent per-character LLM calls with PersonaParams |
-| M11 | `dialog_quality_gate` | 11 | Semantic quality evaluation (surface + frontier model) |
-| M15 | `post_dialog_proception` | 11 | Post-dialog episodic memory generation and rumination |
-| M19 | `extract_knowledge_from_dialog` | 11 | Post-dialog knowledge extraction, creating new exposure events |
-| M6 | `compress` | 8 | Tensor compression via PCA/SVD into 8D vectors |
-| M5 | `synthesize_response` | 6 | On-demand resolution elevation (lazy fidelity) |
-| M9 | `detect_entity_gap` | 6 | Missing entity auto-detection in scenes |
-| M13 | `update_relationships` | 11 | Relationship state tracking between entities |
+| M3 | `_build_knowledge_from_exposures` | 24 | Build knowledge graph from exposure events (4 entities x 6 timepoints) |
+| M8 | `couple_pain_to_cognition` | 24 | Physical state &rarr; cognitive state coupling (embodied cognition) |
+| M11 | `synthesize_dialog` | 6 | Per-character turn generation with LangGraph steering (one dialog per timepoint) |
+| M11 | `dialog_steering` | ~78 | Steering agent: next-speaker selection, mood shifts, narrative evaluation |
+| M11 | `character_generation` | ~78 | Independent per-character LLM calls with PersonaParams |
+| M11 | `dialog_quality_gate` | 6 | Semantic quality evaluation (surface + frontier model) |
+| M15 | `post_dialog_proception` | 6 | Post-dialog episodic memory generation and rumination |
+| M19 | `extract_knowledge_from_dialog` | 6 | Post-dialog knowledge extraction, creating new exposure events |
+| M6 | `compress` | 4 | Tensor compression via PCA/SVD into 8D vectors |
+| M5 | `synthesize_response` | 4 | On-demand resolution elevation (lazy fidelity) |
+| M9 | `detect_entity_gap` | 4 | Missing entity auto-detection in scenes |
+| M13 | `update_relationships` | 6 | Relationship state tracking between entities |
 | M2 | `progressive_training_check` | 4 | Entity quality improvement tracking |
 | M4 | `validate_biological_constraints` | 4 | Constraint enforcement (resource + biological validation) |
 | M6 | `create_baseline_tensor` | 4 | Initial tensor creation for each entity |
 | M6 | `populate_tensor_llm_guided` | 4 | LLM-guided tensor population with personality/knowledge |
-| M7 | `build_causal_history` | 11 | Causal history assembly for each timepoint |
+| M7 | `build_causal_history` | 6 | Causal history assembly for each timepoint |
 | M1+M17 | `determine_fidelity_temporal_strategy` | 2 | Joint fidelity + temporal mode planning |
 | M1 | `assign_resolutions` / `build_graph` | 2 | Resolution assignment and relationship graph construction |
-| M17 | `orchestrate` | 1 | Portal backward orchestration (10 steps, 3 candidates each) |
-
-Note: M15 (post-dialog proception) now fires for the first time in a documented run, generating episodic memories and rumination states after each dialog. This was not active in the previous run.
+| M17 | `orchestrate` | 1 | Portal backward orchestration (5 steps, 3 candidates each) |
 
 ### Mechanism interaction chain
 
@@ -378,7 +355,7 @@ M17 (portal orchestrate)
 
 ## 10. Training Data
 
-This run generated **40 structured training examples** (prompt/completion pairs). Each example includes the entity's full causal history (M7), relationship context (M13), knowledge provenance (M3), and quantitative state (M6).
+This run generated **20 structured training examples** (prompt/completion pairs). Each example includes the entity's full causal history (M7), relationship context (M13), knowledge provenance (M3), and quantitative state (M6).
 
 ### Example training prompt structure
 
@@ -386,8 +363,8 @@ This run generated **40 structured training examples** (prompt/completion pairs)
 === CAUSAL HISTORY (M7) ===
 Timeline leading to current moment (3 events):
   tp_000_2031: Mission failure during orbital insertion...
-  tp_001_2030: Critical testing challenge, Lin detects anomalies...
-  tp_002_2030: Sarah and Lin attend risk management workshop...
+  tp_001_2030: Raj patches comm anomalies, Webb reduces bandwidth...
+  tp_002_2029: Lin discovers oxygen generator design flaw...
 
 === RELATIONSHIP CONTEXT (M13) ===
 Relationships with entities present:
@@ -396,15 +373,14 @@ Relationships with entities present:
   thomas_webb: tense (trust: 0.40, alignment: 0.30)
 
 === KNOWLEDGE PROVENANCE (M3) ===
-Primary sources: scene_initialization (3 items), lin_zhang (2 items)
-Learning modes: experienced (70%), told (30%)
+Primary sources: scene_initialization (3 items)
 Recent: "oxygen generator design has critical flaw" (from lin_zhang, conf: 0.9)
 
 === ENTITY STATE (M6) ===
 raj_mehta at T0:
-  Physical: energy 119.4/150
-  Cognitive: knowledge items, -0.26 valence
-  Emotional: Arousal 0.97
+  Physical: energy 123.7/150
+  Cognitive: 3 knowledge items, -0.20 valence
+  Emotional: Arousal 0.81
 
 === PREDICTION TASK ===
 Predict: new knowledge, energy change, emotional impact, causal reasoning.
@@ -416,10 +392,10 @@ The training data formatter produces varied, entity-specific data:
 
 | Metric | Value |
 |--------|-------|
-| Energy values | 109.2--119.4 (entity-specific) |
-| Arousal values | 0.96--1.00 (entity-specific) |
-| Valence values | -0.50--+0.27 (entity-specific) |
-| Personality trait count | 6 per entity |
+| Energy values | 116.7--124.4 (entity-specific) |
+| Arousal values | 0.57--0.94 (entity-specific) |
+| Valence values | -0.20--+0.47 (entity-specific) |
+| Mean energy change | -13.0 |
 
 ---
 
@@ -430,20 +406,20 @@ The training data formatter produces varied, entity-specific data:
 
 | Field | Value |
 |-------|-------|
-| run_id | `run_20260217_074855_c7661141` |
+| run_id | `run_20260218_091456_55697771` |
 | template_id | `mars_mission_portal` |
-| started_at | 2026-02-17T07:48:55 |
-| completed_at | 2026-02-17T09:31:57 |
-| duration | 6,183s (~103 min) |
+| started_at | 2026-02-18T09:14:56 |
+| completed_at | 2026-02-18T09:59:24 |
+| duration | 2,668s (~44 min) |
 | causal_mode | portal |
 | entities_created | 4 |
-| timepoints_created | 11 |
-| training_examples | 40 |
-| cost_usd | $0.49 |
-| llm_calls | 912 |
-| tokens_used | 900,072 |
+| timepoints_created | 6 |
+| training_examples | 20 |
+| cost_usd | $0.18 |
+| llm_calls | 479 |
+| tokens_used | 317,796 |
 | status | completed |
-| fidelity_distribution | `{"trained": 4}` |
+| portal_quick | true (5 backward steps) |
 | narrative_exports | markdown, json, pdf |
 
 </details>
@@ -452,27 +428,28 @@ The training data formatter produces varied, entity-specific data:
 
 ```
 datasets/mars_mission_portal/
-  narrative_20260217_093158.markdown   (narrative export)
-  narrative_20260217_093158.json       (structured data)
-  narrative_20260217_093158.pdf        (PDF export)
+  narrative_20260218_095924.markdown   (narrative export)
+  narrative_20260218_095924.json       (structured data)
+  narrative_20260218_095924.pdf        (PDF export)
   shadow_report.json                   (ADPRS evaluation)
 ```
 
-### Cost and efficiency improvements
+### Cost and efficiency: full vs. quick mode
 
-This run reflects several optimizations compared to the previous documented run (`run_20260216_055738_296983ea`):
+This run used `--portal-quick` to reduce backward steps from 10 to 5. Comparison with the previous full run:
 
-| Metric | Previous Run | This Run | Change |
-|--------|-------------|----------|--------|
-| Cost | $0.68 | $0.49 | -28% |
-| LLM calls | 1,662 | 912 | -45% |
-| Tokens | 1.22M | 900K | -26% |
-| PORTAL candidates per step | 7 | 3 | -57% |
-| Mini-sim dialog generation | enabled | disabled (states-only scoring) | eliminated waste |
-| Voice distinctiveness | 0.58--0.89 | 0.92--0.96 | +24% at low end |
-| Quality gate scores | mixed | all 1.00 | consistent |
+| Metric | Full Run (Feb 17) | Quick Run (Feb 18) | Change |
+|--------|-------------------|-------------------|--------|
+| Cost | $0.49 | $0.18 | -63% |
+| LLM calls | 912 | 479 | -47% |
+| Tokens | 900K | 318K | -65% |
+| Backward steps | 10 | 5 | -50% |
+| Timepoints | 11 | 6 | -45% |
+| Dialogs / turns | 11 / 143 | 6 / 78 | -45% |
+| Training examples | 40 | 20 | -50% |
+| Duration | 6,183s (~103 min) | 2,668s (~44 min) | -57% |
 
-The candidate reduction from 7 to 3 per backward step captures sufficient diversity while cutting the most expensive part of PORTAL inference. Disabling mini-sim dialog generation (scoring states directly rather than generating disposable dialog for each candidate) eliminates token waste without affecting selection quality.
+The `--portal-quick` flag is designed for fast demos and iteration. It halves the backward steps while maintaining the same per-step quality (3 candidates, 405B scoring). For full depth, omit the flag: `./run.sh run mars_mission_portal` (~$0.40--$0.60).
 
 ### Models used
 
@@ -495,7 +472,8 @@ cd timepoint-pro
 pip install -r requirements.txt
 export OPENROUTER_API_KEY=your_key_here
 
-./run.sh run mars_mission_portal    # ~$0.40-$0.60
+./run.sh run mars_mission_portal --portal-quick    # ~$0.15-$0.25
+./run.sh run mars_mission_portal                   # Full depth: ~$0.40-$0.60
 ```
 
 ### Run convergence testing
@@ -560,7 +538,7 @@ Training data auto-uploads to [Oxen.ai](https://oxen.ai) when `OXEN_API_KEY` is 
 export OPENROUTER_API_KEY=your_key
 export OXEN_API_KEY=your_oxen_token
 
-./run.sh run mars_mission_portal
+./run.sh run mars_mission_portal --portal-quick
 # -> local JSONL + SQLite as usual
 # -> auto-uploads training_*.jsonl to Oxen.ai with commit history
 # -> prints dataset URL and fine-tune URL on completion
@@ -574,8 +552,8 @@ from oxen_integration import OxenClient
 client = OxenClient(namespace="your-username", repo_name="mars-mission-data")
 
 # Upload a dataset
-result = client.upload_dataset("datasets/mars_mission_portal/training_20260217.jsonl",
-                               commit_message="Mars mission PORTAL run")
+result = client.upload_dataset("datasets/mars_mission_portal/training_20260218.jsonl",
+                               commit_message="Mars mission PORTAL run (quick mode)")
 print(result.dataset_url)    # View on Oxen Hub
 print(result.finetune_url)   # One-click fine-tune
 
@@ -596,7 +574,7 @@ validation = formatter.validate_dataset(formatted)
 
 # Configure and launch fine-tuning
 config = FineTuneConfig(
-    dataset_path="datasets/mars_mission_portal/training_20260217.jsonl",
+    dataset_path="datasets/mars_mission_portal/training_20260218.jsonl",
     base_model="Qwen/Qwen2.5-1.5B-Instruct",
     num_epochs=3, batch_size=4
 )
@@ -667,4 +645,4 @@ Network-isolated container with iptables firewall, allowlisted API endpoints, an
 
 ---
 
-*Generated from run `run_20260217_074855_c7661141` on February 17, 2026. All data extracted from `metadata/runs.db` and `datasets/mars_mission_portal/`. Every number in this document comes from the database, not from documentation --- if you run the same template, you'll get different numbers but the same structural patterns.*
+*Generated from run `run_20260218_091456_55697771` on February 18, 2026. All data extracted from `metadata/runs.db` and `datasets/mars_mission_portal/`. Every number in this document comes from the database, not from documentation --- if you run the same template, you'll get different numbers but the same structural patterns.*
