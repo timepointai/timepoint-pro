@@ -1,5 +1,5 @@
 """
-Timepoint-Daedalus Simulation Monitor
+Timepoint-Pro Simulation Monitor
 
 Real-time monitoring and LLM-powered explanation system for simulation runs.
 """

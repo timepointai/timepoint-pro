@@ -1,5 +1,5 @@
 """
-Workflows package for Timepoint-Daedalus
+Workflows package for Timepoint-Pro
 
 Provides complete E2E workflow orchestration.
 """

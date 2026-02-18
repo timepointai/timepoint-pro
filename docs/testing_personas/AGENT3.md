@@ -70,7 +70,7 @@
 
 ---
 
-## Relationship with Timepoint Daedalus
+## Relationship with Timepoint Pro
 
 **What first attracted him:** The synthetic training data section of the README. He has been looking for this exact thing for eighteen months. The key paragraph was: "training data where every example carries its full causal ancestry." His current training data pipeline generates prompt/completion pairs using GPT-4 and Claude, and the quality is decent for simple legal reasoning tasks but terrible for anything involving temporal dynamics, information asymmetry, or causal reasoning. The idea that he could generate training examples where entity knowledge is structurally enforced --- where a plaintiff's attorney literally cannot know about evidence that has not been disclosed in discovery --- would solve his biggest data quality problem.
 

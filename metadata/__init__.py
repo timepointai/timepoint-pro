@@ -1,5 +1,5 @@
 """
-Metadata tracking system for Timepoint-Daedalus
+Metadata tracking system for Timepoint-Pro
 
 Provides:
 - Run tracking and metadata storage

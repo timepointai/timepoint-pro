@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# run.sh - Timepoint Daedalus Command Center
+# run.sh - Timepoint Pro Command Center
 #
 # The single entry point for all simulation operations.
 # Supports running simulations, viewing results, managing data, and API operations.
@@ -65,7 +65,7 @@ check_env() {
 
 show_main_help() {
     cat << 'EOF'
-Timepoint Daedalus Command Center
+Timepoint Pro Command Center
 
 USAGE:
     ./run.sh <command> [options]
@@ -136,7 +136,7 @@ EOF
 show_full_help() {
     cat << 'EOF'
 ================================================================================
-TIMEPOINT DAEDALUS - FULL DOCUMENTATION
+TIMEPOINT PRO - FULL DOCUMENTATION
 ================================================================================
 
 COMMANDS
@@ -1870,7 +1870,7 @@ cmd_doctor() {
 # ============================================================================
 
 cmd_info() {
-    print_header "Timepoint Daedalus Info"
+    print_header "Timepoint Pro Info"
 
     echo "Version:     1.0.0 (SynthasAIzer)"
     echo "Python:      $($PYTHON --version 2>&1)"

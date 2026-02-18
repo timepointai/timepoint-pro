@@ -1,4 +1,4 @@
-# SynthasAIzer: A Control Paradigm for Timepoint-Daedalus
+# SynthasAIzer: A Control Paradigm for Timepoint-Pro
 
 **Version**: 1.0
 **Status**: Phase 1-3 Implemented, Phase 4 Planned
@@ -116,7 +116,7 @@ decision = scheduler.schedule("entity_1", t_ms=5000)
 
 ## Philosophy
 
-Timepoint-Daedalus and analog synthesizers solve the same fundamental problem: **steering complex, concurrent, time-evolving systems through intuitive controls**.
+Timepoint-Pro and analog synthesizers solve the same fundamental problem: **steering complex, concurrent, time-evolving systems through intuitive controls**.
 
 This document specifies the "SynthasAIzer" paradigm—a control layer that borrows synthesizer interface patterns without claiming mathematical equivalence. We use the metaphor where it fits naturally and stop where it would require forcing.
 
@@ -475,7 +475,7 @@ Templates become "patches"—named presets with additional metadata for the synt
     "name": "Boardroom Brass",
     "category": "corporate",
     "tags": ["conflict", "decision", "multi-entity"],
-    "author": "timepoint-daedalus",
+    "author": "timepoint-pro",
     "version": "1.0",
     "description": "High-tension executive dynamics with competing agendas"
   },
@@ -757,7 +757,7 @@ Add patch metadata to make templates discoverable:
     "name": "Castaway Colony",
     "category": "scifi",
     "tags": ["alien-planet", "survival", "branching", "knowledge-provenance", "full-mechanism-coverage", "showcase"],
-    "author": "timepoint-daedalus",
+    "author": "timepoint-pro",
     "version": "1.0",
     "description": "Full-mechanism showcase: crash-landed crew on alien planet with branching survival strategies"
   }

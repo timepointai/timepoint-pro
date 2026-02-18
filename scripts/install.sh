@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Installation script for timepoint-daedalus
+# Installation script for timepoint-pro
 # Handles grpcio build issues on macOS
 
-echo "🚀 Installing timepoint-daedalus dependencies..."
+echo "🚀 Installing timepoint-pro dependencies..."
 
 # Check if Poetry is installed
 if command -v poetry &> /dev/null; then

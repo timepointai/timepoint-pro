@@ -406,7 +406,7 @@ Provide ONLY a number from 0-100 as your response."""
 
 class TimepointEvaluator:
     """
-    Specialized evaluator for Timepoint-Daedalus simulation quality.
+    Specialized evaluator for Timepoint-Pro simulation quality.
 
     Evaluates models on their ability to generate realistic temporal simulations.
     """

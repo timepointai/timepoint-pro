@@ -1,4 +1,4 @@
-# Testing Requirements for Timepoint-Daedalus
+# Testing Requirements for Timepoint-Pro
 # Install with: pip install -r requirements-test.txt
 
 # Core pytest

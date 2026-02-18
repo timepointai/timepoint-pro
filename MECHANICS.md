@@ -1,4 +1,4 @@
-# MECHANICS.md — Timepoint-Daedalus Technical Architecture
+# MECHANICS.md — Timepoint-Pro Technical Architecture
 
 **A temporal simulation framework where fidelity follows attention, knowledge has provenance, and time has modes.**
 
@@ -25,7 +25,7 @@ Traditional approaches assume uniform fidelity—every entity at every moment re
 
 ## The Architectural Insight
 
-Timepoint-Daedalus treats **fidelity as a query-driven 2D surface** over (entity, timepoint) space. Resolution is heterogeneous and mutable: a minor attendee exists as a 200-token tensor embedding until someone asks about them, at which point the system elevates their resolution while preserving causal consistency with everything already established.
+Timepoint-Pro treats **fidelity as a query-driven 2D surface** over (entity, timepoint) space. Resolution is heterogeneous and mutable: a minor attendee exists as a 200-token tensor embedding until someone asks about them, at which point the system elevates their resolution while preserving causal consistency with everything already established.
 
 This enables 95% cost reduction without temporal incoherence—but only because the system maintains explicit causal structure (exposure events, temporal chains, validation constraints) that compression-based approaches discard.
 

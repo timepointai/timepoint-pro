@@ -1,5 +1,5 @@
 """
-Training data formatters for Timepoint-Daedalus fine-tuning.
+Training data formatters for Timepoint-Pro fine-tuning.
 
 Converts simulation outputs into prompt/completion pairs for various training objectives.
 """
