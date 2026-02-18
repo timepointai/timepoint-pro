@@ -289,6 +289,13 @@ class GraphStore:
             # Delete in order to respect foreign keys
             session.exec(text("DELETE FROM queryhistory"))
             session.exec(text("DELETE FROM exposureevent"))
+            session.exec(text("DELETE FROM dialog"))
+            session.exec(text("DELETE FROM relationshiptrajectory"))
+            session.exec(text("DELETE FROM prospectivestate"))
+            session.exec(text("DELETE FROM convergenceset"))
+            session.exec(text("DELETE FROM environmententity"))
+            session.exec(text("DELETE FROM atmosphereentity"))
+            session.exec(text("DELETE FROM crowdentity"))
             session.exec(text("DELETE FROM entity"))
             session.exec(text("DELETE FROM timepoint"))
             session.exec(text("DELETE FROM timeline"))

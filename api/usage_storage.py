@@ -224,7 +224,7 @@ class UsageDatabase:
         with self._transaction() as conn:
             conn.execute(
                 """
-                INSERT INTO usage_records
+                INSERT OR IGNORE INTO usage_records
                 (user_id, period, api_calls, tokens_used, cost_usd,
                  simulations_run, simulations_completed, simulations_failed,
                  created_at, updated_at)
