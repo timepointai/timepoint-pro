@@ -33,15 +33,9 @@ export OPENROUTER_API_KEY="your_key_here"
 
 **Important**: The API key must be on a **single line** with no line breaks. If you see "Illegal header value" errors, check that your key doesn't have embedded newlines.
 
-### Docker Sandbox (Optional)
+### Dev Container (Optional)
 
-Run in an isolated container with network restrictions:
-
-```bash
-./claude-container.sh up          # Launch containerized Claude Code
-```
-
-The container mounts the project directory read-write but restricts network access to approved API endpoints via iptables. Dependencies are installed automatically via `poetry install` on first boot.
+For an isolated development environment, open the repo in VS Code or GitHub Codespaces — the `.devcontainer/` configuration handles setup automatically.
 
 ## Examples
 
