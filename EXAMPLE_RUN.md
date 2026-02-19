@@ -634,14 +634,9 @@ instructions = launcher.launch_via_notebook(job)
 ./run.sh run --nl "CEO announces mandatory salary cuts due to market downturn"
 ```
 
-### Docker sandbox
+### Dev Container
 
-```bash
-./claude-container.sh up       # Build + start + launch Claude Code in sandbox
-./claude-container.sh shell    # Interactive shell
-```
-
-Network-isolated container with iptables firewall, allowlisted API endpoints, and `.env` injection.
+For an isolated development environment, open the repo in VS Code or GitHub Codespaces — the `.devcontainer/` configuration handles setup automatically.
 
 ---
 
