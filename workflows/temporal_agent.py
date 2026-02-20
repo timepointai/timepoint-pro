@@ -731,7 +731,24 @@ class TemporalAgent:
             # Generate meaningful progression description instead of concatenating
             iteration = context.get("iteration", 0)
             total = context.get("total", 1)
-            event_description = f"Timepoint {iteration + 1}/{total}: Events continue to unfold"
+
+            # Phase 1: Incorporate prior dialog summary if available
+            prior_dialog = context.get("prior_dialog_summary", "")
+            entity_states = context.get("entity_states_post_dialog", {})
+
+            if prior_dialog and self.llm_client:
+                # Use dialog outcome to inform event generation
+                dialog_context = f"\nPrevious conversation context: {prior_dialog}"
+                if entity_states:
+                    state_summary = ", ".join(
+                        f"{eid}: {info.get('final_tone', 'neutral')}"
+                        for eid, info in list(entity_states.items())[:4]
+                    )
+                    dialog_context += f"\nEntity emotional states: {state_summary}"
+
+                event_description = f"Timepoint {iteration + 1}/{total}: Events develop following recent discussions.{dialog_context}"
+            else:
+                event_description = f"Timepoint {iteration + 1}/{total}: Events continue to unfold"
 
         # M1 → M17: Determine resolution level from fidelity strategy
         # This connects fidelity decisions to generation granularity

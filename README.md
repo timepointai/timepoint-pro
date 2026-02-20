@@ -84,5 +84,9 @@ Outputs: JSONL/SQLite for ML, markdown/Fountain for humans, Oxen.ai auto-upload 
 - [SYNTH.md](SYNTH.md) --- synthesizer paradigm details
 - [QUICKSTART.md](QUICKSTART.md) --- full setup
 
+## Author
+
+**Sean McDonald** ([@seanmcdonaldxyz](https://x.com/seanmcdonaldxyz) · [realityinspector](https://github.com/realityinspector))
+
 License: Apache 2.0
 Models: fully permissive open weights for training data; commercial frontier models for coding, mostly documented in git commit history.

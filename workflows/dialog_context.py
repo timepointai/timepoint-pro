@@ -41,6 +41,10 @@ class BackLayerContext:
     steering_directives: List[str] = field(default_factory=list)
     true_emotional_state: Dict[str, float] = field(default_factory=dict)
     anxiety_level: float = 0.0
+    # Phase 2: Character arc summary
+    character_arc_summary: str = ""
+    # Phase 4: Rhetorical profile from archetype
+    rhetorical_profile: Dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -368,6 +372,58 @@ def _describe_physical_state(physical: 'PhysicalTensor') -> str:
 
 
 # ============================================================================
+# Information Asymmetry (Phase 3)
+# ============================================================================
+
+def _compute_information_asymmetry(
+    fourth_wall_contexts: Dict[str, 'FourthWallContext'],
+) -> Dict[str, List[str]]:
+    """
+    Compare withheld_knowledge across entities to find exclusive items.
+
+    Returns dict mapping entity_id -> list of knowledge items that ONLY
+    this entity holds (others don't have it in their front layer knowledge).
+    """
+    asymmetry = {}
+
+    # Build per-entity withheld knowledge sets
+    entity_withheld = {}
+    for eid, ctx in fourth_wall_contexts.items():
+        withheld = ctx.back_layer.withheld_knowledge if hasattr(ctx, 'back_layer') else []
+        entity_withheld[eid] = [
+            w.get("content", str(w)) if isinstance(w, dict) else str(w)
+            for w in withheld
+        ]
+
+    # Build per-entity known content (from front layer knowledge items)
+    entity_known = {}
+    for eid, ctx in fourth_wall_contexts.items():
+        known = ctx.front_layer.knowledge_items if hasattr(ctx, 'front_layer') else []
+        entity_known[eid] = set(
+            k.get("content", "")[:60].lower() for k in known if isinstance(k, dict)
+        )
+
+    # For each entity, find withheld items that no other entity knows
+    for eid, withheld_items in entity_withheld.items():
+        exclusive = []
+        other_known = set()
+        for other_eid, known_set in entity_known.items():
+            if other_eid != eid:
+                other_known.update(known_set)
+
+        for item in withheld_items:
+            item_lower = item[:60].lower()
+            # Check if this item is NOT known by others
+            if not any(item_lower in k for k in other_known):
+                exclusive.append(item)
+
+        if exclusive:
+            asymmetry[eid] = exclusive
+
+    return asymmetry
+
+
+# ============================================================================
 # Main Builder
 # ============================================================================
 
@@ -518,6 +574,24 @@ def build_fourth_wall_context(
     if proception_state:
         anxiety = proception_state.anxiety_level
 
+    # Phase 2: Character arc summary
+    character_arc_summary = ""
+    try:
+        from workflows.dialog_synthesis import _get_character_arc_for_context
+        character_arc_summary = _get_character_arc_for_context(entity)
+    except (ImportError, Exception):
+        pass
+
+    # Phase 4: Rhetorical profile from archetype
+    rhetorical_profile = {}
+    try:
+        from workflows.dialog_archetypes import ARCHETYPE_RHETORICAL_PROFILES
+        archetype_id = entity.entity_metadata.get("archetype_id", "")
+        if archetype_id and archetype_id in ARCHETYPE_RHETORICAL_PROFILES:
+            rhetorical_profile = ARCHETYPE_RHETORICAL_PROFILES[archetype_id]
+    except (ImportError, Exception):
+        pass
+
     back_layer = BackLayerContext(
         context_vector_summary={},
         behavior_vector_summary=behavior_summary,
@@ -533,6 +607,8 @@ def build_fourth_wall_context(
             "energy": coupled_cognitive.energy_budget,
         },
         anxiety_level=anxiety,
+        character_arc_summary=character_arc_summary,
+        rhetorical_profile=rhetorical_profile,
     )
 
     # --- Front Layer ---
@@ -617,6 +693,22 @@ def format_context_for_prompt(
             parts.append(f"Steering directives:")
             for sd in bl.steering_directives:
                 parts.append(f"  - {sd}")
+
+        # Phase 2: Character arc
+        if bl.character_arc_summary:
+            parts.append(f"Character arc (informs how you approach this conversation):")
+            parts.append(f"  {bl.character_arc_summary}")
+
+        # Phase 4: Rhetorical profile
+        if bl.rhetorical_profile:
+            parts.append("RHETORICAL PROFILE:")
+            for key, val in bl.rhetorical_profile.items():
+                if key == "never_does":
+                    parts.append(f"  NEVER: {', '.join(val) if isinstance(val, list) else val}")
+                elif key == "signature_moves":
+                    parts.append(f"  Signature moves: {', '.join(val) if isinstance(val, list) else val}")
+                else:
+                    parts.append(f"  {key}: {val}")
 
     fl = fourth_wall.front_layer
     parts.append("")
