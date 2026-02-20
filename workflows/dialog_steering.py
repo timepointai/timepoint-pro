@@ -188,14 +188,30 @@ def evaluate_full_run_coherence(
     all_dialog_summaries: List[str],
     llm: 'LLMClient',
     model: Optional[str] = None,
+    character_arcs: Optional[Dict[str, Dict[str, Any]]] = None,
+    all_turns: Optional[List[List[Dict[str, Any]]]] = None,
 ) -> Dict[str, Any]:
     """
     Full-run coherence check. Called once after all dialogs.
 
     Does the complete chain tell a coherent story?
+    Includes Phase 6 evaluation metrics when character_arcs are available.
     """
+    result = {}
+
+    # Phase 6: Compute tactic evolution score
+    if character_arcs:
+        result["tactic_evolution_score"] = _compute_tactic_evolution_score(character_arcs)
+        result["information_asymmetry_utilization_score"] = _compute_info_asymmetry_utilization_score(
+            character_arcs, all_turns or []
+        )
+        result["subtext_density_score"] = _compute_subtext_density_score(
+            all_turns or [], character_arcs
+        )
+
     if not all_dialog_summaries:
-        return {"coherent": True, "score": 1.0, "notes": "no_dialogs"}
+        result.update({"coherent": True, "score": 1.0, "notes": "no_dialogs"})
+        return result
 
     summaries_text = "\n".join(
         f"  {i+1}. {s}" for i, s in enumerate(all_dialog_summaries)
@@ -220,11 +236,125 @@ Return JSON: {{"coherent": bool, "score": float, "character_consistency": float,
             call_type="dialog_quality_semantic",
         )
         if response.success:
-            return json.loads(response.content)
+            result.update(json.loads(response.content))
+            return result
     except Exception as e:
         logger.warning(f"Full-run coherence check failed: {e}")
 
-    return {"coherent": True, "score": 0.5, "notes": "evaluation_failed"}
+    result.update({"coherent": True, "score": 0.5, "notes": "evaluation_failed"})
+    return result
+
+
+# ============================================================================
+# Phase 6: Dialog Quality Evaluation Metrics
+# ============================================================================
+
+def _compute_tactic_evolution_score(
+    character_arcs: Dict[str, Dict[str, Any]],
+) -> float:
+    """
+    Tactic Evolution Score (0.0-1.0).
+
+    Compares dialog_attempts[i].tactic_used across timepoints per entity.
+    0.0 = same tactic every time. 1.0 = clear evolution with variety.
+    """
+    if not character_arcs:
+        return 0.0
+
+    entity_scores = []
+    for eid, arc in character_arcs.items():
+        attempts = arc.get("dialog_attempts", [])
+        if len(attempts) < 2:
+            continue
+
+        tactics = [a.get("tactic_used", "") for a in attempts]
+        unique_tactics = set(tactics)
+
+        # Score based on variety and transitions
+        variety = len(unique_tactics) / max(len(tactics), 1)
+
+        # Count tactic transitions (changes between consecutive attempts)
+        transitions = sum(1 for i in range(1, len(tactics)) if tactics[i] != tactics[i-1])
+        transition_rate = transitions / max(len(tactics) - 1, 1)
+
+        entity_scores.append(min(1.0, (variety + transition_rate) / 2))
+
+    if not entity_scores:
+        return 0.0
+
+    return round(sum(entity_scores) / len(entity_scores), 3)
+
+
+def _compute_info_asymmetry_utilization_score(
+    character_arcs: Dict[str, Dict[str, Any]],
+    all_turns: List[List[Dict[str, Any]]],
+) -> float:
+    """
+    Information Asymmetry Utilization Score (0.0-1.0).
+
+    Checks whether entities with unspoken_accumulation produced dialog turns
+    that show strategic behavior (non-direct_statement moves).
+    """
+    if not character_arcs or not all_turns:
+        return 0.0
+
+    entities_with_info = 0
+    entities_utilizing = 0
+
+    for eid, arc in character_arcs.items():
+        unspoken = arc.get("unspoken_accumulation", [])
+        if not unspoken:
+            continue
+
+        entities_with_info += 1
+
+        # Check if this entity used strategic moves
+        strategic_moves = 0
+        total_moves = 0
+        for dialog_turns in all_turns:
+            for turn in dialog_turns:
+                if turn.get("speaker") == eid:
+                    total_moves += 1
+                    move = turn.get("dialog_move", "direct_statement")
+                    if move in ("strategic_question", "partial_disclosure", "deflection"):
+                        strategic_moves += 1
+
+        if total_moves > 0 and strategic_moves / total_moves > 0.15:
+            entities_utilizing += 1
+
+    if entities_with_info == 0:
+        return 0.5  # No info asymmetry to utilize
+
+    return round(entities_utilizing / entities_with_info, 3)
+
+
+def _compute_subtext_density_score(
+    all_turns: List[List[Dict[str, Any]]],
+    character_arcs: Dict[str, Dict[str, Any]],
+) -> float:
+    """
+    Subtext Density Score (0.0-1.0).
+
+    Percentage of turns assigned non-direct_statement dialog moves.
+    Target: >= 30% for any character with unspoken_accumulation urgency > 0.4.
+    """
+    if not all_turns:
+        return 0.0
+
+    total_turns = 0
+    non_direct_turns = 0
+
+    for dialog_turns in all_turns:
+        for turn in dialog_turns:
+            total_turns += 1
+            move = turn.get("dialog_move", "direct_statement")
+            if move != "direct_statement":
+                non_direct_turns += 1
+
+    if total_turns == 0:
+        return 0.0
+
+    return round(non_direct_turns / total_turns, 3)
 
 
 # ============================================================================
@@ -234,10 +364,11 @@ Return JSON: {{"coherent": bool, "score": float, "character_consistency": float,
 @track_mechanism("M11", "dialog_steering")
 def steering_node(state: 'DialogState') -> 'DialogState':
     """
-    Selects next speaker, evaluates narrative, injects mood shifts.
+    Strategic dialog director modeling organizational power dynamics.
 
-    Uses configurable model (defaults to 405B for quality).
-    Characters can choose not to speak — steering decides.
+    Selects next speaker AND assigns a dialog_move that shapes how
+    the character's turn is generated. Models information asymmetry,
+    tactic history, and strategic intents.
     """
     state = dict(state)  # Mutable copy
     llm = state.get("llm")
@@ -271,9 +402,56 @@ def steering_node(state: 'DialogState') -> 'DialogState':
         if lines:
             proception_text = "\nCharacter anxiety levels:\n" + "\n".join(lines)
 
+    # Phase 3: Strategic intents from character arcs
+    strategic_intents_text = ""
+    character_arcs = state.get("character_arcs", {})
+    if character_arcs:
+        intent_lines = []
+        for eid, arc in character_arcs.items():
+            unspoken = arc.get("unspoken_accumulation", [])
+            urgent = [u for u in unspoken if u.get("urgency", 0) > 0.4]
+            failures = [a for a in arc.get("dialog_attempts", []) if a.get("outcome") in ("dismissed", "ignored")]
+            if urgent or failures:
+                line = f"  {eid}:"
+                if urgent:
+                    line += f" wants to say: {urgent[0].get('content', '?')[:60]} (urgency: {urgent[0].get('urgency', 0):.1f})"
+                if failures:
+                    last_fail = failures[-1]
+                    line += f" | last failed: {last_fail.get('tactic_used', '?')} → {last_fail.get('outcome', '?')}"
+                intent_lines.append(line)
+        if intent_lines:
+            strategic_intents_text = "\nSTRATEGIC INTENTS:\n" + "\n".join(intent_lines)
+
+    # Phase 3: Information asymmetry
+    info_asymmetry_text = ""
+    info_asymmetry = state.get("information_asymmetry", {})
+    if info_asymmetry:
+        asym_lines = []
+        for eid, exclusive_items in info_asymmetry.items():
+            if exclusive_items:
+                asym_lines.append(f"  {eid} exclusively knows: {exclusive_items[0][:60]}")
+        if asym_lines:
+            info_asymmetry_text = "\nINFORMATION ASYMMETRY (who knows what others don't):\n" + "\n".join(asym_lines[:5])
+
+    # Phase 3: Tactic history
+    tactic_history_text = ""
+    if character_arcs:
+        tactic_lines = []
+        for eid, arc in character_arcs.items():
+            attempts = arc.get("dialog_attempts", [])[-5:]
+            if attempts:
+                summary = ", ".join(f"{a.get('tactic_used', '?')}→{a.get('outcome', '?')}" for a in attempts)
+                tactic_lines.append(f"  {eid}: {summary}")
+        if tactic_lines:
+            tactic_history_text = "\nTACTIC HISTORY:\n" + "\n".join(tactic_lines)
+
     system_prompt = (
-        "You are a dialog steering agent. You decide who speaks next, "
-        "whether to escalate or de-escalate tension, and when to end the dialog. "
+        "You are a strategic dialog director modeling realistic organizational power dynamics. "
+        "Characters with power dismiss concerns because they can. "
+        "Characters without power find indirect routes to influence. "
+        "Information advantage creates behavioral differences. "
+        "When a tactic fails, characters change tactics — or double down and pay for it. "
+        "Your job: create realistic strategic interaction, not balanced turn-taking. "
         "Return ONLY valid JSON."
     )
 
@@ -285,13 +463,18 @@ NARRATIVE GOALS:
 {goals_text or '  (none)'}
 CURRENT MOOD: {mood_register}
 {proception_text}
+{strategic_intents_text}
+{info_asymmetry_text}
+{tactic_history_text}
 
 Decide the next action. Return JSON:
 {{
   "next_speaker": "entity_id" or null (if ending),
+  "dialog_move": "direct_statement" | "deflection" | "strategic_question" | "alliance_signal" | "silence" | "partial_disclosure" | "status_move" | "humor",
+  "move_target": "entity_id or null",
+  "move_rationale": "why this move at this moment",
   "mood_shift": "escalate" | "de-escalate" | "maintain",
-  "narrative_notes": "hint for next speaker about what to say/do",
-  "suppress_speaker": ["entity_ids to skip"],
+  "suppress_speaker": [],
   "end_dialog": false,
   "end_reason": null
 }}
@@ -300,7 +483,10 @@ Rules:
 - Don't use round-robin order. Some characters speak multiple times in a row.
 - If narrative goals are all done and tension has resolved, end the dialog.
 - If turn count exceeds {state.get('max_turns', 12)}, strongly consider ending.
-- Characters with high anxiety should speak more urgently."""
+- Characters with high anxiety should speak more urgently.
+- Use "silence" to skip a character's turn but record a suppressed impulse.
+- If a character's tactic was just dismissed, choose a DIFFERENT move for them.
+- Characters with exclusive information should use it strategically (partial_disclosure, strategic_question)."""
 
     steering_model = state.get("steering_model")
 
@@ -310,7 +496,7 @@ Rules:
                 system=system_prompt,
                 user=user_prompt,
                 temperature=0.3,
-                max_tokens=200,
+                max_tokens=300,
                 model=steering_model,
                 call_type="dialog_steering",
             )
@@ -320,6 +506,25 @@ Rules:
 
                 # Apply steering decision
                 state["current_speaker"] = decision.get("next_speaker")
+
+                # Phase 3: Store steering directive for character_node
+                dialog_move = decision.get("dialog_move", "direct_statement")
+                move_target = decision.get("move_target")
+                state["steering_directive_for_turn"] = {
+                    "dialog_move": dialog_move,
+                    "move_target": move_target,
+                    "move_rationale": decision.get("move_rationale", ""),
+                }
+
+                # Handle silence move: skip turn but record suppressed impulse
+                if dialog_move == "silence" and state["current_speaker"]:
+                    speaker = state["current_speaker"]
+                    suppressed.setdefault(speaker, []).append(
+                        f"chose_silence_turn_{len(turns)}"
+                    )
+                    state["suppressed_impulses"] = suppressed
+                    # Don't set current_speaker to None — let character_node handle it
+                    # by checking the directive
 
                 # Update mood
                 mood_shift = decision.get("mood_shift", "maintain")
@@ -341,6 +546,7 @@ Rules:
 
                 logger.info(
                     f"[Steering] Next: {state['current_speaker']}, "
+                    f"move: {dialog_move}, target: {move_target}, "
                     f"mood: {mood_shift}, end: {decision.get('end_dialog')}"
                 )
 
@@ -348,7 +554,13 @@ Rules:
     except Exception as e:
         logger.warning(f"Steering agent failed: {e}. Using fallback round-robin.")
 
-    # Fallback: simple next-speaker logic
+    # Fallback: simple next-speaker logic with default direct_statement
+    state["steering_directive_for_turn"] = {
+        "dialog_move": "direct_statement",
+        "move_target": None,
+        "move_rationale": "fallback",
+    }
+
     if turns and active_speakers:
         last_speaker = turns[-1].get("speaker")
         # Pick someone who didn't speak last
@@ -373,8 +585,8 @@ def character_node(state: 'DialogState') -> 'DialogState':
     """
     Generates ONE dialog turn for current_speaker.
 
-    Uses character-specific PersonaParams and FourthWallContext.
-    Independent LLM call with per-character model params.
+    Uses character-specific PersonaParams, FourthWallContext, and
+    the steering directive (dialog_move) to shape the turn.
     """
     state = dict(state)
     llm = state.get("llm")
@@ -382,6 +594,20 @@ def character_node(state: 'DialogState') -> 'DialogState':
     turns = state.get("turns", [])
 
     if not current_speaker or not llm:
+        return state
+
+    # Phase 3: Handle silence move — record suppressed impulse, no dialog line
+    directive = state.get("steering_directive_for_turn", {})
+    dialog_move = directive.get("dialog_move", "direct_statement")
+
+    if dialog_move == "silence":
+        # Record that the character chose silence
+        suppressed = state.get("suppressed_impulses", {})
+        suppressed.setdefault(current_speaker, []).append(
+            f"silence_at_turn_{len(turns)}"
+        )
+        state["suppressed_impulses"] = suppressed
+        logger.info(f"[Character] {current_speaker}: *silence* (suppressed)")
         return state
 
     # Get character context
@@ -412,12 +638,54 @@ def character_node(state: 'DialogState') -> 'DialogState':
     # Steering notes
     mood = state.get("mood_register", "neutral")
 
+    # Phase 3: Build dialog move instruction
+    move_target = directive.get("move_target", "")
+    move_instruction = _get_move_instruction(dialog_move, move_target)
+
+    # Phase 4: Build subtext from back layer
+    subtext_lines = []
+    if hasattr(ctx, 'back_layer'):
+        bl = ctx.back_layer
+        if directive.get("move_rationale"):
+            subtext_lines.append(f"- Steering directive: {dialog_move} targeting {move_target or 'general'}")
+        if bl.withheld_knowledge:
+            wk_summary = "; ".join(w.get("content", str(w))[:50] for w in bl.withheld_knowledge[:2])
+            subtext_lines.append(f"- What you're concealing: {wk_summary}")
+        if bl.character_arc_summary:
+            subtext_lines.append(f"- Arc context: {bl.character_arc_summary}")
+
+    subtext_block = ""
+    if subtext_lines:
+        subtext_block = "\n\nSUBTEXT (shapes your words — do NOT state any of this directly):\n" + "\n".join(subtext_lines)
+
+    # Phase 4: Rhetorical profile
+    rhetorical_block = ""
+    if hasattr(ctx, 'back_layer') and ctx.back_layer.rhetorical_profile:
+        rp = ctx.back_layer.rhetorical_profile
+        rp_lines = []
+        for key, val in rp.items():
+            if key == "never_does":
+                rp_lines.append(f"  NEVER: {', '.join(val) if isinstance(val, list) else val}")
+            elif key == "signature_moves":
+                rp_lines.append(f"  Signature: {', '.join(val) if isinstance(val, list) else val}")
+            else:
+                rp_lines.append(f"  {key}: {val}")
+        rhetorical_block = "\n\nRHETORICAL PROFILE:\n" + "\n".join(rp_lines)
+
     system_prompt = (
         f"You are {current_speaker} in a conversation. "
         f"Speak in character using the voice guide below. "
         f"Generate ONLY the dialog line — no stage directions, no speaker label, "
         f"no quotes around the text. Just the words the character says."
+        f"{subtext_block}"
+        f"{rhetorical_block}"
     )
+
+    if rhetorical_block:
+        system_prompt += (
+            "\n\nYour line MUST match your rhetorical profile AND execute the steering directive. "
+            "Express subtext through FRAMING, WORD CHOICE, and WHAT YOU CHOOSE NOT TO SAY."
+        )
 
     user_prompt = f"""{context_text}
 
@@ -426,6 +694,7 @@ CONVERSATION SO FAR:
 
 MOOD: {mood}
 TURN POSITION: {state.get('turn_count', 0)} of {state.get('max_turns', 12)}
+{move_instruction}
 
 Generate {current_speaker}'s next line of dialog. Keep it natural and in-character.
 The response must be ONLY the dialog text, nothing else.
@@ -458,19 +727,47 @@ Return JSON: {{"content": "dialog line", "emotional_tone": "tone", "knowledge_re
                     "top_p": params.top_p,
                     "max_tokens": params.max_tokens,
                 },
+                # Phase 3: Track the dialog move used
+                "dialog_move": dialog_move,
+                "move_target": move_target,
             }
             turns.append(new_turn)
             state["turns"] = turns
             state["turn_count"] = len(turns)
 
             logger.info(
-                f"[Character] {current_speaker} (turn {len(turns)}): "
+                f"[Character] {current_speaker} (turn {len(turns)}, move={dialog_move}): "
                 f"{content[:80]}..."
             )
     except Exception as e:
         logger.warning(f"Character generation failed for {current_speaker}: {e}")
 
     return state
+
+
+# ============================================================================
+# Dialog Move Instructions (Phase 3)
+# ============================================================================
+
+_MOVE_INSTRUCTIONS = {
+    "direct_statement": "",
+    "deflection": "MOVE: Avoid answering the direct question. Redirect to a related but different topic.",
+    "strategic_question": "MOVE: Ask a question you already know the answer to, to force {target} to commit publicly.",
+    "alliance_signal": "MOVE: Signal agreement with {target}'s position to build coalition against others.",
+    "partial_disclosure": "MOVE: Hint at what you know without fully revealing it. Leave {target} uncertain about how much you know.",
+    "status_move": "MOVE: Assert authority through framing, not content. Assign an action item or deadline.",
+    "humor": "MOVE: Use humor to defuse or to mask genuine concern. The joke should reveal something true.",
+}
+
+
+def _get_move_instruction(dialog_move: str, move_target: str = "") -> str:
+    """Get the behavioral instruction text for a dialog move."""
+    instruction = _MOVE_INSTRUCTIONS.get(dialog_move, "")
+    if instruction and move_target:
+        instruction = instruction.replace("{target}", move_target)
+    elif instruction:
+        instruction = instruction.replace("{target}", "the other speaker")
+    return instruction
 
 
 @track_mechanism("M11", "dialog_quality_gate")

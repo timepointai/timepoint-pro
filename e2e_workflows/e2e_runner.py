@@ -838,17 +838,71 @@ class FullE2EWorkflowRunner:
                 self._persist_all_entities_for_convergence(trained_entities, run_id)
 
                 # Step 4.5: Synthesize dialogs (M11)
-                # Phase 2 ADPRS: Initialize trajectory tracker before dialog synthesis
-                try:
-                    from synth.trajectory_tracker import TrajectoryTracker
-                    self._trajectory_tracker = TrajectoryTracker()
-                except ImportError:
-                    self._trajectory_tracker = None
+                # Phase 1: Skip if inline dialog already completed (FORWARD mode)
+                if scene_result.get("dialog_inline_complete"):
+                    print("\nStep 4.5: Skipping post-hoc dialog synthesis (dialog_inline_complete=True)")
+                else:
+                    # Phase 2 ADPRS: Initialize trajectory tracker before dialog synthesis
+                    try:
+                        from synth.trajectory_tracker import TrajectoryTracker
+                        self._trajectory_tracker = TrajectoryTracker()
+                    except ImportError:
+                        self._trajectory_tracker = None
 
-                self._synthesize_dialogs(
-                    trained_entities, all_timepoints, scene_result, run_id,
-                    config=config
-                )
+                    self._synthesize_dialogs(
+                        trained_entities, all_timepoints, scene_result, run_id,
+                        config=config
+                    )
+
+                # Step 4.5a: Phase 6 - Full-run dialog evaluation metrics
+                try:
+                    from workflows.dialog_steering import evaluate_full_run_coherence
+                    llm = scene_result["llm_client"]
+
+                    # Collect character arcs and dialog turns for evaluation
+                    character_arcs = {}
+                    all_dialog_turns = []
+                    for entity in trained_entities:
+                        arc = entity.entity_metadata.get("character_arc")
+                        if arc:
+                            character_arcs[entity.entity_id] = arc
+
+                    # Collect dialog summaries from store
+                    store = scene_result["store"]
+                    dialog_summaries = []
+                    for tp in all_timepoints:
+                        try:
+                            dialogs = store.get_dialogs_for_timepoint(tp.timepoint_id)
+                            for d in (dialogs or []):
+                                turns = json.loads(d.turns) if isinstance(d.turns, str) else (d.turns or [])
+                                all_dialog_turns.append(turns)
+                                speakers = list(set(t.get("speaker", "?") for t in turns))
+                                dialog_summaries.append(
+                                    f"{tp.timepoint_id}: {', '.join(speakers[:3])} - {len(turns)} turns"
+                                )
+                        except Exception:
+                            pass
+
+                    if character_arcs:
+                        eval_result = evaluate_full_run_coherence(
+                            all_dialog_summaries=dialog_summaries,
+                            llm=llm,
+                            character_arcs=character_arcs,
+                            all_turns=all_dialog_turns,
+                        )
+                        print(f"\n  [Dialog Evaluation Metrics]")
+                        if "tactic_evolution_score" in eval_result:
+                            print(f"    Tactic Evolution: {eval_result['tactic_evolution_score']:.3f}")
+                        if "information_asymmetry_utilization_score" in eval_result:
+                            print(f"    Info Asymmetry Utilization: {eval_result['information_asymmetry_utilization_score']:.3f}")
+                        if "subtext_density_score" in eval_result:
+                            print(f"    Subtext Density: {eval_result['subtext_density_score']:.3f}")
+                        if "score" in eval_result:
+                            print(f"    Overall Coherence: {eval_result['score']}")
+
+                        scene_result["dialog_evaluation_metrics"] = eval_result
+                except Exception as eval_err:
+                    print(f"  ⚠️  Dialog evaluation metrics failed: {eval_err}")
 
                 # Step 4.5b: Fit ADPRS envelopes from observed trajectories (Phase 2)
                 self._fit_adprs_envelopes(
@@ -1703,6 +1757,191 @@ class FullE2EWorkflowRunner:
                 print("  Falling back to single-layer training")
                 return [entities]  # Fallback: all entities in one layer
 
+    # ============================================================================
+    # Phase 1: Inline Dialog Infrastructure
+    # ============================================================================
+
+    def _seed_entity_tensors(self, entities: List[Entity], scene_result: Dict) -> None:
+        """
+        Ensure every entity has physical_tensor and cognitive_tensor in entity_metadata
+        BEFORE the inline dialog loop starts.
+
+        _initialize_baseline_tensors() only creates TTM tensors; the physical_tensor/
+        cognitive_tensor dicts that synthesize_dialog() requires are normally populated by
+        _train_entities() (Step 4). This seeds minimal values to break that dependency.
+        """
+        from schemas import PhysicalTensor, CognitiveTensor
+
+        for entity in entities:
+            # Seed physical_tensor if missing
+            if not entity.entity_metadata.get("physical_tensor"):
+                age = entity.entity_metadata.get("age", 35.0)
+                if isinstance(age, str):
+                    try:
+                        age = float(age)
+                    except (ValueError, TypeError):
+                        age = 35.0
+
+                physical = PhysicalTensor(
+                    age=age,
+                    health_status=1.0,
+                    pain_level=0.0,
+                    pain_location=None,
+                    fever=36.5,
+                    mobility=1.0,
+                    stamina=1.0,
+                    sensory_acuity={"vision": 1.0, "hearing": 1.0},
+                    location=None,
+                )
+                entity.entity_metadata["physical_tensor"] = physical.model_dump()
+
+            # Seed cognitive_tensor if missing
+            if not entity.entity_metadata.get("cognitive_tensor"):
+                cognitive = CognitiveTensor(
+                    knowledge_state=[],
+                    emotional_valence=0.0,
+                    emotional_arousal=0.2,
+                    energy_budget=100.0,
+                    decision_confidence=0.8,
+                    patience_threshold=50.0,
+                    risk_tolerance=0.5,
+                    social_engagement=0.8,
+                )
+                entity.entity_metadata["cognitive_tensor"] = cognitive.model_dump()
+
+        print(f"  [Tensor Seeding] Seeded physical/cognitive tensors for {len(entities)} entities")
+
+    def _run_incremental_andos(
+        self, entity: Entity, timepoint: Timepoint, scene_result: Dict
+    ) -> None:
+        """
+        Run a single-entity incremental ANDOS training pass using the current
+        timepoint's context. Gives each entity progressively better tensors as
+        the inline loop advances.
+        """
+        llm = scene_result["llm_client"]
+        store = scene_result["store"]
+        graph = scene_result.get("graph")
+
+        try:
+            # Only run if entity needs LLM population
+            if entity.entity_metadata.get("needs_llm_population", False):
+                from tensor_initialization import populate_tensor_llm_guided
+                import base64
+                refined_tensor, maturity = populate_tensor_llm_guided(
+                    entity, timepoint, graph, llm
+                )
+                entity.tensor = json.dumps({
+                    "context_vector": base64.b64encode(refined_tensor.context_vector).decode('utf-8'),
+                    "biology_vector": base64.b64encode(refined_tensor.biology_vector).decode('utf-8'),
+                    "behavior_vector": base64.b64encode(refined_tensor.behavior_vector).decode('utf-8')
+                })
+                entity.entity_metadata["needs_llm_population"] = False
+                entity.tensor_maturity = maturity
+                store.save_entity(entity)
+        except Exception as e:
+            logger.debug(f"Incremental ANDOS for {entity.entity_id}: {e}")
+
+    def _run_inline_dialog(
+        self,
+        timepoint: Timepoint,
+        entities: List[Entity],
+        scene_result: Dict,
+        run_id: str,
+        prior_dialog_beats: List[str],
+        timepoint_idx: int,
+        config: 'SimulationConfig',
+    ) -> tuple:
+        """
+        Run dialog synthesis for a single timepoint during the inline loop.
+
+        Returns:
+            (dialog_or_none, updated_beats, dialog_outcome_context_or_none)
+        """
+        from workflows.dialog_synthesis import (
+            synthesize_dialog, _extract_dialog_outcome,
+            DialogOutcomeContext, _update_character_arc,
+        )
+
+        llm = scene_result["llm_client"]
+        store = scene_result["store"]
+
+        if len(entities) < 2:
+            return None, prior_dialog_beats, None
+
+        # Select dialog participants (up to 4)
+        import random
+        num_participants = min(4, len(entities))
+        dialog_participants = random.sample(entities, num_participants)
+
+        # Build timeline context
+        all_timepoints = scene_result.get("all_timepoints_so_far", [])
+        timeline = [
+            {
+                "event_description": tp.event_description,
+                "timestamp": tp.timestamp.isoformat() if hasattr(tp.timestamp, 'isoformat') else str(tp.timestamp),
+            }
+            for tp in all_timepoints
+        ]
+
+        # Get animism_level
+        animism_level = 0
+        if config and hasattr(config, 'entities') and hasattr(config.entities, 'animism_level'):
+            animism_level = config.entities.animism_level
+
+        # QSE resource state
+        qse_state = None
+        if hasattr(self, '_qse') and self._qse and self._qse.is_active:
+            qse_state = self._qse.get_state_summary()
+
+        try:
+            dialog = synthesize_dialog(
+                dialog_participants,
+                timepoint,
+                timeline,
+                llm,
+                store,
+                run_id=run_id,
+                animism_level=animism_level,
+                prior_dialog_beats=prior_dialog_beats if prior_dialog_beats else None,
+                qse_state=qse_state,
+                voice_mixer=getattr(self, '_voice_mixer', None),
+                use_per_turn=getattr(self, '_use_per_turn_dialog', True),
+                steering_model=getattr(self, '_steering_model', None),
+            )
+
+            # Save dialog to store
+            store.save_dialog(dialog)
+
+            # Accumulate beats
+            new_beats = self._extract_dialog_beats(dialog)
+            prior_dialog_beats = list(prior_dialog_beats) + new_beats
+            prior_dialog_beats = prior_dialog_beats[-10:]
+
+            # Phase 2: Update character arcs
+            try:
+                turns = json.loads(dialog.turns) if isinstance(dialog.turns, str) else dialog.turns
+                other_entities = entities
+                for entity in dialog_participants:
+                    _update_character_arc(entity, turns, other_entities, timepoint.timepoint_id)
+                    store.save_entity(entity)
+            except Exception as arc_err:
+                logger.debug(f"Character arc update failed: {arc_err}")
+
+            # Extract dialog outcome for next timepoint
+            outcome = _extract_dialog_outcome(dialog, dialog_participants, timepoint)
+
+            # Record trajectory snapshots
+            if hasattr(self, '_trajectory_tracker') and self._trajectory_tracker is not None:
+                for entity in dialog_participants:
+                    self._trajectory_tracker.record_snapshot(entity, timepoint, timepoint_idx)
+
+            return dialog, prior_dialog_beats, outcome
+
+        except Exception as e:
+            logger.warning(f"Inline dialog failed for {timepoint.timepoint_id}: {e}")
+            return None, prior_dialog_beats, None
+
     def _generate_all_timepoints(
         self, scene_result: Dict, config: SimulationConfig, run_id: str
     ) -> List[Timepoint]:
@@ -1896,12 +2135,23 @@ class FullE2EWorkflowRunner:
                 self._shadow_evaluate_all_timepoints(all_timepoints, scene_result)
                 return all_timepoints
 
-            # FORWARD MODE: Original forward generation logic
+            # FORWARD MODE: Integrated generation + inline dialog loop
             all_timepoints = [initial_timepoint]
             current_timepoint = initial_timepoint
+            entities = scene_result["entities"]
 
             # CONVERGENCE FIX: Persist initial timepoint to shared DB
             self._persist_timepoint_for_convergence(initial_timepoint, run_id)
+
+            # Phase 1: Seed entity tensors for inline dialog
+            self._seed_entity_tensors(entities, scene_result)
+
+            # Phase 1: Initialize trajectory tracker early for inline dialog
+            try:
+                from synth.trajectory_tracker import TrajectoryTracker
+                self._trajectory_tracker = TrajectoryTracker()
+            except ImportError:
+                self._trajectory_tracker = None
 
             # January 2026: Extract directorial mode info for rich event descriptions
             is_directorial = config.temporal.mode == TemporalMode.DIRECTORIAL
@@ -1910,7 +2160,13 @@ class FullE2EWorkflowRunner:
             scenario_desc = config.scenario_description
             narrative_beats = config.metadata.get('narrative_beats', []) if config.metadata else []
 
-            # Generate remaining timepoints
+            # Phase 1: Inline dialog state
+            prior_dialog_beats: List[str] = []
+            last_dialog_outcome = None
+            scene_result["all_timepoints_so_far"] = all_timepoints
+            inline_dialogs_created = 0
+
+            # Generate remaining timepoints with inline dialog
             target_count = config.timepoints.count
             for i in range(1, target_count):
                 print(f"  Generating timepoint {i+1}/{target_count}...")
@@ -1929,13 +2185,20 @@ class FullE2EWorkflowRunner:
                             narrative_beats=narrative_beats,
                             dramatic_tension=dramatic_tension,
                             previous_event=current_timepoint.event_description,
-                            entities=[e.entity_id for e in scene_result["entities"]]
+                            entities=[e.entity_id for e in entities]
                         )
                         context["next_event"] = event_desc
 
                     # Inject quantitative state into context for LLM
                     if hasattr(self, '_qse') and self._qse and self._qse.is_active:
                         context["resource_state"] = self._qse.get_state_summary()
+
+                    # Phase 1: Inject dialog outcome from previous timepoint
+                    if last_dialog_outcome:
+                        context["prior_dialog_summary"] = last_dialog_outcome.summary
+                        context["entity_states_post_dialog"] = {
+                            eid: delta for eid, delta in last_dialog_outcome.emotional_deltas.items()
+                        }
 
                     next_timepoint = temporal_agent.generate_next_timepoint(
                         current_timepoint,
@@ -1964,20 +2227,43 @@ class FullE2EWorkflowRunner:
                     self._persist_timepoint_for_convergence(next_timepoint, run_id)
 
                     all_timepoints.append(next_timepoint)
+                    scene_result["all_timepoints_so_far"] = all_timepoints
                     current_timepoint = next_timepoint
+
+                    # Phase 1: Run incremental ANDOS for each entity at this timepoint
+                    for entity in entities:
+                        self._run_incremental_andos(entity, next_timepoint, scene_result)
+
+                    # Phase 1: Run inline dialog for this timepoint
+                    dialog, prior_dialog_beats, outcome = self._run_inline_dialog(
+                        timepoint=next_timepoint,
+                        entities=entities,
+                        scene_result=scene_result,
+                        run_id=run_id,
+                        prior_dialog_beats=prior_dialog_beats,
+                        timepoint_idx=i,
+                        config=config,
+                    )
+                    if dialog:
+                        inline_dialogs_created += 1
+                        last_dialog_outcome = outcome
+                        print(f"    [Inline Dialog] Created dialog for {next_timepoint.timepoint_id}")
 
                 except Exception as e:
                     print(f"  Warning: Failed to generate timepoint {i+1}: {e}")
                     # Continue with what we have
                     break
 
-            print(f"✓ Generated {len(all_timepoints)} timepoints")
+            # Phase 1: Mark inline dialog as complete for FORWARD mode
+            scene_result["dialog_inline_complete"] = True
+            print(f"✓ Generated {len(all_timepoints)} timepoints with {inline_dialogs_created} inline dialogs")
 
             self._shadow_evaluate_all_timepoints(all_timepoints, scene_result)
 
             self.logfire.info(
-                "Temporal generation complete",
-                timepoints=len(all_timepoints)
+                "Temporal generation complete (inline dialog)",
+                timepoints=len(all_timepoints),
+                inline_dialogs=inline_dialogs_created,
             )
 
             return all_timepoints

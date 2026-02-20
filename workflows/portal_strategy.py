@@ -265,6 +265,14 @@ class PortalStrategy:
         self.paths: List[PortalPath] = []  # Top-ranked paths (backward compatible)
         self.all_paths: List[PortalPath] = []  # ALL generated paths for exploration
 
+        # Phase 5: Inline dialog at each backward step
+        portal_metadata = getattr(config, 'metadata', None) or {}
+        if isinstance(portal_metadata, dict):
+            self.enable_inline_dialog = portal_metadata.get("portal_inline_dialog", True)
+        else:
+            self.enable_inline_dialog = True
+        self._last_dialog_constraints = None
+
         # Validate configuration
         if not config.portal_description:
             raise ValueError("portal_description is required for PORTAL mode")
@@ -354,6 +362,150 @@ class PortalStrategy:
         print(f"{'='*80}\n")
 
         return return_paths
+
+    # ============================================================================
+    # Phase 5: Portal Inline Dialog
+    # ============================================================================
+
+    def _run_portal_step_dialog(
+        self,
+        portal_state: PortalState,
+        step_index: int,
+        prior_beats: list,
+    ) -> dict:
+        """
+        Run dialog at a backward step. Returns dialog_constraints dict.
+
+        Creates an ephemeral Timepoint from the PortalState, seeds tensors,
+        runs synthesize_dialog(), and extracts constraints for antecedent generation.
+        """
+        from schemas import Timepoint, PhysicalTensor, CognitiveTensor
+        from datetime import datetime
+
+        # Create ephemeral Timepoint from PortalState
+        tp_id = f"portal_step_{step_index}_{portal_state.year}_{portal_state.month}"
+        try:
+            timestamp = datetime(portal_state.year, portal_state.month or 1, 15)
+        except (ValueError, TypeError):
+            timestamp = datetime(2025, 1, 15)
+
+        ephemeral_tp = Timepoint(
+            timepoint_id=tp_id,
+            timestamp=timestamp,
+            event_description=portal_state.description or f"Portal step {step_index}",
+            entities_present=[e.entity_id for e in portal_state.entities[:8]],
+            causal_parent=None,
+        )
+
+        # Seed physical/cognitive tensors for entities if needed
+        for entity in portal_state.entities:
+            if not entity.entity_metadata.get("physical_tensor"):
+                age = entity.entity_metadata.get("age", 35.0)
+                if isinstance(age, str):
+                    try:
+                        age = float(age)
+                    except (ValueError, TypeError):
+                        age = 35.0
+                entity.entity_metadata["physical_tensor"] = PhysicalTensor(
+                    age=age, health_status=1.0, pain_level=0.0,
+                    fever=36.5, mobility=1.0, stamina=1.0,
+                    sensory_acuity={"vision": 1.0, "hearing": 1.0},
+                ).model_dump()
+
+            if not entity.entity_metadata.get("cognitive_tensor"):
+                entity.entity_metadata["cognitive_tensor"] = CognitiveTensor(
+                    knowledge_state=[], emotional_valence=0.0, emotional_arousal=0.2,
+                    energy_budget=100.0, decision_confidence=0.8,
+                ).model_dump()
+
+        # Run dialog
+        dialog_constraints = {
+            "character_positions": {},
+            "contested_claims": [],
+            "resolved_facts": [],
+            "escalation_level": 0.0,
+            "dialog_summary": "",
+        }
+
+        try:
+            from workflows.dialog_synthesis import synthesize_dialog
+
+            participants = portal_state.entities[:4]  # Max 4 participants
+            if len(participants) < 2:
+                return dialog_constraints
+
+            timeline = [{"event_description": portal_state.description, "timestamp": timestamp.isoformat()}]
+
+            dialog = synthesize_dialog(
+                entities=participants,
+                timepoint=ephemeral_tp,
+                timeline=timeline,
+                llm=self.llm,
+                store=self.store,
+                prior_dialog_beats=prior_beats if prior_beats else None,
+                use_per_turn=True,
+            )
+
+            # Extract dialog constraints from the result
+            import json as _json
+            turns = _json.loads(dialog.turns) if isinstance(dialog.turns, str) else (dialog.turns or [])
+
+            # Build character positions
+            for entity in participants:
+                entity_turns = [t for t in turns if t.get("speaker") == entity.entity_id]
+                if entity_turns:
+                    # Last statement as stated position
+                    last_content = entity_turns[-1].get("content", "")
+                    dialog_constraints["character_positions"][entity.entity_id] = {
+                        "stated_position": last_content[:150],
+                        "information_held": [
+                            kr for t in entity_turns
+                            for kr in t.get("knowledge_references", [])
+                        ][:5],
+                        "trust_toward": entity.entity_metadata.get("character_arc", {}).get("trust_ledger", {}),
+                    }
+
+            # Identify contested vs resolved claims
+            all_content = " ".join(t.get("content", "") for t in turns).lower()
+            disagreement_markers = ["disagree", "wrong", "no,", "but that's", "however", "actually"]
+            agreement_markers = ["agree", "right", "exactly", "correct", "yes,"]
+
+            for turn in turns:
+                content = turn.get("content", "")
+                content_lower = content.lower()
+                if any(m in content_lower for m in disagreement_markers):
+                    dialog_constraints["contested_claims"].append(content[:80])
+                elif any(m in content_lower for m in agreement_markers):
+                    dialog_constraints["resolved_facts"].append(content[:80])
+
+            # Escalation level based on emotional tones
+            tones = [t.get("emotional_tone", "neutral") for t in turns]
+            escalation_tones = ["angry", "frustrated", "desperate", "fearful", "aggressive"]
+            escalation_count = sum(1 for t in tones if t and t.lower() in escalation_tones)
+            dialog_constraints["escalation_level"] = min(1.0, escalation_count / max(len(turns), 1))
+
+            # Summary
+            speakers = list(set(t.get("speaker", "?") for t in turns))
+            dialog_constraints["dialog_summary"] = (
+                f"Dialog between {', '.join(speakers[:4])} at step {step_index} "
+                f"({len(turns)} turns, escalation: {dialog_constraints['escalation_level']:.1f})"
+            )
+
+            # Update prior beats
+            for turn in turns[:5]:
+                speaker = turn.get("speaker", "?")
+                content = turn.get("content", "")[:60]
+                if content:
+                    prior_beats.append(f"{speaker}: {content}")
+
+            print(f"    [Portal Dialog] Step {step_index}: {len(turns)} turns, "
+                  f"{len(dialog_constraints['contested_claims'])} contested claims")
+
+        except Exception as e:
+            print(f"    ⚠️  Portal dialog failed at step {step_index}: {e}")
+            dialog_constraints["dialog_summary"] = f"Dialog failed: {str(e)[:60]}"
+
+        return dialog_constraints
 
     def _generate_portal_state(self) -> PortalState:
         """Generate the endpoint state from description, including entity inference."""
@@ -657,6 +809,19 @@ Include 3-10 relevant entities."""
 
                     next_states.extend(top_antecedents)
 
+            # Phase 5: Run inline dialog on top antecedent before proceeding
+            if self.enable_inline_dialog and next_states:
+                try:
+                    top_state = next_states[0]  # Best-scoring antecedent
+                    prior_beats = []  # Fresh beats per step
+                    dialog_constraints = self._run_portal_step_dialog(
+                        top_state, step, prior_beats
+                    )
+                    top_state.world_state["dialog_constraints"] = dialog_constraints
+                    self._last_dialog_constraints = dialog_constraints
+                except Exception as e:
+                    print(f"    ⚠️  Portal inline dialog failed: {e}")
+
             current_states = next_states
 
             # Prune if too many paths
@@ -749,6 +914,40 @@ Include 3-10 relevant entities."""
                       "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
         target_time_str = f"{month_names[target_month-1]} {target_year}"
 
+        # Phase 5: Build dialog constraints section if available
+        dialog_constraints_text = ""
+        dialog_constraints = current_state.world_state.get("dialog_constraints") or self._last_dialog_constraints
+        if dialog_constraints and isinstance(dialog_constraints, dict):
+            positions = dialog_constraints.get("character_positions", {})
+            contested = dialog_constraints.get("contested_claims", [])
+            resolved = dialog_constraints.get("resolved_facts", [])
+
+            if positions or contested:
+                dc_lines = [f"\nDIALOG CONSTRAINTS FROM THE CONSEQUENT STEP ({current_state.to_year_month_str()}):"]
+                dc_lines.append("The following was established in conversation at the next time step:")
+                for eid, pos in positions.items():
+                    stated = pos.get("stated_position", "")[:100]
+                    info_held = pos.get("information_held", [])
+                    dc_lines.append(f"- {eid} argued: {stated}")
+                    if info_held:
+                        dc_lines.append(f"  (held information: {', '.join(str(i)[:40] for i in info_held[:3])})")
+                if contested:
+                    dc_lines.append(f"- Contested: {'; '.join(c[:60] for c in contested[:3])}")
+                if resolved:
+                    dc_lines.append(f"- Agreed upon: {'; '.join(r[:60] for r in resolved[:3])}")
+
+                dc_lines.append("")
+                dc_lines.append("CRITICAL REQUIREMENT — INDEPENDENT FAILURE MODES:")
+                dc_lines.append("Each antecedent must show a DIFFERENT organizational pressure leading to this situation.")
+                dc_lines.append("NOT the same argument happening earlier. Instead:")
+                dc_lines.append("- One antecedent: schedule pressure from external stakeholder")
+                dc_lines.append("- Another: a different character has genuinely incomplete information")
+                dc_lines.append("- Another: political dynamics where a valid concern is traded away")
+                dc_lines.append("- Another: a character who is right about one thing is wrong about another")
+                dc_lines.append("The antecedent states MUST be consistent with characters arriving at the positions documented above.")
+
+                dialog_constraints_text = "\n".join(dc_lines)
+
         user_prompt = f"""Generate {count} DIVERSE and DISTINCT plausible antecedent states that could naturally lead to this consequent state.
 
 CONSEQUENT STATE ({current_state.to_year_month_str()}):
@@ -757,6 +956,7 @@ CONSEQUENT STATE ({current_state.to_year_month_str()}):
 {entity_summary}
 
 World Context: {current_state.world_state}
+{dialog_constraints_text}
 
 TARGET TIME FOR ANTECEDENTS: {target_time_str}
 

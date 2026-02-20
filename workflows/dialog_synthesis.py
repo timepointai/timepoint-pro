@@ -23,7 +23,8 @@ Knowledge Extraction (M19):
     - Assigns confidence and causal relevance scores
 """
 
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
+from dataclasses import dataclass, field
 from datetime import datetime
 import json
 import logging
@@ -32,6 +33,320 @@ from schemas import Entity, Dialog, ExposureEvent
 from metadata.tracking import track_mechanism
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# Dialog Co-Generation Data Classes (Phase 1 + Phase 2)
+# ============================================================================
+
+@dataclass
+class DialogOutcomeContext:
+    """
+    Outcome of a dialog that feeds into next timepoint generation.
+
+    Created after each inline dialog, passed to generate_next_timepoint()
+    so that dialog at timepoint N influences timepoint N+1.
+    """
+    dialog_id: str = ""
+    timepoint_id: str = ""
+    topics_raised: List[str] = field(default_factory=list)
+    persuasion_outcomes: Dict[str, bool] = field(default_factory=dict)
+    emotional_deltas: Dict[str, Dict[str, float]] = field(default_factory=dict)
+    relationship_shifts: Dict[str, float] = field(default_factory=dict)
+    summary: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "dialog_id": self.dialog_id,
+            "timepoint_id": self.timepoint_id,
+            "topics_raised": self.topics_raised,
+            "persuasion_outcomes": self.persuasion_outcomes,
+            "emotional_deltas": self.emotional_deltas,
+            "relationship_shifts": self.relationship_shifts,
+            "summary": self.summary,
+        }
+
+
+def _extract_dialog_outcome(
+    dialog: Dialog,
+    entities: List[Entity],
+    timepoint: 'Timepoint',
+) -> DialogOutcomeContext:
+    """
+    Extract a DialogOutcomeContext from a completed dialog.
+
+    Reads dialog turns to identify topics raised, persuasion outcomes,
+    emotional deltas, and relationship shifts.
+    """
+    try:
+        turns = json.loads(dialog.turns) if isinstance(dialog.turns, str) else dialog.turns
+    except (json.JSONDecodeError, TypeError):
+        turns = []
+
+    # Extract topics from turns
+    topics = []
+    for turn in turns:
+        content = turn.get("content", "")
+        if content and len(content) > 15:
+            # Use first sentence or first 80 chars as topic indicator
+            topic = content.split(".")[0][:80].strip()
+            if topic and topic not in topics:
+                topics.append(topic)
+
+    # Extract emotional deltas per entity
+    emotional_deltas = {}
+    for entity in entities:
+        speaker_turns = [t for t in turns if t.get("speaker") == entity.entity_id]
+        if speaker_turns:
+            tones = [t.get("emotional_tone", "neutral") for t in speaker_turns]
+            emotional_deltas[entity.entity_id] = {
+                "turn_count": len(speaker_turns),
+                "final_tone": tones[-1] if tones else "neutral",
+            }
+
+    # Extract relationship shifts from dialog context
+    relationship_shifts = {}
+    try:
+        context = json.loads(dialog.context_used) if isinstance(dialog.context_used, str) else (dialog.context_used or {})
+        if isinstance(context, dict):
+            impacts = context.get("relationship_impacts", {})
+            if isinstance(impacts, dict):
+                relationship_shifts = {k: float(v) for k, v in impacts.items() if isinstance(v, (int, float))}
+    except (json.JSONDecodeError, TypeError, ValueError):
+        pass
+
+    # Build summary
+    speaker_names = list(set(t.get("speaker", "?") for t in turns))
+    summary = f"Dialog between {', '.join(speaker_names[:4])} covering {len(topics)} topics."
+    if turns:
+        summary += f" {len(turns)} turns total."
+
+    return DialogOutcomeContext(
+        dialog_id=dialog.dialog_id,
+        timepoint_id=timepoint.timepoint_id,
+        topics_raised=topics[:10],
+        persuasion_outcomes={},
+        emotional_deltas=emotional_deltas,
+        relationship_shifts=relationship_shifts,
+        summary=summary,
+    )
+
+
+# ============================================================================
+# Character Arc Tracking (Phase 2)
+# ============================================================================
+
+# Tactic vocabulary for classifying dialog moves
+TACTIC_VOCABULARY = [
+    "data_argument", "emotional_appeal", "authority_claim", "humor_deflection",
+    "silence_withdrawal", "procedural_challenge", "alliance_appeal", "threat_escalation",
+]
+
+# Outcome vocabulary for tracking what happened
+OUTCOME_VOCABULARY = [
+    "accepted", "dismissed", "deferred", "ignored", "partially_acknowledged",
+]
+
+# Keywords mapping for tactic classification
+_TACTIC_KEYWORDS = {
+    "data_argument": ["data", "number", "percent", "measurement", "reading", "test", "evidence", "shows", "indicates", "according to"],
+    "emotional_appeal": ["feel", "worried", "concerned", "scared", "lives at stake", "people", "families", "care about"],
+    "authority_claim": ["my authority", "i'm responsible", "as the", "my role", "chain of command", "protocol", "regulation"],
+    "humor_deflection": ["joke", "laugh", "funny", "ha", "lighten", "humor", "kidding"],
+    "silence_withdrawal": [],  # Detected by absence, not keywords
+    "procedural_challenge": ["procedure", "process", "formal", "review", "committee", "schedule", "agenda", "motion"],
+    "alliance_appeal": ["agree with", "support", "together", "join", "side with", "back me", "ally"],
+    "threat_escalation": ["escalate", "report", "consequences", "warning", "unless", "force", "compel"],
+}
+
+
+def _classify_tactic(content: str) -> str:
+    """Classify a dialog turn's tactic based on content keywords."""
+    content_lower = content.lower()
+    best_tactic = "data_argument"  # default
+    best_score = 0
+
+    for tactic, keywords in _TACTIC_KEYWORDS.items():
+        score = sum(1 for kw in keywords if kw in content_lower)
+        if score > best_score:
+            best_score = score
+            best_tactic = tactic
+
+    return best_tactic
+
+
+def _classify_outcome(
+    turn_content: str,
+    next_turns: List[Dict[str, Any]],
+    target_entity: str,
+) -> str:
+    """Classify the outcome of a dialog tactic based on subsequent turns."""
+    if not next_turns:
+        return "deferred"
+
+    # Look at the target's next response
+    for next_turn in next_turns[:3]:
+        if next_turn.get("speaker") == target_entity:
+            response = next_turn.get("content", "").lower()
+            if any(w in response for w in ["agree", "right", "good point", "yes", "fair", "accepted"]):
+                return "accepted"
+            if any(w in response for w in ["no", "wrong", "disagree", "reject", "absurd", "nonsense"]):
+                return "dismissed"
+            if any(w in response for w in ["later", "table", "revisit", "not now", "another time"]):
+                return "deferred"
+            if any(w in response for w in ["perhaps", "some merit", "partly", "but also"]):
+                return "partially_acknowledged"
+            # No clear response pattern
+            return "ignored"
+
+    return "ignored"
+
+
+def _update_character_arc(
+    entity: Entity,
+    dialog_turns: List[Dict[str, Any]],
+    other_entities: List[Entity],
+    timepoint_id: str,
+) -> None:
+    """
+    Update character arc tracking after a dialog.
+
+    Records tactics used, outcomes, trust shifts, and promotes
+    suppressed impulses to unspoken accumulation.
+    """
+    arc = entity.entity_metadata.get("character_arc", {
+        "dialog_attempts": [],
+        "trust_ledger": {},
+        "alliance_history": [],
+        "unspoken_accumulation": [],
+    })
+
+    other_ids = [e.entity_id for e in other_entities if e.entity_id != entity.entity_id]
+
+    # Analyze entity's turns
+    entity_turns = []
+    for i, turn in enumerate(dialog_turns):
+        if turn.get("speaker") == entity.entity_id:
+            entity_turns.append((i, turn))
+
+    for turn_idx, turn in entity_turns:
+        content = turn.get("content", "")
+        if not content:
+            continue
+
+        tactic = _classify_tactic(content)
+
+        # Determine target: who is this turn directed at?
+        # Simple heuristic: the previous speaker (if different)
+        target = None
+        if turn_idx > 0:
+            prev_speaker = dialog_turns[turn_idx - 1].get("speaker")
+            if prev_speaker != entity.entity_id:
+                target = prev_speaker
+        if not target and other_ids:
+            target = other_ids[0]
+
+        # Classify outcome based on subsequent turns
+        subsequent = dialog_turns[turn_idx + 1:turn_idx + 4]
+        outcome = _classify_outcome(content, subsequent, target) if target else "deferred"
+
+        arc["dialog_attempts"].append({
+            "timepoint_id": timepoint_id,
+            "tactic_used": tactic,
+            "target_entity": target,
+            "outcome": outcome,
+            "argument_summary": content[:100],
+        })
+
+        # Update trust ledger from outcome
+        if target:
+            current_trust = arc["trust_ledger"].get(target, 0.0)
+            if outcome == "accepted":
+                current_trust = min(1.0, current_trust + 0.1)
+            elif outcome == "dismissed":
+                current_trust = max(-1.0, current_trust - 0.15)
+            elif outcome == "ignored":
+                current_trust = max(-1.0, current_trust - 0.05)
+            elif outcome == "partially_acknowledged":
+                current_trust = min(1.0, current_trust + 0.03)
+            arc["trust_ledger"][target] = round(current_trust, 3)
+
+    # Promote suppressed impulses to unspoken accumulation
+    # Check proception state for suppressed impulses
+    try:
+        si_raw = entity.entity_metadata.get("proception_state", {}).get("suppressed_impulses", "[]")
+        if isinstance(si_raw, str):
+            suppressed = json.loads(si_raw)
+        else:
+            suppressed = si_raw or []
+
+        for item in suppressed:
+            impulse_text = item.get("impulse", str(item)) if isinstance(item, dict) else str(item)
+            # Check if already in unspoken accumulation
+            existing = [u for u in arc["unspoken_accumulation"] if u.get("content") == impulse_text]
+            if not existing:
+                arc["unspoken_accumulation"].append({
+                    "content": impulse_text,
+                    "urgency": 0.3,
+                    "first_formed": timepoint_id,
+                })
+    except (json.JSONDecodeError, TypeError, AttributeError):
+        pass
+
+    # Grow urgency for existing unspoken items that weren't expressed
+    spoken_content = " ".join(t.get("content", "") for t in dialog_turns if t.get("speaker") == entity.entity_id).lower()
+    for item in arc["unspoken_accumulation"]:
+        content_lower = item.get("content", "").lower()
+        # If the core of the unspoken item wasn't expressed, urgency grows
+        if content_lower and content_lower[:30] not in spoken_content:
+            item["urgency"] = min(1.0, item.get("urgency", 0.3) + 0.15)
+
+    entity.entity_metadata["character_arc"] = arc
+
+
+def _get_character_arc_for_context(entity: Entity) -> str:
+    """
+    Return a prompt-ready summary of the character's arc.
+
+    Format: [Arc: Data arguments dismissed by Webb (T1, T2). Has not yet
+    disclosed: O2 fault reading (urgency: 0.8)]
+    """
+    arc = entity.entity_metadata.get("character_arc")
+    if not arc:
+        return ""
+
+    parts = []
+
+    # Summarize failed tactics
+    attempts = arc.get("dialog_attempts", [])
+    if attempts:
+        # Group failures by tactic + target
+        failures = {}
+        for a in attempts:
+            if a.get("outcome") in ("dismissed", "ignored"):
+                key = f"{a.get('tactic_used', '?')} by {a.get('target_entity', '?')}"
+                failures.setdefault(key, []).append(a.get("timepoint_id", "?"))
+
+        for key, tps in list(failures.items())[:3]:
+            tp_str = ", ".join(tps[-3:])
+            parts.append(f"{key} ({tp_str})")
+
+    # Summarize trust
+    trust = arc.get("trust_ledger", {})
+    low_trust = [(eid, v) for eid, v in trust.items() if v < -0.2]
+    for eid, v in low_trust[:2]:
+        parts.append(f"low trust toward {eid} ({v:.1f})")
+
+    # Unspoken items with high urgency
+    unspoken = arc.get("unspoken_accumulation", [])
+    urgent = [u for u in unspoken if u.get("urgency", 0) > 0.4]
+    for u in urgent[:3]:
+        parts.append(f"has not yet disclosed: {u['content'][:50]} (urgency: {u['urgency']:.1f})")
+
+    if not parts:
+        return ""
+
+    return "[Arc: " + ". ".join(parts) + "]"
 
 
 @track_mechanism("M8", "embodied_states_pain")
@@ -1439,6 +1754,68 @@ def _evaluate_dialog_quality(turns: List[Dict]) -> Dict:
     }
 
 
+def _evaluate_dialog_subtext_quality(
+    turns: List[Dict],
+    entities: List['Entity'],
+) -> Dict:
+    """
+    Phase 4 quality check: subtext and archetype adherence.
+
+    1. Subtext check: withheld knowledge content should NOT appear verbatim
+    2. Archetype check: no turn contains phrases from never_does list
+    """
+    failures = []
+
+    # Check 1: Withheld knowledge not stated verbatim
+    for entity in entities:
+        arc = entity.entity_metadata.get("character_arc", {})
+        unspoken = arc.get("unspoken_accumulation", [])
+
+        # Also check proception state for withheld knowledge
+        try:
+            wk_raw = entity.entity_metadata.get("proception_state", {}).get("withheld_knowledge", "[]")
+            if isinstance(wk_raw, str):
+                withheld = json.loads(wk_raw)
+            else:
+                withheld = wk_raw or []
+        except (json.JSONDecodeError, TypeError):
+            withheld = []
+
+        withheld_content = [
+            w.get("content", str(w))[:40].lower() if isinstance(w, dict) else str(w)[:40].lower()
+            for w in withheld
+        ]
+
+        entity_turns = [t for t in turns if t.get("speaker") == entity.entity_id]
+        for turn in entity_turns:
+            content_lower = turn.get("content", "").lower()
+            for wc in withheld_content:
+                if wc and len(wc) > 10 and wc in content_lower:
+                    failures.append(f"subtext_leak:{entity.entity_id}:'{wc[:30]}' stated verbatim")
+
+    # Check 2: Archetype never_does adherence
+    try:
+        from workflows.dialog_archetypes import ARCHETYPE_RHETORICAL_PROFILES
+        for entity in entities:
+            archetype_id = entity.entity_metadata.get("archetype_id", "")
+            profile = ARCHETYPE_RHETORICAL_PROFILES.get(archetype_id, {})
+            never_does = profile.get("never_does", [])
+
+            entity_turns = [t for t in turns if t.get("speaker") == entity.entity_id]
+            for turn in entity_turns:
+                content_lower = turn.get("content", "").lower()
+                for forbidden in never_does:
+                    if forbidden.lower() in content_lower:
+                        failures.append(f"archetype_violation:{entity.entity_id}:{forbidden}")
+    except ImportError:
+        pass
+
+    return {
+        "passed": len(failures) == 0,
+        "failures": failures,
+    }
+
+
 @track_mechanism("M11", "dialog_synthesis")
 def synthesize_dialog(
     entities: List[Entity],
@@ -1473,6 +1850,13 @@ def synthesize_dialog(
     # Sanitize timeline to ensure all datetime objects are converted to strings
     sanitized_timeline = []
     for item in timeline:
+        # Convert Pydantic/SQLModel objects to dicts
+        if hasattr(item, 'model_dump'):
+            item = item.model_dump()
+        elif hasattr(item, 'dict'):
+            item = item.dict()
+        elif not isinstance(item, dict):
+            item = {"event_description": str(item)}
         sanitized_item = {}
         for key, value in item.items():
             if hasattr(value, 'isoformat'):  # datetime object
@@ -1792,6 +2176,21 @@ def synthesize_dialog(
         # Build initial DialogState
         from schemas import DialogState
 
+        # Phase 3: Compute information asymmetry across entities
+        info_asymmetry = {}
+        try:
+            from workflows.dialog_context import _compute_information_asymmetry
+            info_asymmetry = _compute_information_asymmetry(fourth_wall_contexts)
+        except (ImportError, Exception):
+            pass
+
+        # Phase 2/3: Collect character arcs for steering
+        character_arcs_for_steering = {}
+        for entity in entities:
+            arc = entity.entity_metadata.get("character_arc")
+            if arc:
+                character_arcs_for_steering[entity.entity_id] = arc
+
         initial_state: DialogState = {
             "turns": [],
             "active_speakers": [e.entity_id for e in entities if e.entity_id in fourth_wall_contexts],
@@ -1816,6 +2215,10 @@ def synthesize_dialog(
             "run_id": run_id,
             "llm": llm,
             "store": store,
+            # Phase 3: Strategic steering data
+            "information_asymmetry": info_asymmetry,
+            "steering_directive_for_turn": {},
+            "character_arcs": character_arcs_for_steering,
         }
 
         # Run dialog graph

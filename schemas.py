@@ -393,6 +393,10 @@ class DialogState(TypedDict, total=False):
     run_quality_per_turn: bool
     timepoint_id: str
     run_id: Optional[str]
+    # Phase 3: Strategic steering fields
+    information_asymmetry: Dict[str, List[str]]  # entity_id -> exclusive knowledge items
+    steering_directive_for_turn: Dict[str, Any]  # current steering directive (dialog_move, move_target, etc.)
+    character_arcs: Dict[str, Dict[str, Any]]  # entity_id -> character_arc data
     # Injected dependencies (not serializable, passed through state)
     llm: Any  # LLMClient
     store: Any  # GraphStore
