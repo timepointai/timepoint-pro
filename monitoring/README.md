@@ -233,7 +233,7 @@ export OPENROUTER_API_KEY="sk-or-v1-..."
 
 ### Monitor Long-Running Simulation
 ```bash
-# All 35 Timepoint corporate templates (~4 hours)
+# All 21 Timepoint templates
 python3.10 -m monitoring.monitor_runner --interval 600 -- \
   python3.10 run_all_mechanism_tests.py --timepoint-all
 ```
