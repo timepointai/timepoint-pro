@@ -32,6 +32,8 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 import logging
 
+from metadata.tracking import track_mechanism
+
 logger = logging.getLogger(__name__)
 
 
@@ -776,6 +778,7 @@ class ModelSelector:
 
         return False
 
+    @track_mechanism("M18", "intelligent_model_selection")
     def select_model(
         self,
         action: ActionType,
