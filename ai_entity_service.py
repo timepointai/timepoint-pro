@@ -284,7 +284,7 @@ class AIEntityRunner:
     def generate_cache_key(self, entity_id: str, message: str, context: Dict) -> str:
         """Generate cache key for request"""
         content = f"{entity_id}:{message}:{json.dumps(context, sort_keys=True)}"
-        return hashlib.md5(content.encode()).hexdigest()
+        return hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()
 
     async def process_request(self, request: AIRequest) -> AIResponse:
         """Process an AI entity interaction request"""

@@ -63,7 +63,7 @@ class QueryInterface:
         """Generate cache key for query based on content and intent"""
         # Create a hash of the query and relevant intent fields
         cache_content = f"{query}|{query_intent.target_entity}|{query_intent.target_timepoint}|{query_intent.information_type}"
-        return hashlib.md5(cache_content.encode()).hexdigest()
+        return hashlib.md5(cache_content.encode(), usedforsecurity=False).hexdigest()
 
     def _get_cached_response(self, cache_key: str) -> Optional[str]:
         """Get cached response if it exists and hasn't expired"""

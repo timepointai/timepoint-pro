@@ -24,7 +24,7 @@ class QueryResultCache:
     def _compute_key(self, query: str, context: Dict[str, Any]) -> str:
         """Compute cache key from query and context"""
         cache_str = json.dumps({"query": query, "context": context}, sort_keys=True)
-        return hashlib.md5(cache_str.encode()).hexdigest()
+        return hashlib.md5(cache_str.encode(), usedforsecurity=False).hexdigest()
 
     def get(self, query: str, context: Dict[str, Any]) -> Optional[Any]:
         """Get cached result if available and not expired"""

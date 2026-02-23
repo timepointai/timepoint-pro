@@ -93,6 +93,17 @@ class TimepointDB:
 
         where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
 
+        # Validate sort_by and order against whitelist to prevent SQL injection
+        allowed_sort_columns = {
+            "started_at", "completed_at", "template_id", "causal_mode",
+            "entities_created", "timepoints_created", "cost_usd",
+            "status", "duration_seconds", "run_id"
+        }
+        if sort_by not in allowed_sort_columns:
+            sort_by = "started_at"
+        if order.upper() not in ("ASC", "DESC"):
+            order = "DESC"
+
         # Handle mechanism filtering (requires subquery)
         if mechanisms:
             mechanism_placeholders = ",".join(["?"] * len(mechanisms))
@@ -102,16 +113,17 @@ class TimepointDB:
                     FROM mechanism_usage
                     WHERE mechanism IN ({mechanism_placeholders})
                 )
-            """
+            """  # nosec B608 - placeholders are ?-only, values go through params
             params.extend(mechanisms)
 
         # Get total count
-        count_query = f"SELECT COUNT(*) FROM runs WHERE {where_sql}"
+        count_query = f"SELECT COUNT(*) FROM runs WHERE {where_sql}"  # nosec B608 - where_sql uses ? params
         cursor.execute(count_query, params)
         total_count = cursor.fetchone()[0]
 
         # Get paginated results
         offset = (page - 1) * limit
+        # nosec B608 - sort_by/order validated above, where_sql uses ? parameterized placeholders
         results_query = f"""
             SELECT
                 run_id, template_id, started_at, completed_at,
