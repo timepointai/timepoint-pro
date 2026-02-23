@@ -174,12 +174,11 @@ Stores validation results for each run.
 - Check run has data: `./run.sh status`
 - Test API directly: `curl http://localhost:8000/api/runs`
 
-## Statistics (January 2026)
+## Statistics (February 2026)
 
-- **Total Runs**: 600+
-- **Templates**: 41 (organized by category with patch metadata)
+- **Templates**: 21 verified (organized by category with patch metadata)
 - **Mechanisms**: 19 (M1-M19)
-- **SynthasAIzer**: Phase 1-3 implemented
+- **SynthasAIzer**: Phase 1-3 implemented, ADPRS production pipeline complete (142 tests)
 
 ## Frontend Note
 
