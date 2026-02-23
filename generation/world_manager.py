@@ -225,12 +225,19 @@ class WorldManager:
 
     def _add_world_id_columns(self, engine, world_id: str):
         """Add world_id columns to tables for partitioned isolation"""
+        # Table names are hardcoded — safe for interpolation.
+        # world_id is validated to prevent SQL injection via the DEFAULT clause.
         tables = [
             "entity", "timeline", "timepoint", "exposureevent",
             "queryhistory", "dialog", "relationshiptrajectory",
             "prospectivestate", "environmententity", "atmosphereentity",
             "crowdentity", "systemprompt", "validationrule"
         ]
+
+        # Validate world_id contains only safe characters (alphanumeric, dash, underscore)
+        import re
+        if not re.match(r'^[a-zA-Z0-9_-]+$', world_id):
+            raise ValueError(f"Invalid world_id format: {world_id}")
 
         with engine.begin() as conn:
             for table in tables:
@@ -243,8 +250,8 @@ class WorldManager:
                 if "world_id" not in columns:
                     # Add world_id column with default
                     conn.execute(text(
-                        f"ALTER TABLE {table} ADD COLUMN world_id TEXT DEFAULT '{world_id}'"
-                    ))
+                        f"ALTER TABLE {table} ADD COLUMN world_id TEXT DEFAULT :world_id"
+                    ), {"world_id": world_id})
 
                     # Create index on world_id
                     conn.execute(text(

@@ -120,7 +120,7 @@ class NLToProductionAdapter:
     def _generate_world_id(self, scenario: str) -> str:
         """Generate deterministic world_id from scenario description."""
         # Use first 8 chars of MD5 hash + timestamp for uniqueness
-        scenario_hash = hashlib.md5(scenario.encode()).hexdigest()[:8]
+        scenario_hash = hashlib.md5(scenario.encode(), usedforsecurity=False).hexdigest()[:8]
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         return f"nl_{scenario_hash}_{timestamp}"
 

@@ -220,15 +220,19 @@ class EmbeddingIndex:
         Args:
             path: Path to save index (will create .npz file)
         """
+        import json as _json
         path = Path(path)
 
-        # Save as numpy archive
+        # Save embeddings and metadata as numpy archive (no pickle needed)
         np.savez(
             str(path) + ".npz",
-            ids=np.array(self._ids, dtype=object),
             embeddings=self._embeddings if self._embeddings is not None else np.array([]),
             embedding_dim=np.array([self.embedding_dim]),
         )
+        # Save IDs separately as JSON (avoids numpy pickle for object arrays)
+        ids_path = str(path) + ".ids.json"
+        with open(ids_path, "w") as f:
+            _json.dump(self._ids, f)
 
     def load(self, path: Path) -> None:
         """
@@ -237,12 +241,17 @@ class EmbeddingIndex:
         Args:
             path: Path to load index from
         """
+        import json as _json
         path = Path(path)
         npz_path = str(path) + ".npz" if not str(path).endswith(".npz") else str(path)
 
-        data = np.load(npz_path, allow_pickle=True)
+        data = np.load(npz_path, allow_pickle=False)
 
-        self._ids = list(data["ids"])
+        # Load IDs from JSON sidecar
+        ids_json_path = npz_path.replace(".npz", ".ids.json")
+        with open(ids_json_path, "r") as f:
+            self._ids = _json.load(f)
+
         self._id_to_idx = {id_: i for i, id_ in enumerate(self._ids)}
 
         embeddings = data["embeddings"]
