@@ -41,6 +41,8 @@ class SemanticQualityResult:
     narrative_advancement_score: float = 0.0
     conflict_specificity_score: float = 0.0
     voice_distinctiveness_score: float = 0.0
+    naturalness_score: float = 0.0
+    pattern_flags: List[str] = field(default_factory=list)
     evaluation_text: str = ""
     passed: bool = True
     failures: List[str] = field(default_factory=list)
@@ -87,15 +89,18 @@ Score each dimension 0.0-1.0 and explain:
 1. narrative_advancement: Did the dialog move the story forward? New information revealed? Decisions made?
 2. conflict_specificity: Are disagreements specific (naming numbers, dates, consequences) or vague platitudes?
 3. voice_distinctiveness: Could you identify speakers without labels? Different sentence lengths, vocabulary, tone?
+4. naturalness: Does this sound like humans talking, or like an AI generating dialog? Check for: significance inflation ("marking a pivotal moment in the evolution of"), performative verbs ("serves as", "showcases", "boasts"), rhetorical three-beat lists ("innovation, inspiration, and insights"), -ing narration chains ("symbolizing... reflecting... showcasing..."), hedging stacks ("could potentially possibly"), filler phrases ("In order to", "Due to the fact that"), em dash overuse, promotional language ("nestled within the breathtaking"), vague attributions ("experts believe"), false ranges ("from X to Y"), synonym cycling (different word for same thing each time instead of just repeating). Score 1.0 = indistinguishable from human conversation. Score 0.0 = obvious AI output.
 
 Return JSON:
 {{
   "narrative_advancement_score": float,
   "conflict_specificity_score": float,
   "voice_distinctiveness_score": float,
+  "naturalness_score": float,
   "narrative_goals_advanced": boolean,
   "specific_disagreement_present": boolean,
   "character_voices_distinct": boolean,
+  "pattern_flags": ["list of specific AI-writing anti-patterns detected, e.g. 'significance_inflation in turn 3 (Webb)', 'performative_verb in turn 5 (Chen)'"],
   "evaluation_text": "brief explanation",
   "failures": ["list of specific failures"]
 }}"""
@@ -113,12 +118,18 @@ Return JSON:
         if response.success:
             parsed = json.loads(response.content)
             failures = parsed.get("failures", [])
+            pattern_flags = parsed.get("pattern_flags", [])
             scores = [
                 parsed.get("narrative_advancement_score", 0.5),
                 parsed.get("conflict_specificity_score", 0.5),
                 parsed.get("voice_distinctiveness_score", 0.5),
+                parsed.get("naturalness_score", 0.5),
             ]
             passed = all(s >= 0.4 for s in scores) and len(failures) < 2
+
+            # If naturalness failed, promote pattern_flags into failures for retry
+            if parsed.get("naturalness_score", 0.5) < 0.4 and pattern_flags:
+                failures.extend(f"anti_pattern: {pf}" for pf in pattern_flags)
 
             return SemanticQualityResult(
                 narrative_goals_advanced=parsed.get("narrative_goals_advanced", False),
@@ -127,6 +138,8 @@ Return JSON:
                 narrative_advancement_score=parsed.get("narrative_advancement_score", 0.5),
                 conflict_specificity_score=parsed.get("conflict_specificity_score", 0.5),
                 voice_distinctiveness_score=parsed.get("voice_distinctiveness_score", 0.5),
+                naturalness_score=parsed.get("naturalness_score", 0.5),
+                pattern_flags=pattern_flags,
                 evaluation_text=parsed.get("evaluation_text", ""),
                 passed=passed,
                 failures=failures,
@@ -664,13 +677,22 @@ def character_node(state: 'DialogState') -> 'DialogState':
         rp = ctx.back_layer.rhetorical_profile
         rp_lines = []
         for key, val in rp.items():
-            if key == "never_does":
+            if key == "voice_anti_exemplar":
+                continue  # Handled separately as NEVER SOUND LIKE THIS block
+            elif key == "never_does":
                 rp_lines.append(f"  NEVER: {', '.join(val) if isinstance(val, list) else val}")
             elif key == "signature_moves":
                 rp_lines.append(f"  Signature: {', '.join(val) if isinstance(val, list) else val}")
             else:
                 rp_lines.append(f"  {key}: {val}")
         rhetorical_block = "\n\nRHETORICAL PROFILE:\n" + "\n".join(rp_lines)
+
+    # Phase 4+: Voice anti-exemplar from archetype
+    anti_exemplar_block = ""
+    if hasattr(ctx, 'back_layer') and ctx.back_layer.rhetorical_profile:
+        anti_ex = ctx.back_layer.rhetorical_profile.get("voice_anti_exemplar", "")
+        if anti_ex:
+            anti_exemplar_block = f'\n\nNEVER SOUND LIKE THIS:\n"{anti_ex}"'
 
     system_prompt = (
         f"You are {current_speaker} in a conversation. "
@@ -679,6 +701,15 @@ def character_node(state: 'DialogState') -> 'DialogState':
         f"no quotes around the text. Just the words the character says."
         f"{subtext_block}"
         f"{rhetorical_block}"
+        f"{anti_exemplar_block}"
+        "\n\nVOICE DISCIPLINE:"
+        "\n- Plain verbs over performative ones. 'is' not 'serves as'. 'has' not 'boasts'."
+        "\n- No rhetorical inflation. Events happen; they don't 'mark pivotal moments in the evolution of'."
+        "\n- No -ing narration chains. Characters speak, they don't 'symbolize, reflect, and showcase'."
+        "\n- No hedging stacks. One qualifier max. 'may' not 'could potentially possibly'."
+        "\n- No filler. 'To' not 'In order to'. 'Because' not 'Due to the fact that'."
+        "\n- No three-beat lists for rhetorical effect. Use the natural number of items."
+        "\n- Characters live in the simulation world. No real-world publications, institutions, or media."
     )
 
     if rhetorical_block:
@@ -810,7 +841,19 @@ def quality_gate_node(state: 'DialogState') -> 'DialogState':
 
     if not semantic_result.passed:
         state.setdefault("quality_failures", []).extend(semantic_result.failures)
-        logger.info(f"[QualityGate] Semantic check: {semantic_result.evaluation_text}")
+
+        # Pattern-aware repair notes: if naturalness failed, give specific retry guidance
+        if semantic_result.naturalness_score < 0.4 and semantic_result.pattern_flags:
+            repair_notes = (
+                "RETRY — AI-writing patterns detected:\n"
+                + "\n".join(f"  - {pf}" for pf in semantic_result.pattern_flags[:5])
+                + "\nRegenerate affected turns using plain, direct language. "
+                "Characters speak to accomplish goals, not to narrate themes."
+            )
+            state.setdefault("quality_failures", []).append(repair_notes)
+            logger.info(f"[QualityGate] Naturalness failed ({semantic_result.naturalness_score:.2f}): {semantic_result.pattern_flags}")
+        else:
+            logger.info(f"[QualityGate] Semantic check: {semantic_result.evaluation_text}")
     else:
         # Clear failures if quality improved
         state["quality_failures"] = []
