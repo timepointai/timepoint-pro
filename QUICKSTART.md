@@ -152,7 +152,7 @@ Each mode changes what "time" means and how the simulation validates consistency
 | `forward` | Standard causality, no time paradoxes | Default, most realistic | `board_meeting` |
 | `portal` | Backward reasoning from known outcomes | "How did we get here?" scenarios | `mars_mission_portal` |
 | `directorial` | Narrative-focused with dramatic tension | Stories, character arcs | `hound_shadow_directorial` |
-| `cyclical` | Allows prophecy and time loops | Sci-fi, mystical, generational | (no verified templates) |
+| `cyclical` | Allows prophecy and time loops | Sci-fi, mystical, generational | `agent4_elk_migration` |
 | `branching` | Counterfactual what-if scenarios | Decision analysis, alternate history | `castaway_colony_branching` |
 
 ### Choosing a Mode

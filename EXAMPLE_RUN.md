@@ -520,7 +520,7 @@ print(f"Outcome similarity: {results['outcome_mean_similarity']}")
 
 ```bash
 ./run.sh list                                         # List all 21 templates
-./run.sh run castaway_colony_branching                # BRANCHING: 8 entities, all 19 mechanisms
+./run.sh run castaway_colony_branching                # BRANCHING: 10 entities, all 19 mechanisms
 ./run.sh run hound_shadow_directorial                 # DIRECTORIAL: 5-act arc engine, camera system
 ./run.sh run agent4_elk_migration                     # CYCLICAL: prophecy system, causal loops
 ./run.sh run convergence_simple                       # Cheapest run: $0.01, 2 entities

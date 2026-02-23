@@ -404,7 +404,7 @@ config = TemporalConfig(
 - Mythic/religious narratives with destiny and fate
 - Training data for temporal reasoning about non-linear causality
 
-**Templates**: (no verified cyclical templates currently)
+**Templates**: `agent4_elk_migration` (verified Feb 2026: 5 paths, 5 cycles, prophecy resolution, coherence 0.727)
 
 ## M7: Causal Temporal Chains
 
@@ -1170,7 +1170,7 @@ Response + Metadata
 
 # Part 2: Infrastructure Platform (Vision)
 
-The simulation engine (18 mechanisms above) is implemented. The following describes the **target infrastructure**—what we're building toward. See [MILESTONES.md](MILESTONES.md) for timeline.
+The simulation engine (19 mechanisms above) is implemented. The following describes the **target infrastructure**—what we're building toward. See [MILESTONES.md](MILESTONES.md) for timeline.
 
 ## What Timepoint Does vs. What the Model Does
 

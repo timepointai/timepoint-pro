@@ -94,7 +94,7 @@ curl "http://localhost:8000/api/convergence-stats"
 | `limit` | int | Results per page (default: 20) |
 | `template` | str | Filter by template ID |
 | `status` | str | completed, running, failed |
-| `causal_mode` | str | STANDARD, PORTAL, etc. |
+| `causal_mode` | str | FORWARD, PORTAL, BRANCHING, DIRECTORIAL, CYCLICAL |
 | `start_date` | str | Filter by start date (YYYY-MM-DD) |
 | `end_date` | str | Filter by end date |
 | `min_cost` | float | Minimum cost |
@@ -116,7 +116,7 @@ Core run metadata: template_id, status, cost, entities/timepoints created, durat
 Tracks mechanisms used per run with timestamps and context.
 
 ### `resolution_assignments`
-Records entity resolution changes (sketch -> low -> high).
+Records entity resolution changes (TENSOR_ONLY -> SCENE -> GRAPH -> DIALOG -> TRAINED).
 
 ### `validations`
 Stores validation results for each run.
