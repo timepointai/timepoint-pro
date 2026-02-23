@@ -79,6 +79,16 @@ Outputs: JSONL/SQLite for ML, markdown/Fountain for humans, Oxen.ai auto-upload 
 - Fine-tuning for causal/temporal/multi-agent reasoning
 - Research platform for social physics
 
+## Architecture: Isolation by Design
+
+Timepoint Pro is a **standalone simulation engine**. It has no runtime dependencies on Flash, Billing, Clockchain, or any other Timepoint Suite service. All LLM calls go directly to OpenRouter. All data stays in local SQLite + flat files.
+
+This is intentional: the public repo must remain forkable and self-contained. Anyone with an OpenRouter key can run the full pipeline.
+
+**Planned: `/api/data-export`** --- A future endpoint for bulk export of simulation artifacts (causal graphs, entity tensors, dialog corpora, convergence sets) in standardized formats. Primary consumers: SNAG-Bench Axis 2 (causal reasoning benchmarks) and Proteus (simulation-to-training pipeline). This endpoint will live in the dashboard API (`dashboards/api/server.py`) and serve read-only data from the existing runs database. No auth required for local use; the Pro-Cloud private wrapper will gate access through its own auth layer.
+
+**Pro-Cloud boundary** --- `/api/usage` and `/api/budget` are not implemented here. The private Pro-Cloud wrapper decides whether those belong in shared Billing or stay as wrapper-local endpoints. This repo exposes simulation data only.
+
 ## Documentation
 - [EXAMPLE_RUN.md](EXAMPLE_RUN.md) --- complete walkthrough
 - [MECHANICS.md](MECHANICS.md) --- all 19 mechanisms
