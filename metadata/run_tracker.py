@@ -296,7 +296,7 @@ class MetadataManager:
         for col_name, col_type in v2_columns.items():
             if col_name not in columns:
                 print(f"📝 Migrating database v1→v2: Adding '{col_name}' column...")
-                cursor.execute(f"ALTER TABLE runs ADD COLUMN {col_name} {col_type}")
+                cursor.execute(f"ALTER TABLE runs ADD COLUMN {col_name} {col_type}")  # nosec B608 - col_name/col_type from hardcoded dict
                 conn.commit()
                 print(f"   ✓ {col_name} column added")
 
@@ -311,7 +311,7 @@ class MetadataManager:
         for col_name, col_type in resolution_columns.items():
             if col_name not in columns:
                 print(f"📝 Migrating database: Adding '{col_name}' column (Phase 7 tensor resolution)...")
-                cursor.execute(f"ALTER TABLE runs ADD COLUMN {col_name} {col_type}")
+                cursor.execute(f"ALTER TABLE runs ADD COLUMN {col_name} {col_type}")  # nosec B608 - col_name/col_type from hardcoded dict
                 conn.commit()
                 print(f"   ✓ {col_name} column added")
 

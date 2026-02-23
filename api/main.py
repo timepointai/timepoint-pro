@@ -13,6 +13,7 @@ Usage:
     TENSOR_DB_PATH=./tensors.db uvicorn api.main:app
 """
 
+import os
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -138,9 +139,10 @@ See /simulations/batch/usage for current usage.
     )
 
     # Add CORS middleware
+    cors_origins = os.environ.get("CORS_ORIGINS", "*").split(",")
     application.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # Configure appropriately for production
+        allow_origins=cors_origins,  # Set CORS_ORIGINS env var for production
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

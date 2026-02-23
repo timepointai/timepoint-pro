@@ -110,7 +110,7 @@ class MockProvider:
         """Generate deterministic mock response"""
         # Generate deterministic content based on prompts
         seed_str = system + user
-        seed = int(hashlib.md5(seed_str.encode()).hexdigest(), 16) % 10000
+        seed = int(hashlib.md5(seed_str.encode(), usedforsecurity=False).hexdigest(), 16) % 10000
 
         # Mock response content
         content = f"This is a mock LLM response (seed={seed}). "
@@ -175,7 +175,7 @@ class MockProvider:
 
     def _generate_mock_instance(self, schema: Type[BaseModel], seed_str: str) -> BaseModel:
         """Generate a mock instance with realistic data"""
-        seed = int(hashlib.md5(seed_str.encode()).hexdigest(), 16) % 10000
+        seed = int(hashlib.md5(seed_str.encode(), usedforsecurity=False).hexdigest(), 16) % 10000
         np.random.seed(seed)
 
         # Build mock data dict

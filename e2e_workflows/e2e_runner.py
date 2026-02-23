@@ -1227,7 +1227,8 @@ class FullE2EWorkflowRunner:
                 llm = LLMClient(api_key=api_key)
 
             # Initialize storage
-            db_path = tempfile.mktemp(suffix=".db")
+            db_fd, db_path = tempfile.mkstemp(suffix=".db")
+            os.close(db_fd)
             store = GraphStore(f"sqlite:///{db_path}")
 
             # Run orchestrator
