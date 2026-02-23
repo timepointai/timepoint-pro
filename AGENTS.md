@@ -14,10 +14,10 @@
 - Pythonic: type hints, dataclasses, protocols
 - SQLite persistence (metadata/runs.db for runs, timepoint.db for temp), FastAPI backend
 - TDD: pytest with mechanism markers (M1-M19)
-- SynthasAIzer paradigm: templates as "patches", ADSR envelopes for entity lifecycle
+- SynthasAIzer paradigm: templates as "patches", ADPRS envelopes for entity lifecycle
 
 ## Stack
-Python 3.10+, FastAPI, Pydantic, pytest, ruff, mypy
+Python 3.10+, FastAPI, Pydantic, LangGraph, pytest, ruff, mypy
 
 ## Standards
 - Type hints mandatory
@@ -40,6 +40,18 @@ Each mode has a dedicated strategy class in `workflows/`:
 
 Strategies share a common interface: `run(config) -> List[Path]`. Each path contains states with mode-specific metadata (tension scores for DIRECTORIAL, cycle positions for CYCLICAL, etc.).
 
+## Dialog System
+
+Per-character dialog generation via LangGraph pipeline (`workflows/dialog_steering.py`):
+
+- **steering_node** selects next speaker, mood shift, dialog continuation
+- **character_node** generates dialog with persona-derived LLM params, Fourth Wall context, and voice discipline
+- **quality_gate_node** three-level evaluation (narrative advancement, conflict specificity, voice distinctiveness) + naturalness scoring
+
+**Voice discipline**: 7-principle block in character_node prevents AI-sounding output (no "I understand your concern", no corporate filler, no therapeutic framing). Evaluated via LLM naturalness scoring, not hardcoded regex.
+
+**Archetype profiles** (`workflows/dialog_archetypes.py`): 10 rhetorical profiles (engineer, executive_director, military_commander, scientist, politician, lawyer, diplomat, safety_officer, doctor, journalist) with argument_style, disagreement_pattern, deflection_style, sentence_style, never_does, signature_moves, and voice anti-exemplars.
+
 ## Key Commands
 ```bash
 ./run.sh list                    # List all 21 templates
@@ -52,157 +64,17 @@ Strategies share a common interface: `run(config) -> List[Path]`. Each path cont
 
 ## Testing
 ```bash
-pytest -v -m synth               # SynthasAIzer tests
+pytest -v -m synth               # SynthasAIzer tests (142 ADPRS tests)
 pytest -v -m mechanism           # All M1-M19 tests
 pytest -v -m "m1 or m7"          # Specific mechanisms
 ```
 
-## Recent Fixes (January 2026)
+## Security
 
-### Portal Mode Enhancements
-- **Preserve All Paths**: `preserve_all_paths=True` returns ALL generated paths (not just top N) for full analysis
-- **Divergence Detection**: Identifies where paths diverge with clustering analysis (`high_coherence`, `medium`, `low`)
-- **Quick Mode**: `--portal-quick` reduces backward_steps to 5 for fast demos (~15 min vs 1+ hour)
-- **Fidelity Scaling**: Templates now scale proportionally with backward_steps (no longer hardcoded)
-
-**Files:** `workflows/portal_strategy.py`, `workflows/temporal_agent.py`, `run_all_mechanism_tests.py`, `run.sh`
-
-### Entity Inference in Portal Mode
-Portal mode now infers `entities_present` for each timepoint using LLM-based entity identification instead of blind copying from consequent timepoints.
-
-**Files:** `workflows/temporal_agent.py:_infer_entities_for_timepoint()`, `workflows/portal_strategy.py:_infer_entities_from_description()`
-
-### Entity Fallback in Portal Mode
-Added fallback logic when `_filter_entities_by_relevance()` returns an empty list (because LLM-generated antecedent descriptions don't explicitly mention entity names). The fix inherits all parent entities instead of leaving `entities_present` empty.
-
-**Files:** `workflows/portal_strategy.py:_generate_antecedents()` (lines 788-791), `workflows/portal_strategy.py:_generate_placeholder_antecedents()` (lines 844-847)
-
-### Data Quality Validation
-Added `_run_data_quality_check()` in e2e_runner.py that validates:
-- All timepoints have non-empty `entities_present`
-- All entity references point to existing entities
-- No duplicate entity IDs
-
-### Entity Persistence to Shared DB
-Entities now sync to metadata/runs.db alongside timepoints for convergence analysis.
-
-**Files:** `e2e_workflows/e2e_runner.py:_persist_entity_for_convergence()`, `_persist_all_entities_for_convergence()`
-
-### Timepoint Validation Warning
-`schemas.py:Timepoint.__init__()` now emits `UserWarning` when `entities_present` is empty.
-
-### Template Name Normalization
-Template names now accept both slash and underscore formats interchangeably:
-- `./run.sh run showcase/board_meeting` works the same as
-- `./run.sh run board_meeting`
-
-**Files:** `run_all_mechanism_tests.py:run_single_template()`
-
-### Pivot Point Detection Fix
-Rewrote `_detect_pivot_points()` in portal_strategy.py. The original checked `children_states` which was never populated during backward simulation (always returned 0 pivot points).
-
-**New 4-strategy detection:**
-1. **Divergence-based**: Uses `key_divergence_points` from path divergence analysis
-2. **Keyword-based**: Detects pivot language ("decision", "pivoted", "funding", "launched", etc.)
-3. **Event-based**: Checks `key_events` and `entity_changes` in world_state
-4. **Score-variance**: Flags states with unusual plausibility scores
-
-**Also reordered** `PortalStrategy.run()` so divergence analysis (Step 6) runs BEFORE pivot detection (Step 7).
-
-**Result:** 84 pivot points detected (vs 0 before) spanning the full 2024-2030 timeline.
-
-**Files:** `workflows/portal_strategy.py:_detect_pivot_points()` (lines 1575-1680), `workflows/portal_strategy.py:run()` (lines 308-319)
-
-## Recent Fixes (February 2026)
-
-### DIRECTORIAL and CYCLICAL Mode Full Implementation
-
-Implemented complete strategy classes for DIRECTORIAL and CYCLICAL temporal modes, replacing the previous stub implementations.
-
-**New Files:**
-- `workflows/directorial_strategy.py` (~800 lines) - Narrative-driven temporal simulation with:
-  - Five-act arc engine (SETUP → RISING → CLIMAX → FALLING → RESOLUTION)
-  - Camera system with POV rotation and framing controls
-  - Tension curve planning with act-aware prompting
-  - Dramatic irony detection
-  - Fidelity allocation: climax states get TRAINED, rising action gets DIALOG
-
-- `workflows/cyclical_strategy.py` (~900 lines) - Cycle-based temporal simulation with:
-  - LLM-driven cycle semantics interpretation (repeating, spiral, causal_loop, oscillating, composite)
-  - Prophecy system with fulfillment tracking across cycles
-  - Causal loop detection and enforcement
-  - Escalation rules per cycle type
-  - Fidelity allocation: prophecy states get TRAINED, cycle boundaries get DIALOG
-
-**Modified Files:**
-- `workflows/temporal_agent.py`: Added `run_directorial_simulation()` and `run_cyclical_simulation()` methods; replaced fidelity stub methods with real implementations
-- `e2e_workflows/e2e_runner.py`: Added DIRECTORIAL and CYCLICAL mode detection and path converter methods
-- `workflows/__init__.py`: Added exports for DirectorialStrategy and CyclicalStrategy
-- `llm_service/model_selector.py`: Added 4 new ActionType entries for mode-specific LLM calls
-
-### Templates (February 2026 cleanup)
-
-Pending directorial/cyclical templates were removed during template cleanup.
-The verified directorial template is `hound_shadow_directorial.json`.
-Mode strategies (directorial_strategy.py, cyclical_strategy.py) remain fully implemented.
-
-### Portal Scoring Stubs Replaced
-
-All 5 portal scoring methods now use real LLM-based evaluation instead of hardcoded/random values:
-- `_llm_score()` - Plausibility rating with Pydantic response model
-- `_historical_precedent_score()` - Historical precedent check with examples
-- `_causal_necessity_score()` - Causal necessity evaluation with alternatives
-- `_entity_capability_score()` - Entity capability validation
-- `_dynamic_context_score()` - Contextual plausibility by era
-
-### Bug Fixes
-- `metadata/narrative_exporter.py`: Added `json.loads()` deserialization for dialog data
-- `metadata/run_summarizer.py`: Fixed dialog turn parsing for narrative summaries
-- `llm_service/response_parser.py`: Replaced greedy regex JSON extraction with bracket-depth matching parser. The old regex (`\{[\s\S]*\}`) failed on truncated responses and text-wrapped JSON; the new `_extract_by_bracket_matching()` tracks bracket depth, string boundaries, and escape sequences character-by-character.
-- `workflows/dialog_synthesis.py`: **Arousal decay** — Added exponential decay toward baseline (0.3) with 15% relaxation rate before each dialog impact. Previously arousal only accumulated, saturating at 1.0 within 3-4 dialog rounds for all entities. Also rebalanced keyword weights (low-arousal: -0.03 from -0.01), reduced interaction cap (0.08 from 0.15), symmetric delta clamp [-0.25, +0.25].
-- `workflows/directorial_strategy.py`: **Prompt-schema alignment** — Added explicit format instructions to narrative planning prompt. LLM returned beats as `[{name, description}]` instead of `["string"]` and character_arcs with wrong field names. Fix specifies exact field structure in the prompt.
-- `workflows/dialog_synthesis.py`: **Entity hallucination prevention** — Replaced generic `"Generate a conversation between N historical figures"` with explicit entity name anchoring. Added `IMPORTANT: ONLY use the character IDs listed below as speakers. Do NOT invent or substitute other characters.` This prevents the LLM from hallucinating Leonardo da Vinci, Cleopatra, etc. when entity context is sparse.
-- `workflows/dialog_synthesis.py`: **Temporal freshness** — Added rule #8 (TEMPORAL FRESHNESS) to dialog prompt requiring new information per timepoint. Prevents recycling the same dialog beats ("3 weeks behind schedule", "Q4 targets") across every timepoint.
-- `workflows/portal_strategy.py`: **key_events schema** — Added explicit `CORRECT/WRONG` format examples to portal antecedent prompt. LLM consistently returned `key_events` as `[{date, description}]` objects instead of flat strings, causing Pydantic validation failures on every backward step.
-- `workflows/portal_strategy.py`: **Entity context enrichment** — Enriched entity_summary in antecedent generation prompt with roles, descriptions, knowledge items, and personality traits. Previously only listed entity IDs. Added rule #6 requiring antecedent narratives to feature the specific named entities, preventing drift to generic corporate/startup framing.
-
-### Mars Mission Portal Template
-- `generation/templates/showcase/mars_mission_portal.json`: Portal mode template. Backward reasoning from failed Mars mission (2031) to origins (2026). 4 entities, 10 backward steps, 3 candidates per step, simulation-judged with 405B judge model. First verified portal template. ADPRS envelopes configured in template JSON (`adprs_envelopes` array), `simulation_include_dialog: false` (mini-sim dialogs disabled for cost efficiency).
-- `generation/templates/catalog.json`: Added `showcase/mars_mission_portal` entry, `portal` and `space` patch categories.
-- `run.sh`: Added `mars_mission_portal` to SHOWCASE_TEMPLATES array and dispatch case.
-
-### Castaway Colony Full-Mechanism Showcase (NEW)
-- `generation/templates/showcase/castaway_colony_branching.json`: Full 19-mechanism showcase template. 6 crew members crash-land on Kepler-442b, must choose between 3 survival strategies (Fortify, Explore, Repair) at Day 7 branch point. 10 entities (human, abstract, building, animal), branching mode with simulation judging, 90+ quantitative state variables, O(100,000) interaction paths. First template to verify M1, M2, M4, M5, M6, M9, M18 — 7 mechanisms that previously had zero verified templates.
-- `generation/templates/catalog.json`: Added template entry with M1-M18 mechanisms, `scifi` and `space` patch categories.
-- `run.sh`: Added `castaway_colony_branching` to SHOWCASE_TEMPLATES array and dispatch case.
-
-### NONLINEAR Mode Removed
-Removed the NONLINEAR temporal mode from codebase (was never fully implemented). Now 5 modes: FORWARD, DIRECTORIAL, BRANCHING, CYCLICAL, PORTAL.
-
-### Branching Quality & Scenario Anchoring (February 2026)
-
-**Problem**: Castaway Colony ran successfully ($0.28, 482 LLM calls, 19/19 mechanisms) but output quality had critical issues: scenario drift by step 2, dialog repetition across 16 timepoints, environment entities speaking as humans, invalid groq fallback models.
-
-**Fixes across 6 files**:
-- `workflows/branching_strategy.py`: Fixed `portal_description` → `scenario_description` lookup. Fixed wrong ActionType (`PORTAL_BACKWARD_REASONING` → `BRANCHING_CONSEQUENT_GENERATION`). Added `scenario_description` and `entity_roster` params to `__init__`. Rewrote forward step prompt with SCENARIO ANCHOR block, ENTITY ROLES, ACCUMULATED WORLD STATE summary, and STEP MONITORING. Added `_accumulate_world_state()` and `_summarize_accumulated_world_state()` helpers. Extended ConsequentSchema with `resource_updates` field.
-- `workflows/dialog_synthesis.py`: Added `_filter_dialog_participants()` with animism_level thresholds (human=0, animal=1, environment=2, abstract=3) and per-type speaking modes. Added `_derive_dialog_params_from_persona()` for emotion×personality→behavior mapping. Updated `synthesize_dialog()` with `animism_level` and `prior_dialog_beats` params. Added Rule #9 (NON-HUMAN ENTITY VOICE RULES) to prompt. Enhanced Rule #8 with concrete beat avoidance from `prior_dialog_beats`.
-- `llm_service/model_selector.py`: Removed `groq/llama-3.3-70b-versatile` and `groq/llama-3.1-70b-versatile` (removed from OpenRouter). Updated `max_output_tokens`: Llama 70B/405B 4096→16384, Qwen 72B 4096→8192. Updated BRANCHING action: `min_context_tokens` 16384→32768, `min_output_tokens` 2000→3000, `tokens_per_unit` 600→800. Added `get_effective_output_limit()` method.
-- `workflows/knowledge_extraction.py`: Added `KNOWN_UNAVAILABLE` set for defensive fallback filtering in M19.
-- `workflows/temporal_agent.py`: Forwards `scenario_description` and `entity_roster` to BranchingStrategy.
-- `e2e_workflows/e2e_runner.py`: Injects scenario context before branching simulation. Passes `animism_level` and `prior_dialog_beats` to dialog synthesis. Added `_extract_dialog_beats()` accumulator.
-
-### Configurable `max_parallel_workers`
-
-Added `max_parallel_workers` field to `TemporalConfig` (default 5, range 0-20). Acts as a global ceiling for all parallel LLM call subsystems. Set to `0` for max parallelism (no ceiling — uses as many workers as items available):
-- **BranchingStrategy**: forward exploration workers (replaces hardcoded `min(5, branch_count*2)`)
-- **PortalStrategy**: ceiling for `max_antecedent_workers` in backward exploration
-- **e2e_runner**: ceiling for `max_training_workers` in parallel tensor training
-
-Override via environment: `TIMEPOINT_MAX_PARALLEL_WORKERS=10`. Works independently of `TIMEPOINT_FAST_SIMJUDGED` mode.
-
-OpenRouter guidance: 5-10 recommended for paid accounts ($1 balance = 1 RPS). Hard cap at 20.
-
-**Files:** `generation/config_schema.py`, `workflows/branching_strategy.py`, `workflows/portal_strategy.py`, `e2e_workflows/e2e_runner.py`, `generation/templates/showcase/castaway_colony_branching.json`
+Static analysis (Bandit + Semgrep) integrated. All HIGH findings resolved:
+- Embedding index uses numpy `.npz` + JSON sidecar (safe serialization)
+- All DB queries parameterized
+- No hardcoded secrets -- environment variable patterns only
 
 ## Commits
 `type(scope): description` - types: feat, fix, refactor, test, docs, chore

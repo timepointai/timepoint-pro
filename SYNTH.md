@@ -12,7 +12,7 @@
 |-------|---------|--------|-------|
 | **Phase 1** | ADSR Envelopes | **COMPLETE** | 53 unit tests |
 | **Phase 2** | Voice Controls | **COMPLETE** | Integrated |
-| **Phase 3** | Patch System | **COMPLETE** | 15 templates with patch metadata |
+| **Phase 3** | Patch System | **COMPLETE** | 21 templates with patch metadata |
 | **Phase 4** | Event Monitoring | Specification | - |
 | **ADPRS Phase 1** | Fidelity Envelope + Trajectory Tracker | **COMPLETE** | 50 unit tests |
 | **ADPRS Phase 2** | Cold/Warm Fitting + Harmonic Extension | **COMPLETE** | 38 unit tests, 6 integration |
@@ -105,8 +105,8 @@ decision = scheduler.schedule("entity_1", t_ms=5000)
 **Patch System** (`generation/templates/loader.py`):
 - `TemplateLoader` with `get_all_patches()`, `list_patch_categories()`
 - `PatchInfo` dataclass with name, category, tags, author, version, description
-- 9 patch categories: corporate, historical, crisis, mystical, mystery, directorial, portal, space, scifi, convergence
-- 15 JSON templates with patch metadata in `generation/templates/`
+- 10 patch categories: corporate, historical, crisis, mystical, mystery, directorial, portal, space, scifi, convergence
+- 21 JSON templates with patch metadata in `generation/templates/`
 
 **Template Organization**:
 - `generation/templates/showcase/` - 12 showcase scenarios (including `castaway_colony_branching` — full 19-mechanism showcase)
