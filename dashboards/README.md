@@ -29,6 +29,11 @@ The API provides real-time access to the runs database via FastAPI.
 | GET | `/api/convergence-sets` | List convergence sets with filtering |
 | GET | `/api/convergence-set/{set_id}` | Get detailed convergence set info |
 
+**Planned:**
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/data-export/{run_id}` | Bulk export: causal graphs, tensors, dialogs, convergence sets (for SNAG-Bench Axis 2 / Proteus) |
+
 ## Quick Start
 
 ### Installation

@@ -91,14 +91,10 @@ PRESETS (run by tier or category):
     ./run.sh quick                   Quick-tier templates (~$0.02-0.05 each)
     ./run.sh standard                Standard-tier templates (~$0.05-0.20)
     ./run.sh comprehensive           Comprehensive templates (~$0.20-1.00)
-    ./run.sh core                    All 19 mechanism tests (M1-M19)
-    ./run.sh showcase                10 production-ready scenarios
-    ./run.sh portal                  4 backward reasoning scenarios
+    ./run.sh showcase                Production-ready scenarios
 
-DIRECT TEMPLATES (41 total):
+DIRECT TEMPLATES:
     ./run.sh board_meeting           Showcase: Board meeting simulation
-    ./run.sh startup_unicorn         Portal: $1B valuation backward reasoning
-    ./run.sh m07_causal_chains       Core: Causal chain mechanism test
     ./run.sh convergence_simple      Test: Convergence evaluation
 
 E2E TESTING:
@@ -129,7 +125,7 @@ QUICK EXAMPLES:
     ./run.sh info                    Show system info
 
 Run './run.sh <command> --help' for command-specific help.
-Run './run.sh help' for full documentation with all 41 templates.
+Run './run.sh help' for full documentation.
 EOF
 }
 
@@ -150,10 +146,7 @@ RUN - Execute Simulations
         quick           All quick-tier templates (~2-3 min each)
         standard        All standard-tier templates (~5-10 min each)
         comprehensive   All comprehensive-tier templates (~15-30 min)
-        stress          All stress-tier templates (~30-60 min)
-        core            All 19 core mechanism tests
         showcase        Production-ready scenarios
-        portal          Backward reasoning scenarios
         convergence     Convergence evaluation tests
         all             ALL templates (warning: expensive!)
 
@@ -310,59 +303,32 @@ API - API Server Operations
     ./run.sh api <ACTION> [OPTIONS]
 
 ================================================================================
-ALL 41 TEMPLATES
+ALL TEMPLATES (21)
 ================================================================================
 
-CORE - Mechanism Isolation Tests (19)
--------------------------------------
-  m01_heterogeneous_fidelity    M1: Different resolution levels in same scene
-  m02_progressive_training      M2: Entity quality improves through queries
-  m03_exposure_events           M3: Knowledge propagates with provenance
-  m04_physics_validation        M4: Info conservation, energy budget, inertia
-  m05_lazy_resolution           M5: Query-driven resolution elevation
-  m06_tensor_compression        M6: TTM tensor compression/reconstruction
-  m07_causal_chains             M7: Temporal ordering, causal parent validation
-  m08_embodied_states           M8: Physical state affects cognition
-  m09_on_demand_entities        M9: Missing entities auto-generated
-  m10_scene_atmosphere          M10: Environment influences behavior
-  m11_dialog_synthesis          M11: Multi-turn contextual conversation
-  m12_counterfactual            M12: Timeline branches at decision points
-  m13_relationships             M13: Trust/tension evolves over time
-  m14_circadian                 M14: Time-of-day affects behavior
-  m15_prospection               M15: Entity models future states
-  m16_animistic                 M16: Non-human entities have agency
-  m17_modal_causality           M17: PORTAL backward reasoning
-  m18_model_selection           M18: Action-appropriate LLM selection
-  m19_knowledge_extraction      M19: Semantic knowledge extraction from dialog
-
-SHOWCASE - Production Scenarios (10)
+SHOWCASE - Production Scenarios (13)
 ------------------------------------
   board_meeting                 Tech startup board meeting (M1,M7,M11,M13)
   jefferson_dinner              1790 Compromise Dinner (M3,M7,M11,M13)
   hospital_crisis               ER night shift (M8,M14)
   detective_prospection         Holmes models Moriarty (M15,M7)
   kami_shrine                   Japanese shrine ritual (M16)
-  vc_pitch_forward                Pre-seed pitch - forward causality
+  sec_investigation             SEC insider trading (M3,M7,M19)
+  vc_pitch_forward              Pre-seed pitch - forward causality
   vc_pitch_branching            Pre-seed pitch - counterfactual
   vc_pitch_roadshow             Multi-meeting VC roadshow
   vc_pitch_strategies           Multiple negotiation strategies
   hound_shadow_directorial      Detective on foggy moors - directorial
+  mars_mission_portal           Mars mission failure - backward reasoning
+  castaway_colony_branching     Alien planet survival - all 19 mechanisms
 
-PORTAL - Backward Reasoning (4)
--------------------------------
-  startup_unicorn               PORTAL: $1B valuation → founding
-  presidential_election         PORTAL: Election victory → candidacy
-  academic_tenure               PORTAL: Tenure → PhD start
-  startup_failure               PORTAL: Shutdown → founding
-
-STRESS - High Complexity (6)
-----------------------------
-  constitutional_convention_day1  28 entities, 500 timepoints ($500-1000)
-  scarlet_study_deep              101 timepoints, all 19 mechanisms ($50-100)
-  empty_house_flashback           81 timepoints directorial ($30-50)
-  final_problem_branching         61 timepoints, 4 branches ($25-40)
-  sign_loops_cyclical             Cyclical temporal patterns ($20-35)
-  tensor_resolution_hybrid        Tests all tensor resolution paths
+PERSONA - Domain Evaluator Scenarios (5)
+-----------------------------------------
+  agent1_regulatory_stress      Corporate finance / regulatory (PORTAL)
+  agent2_mission_failure        Aerospace / mission assurance (BRANCHING)
+  agent3_litigation_discovery   Legal tech startup (FORWARD)
+  agent3_litigation_portal      Legal tech startup (PORTAL)
+  agent4_elk_migration          Wildlife ecology (CYCLICAL)
 
 CONVERGENCE - Consistency Testing (3)
 -------------------------------------
@@ -376,7 +342,6 @@ TEMPLATE TIERS
   quick          Fast tests (~30s-2min, <$0.05 each)
   standard       Moderate tests (~2-5 min, $0.05-0.20)
   comprehensive  Thorough tests (~5-15 min, $0.20-1.00)
-  stress         Complex tests (~15-60+ min, $20-1000)
 
 ================================================================================
 EXAMPLES
@@ -384,13 +349,12 @@ EXAMPLES
 
 # Direct template execution
 ./run.sh board_meeting                    # Showcase template
-./run.sh startup_unicorn                  # Portal template
-./run.sh m07_causal_chains                # Core mechanism test
+./run.sh castaway_colony_branching        # All 19 mechanisms
 
 # By tier/category
 ./run.sh quick                            # All quick-tier
 ./run.sh run --tier quick --parallel 4    # Quick with parallelism
-./run.sh run --category core              # All 19 mechanism tests
+./run.sh run --category showcase          # All showcase scenarios
 
 # Free models ($0 cost)
 ./run.sh run --free board_meeting         # Best free model
@@ -574,7 +538,7 @@ cmd_run() {
             --nl) nl_prompt="$2"; shift 2 ;;
             --nl-entities) nl_entities="$2"; shift 2 ;;
             --nl-timepoints) nl_timepoints="$2"; shift 2 ;;
-            quick|standard|comprehensive|stress|core|showcase|portal|convergence|all)
+            quick|standard|comprehensive|showcase|convergence|all)
                 preset="$1"; shift ;;
             -*)
                 print_error "Unknown option: $1"
@@ -649,8 +613,8 @@ cmd_run() {
         py_args+=(--template "$template")
     elif [[ -n "$preset" ]]; then
         case "$preset" in
-            quick|standard|comprehensive|stress) py_args+=(--tier "$preset") ;;
-            core|showcase|portal|convergence) py_args+=(--category "$preset") ;;
+            quick|standard|comprehensive) py_args+=(--tier "$preset") ;;
+            showcase|convergence) py_args+=(--category "$preset") ;;
             all) ;; # No filter = all
         esac
     fi
@@ -758,8 +722,8 @@ USAGE:
     ./run.sh <template_name>             (direct template)
 
 PRESETS:
-    quick, standard, comprehensive, stress
-    core, showcase, portal, convergence, all
+    quick, standard, comprehensive
+    showcase, convergence, all
 
 SELECTION OPTIONS:
     --tier TIER           Filter by tier
@@ -1914,28 +1878,6 @@ print(len(mm.get_recent_runs(1000)))
 # TEMPLATE SHORTCUTS - All 41 templates accessible by name
 # ============================================================================
 
-# Core mechanism tests (M1-M19)
-CORE_TEMPLATES=(
-    "m01_heterogeneous_fidelity"
-    "m02_progressive_training"
-    "m03_exposure_events"
-    "m04_physics_validation"
-    "m05_lazy_resolution"
-    "m06_tensor_compression"
-    "m07_causal_chains"
-    "m08_embodied_states"
-    "m09_on_demand_entities"
-    "m10_scene_atmosphere"
-    "m11_dialog_synthesis"
-    "m12_counterfactual"
-    "m13_relationships"
-    "m14_circadian"
-    "m15_prospection"
-    "m16_animistic"
-    "m17_modal_causality"
-    "m18_model_selection"
-)
-
 # Showcase templates
 SHOWCASE_TEMPLATES=(
     "board_meeting"
@@ -1943,6 +1885,7 @@ SHOWCASE_TEMPLATES=(
     "hospital_crisis"
     "detective_prospection"
     "kami_shrine"
+    "sec_investigation"
     "vc_pitch_forward"
     "vc_pitch_branching"
     "vc_pitch_roadshow"
@@ -1952,22 +1895,13 @@ SHOWCASE_TEMPLATES=(
     "castaway_colony_branching"
 )
 
-# Portal templates
-PORTAL_TEMPLATES=(
-    "startup_unicorn"
-    "presidential_election"
-    "academic_tenure"
-    "startup_failure"
-)
-
-# Stress templates
-STRESS_TEMPLATES=(
-    "constitutional_convention_day1"
-    "scarlet_study_deep"
-    "empty_house_flashback"
-    "final_problem_branching"
-    "sign_loops_cyclical"
-    "tensor_resolution_hybrid"
+# Persona templates
+PERSONA_TEMPLATES=(
+    "agent1_regulatory_stress"
+    "agent2_mission_failure"
+    "agent3_litigation_discovery"
+    "agent3_litigation_portal"
+    "agent4_elk_migration"
 )
 
 # Convergence templates
@@ -1980,7 +1914,7 @@ CONVERGENCE_TEMPLATES=(
 # Function to check if argument is a known template
 is_template() {
     local name="$1"
-    for t in "${CORE_TEMPLATES[@]}" "${SHOWCASE_TEMPLATES[@]}" "${PORTAL_TEMPLATES[@]}" "${STRESS_TEMPLATES[@]}" "${CONVERGENCE_TEMPLATES[@]}"; do
+    for t in "${SHOWCASE_TEMPLATES[@]}" "${PERSONA_TEMPLATES[@]}" "${CONVERGENCE_TEMPLATES[@]}"; do
         if [[ "$t" == "$name" ]]; then
             return 0
         fi
@@ -2049,30 +1983,18 @@ main() {
             cmd_info
             ;;
         # Shortcuts - direct presets
-        quick|standard|comprehensive|stress|core|showcase|portal|all)
-            cmd_run "$cmd" "$@"
-            ;;
-        # Core mechanism templates (M1-M19)
-        m01_*|m02_*|m03_*|m04_*|m05_*|m06_*|m07_*|m08_*|m09_*|m10_*|m11_*|m12_*|m13_*|m14_*|m15_*|m16_*|m17_*|m18_*|m19_*)
+        quick|standard|comprehensive|showcase|all)
             cmd_run "$cmd" "$@"
             ;;
         # Showcase templates
-        board_meeting|jefferson_dinner|hospital_crisis|detective_prospection|kami_shrine)
+        board_meeting|jefferson_dinner|hospital_crisis|detective_prospection|kami_shrine|sec_investigation)
             cmd_run "$cmd" "$@"
             ;;
-        vc_pitch_forward|vc_pitch_branching|vc_pitch_roadshow|vc_pitch_strategies|hound_shadow_directorial|mars_mission_portal|castaway_colony_branching|sec_investigation)
+        vc_pitch_forward|vc_pitch_branching|vc_pitch_roadshow|vc_pitch_strategies|hound_shadow_directorial|mars_mission_portal|castaway_colony_branching)
             cmd_run "$cmd" "$@"
             ;;
         # Persona templates
         agent1_regulatory_stress|agent2_mission_failure|agent3_litigation_discovery|agent3_litigation_portal|agent4_elk_migration)
-            cmd_run "$cmd" "$@"
-            ;;
-        # Portal templates
-        startup_unicorn|presidential_election|academic_tenure|startup_failure)
-            cmd_run "$cmd" "$@"
-            ;;
-        # Stress templates
-        constitutional_convention_day1|scarlet_study_deep|empty_house_flashback|final_problem_branching|sign_loops_cyclical|tensor_resolution_hybrid)
             cmd_run "$cmd" "$@"
             ;;
         # Convergence templates
