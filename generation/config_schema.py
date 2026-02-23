@@ -255,7 +255,6 @@ class TemporalMode(str, Enum):
     """Temporal causality modes"""
     FORWARD = "forward"
     DIRECTORIAL = "directorial"
-    NONLINEAR = "nonlinear"
     BRANCHING = "branching"
     CYCLICAL = "cyclical"
     PORTAL = "portal"  # Backward inference from fixed endpoint to origin
