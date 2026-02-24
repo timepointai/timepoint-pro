@@ -453,12 +453,14 @@ The `--portal-quick` flag is designed for fast demos and iteration. It halves th
 
 ### Models used
 
-All inference via OpenRouter. MIT/Apache 2.0/Llama-licensed models only --- all permit commercial synthetic data generation.
+All inference via OpenRouter using open-weight models.
 
 | Model | License | Role |
 |-------|---------|------|
 | Llama 3.1 70B Instruct | Llama | Per-character dialog generation, entity population, knowledge extraction, relevance scoring |
 | Llama 3.1 405B Instruct | Llama | Portal candidate scoring, dialog steering, semantic quality evaluation |
+
+**Training data note:** This example run used Llama models. Meta's Llama license permits commercial use but restricts using Llama outputs to train non-Llama models. If you plan to fine-tune a non-Llama model with simulation outputs, use DeepSeek (MIT) or Mistral (Apache 2.0) models instead: `./run.sh run --model deepseek/deepseek-r1 mars_mission_portal`. See [Training Data & Model Licensing](README.md#training-data--model-licensing).
 
 ---
 
@@ -532,13 +534,16 @@ print(f"Outcome similarity: {results['outcome_mean_similarity']}")
 
 Training data auto-uploads to [Oxen.ai](https://oxen.ai) when `OXEN_API_KEY` is set. Without it, everything saves locally.
 
+**Model licensing requirement:** When generating data for Oxen upload / fine-tuning, use models with unrestricted training data licenses (MIT or Apache 2.0). DeepSeek and Mistral models are fully permissive. Llama models restrict using outputs to train non-Llama models. See [Training Data & Model Licensing](README.md#training-data--model-licensing).
+
 ### Auto-upload during a run
 
 ```bash
 export OPENROUTER_API_KEY=your_key
 export OXEN_API_KEY=your_oxen_token
 
-./run.sh run mars_mission_portal --portal-quick
+# Use a training-safe model (MIT license, fully unrestricted)
+./run.sh run --model deepseek/deepseek-r1 mars_mission_portal --portal-quick
 # -> local JSONL + SQLite as usual
 # -> auto-uploads training_*.jsonl to Oxen.ai with commit history
 # -> prints dataset URL and fine-tune URL on completion
