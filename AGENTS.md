@@ -56,7 +56,7 @@ Per-character dialog generation via LangGraph pipeline (`workflows/dialog_steeri
 ```bash
 ./run.sh list                    # List all 21 templates
 ./run.sh run board_meeting       # Run single template
-./run.sh run --category core     # Run by category
+./run.sh run --category showcase  # Run by category
 ./run.sh quick                   # Quick tier tests
 ./run.sh run <template> --portal-simjudged-quick  # Portal mode with sim-judging
 ./run.sh run <template> --portal-quick           # Portal quick mode (5 steps)
