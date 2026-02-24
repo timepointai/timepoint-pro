@@ -157,7 +157,7 @@ Each mode changes what "time" means and how the simulation validates consistency
 
 ### Choosing a Mode
 
-**Use FORWARD when:** You want realistic forward simulation. Causes precede effects. Knowledge flows forward. No magic, no paradoxes. This is the default for business scenarios, historical reconstruction, training data generation.
+**Use FORWARD when:** You want realistic forward simulation. Causes precede effects. Knowledge flows forward. No magic, no paradoxes. This is the default for business scenarios, historical reconstruction, training data generation. If generating training data for fine-tuning, use a model with an unrestricted license (DeepSeek or Mistral) --- see [Training Data & Model Licensing](README.md#training-data--model-licensing).
 
 **Use PORTAL when:** You know the endpoint and want to discover paths there. "What decisions lead to a $1B exit?" "What events preceded this crisis?" Works backward from a fixed future, finding plausible routes from the present.
 

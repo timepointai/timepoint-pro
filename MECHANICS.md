@@ -1044,13 +1044,20 @@ Bracket-depth matching handles common LLM failure modes: text before/after JSON,
 
 ### License Compliance
 
-All models in the registry permit commercial use including synthetic data generation:
-- **MIT** (DeepSeek): Most permissive, no restrictions
-- **Apache 2.0** (Mistral): Permissive, attribution required
-- **Llama 3.1/4**: Commercial use allowed, some restrictions on scale
-- **Qwen**: Commercial use allowed
+All models in the registry permit commercial use. However, not all permit unrestricted use of outputs as training data:
 
-Models explicitly excluded: OpenAI (usage restrictions), Anthropic (synthetic data restrictions), Google (commercial restrictions).
+**Unrestricted for training data (outputs can train any model):**
+- **MIT** (DeepSeek Chat, DeepSeek R1): Most permissive, no restrictions
+- **Apache 2.0** (Mistral 7B, Mixtral 8x7B, Mixtral 8x22B): Permissive, attribution required
+
+**Restricted for training data:**
+- **Llama 3.1/4**: Commercial use allowed, but Meta's license **prohibits using Llama outputs to train non-Llama models**. Use for simulation is fine; use outputs to fine-tune a Llama model is fine; use outputs to fine-tune DeepSeek/Qwen/Mistral/custom models is not permitted.
+- **Qwen**: Commercial use allowed, permissive for most training uses
+- **Google Gemini**: TOS restricts synthetic data generation entirely (opt-in only via `--gemini-flash`)
+
+**If you intend to use simulation outputs as training data**, pass `for_training_data=True` to `select_model()` or use `get_training_safe_models()`. These filter to MIT/Apache-2.0 models only.
+
+Models explicitly excluded from the registry: OpenAI (usage restrictions), Anthropic (synthetic data restrictions).
 
 ### Free Model Support
 
