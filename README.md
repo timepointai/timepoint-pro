@@ -73,6 +73,21 @@ PORTAL stands out: generates candidate antecedent states at each backward step, 
 
 Outputs: JSONL/SQLite for ML, markdown/Fountain for humans, Oxen.ai auto-upload for versioning.
 
+## Training Data & Model Licensing
+
+If you intend to use simulation outputs as training data for fine-tuning, you **must** use models with licenses that permit it. Not all open-source models allow unrestricted use of their outputs for training.
+
+| License | Models | Training Data Status |
+|---------|--------|---------------------|
+| **MIT** | DeepSeek Chat, DeepSeek R1 | Fully unrestricted --- outputs can train any model |
+| **Apache 2.0** | Mistral 7B, Mixtral 8x7B, Mixtral 8x22B | Fully unrestricted --- outputs can train any model |
+| **Llama** | Llama 3.1 8B/70B/405B, Llama 4 Scout | **Restricted** --- Meta's license prohibits using Llama outputs to train non-Llama models |
+| **Qwen** | Qwen 2.5 7B/72B, QwQ 32B | Permissive for most uses |
+
+**Default behavior:** The model selector (`M18`) automatically filters to training-safe models (MIT/Apache-2.0) when `for_training_data=True`. When `OXEN_API_KEY` is set, training data upload uses this filter.
+
+**If you plan to fine-tune a non-Llama model** (e.g., Qwen, Mistral, or a custom model), ensure your simulation runs use only MIT or Apache-2.0 licensed models: `./run.sh run --model deepseek/deepseek-r1 your_template`
+
 ## Use Cases Today
 - Corporate strategy & crisis simulation
 - Policy, history, and historical counterfactuals
@@ -87,7 +102,24 @@ This is intentional: the public repo must remain forkable and self-contained. An
 
 **Planned: `/api/data-export`** --- A future endpoint for bulk export of simulation artifacts (causal graphs, entity tensors, dialog corpora, convergence sets) in standardized formats. Primary consumers: SNAG-Bench Axis 2 (causal reasoning benchmarks) and Proteus (simulation-to-training pipeline). This endpoint will live in the dashboard API (`dashboards/api/server.py`) and serve read-only data from the existing runs database. No auth required for local use; the Pro-Cloud private wrapper will gate access through its own auth layer.
 
-**Pro-Cloud boundary** --- `/api/usage` and `/api/budget` are not implemented here. The private Pro-Cloud wrapper decides whether those belong in shared Billing or stay as wrapper-local endpoints. This repo exposes simulation data only.
+**Pro-Cloud boundary** --- `/api/usage` and `/api/budget` are not implemented here. These endpoints live in the Pro-Cloud private wrapper, which tracks usage locally (per-run `UsageRecord` table) and optionally forwards to the shared Billing service when `BILLING_SERVICE_URL` is configured. This repo exposes simulation data only.
+
+## Cloud Execution via Pro-Cloud
+
+For long-running simulations and persistent storage, a private hosted layer wraps this engine with production concerns:
+
+- **Persistent storage** --- Postgres replaces SQLite; results survive deploys
+- **Job queue** --- Celery + Redis for cancellable, deploy-surviving jobs
+- **Auth** --- JWT + API key with Postgres persistence (this repo's in-memory key scaffold is for local dev only)
+- **Budget enforcement** --- Pre-submission budget checks, per-run cost tracking, optional forwarding to shared Billing service
+- **Usage tracking** --- `UsageRecord` table records every run start/complete with cost and token counts
+- **Railway deployment** --- Internal networking to Billing, Auth, and Web services
+
+The cloud layer includes this repo as a git submodule and adds no runtime dependencies back into it. See the engine's API for simulation data; the cloud layer gates access and adds `/api/usage` + `/api/budget` endpoints.
+
+## Sample Training Data
+
+A small sample JSONL file is included at [`examples/sample_training_data.jsonl`](examples/sample_training_data.jsonl). Each line is a prompt/completion pair generated from a PORTAL mode simulation (backward reasoning from a fixed future state). The format demonstrates the structured context (M3 knowledge provenance, M6 entity state, M7 causal history, M10 atmosphere, M11 dialog context, M13 relationships) that makes SNAG training data uniquely rich.
 
 ## Documentation
 - [EXAMPLE_RUN.md](EXAMPLE_RUN.md) --- complete walkthrough
@@ -100,4 +132,4 @@ This is intentional: the public repo must remain forkable and self-contained. An
 **Sean McDonald** ([@seanmcdonaldxyz](https://x.com/seanmcdonaldxyz) · [realityinspector](https://github.com/realityinspector))
 
 License: Apache 2.0
-Models: fully permissive open weights for training data; commercial frontier models for coding, mostly documented in git commit history.
+Models: open-weight models via OpenRouter for simulation (see Training Data & Model Licensing for restrictions); commercial frontier models for coding, documented in git commit history.

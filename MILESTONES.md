@@ -53,14 +53,16 @@ Each mode has its own validation rules, fidelity allocation strategy, and genera
 
 ### Model Stack (All Open Source)
 
-| License | Models |
-|---------|--------|
-| **MIT** | DeepSeek Chat, DeepSeek R1 |
-| **Apache 2.0** | Mistral 7B, Mixtral 8x7B, Mixtral 8x22B |
-| **Llama License** | Llama 3.1 8B/70B/405B, Llama 4 Scout |
-| **Qwen License** | Qwen 2.5 7B/72B, QwQ 32B |
+| License | Models | Training Data |
+|---------|--------|---------------|
+| **MIT** | DeepSeek Chat, DeepSeek R1 | Unrestricted --- outputs can train any model |
+| **Apache 2.0** | Mistral 7B, Mixtral 8x7B, Mixtral 8x22B | Unrestricted --- outputs can train any model |
+| **Llama License** | Llama 3.1 8B/70B/405B, Llama 4 Scout | Restricted --- outputs cannot train non-Llama models |
+| **Qwen License** | Qwen 2.5 7B/72B, QwQ 32B | Permissive for most uses |
 
 **Explicitly excluded:** OpenAI, Anthropic, Google (commercial/synthetic data restrictions)
+
+For fine-tuning non-Llama models, use DeepSeek (MIT) or Mistral (Apache 2.0) exclusively.
 
 ### Architecture
 

@@ -9,8 +9,13 @@ This module provides intelligent model selection based on:
 
 All models must be:
 1. Available on OpenRouter
-2. Open source with licenses permitting commercial synthetic data generation
+2. Open source with licenses permitting commercial use
 3. NOT from major labs that prohibit synthetic data (no OpenAI, Anthropic, Google)
+
+Training data licensing note:
+- MIT (DeepSeek) and Apache-2.0 (Mistral) models have fully unrestricted outputs
+- Llama models restrict using outputs to train non-Llama models
+- Use for_training_data=True in select_model() to filter to unrestricted models only
 
 Usage:
     from llm_service.model_selector import ModelSelector, ActionType
@@ -146,6 +151,7 @@ class ModelProfile:
     # Restrictions
     allows_synthetic_data: bool = True # Can use for synthetic data generation
     allows_commercial: bool = True     # Commercial use allowed
+    training_data_unrestricted: bool = True  # Outputs can train ANY model (MIT/Apache-2.0 only)
 
     # Notes
     notes: str = ""
@@ -158,7 +164,8 @@ class ModelProfile:
 MODEL_REGISTRY: Dict[str, ModelProfile] = {
     # =========================================================================
     # LLAMA FAMILY (Meta) - Llama 3.x license allows commercial use
-    # Note: Llama license restricts using outputs to train non-Llama models
+    # WARNING: Llama license restricts using outputs to train non-Llama models.
+    # training_data_unrestricted=False because outputs cannot freely train any model.
     # =========================================================================
     "meta-llama/llama-3.1-8b-instruct": ModelProfile(
         model_id="meta-llama/llama-3.1-8b-instruct",
@@ -176,6 +183,7 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
         relative_speed=2.0,
         relative_cost=0.3,
         relative_quality=0.7,
+        training_data_unrestricted=False,  # Llama license restricts training non-Llama models
         notes="Fast, cheap, good for simple tasks"
     ),
 
@@ -198,6 +206,7 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
         relative_speed=1.0,
         relative_cost=1.0,
         relative_quality=1.0,
+        training_data_unrestricted=False,  # Llama license restricts training non-Llama models
         notes="Excellent general-purpose model, good balance"
     ),
 
@@ -224,6 +233,7 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
         relative_speed=0.5,
         relative_cost=3.0,
         relative_quality=1.3,
+        training_data_unrestricted=False,  # Llama license restricts training non-Llama models
         notes="Highest quality Llama, use for complex reasoning"
     ),
 
@@ -246,6 +256,7 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
         relative_speed=1.5,
         relative_cost=0.8,
         relative_quality=1.1,
+        training_data_unrestricted=False,  # Llama license restricts training non-Llama models
         notes="Newer Llama 4 model, good speed/quality balance"
     ),
 
@@ -453,6 +464,7 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
         relative_cost=0.5,       # $0.50/M input, $3.00/M output
         relative_quality=1.2,    # High quality reasoning
         allows_synthetic_data=False,  # TOS restriction - explicit opt-in only
+        training_data_unrestricted=False,  # Google TOS prohibits
         notes="1M context, multimodal, fast inference. Use --gemini-flash flag for explicit selection."
     ),
 
@@ -787,6 +799,7 @@ class ModelSelector:
         prefer_speed: bool = False,
         prefer_cost: bool = False,
         exclude_models: Optional[Set[str]] = None,
+        for_training_data: bool = False,
     ) -> str:
         """
         Select the best model for an action.
@@ -798,6 +811,11 @@ class ModelSelector:
             prefer_speed: Prefer faster inference
             prefer_cost: Prefer lower cost
             exclude_models: Models to exclude (e.g., for retry chains)
+            for_training_data: If True, only select models whose outputs can
+                freely train ANY model (MIT/Apache-2.0 only). Required when
+                outputs will be used as training data for non-Llama models
+                or uploaded to Oxen.ai. Llama models are excluded because
+                Meta's license restricts using outputs to train non-Llama models.
 
         Returns:
             Model ID string (e.g., "meta-llama/llama-3.1-70b-instruct")
@@ -820,6 +838,8 @@ class ModelSelector:
             if model_id in exclude_models:
                 continue
             if not profile.allows_commercial or not profile.allows_synthetic_data:
+                continue
+            if for_training_data and not profile.training_data_unrestricted:
                 continue
             if not required_caps.issubset(profile.capabilities):
                 continue
@@ -868,6 +888,7 @@ class ModelSelector:
         action: ActionType,
         chain_length: int = 3,
         requirements: Optional[Dict[str, Any]] = None,
+        for_training_data: bool = False,
     ) -> List[str]:
         """
         Get a chain of models for retry fallback.
@@ -879,6 +900,8 @@ class ModelSelector:
             action: Type of action
             chain_length: Number of models in chain
             requirements: Additional requirements
+            for_training_data: If True, only use models with unrestricted
+                training data licenses (MIT/Apache-2.0)
 
         Returns:
             List of model IDs in fallback order
@@ -888,7 +911,8 @@ class ModelSelector:
 
         # First: quality-preferred model
         model = self.select_model(
-            action, requirements, prefer_quality=True, exclude_models=excluded
+            action, requirements, prefer_quality=True, exclude_models=excluded,
+            for_training_data=for_training_data
         )
         chain.append(model)
         excluded.add(model)
@@ -898,7 +922,8 @@ class ModelSelector:
 
         # Second: balanced model (different provider if possible)
         model = self.select_model(
-            action, requirements, exclude_models=excluded
+            action, requirements, exclude_models=excluded,
+            for_training_data=for_training_data
         )
         chain.append(model)
         excluded.add(model)
@@ -908,11 +933,30 @@ class ModelSelector:
 
         # Third: cost-efficient model as final fallback
         model = self.select_model(
-            action, requirements, prefer_cost=True, exclude_models=excluded
+            action, requirements, prefer_cost=True, exclude_models=excluded,
+            for_training_data=for_training_data
         )
         chain.append(model)
 
         return chain[:chain_length]
+
+    def get_training_safe_models(self) -> List[str]:
+        """
+        List models whose outputs can freely train ANY model.
+
+        These models have MIT or Apache-2.0 licenses with no restrictions
+        on using outputs as training data. Use these when generating data
+        for fine-tuning non-Llama models or uploading to Oxen.ai.
+
+        Returns:
+            List of model IDs with unrestricted training data licenses
+        """
+        return [
+            model_id for model_id, profile in self.registry.items()
+            if profile.training_data_unrestricted
+            and profile.allows_commercial
+            and profile.allows_synthetic_data
+        ]
 
     def get_model_profile(self, model_id: str) -> Optional[ModelProfile]:
         """Get profile for a specific model."""
