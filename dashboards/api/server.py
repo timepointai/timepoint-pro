@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 from typing import List, Optional
+import json
 import math
 
 from models import (
@@ -321,6 +322,39 @@ async def get_convergence_set(set_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/data-export/{run_id}", tags=["Content"])
+async def export_run_tdf(run_id: str):
+    """Export a run's data as TDF JSONL."""
+    import hashlib
+    from datetime import datetime, timezone
+    from fastapi.responses import JSONResponse
+
+    run_meta = db.get_run_details(run_id)
+
+    if not run_meta:
+        raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
+
+    record = {
+        "id": run_id,
+        "version": "1.0.0",
+        "source": "pro",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "provenance": {
+            "generator": "timepoint-pro",
+            "run_id": run_id,
+        },
+        "payload": {
+            "metadata": dict(run_meta) if run_meta else {},
+        },
+        "tdf_hash": "",
+    }
+
+    canonical = json.dumps(record["payload"], sort_keys=True, default=str)
+    record["tdf_hash"] = hashlib.sha256(canonical.encode()).hexdigest()
+
+    return JSONResponse(content=record)
 
 
 if __name__ == "__main__":
