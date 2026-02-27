@@ -12,10 +12,26 @@ The value is exponential with scale: the larger and more intricate the social sy
 
 Render any historical, present, or future social moment---like a synthesizer renders sound waves---with variable fidelity: coarse tensors for broad arcs, rich dialog only at critical pivots.
 
+|                        | RAG                          | SNAG (this engine)                             |
+|------------------------|------------------------------|------------------------------------------------|
+| **Grounds LLMs in**   | Retrieved documents          | Synthesized social graphs                      |
+| **Maintains**          | Document relevance           | Causal provenance + temporal consistency        |
+| **Scales to**          | Millions of documents        | Dozens of entities, hundreds of timepoints      |
+| **Output**             | Grounded answers             | Auditable causal simulations + training data    |
+
 Costs: $0.15--$1.00 per run. All 21 templates verified Feb 16, 2026.
 
 -> Full example run (every artifact): [EXAMPLE_RUN.md](EXAMPLE_RUN.md)
 -> Sample dialogs and character arcs: [EXAMPLE_DIALOGS.md](EXAMPLE_DIALOGS.md)
+
+```mermaid
+flowchart TD
+    S["Define Scenario"] --> G["Generate Social Graph"]
+    G --> P["Propagate States · 19 Mechanisms"]
+    P --> T["Apply Temporal Mode"]
+    T --> D["Per-Character Dialog Synthesis"]
+    D --> O["Export: JSONL · SQLite · Fountain · TDF"]
+```
 
 ## Quick Start
 ```bash
@@ -49,6 +65,15 @@ Flagship examples:
 A Rendered Future is a scored, provenance-tracked causal subgraph — a structured projection of how the present connects to specific future states. Pro reads the Clockchain's Rendered Past as grounding and produces Rendered Futures as TDF records, creating a flywheel:
 
 Flash renders the past → Clockchain stores it → Pro reads it as grounding, renders near-future causal paths → SNAG-Bench scores Causal Resolution → Proteus validates against reality → validated paths strengthen the Clockchain's Bayesian prior → all future renderings improve.
+
+```mermaid
+flowchart LR
+    F["Flash"] -->|render past| C["Clockchain"]
+    C -->|ground| P["Pro"]
+    P -->|simulate future| S["SNAG-Bench"]
+    S -->|score quality| Pr["Proteus"]
+    Pr -.->|validate + strengthen| C
+```
 
 **Causal Resolution** = Coverage × Convergence. How much of a scenario has been rendered, and how reliably do repeated runs converge on the same causal structure?
 
