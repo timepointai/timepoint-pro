@@ -12,8 +12,6 @@ The value is exponential with scale: the larger and more intricate the social sy
 
 Render any historical, present, or future social moment---like a synthesizer renders sound waves---with variable fidelity: coarse tensors for broad arcs, rich dialog only at critical pivots.
 
-In the coming immersive VR era, these simulations become places you inhabit, not just read.
-
 Costs: $0.15--$1.00 per run. All 21 templates verified Feb 16, 2026.
 
 -> Full example run (every artifact): [EXAMPLE_RUN.md](EXAMPLE_RUN.md)
@@ -46,7 +44,19 @@ Flagship examples:
 - **Physics-like social forecasting** --- Variable-depth fidelity treats social systems like physical ones: low-res for long horizons, high-res at pivot points.
 - **Superior training data** --- Full causal ancestry, provenance, counterfactuals, quantitative states baked in.
 
-In the immersive VR future, these simulations become *places you visit*. Timepoint is an early portal.
+## Rendered Futures
+
+A Rendered Future is a scored, provenance-tracked causal subgraph — a structured projection of how the present connects to specific future states. Pro reads the Clockchain's Rendered Past as grounding and produces Rendered Futures as TDF records, creating a flywheel:
+
+Flash renders the past → Clockchain stores it → Pro reads it as grounding, renders near-future causal paths → SNAG-Bench scores Causal Resolution → Proteus validates against reality → validated paths strengthen the Clockchain's Bayesian prior → all future renderings improve.
+
+**Causal Resolution** = Coverage × Convergence. How much of a scenario has been rendered, and how reliably do repeated runs converge on the same causal structure?
+
+The fidelity is asymptotic — we approach near-simulacrum on historical dialog because there are very few things a person *could* have said once the model has perfect context for that moment. We'll never reach 1.0, but we're at the steep end of the curve. And the further we render the past, the stronger the Bayesian prior for rendering the future.
+
+The planned **Timepoint Futures Index (TFI)** will measure Rendered Past coverage and Rendered Future quality across the graph.
+
+**Proof of Causal Convergence (PoCC)** is a future protocol concept: rendering convergent causal paths constitutes useful work. Multiple independent renderings that converge on the same causal structure provide a form of validation without ground truth. Pro and Clockchain are the natural anchors for this protocol.
 
 ## Temporal Modes
 | Mode        | Causality Model                    | Best For                              | Example                      |
@@ -69,9 +79,10 @@ PORTAL stands out: generates candidate antecedent states at each backward step, 
 - **Semantic quality gates** --- Three-level evaluation: per-dialog (narrative advancement, conflict specificity, voice distinctiveness), cross-dialog (progression between conversations), and full-run coherence. Surface heuristics filter first; frontier model evaluation runs on passes. Pattern-aware retry for anti-pattern turns.
 - **Extended proception** --- Entities accumulate episodic memories, rumination topics, withheld knowledge, and suppressed impulses across dialogs. These feed back into future dialog generation.
 - **19 composable mechanisms** --- Full spec in [MECHANICS.md](MECHANICS.md).
+- **Planned: M20 Clockchain Grounding** --- Anchor simulations in the canonical temporal graph. Not yet implemented.
 - **Convergence validation** --- Repeat runs, Jaccard on causal graphs -> reliability without labels.
 
-Outputs: JSONL/SQLite for ML, markdown/Fountain for humans, Oxen.ai auto-upload for versioning.
+Outputs: JSONL/SQLite for ML, TDF for suite interoperability, markdown/Fountain for humans, Oxen.ai auto-upload for versioning.
 
 ## Training Data & Model Licensing
 
@@ -86,6 +97,8 @@ If you intend to use simulation outputs as training data for fine-tuning, you **
 
 **Default behavior:** The model selector (`M18`) automatically filters to training-safe models (MIT/Apache-2.0) when `for_training_data=True`. When `OXEN_API_KEY` is set, training data upload uses this filter.
 
+Training data is also valuable for fine-tuning causal reasoning and roleplay models, and as an end-state goal, training diffusion models conditioned on temporal causal graphs.
+
 **If you plan to fine-tune a non-Llama model** (e.g., Qwen, Mistral, or a custom model), ensure your simulation runs use only MIT or Apache-2.0 licensed models: `./run.sh run --model deepseek/deepseek-r1 your_template`
 
 ## Use Cases Today
@@ -93,12 +106,16 @@ If you intend to use simulation outputs as training data for fine-tuning, you **
 - Policy, history, and historical counterfactuals
 - Fine-tuning for causal/temporal/multi-agent reasoning
 - Research platform for social physics
+- Grounding data for autonomous AI agent swarms
+- Composable data assets for the Clockchain
 
 ## Architecture: Isolation by Design
 
 Timepoint Pro is a **standalone simulation engine**. It has no runtime dependencies on Flash, Billing, Clockchain, or any other Timepoint Suite service. All LLM calls go directly to OpenRouter. All data stays in local SQLite + flat files.
 
 This is intentional: the public repo must remain forkable and self-contained. Anyone with an OpenRouter key can run the full pipeline.
+
+**Recent:** TDF export format via `ExportFormatFactory`. Data export API (`/api/data-export/{run_id}`).
 
 **Planned: `/api/data-export`** --- A future endpoint for bulk export of simulation artifacts (causal graphs, entity tensors, dialog corpora, convergence sets) in standardized formats. Primary consumers: SNAG-Bench Axis 2 (causal reasoning benchmarks) and Proteus (simulation-to-training pipeline). This endpoint will live in the dashboard API (`dashboards/api/server.py`) and serve read-only data from the existing runs database. No auth required for local use; the Pro-Cloud private wrapper will gate access through its own auth layer.
 
@@ -126,6 +143,25 @@ A small sample JSONL file is included at [`examples/sample_training_data.jsonl`]
 - [MECHANICS.md](MECHANICS.md) --- all 19 mechanisms
 - [SYNTH.md](SYNTH.md) --- synthesizer paradigm details
 - [QUICKSTART.md](QUICKSTART.md) --- full setup
+
+## Timepoint Suite
+
+Open-source engines for temporal AI. Render the past. Simulate the future. Score the predictions. Accumulate the graph.
+
+| Service | Type | Repo | Role |
+|---------|------|------|------|
+| **Flash** | Open Source | timepoint-flash | Reality Writer — renders grounded historical moments (Synthetic Time Travel) |
+| **Pro** | **Open Source** | **timepoint-pro** | **Rendering Engine — SNAG-powered simulation, TDF output, training data** |
+| **Clockchain** | Open Source | timepoint-clockchain | Temporal Causal Graph — Rendered Past + Rendered Future, growing 24/7 |
+| **SNAG Bench** | Open Source | timepoint-snag-bench | Quality Certifier — measures Causal Resolution across renderings |
+| **Proteus** | Open Source | proteus | Settlement Layer — prediction markets that validate Rendered Futures |
+| **TDF** | Open Source | timepoint-tdf | Data Format — JSON-LD interchange across all services |
+| **Web App** | Private | timepoint-web-app | Browser client at app.timepointai.com |
+| **iPhone App** | Private | timepoint-iphone-app | iOS client — Synthetic Time Travel on mobile |
+| **Billing** | Private | timepoint-billing | Payment processing — Apple IAP + Stripe |
+| **Landing** | Private | timepoint-landing | Marketing site at timepointai.com |
+
+**The Timepoint Thesis** — a forthcoming paper formalizing the Rendered Past / Rendered Future framework, the mathematics of Causal Resolution, the TDF specification, and the Proof of Causal Convergence protocol. Follow [@seanmcdonaldxyz](https://x.com/seanmcdonaldxyz) for updates.
 
 ## Author
 
