@@ -545,7 +545,11 @@ class PDFExporter(ExportFormat):
 
 
 class TDFExporter(ExportFormat):
-    """Export simulation data as Timepoint Data Format (TDF) JSONL records."""
+    """Export simulation data as Timepoint Data Format (TDF) JSONL records.
+
+    Delegates to the canonical ``timepoint-tdf`` package for record creation
+    and serialisation so the wire format stays consistent across the suite.
+    """
 
     def export(self, data: Any, output_path: str) -> None:
         """Export run data as TDF JSONL.
@@ -554,39 +558,11 @@ class TDFExporter(ExportFormat):
             data: Dict with keys: run_id, entities, dialogs, causal_edges, metadata, timestamp
             output_path: Output file path (e.g., 'output.tdf.jsonl')
         """
-        from datetime import datetime, timezone
+        from timepoint_tdf import from_pro, write_tdf_jsonl
 
         output_path = self._add_compression_suffix(output_path)
-
-        run_id = data.get("run_id", "unknown")
-        timestamp = data.get("timestamp", datetime.now(timezone.utc).isoformat())
-
-        record = {
-            "id": run_id,
-            "version": "1.0.0",
-            "source": "pro",
-            "timestamp": timestamp,
-            "provenance": {
-                "generator": "timepoint-pro",
-                "run_id": run_id,
-                "confidence": data.get("confidence"),
-                "flash_id": None,
-            },
-            "payload": {
-                "entities": data.get("entities", []),
-                "dialogs": data.get("dialogs", []),
-                "causal_edges": data.get("causal_edges", []),
-                "metadata": data.get("metadata", {}),
-            },
-            "tdf_hash": "",
-        }
-
-        # Compute hash
-        canonical = json.dumps(record["payload"], sort_keys=True, default=str)
-        record["tdf_hash"] = hashlib.sha256(canonical.encode()).hexdigest()
-
-        with self._open_file(output_path) as f:
-            f.write(json.dumps(record, default=str) + '\n')
+        record = from_pro(data)
+        write_tdf_jsonl([record], output_path)
 
 
 class ExportFormatFactory:

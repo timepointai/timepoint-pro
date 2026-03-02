@@ -327,34 +327,27 @@ async def get_convergence_set(set_id: str):
 @app.get("/api/data-export/{run_id}", tags=["Content"])
 async def export_run_tdf(run_id: str):
     """Export a run's data as TDF JSONL."""
-    import hashlib
     from datetime import datetime, timezone
     from fastapi.responses import JSONResponse
+    from timepoint_tdf import from_pro
 
     run_meta = db.get_run_details(run_id)
-
     if not run_meta:
         raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
 
-    record = {
-        "id": run_id,
-        "version": "1.0.0",
-        "source": "pro",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "provenance": {
-            "generator": "timepoint-pro",
-            "run_id": run_id,
-        },
-        "payload": {
-            "metadata": dict(run_meta) if run_meta else {},
-        },
-        "tdf_hash": "",
+    narrative = db.get_narrative(run_id) or {}
+
+    run_data = {
+        "run_id": run_id,
+        "created_at": run_meta.get("started_at", datetime.now(timezone.utc).isoformat()),
+        "entities": narrative.get("entities", narrative.get("characters", [])),
+        "dialogs": narrative.get("dialogs", []),
+        "causal_edges": narrative.get("causal_edges", []),
+        "metadata": dict(run_meta),
     }
 
-    canonical = json.dumps(record["payload"], sort_keys=True, default=str)
-    record["tdf_hash"] = hashlib.sha256(canonical.encode()).hexdigest()
-
-    return JSONResponse(content=record)
+    record = from_pro(run_data)
+    return JSONResponse(content=json.loads(record.model_dump_json()))
 
 
 if __name__ == "__main__":
