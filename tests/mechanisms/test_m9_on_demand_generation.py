@@ -2,18 +2,22 @@
 Comprehensive tests for Mechanism 9: On-Demand Entity Generation
 Dynamic entity creation when referenced but missing
 """
-import pytest
+
 from datetime import datetime
-from storage import GraphStore
+
+import pytest
+
 from llm_v2 import LLMClient
 from query_interface import QueryInterface
-from schemas import Entity, Timepoint, ResolutionLevel
+from schemas import Entity, ResolutionLevel, Timepoint
+from storage import GraphStore
 
 
 @pytest.fixture
 def setup_m9():
     """Setup for M9 tests with minimal entities"""
     import os
+
     store = GraphStore("sqlite:///:memory:")
     # Use real API key from environment (required - no mock mode)
     api_key = os.getenv("OPENROUTER_API_KEY", "dummy_key_will_fail")
@@ -26,7 +30,7 @@ def setup_m9():
         timestamp=datetime(1789, 4, 30, 12, 0),
         event_description="Presidential inauguration ceremony at Federal Hall",
         entities_present=["george_washington", "john_adams"],
-        resolution_level=ResolutionLevel.SCENE
+        resolution_level=ResolutionLevel.SCENE,
     )
     store.save_timepoint(timepoint)
 
@@ -38,8 +42,8 @@ def setup_m9():
         entity_metadata={
             "role": "president",
             "age": 57,
-            "knowledge_state": ["First president", "Revolutionary War general"]
-        }
+            "knowledge_state": ["First president", "Revolutionary War general"],
+        },
     )
 
     adams = Entity(
@@ -49,19 +53,14 @@ def setup_m9():
         entity_metadata={
             "role": "vice president",
             "age": 53,
-            "knowledge_state": ["Vice president", "Diplomat"]
-        }
+            "knowledge_state": ["Vice president", "Diplomat"],
+        },
     )
 
     store.save_entity(washington)
     store.save_entity(adams)
 
-    return {
-        "store": store,
-        "llm": llm,
-        "query_interface": query_interface,
-        "timepoint": timepoint
-    }
+    return {"store": store, "llm": llm, "query_interface": query_interface, "timepoint": timepoint}
 
 
 class TestM9EntityGapDetection:
@@ -217,8 +216,7 @@ class TestM9QueryIntegration:
         assert entity is not None
 
         # Response should not indicate missing entity
-        assert "don't have information" not in response.lower() or \
-               "generated" in response.lower()
+        assert "don't have information" not in response.lower() or "generated" in response.lower()
 
     @pytest.mark.integration
     def test_generated_entity_immediately_queryable(self, setup_m9):
@@ -264,7 +262,7 @@ class TestM9QueryIntegration:
             timestamp=datetime(1789, 5, 15, 10, 0),
             event_description="First cabinet meeting at executive mansion",
             entities_present=["george_washington"],
-            resolution_level=ResolutionLevel.SCENE
+            resolution_level=ResolutionLevel.SCENE,
         )
         store.save_timepoint(meeting_tp)
 
@@ -305,7 +303,7 @@ class TestM9Plausibility:
         # Should have physical tensor in metadata
         physical = entity.physical_tensor
         assert physical is not None
-        assert hasattr(physical, 'age')
+        assert hasattr(physical, "age")
         assert physical.age > 0
 
     @pytest.mark.integration
@@ -319,7 +317,7 @@ class TestM9Plausibility:
         # Should have cognitive tensor
         cognitive = entity.cognitive_tensor
         assert cognitive is not None
-        assert hasattr(cognitive, 'knowledge_state')
+        assert hasattr(cognitive, "knowledge_state")
         assert len(cognitive.knowledge_state) >= 0  # May be empty or populated
 
 

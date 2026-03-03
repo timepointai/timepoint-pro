@@ -10,30 +10,30 @@ Contains:
 - retrain_high_traffic_entities: Progressive training for high-usage entities
 """
 
-from langgraph.graph import StateGraph, END
-from typing import TypedDict, List, Dict, Optional
-import networkx as nx
 import json
+from typing import TypedDict
 
-from schemas import Entity, ResolutionLevel, TTMTensor
-from llm_v2 import LLMClient
-from schemas import EntityPopulation
-from resolution_engine import ResolutionEngine
-from storage import GraphStore
+import networkx as nx
+from langgraph.graph import END, StateGraph
+
 from graph import create_test_graph
-from validation import Validator
-from tensors import TensorCompressor
+from llm_v2 import LLMClient
 from metadata.tracking import track_mechanism
+from resolution_engine import ResolutionEngine
+from schemas import Entity, EntityPopulation, ResolutionLevel, TTMTensor
+from storage import GraphStore
+from tensors import TensorCompressor
+from validation import Validator
 
 
 class WorkflowState(TypedDict):
     graph: nx.Graph
-    entities: List[Entity]
+    entities: list[Entity]
     timepoint: str
     resolution: ResolutionLevel
-    violations: List[Dict]
-    results: Dict
-    entity_populations: Dict[str, EntityPopulation]  # Parallel entity results
+    violations: list[dict]
+    results: dict
+    entity_populations: dict[str, EntityPopulation]  # Parallel entity results
 
 
 def create_entity_training_workflow(llm_client: LLMClient, store: GraphStore):
@@ -82,8 +82,12 @@ def create_entity_training_workflow(llm_client: LLMClient, store: GraphStore):
         existing_entities_map = {e.entity_id: e for e in existing_entities}
 
         # PART 1 FIX: Check if entities are orchestrated - if so, skip LLM population merge
-        if existing_entities and all(e.entity_metadata.get("orchestrated", False) for e in existing_entities):
-            print("  ✓ Skipping LLM population for orchestrated entities (preserving orchestrator metadata)")
+        if existing_entities and all(
+            e.entity_metadata.get("orchestrated", False) for e in existing_entities
+        ):
+            print(
+                "  ✓ Skipping LLM population for orchestrated entities (preserving orchestrator metadata)"
+            )
             state["entities"] = existing_entities
             state["results"] = {"populations": []}
             return state
@@ -98,6 +102,7 @@ def create_entity_training_workflow(llm_client: LLMClient, store: GraphStore):
             if existing_entity:
                 # PRESERVE existing metadata, UPDATE cognitive_tensor with new LLM data
                 import copy
+
                 existing_metadata = copy.deepcopy(existing_entity.entity_metadata)
 
                 # PART 2 FIX: Backup physical_tensor before any updates
@@ -107,27 +112,32 @@ def create_entity_training_workflow(llm_client: LLMClient, store: GraphStore):
 
                 # Update cognitive_tensor dict (don't overwrite top-level keys)
                 if "cognitive_tensor" in existing_metadata:
-                    existing_metadata["cognitive_tensor"].update({
-                        "knowledge_state": population.knowledge_state,
-                        "energy_budget": population.energy_budget,
-                        "decision_confidence": population.confidence
-                    })
+                    existing_metadata["cognitive_tensor"].update(
+                        {
+                            "knowledge_state": population.knowledge_state,
+                            "energy_budget": population.energy_budget,
+                            "decision_confidence": population.confidence,
+                        }
+                    )
                 else:
                     # No cognitive tensor yet - create one
                     from schemas import CognitiveTensor
+
                     cognitive = CognitiveTensor(
                         knowledge_state=population.knowledge_state,
                         energy_budget=population.energy_budget,
-                        decision_confidence=population.confidence
+                        decision_confidence=population.confidence,
                     )
                     existing_metadata["cognitive_tensor"] = cognitive.model_dump()
 
                 # Update other metadata fields
-                existing_metadata.update({
-                    "personality_traits": population.personality_traits,
-                    "temporal_awareness": population.temporal_awareness,
-                    "current_timepoint": state["timepoint"]
-                })
+                existing_metadata.update(
+                    {
+                        "personality_traits": population.personality_traits,
+                        "temporal_awareness": population.temporal_awareness,
+                        "current_timepoint": state["timepoint"],
+                    }
+                )
 
                 # PART 2 FIX: Restore physical_tensor after updates
                 if physical_tensor_backup is not None:
@@ -140,7 +150,7 @@ def create_entity_training_workflow(llm_client: LLMClient, store: GraphStore):
                     temporal_span_start=existing_entity.temporal_span_start,
                     temporal_span_end=existing_entity.temporal_span_end,
                     resolution_level=existing_entity.resolution_level,
-                    entity_metadata=existing_metadata
+                    entity_metadata=existing_metadata,
                 )
             else:
                 # Create new entity (no existing metadata to preserve)
@@ -156,12 +166,13 @@ def create_entity_training_workflow(llm_client: LLMClient, store: GraphStore):
                         "personality_traits": population.personality_traits,
                         "temporal_awareness": population.temporal_awareness,
                         "confidence": population.confidence,
-                        "current_timepoint": state["timepoint"]
-                    }
+                        "current_timepoint": state["timepoint"],
+                    },
                 )
 
             # Generate TTM tensor for entity (Phase 7)
             from tensors import generate_ttm_tensor
+
             tensor_json = generate_ttm_tensor(entity)
             if tensor_json:
                 entity.tensor = tensor_json
@@ -178,20 +189,21 @@ def create_entity_training_workflow(llm_client: LLMClient, store: GraphStore):
         # Build knowledge map for network flow validation
         all_entity_knowledge = {}
         for entity in state["entities"]:
-            all_entity_knowledge[entity.entity_id] = entity.entity_metadata.get("knowledge_state", [])
+            all_entity_knowledge[entity.entity_id] = entity.entity_metadata.get(
+                "knowledge_state", []
+            )
 
         # Build circadian config for M14 (Circadian Patterns) tracking
-        from datetime import datetime
         circadian_config = {
             "energy_multipliers": {
                 "base_fatigue_threshold": 16,
                 "night_penalty": 1.5,
-                "fatigue_accumulation": 0.5
+                "fatigue_accumulation": 0.5,
             },
             "activity_probabilities": {
                 "work": {"hours": list(range(8, 18)), "probability": 0.8},
-                "sleep": {"hours": list(range(22, 24)) + list(range(0, 6)), "probability": 0.9}
-            }
+                "sleep": {"hours": list(range(22, 24)) + list(range(0, 6)), "probability": 0.9},
+            },
         }
 
         # Get timepoint object if available
@@ -208,7 +220,7 @@ def create_entity_training_workflow(llm_client: LLMClient, store: GraphStore):
                 "timepoint": timepoint_obj,  # For circadian validation
                 "circadian_config": circadian_config,  # For M14 tracking
                 "activity_type": "work",  # Default activity type for validation
-                "store": None  # Would need to be passed in for full validation
+                "store": None,  # Would need to be passed in for full validation
             }
             entity_violations = Validator.validate_all(entity, context)
             violations.extend(entity_violations)
@@ -216,8 +228,9 @@ def create_entity_training_workflow(llm_client: LLMClient, store: GraphStore):
         return state
 
     def compress_tensors(state: WorkflowState) -> WorkflowState:
-        from schemas import ResolutionLevel
         import logging
+
+        from schemas import ResolutionLevel
 
         logger = logging.getLogger(__name__)
         entities_compressed = 0
@@ -225,7 +238,7 @@ def create_entity_training_workflow(llm_client: LLMClient, store: GraphStore):
 
         for entity in state["entities"]:
             # Phase 7: Expect all entities to have tensor attribute (now generated in pipeline)
-            if not hasattr(entity, 'tensor') or entity.tensor is None:
+            if not hasattr(entity, "tensor") or entity.tensor is None:
                 entities_missing_tensor.append(entity.entity_id)
                 logger.error(f"Entity {entity.entity_id} missing tensor attribute - pipeline error")
                 continue
@@ -233,11 +246,12 @@ def create_entity_training_workflow(llm_client: LLMClient, store: GraphStore):
             try:
                 # Deserialize tensor from base64-encoded JSON
                 import base64
+
                 tensor_dict = json.loads(entity.tensor)
                 ttm = TTMTensor(
-                    context_vector=base64.b64decode(tensor_dict['context_vector']),
-                    biology_vector=base64.b64decode(tensor_dict['biology_vector']),
-                    behavior_vector=base64.b64decode(tensor_dict['behavior_vector'])
+                    context_vector=base64.b64decode(tensor_dict["context_vector"]),
+                    biology_vector=base64.b64decode(tensor_dict["biology_vector"]),
+                    behavior_vector=base64.b64decode(tensor_dict["behavior_vector"]),
                 )
                 context, biology, behavior = ttm.to_arrays()
 
@@ -246,9 +260,11 @@ def create_entity_training_workflow(llm_client: LLMClient, store: GraphStore):
                     # TENSOR_ONLY: Store ONLY compressed representation
                     compressed = {
                         "pca": TensorCompressor.compress(context, "pca"),
-                        "svd": TensorCompressor.compress(context, "svd")
+                        "svd": TensorCompressor.compress(context, "svd"),
                     }
-                    entity.entity_metadata["compressed"] = {k: v.tolist() for k, v in compressed.items()}
+                    entity.entity_metadata["compressed"] = {
+                        k: v.tolist() for k, v in compressed.items()
+                    }
                     # Remove full tensor data to save space
                     entity.tensor = None
 
@@ -256,9 +272,11 @@ def create_entity_training_workflow(llm_client: LLMClient, store: GraphStore):
                     # Higher resolutions: Keep full tensor but also store compressed version
                     compressed = {
                         "pca": TensorCompressor.compress(context, "pca"),
-                        "svd": TensorCompressor.compress(context, "svd")
+                        "svd": TensorCompressor.compress(context, "svd"),
                     }
-                    entity.entity_metadata["compressed"] = {k: v.tolist() for k, v in compressed.items()}
+                    entity.entity_metadata["compressed"] = {
+                        k: v.tolist() for k, v in compressed.items()
+                    }
                     # Keep full tensor for detailed operations
 
                 entities_compressed += 1
@@ -267,10 +285,14 @@ def create_entity_training_workflow(llm_client: LLMClient, store: GraphStore):
                 entities_missing_tensor.append(entity.entity_id)
 
         if entities_missing_tensor:
-            logger.warning(f"⚠️  {len(entities_missing_tensor)} entities missing tensors: {entities_missing_tensor}")
+            logger.warning(
+                f"⚠️  {len(entities_missing_tensor)} entities missing tensors: {entities_missing_tensor}"
+            )
 
         if entities_compressed > 0:
-            print(f"✓ Compressed tensors for {entities_compressed}/{len(state['entities'])} entities")
+            print(
+                f"✓ Compressed tensors for {entities_compressed}/{len(state['entities'])} entities"
+            )
 
         return state
 
@@ -286,8 +308,7 @@ def create_entity_training_workflow(llm_client: LLMClient, store: GraphStore):
             loop = asyncio.get_event_loop()
             with ThreadPoolExecutor() as executor:
                 population = await loop.run_in_executor(
-                    executor,
-                    lambda: llm_client.populate_entity(entity_schema, context)
+                    executor, lambda: llm_client.populate_entity(entity_schema, context)
                 )
             return entity_id, population
 
@@ -305,7 +326,10 @@ def create_entity_training_workflow(llm_client: LLMClient, store: GraphStore):
 
     def trigger_prospection_batch(state: WorkflowState) -> WorkflowState:
         """Trigger prospection (M15) for eligible entities in the training batch."""
-        from prospection_triggers import trigger_prospection_for_entity, refine_tensor_from_prospection
+        from prospection_triggers import (
+            refine_tensor_from_prospection,
+            trigger_prospection_for_entity,
+        )
 
         timepoint_obj = state.get("timepoint_obj")
         if not timepoint_obj:
@@ -323,6 +347,7 @@ def create_entity_training_workflow(llm_client: LLMClient, store: GraphStore):
                     triggered += 1
             except Exception as e:
                 import logging
+
                 logging.getLogger(__name__).warning(
                     f"[M15] Prospection failed for {entity.entity_id}: {e}"
                 )
@@ -367,22 +392,27 @@ def retrain_high_traffic_entities(graph: nx.Graph, store: GraphStore, llm_client
 
     for entity in entities:
         if resolution_engine.check_retraining_needed(entity, graph):
-            print(f"🔄 Retraining needed for {entity.entity_id} (centrality: {entity.eigenvector_centrality:.3f}, queries: {entity.query_count}, training: {entity.training_count})")
+            print(
+                f"🔄 Retraining needed for {entity.entity_id} (centrality: {entity.eigenvector_centrality:.3f}, queries: {entity.query_count}, training: {entity.training_count})"
+            )
 
             # Determine target resolution based on centrality and usage
             current_level_value = list(ResolutionLevel).index(entity.resolution_level)
 
             # High centrality entities get higher priority elevation
             if entity.eigenvector_centrality > 0.5:
-                target_level = min(ResolutionLevel.TRAINED,
-                                 list(ResolutionLevel)[current_level_value + 2])  # Skip one level
+                target_level = min(
+                    ResolutionLevel.TRAINED, list(ResolutionLevel)[current_level_value + 2]
+                )  # Skip one level
             elif entity.eigenvector_centrality > 0.3:
-                target_level = min(ResolutionLevel.TRAINED,
-                                 list(ResolutionLevel)[current_level_value + 1])  # Next level
+                target_level = min(
+                    ResolutionLevel.TRAINED, list(ResolutionLevel)[current_level_value + 1]
+                )  # Next level
             else:
                 # Query-driven elevation (more conservative)
-                target_level = min(ResolutionLevel.TRAINED,
-                                 list(ResolutionLevel)[current_level_value + 1])
+                target_level = min(
+                    ResolutionLevel.TRAINED, list(ResolutionLevel)[current_level_value + 1]
+                )
 
             # Attempt elevation
             if resolution_engine.elevate_resolution(entity, target_level):
@@ -391,5 +421,7 @@ def retrain_high_traffic_entities(graph: nx.Graph, store: GraphStore, llm_client
             else:
                 print(f"⚠️ Failed to elevate {entity.entity_id}")
 
-    print(f"🎯 Progressive training complete: {elevated_count} entities elevated, {retrained_count} retrained")
+    print(
+        f"🎯 Progressive training complete: {elevated_count} entities elevated, {retrained_count} retrained"
+    )
     return elevated_count, retrained_count

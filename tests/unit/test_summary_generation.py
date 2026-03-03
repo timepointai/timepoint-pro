@@ -12,6 +12,7 @@ Tests the full summarizer pipeline:
 import os
 from pathlib import Path
 
+
 # Load environment variables
 def load_env():
     env_file = Path(__file__).parent / ".env"
@@ -19,18 +20,19 @@ def load_env():
         with open(env_file) as f:
             for line in f:
                 line = line.strip()
-                if line and not line.startswith('#') and '=' in line:
-                    key, value = line.split('=', 1)
+                if line and not line.startswith("#") and "=" in line:
+                    key, value = line.split("=", 1)
                     os.environ[key] = value
+
 
 load_env()
 
-from generation.config_schema import SimulationConfig
 from generation.resilience_orchestrator import ResilientE2EWorkflowRunner
 from generation.templates.loader import TemplateLoader
 from metadata.run_tracker import MetadataManager
 
 _loader = TemplateLoader()
+
 
 def test_summary_generation():
     """Test summary generation on a small template"""
@@ -52,7 +54,7 @@ def test_summary_generation():
     metadata_manager = MetadataManager(db_path="metadata/runs.db")
     runner = ResilientE2EWorkflowRunner(
         metadata_manager,
-        generate_summary=True  # Enable summary generation
+        generate_summary=True,  # Enable summary generation
     )
 
     # Run small template
@@ -110,6 +112,7 @@ def test_summary_generation():
         print(f"Error: {e}")
         print()
         import traceback
+
         traceback.print_exc()
         return False
 

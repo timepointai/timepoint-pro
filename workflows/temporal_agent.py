@@ -13,33 +13,38 @@ Contains:
   - run_portal_simulation: Execute backward simulation
 """
 
-from typing import List, Dict, Optional, Tuple
-from datetime import timedelta
-import uuid
 import re
+import uuid
+from datetime import timedelta
+
 import numpy as np
 
-from schemas import TemporalMode, ExposureEvent, ResolutionLevel
 from metadata.tracking import track_mechanism
-
+from schemas import ExposureEvent, ResolutionLevel, TemporalMode
 
 # M1 → M17 Connection: Resolution level determines token budget per entity
 # This connects fidelity decisions (M1) to generation granularity (M17)
 RESOLUTION_TOKEN_BUDGET = {
-    ResolutionLevel.TENSOR_ONLY: 100,    # Minimal: just state snapshot
-    ResolutionLevel.SCENE: 500,          # Brief: scene description
-    ResolutionLevel.GRAPH: 1000,         # Moderate: relationship context
-    ResolutionLevel.DIALOG: 3000,        # Detailed: full dialog turns
-    ResolutionLevel.TRAINED: 5000,       # Rich: trained entity detail
-    ResolutionLevel.FULL_DETAIL: 8000,   # Maximum: complete entity state
+    ResolutionLevel.TENSOR_ONLY: 100,  # Minimal: just state snapshot
+    ResolutionLevel.SCENE: 500,  # Brief: scene description
+    ResolutionLevel.GRAPH: 1000,  # Moderate: relationship context
+    ResolutionLevel.DIALOG: 3000,  # Detailed: full dialog turns
+    ResolutionLevel.TRAINED: 5000,  # Rich: trained entity detail
+    ResolutionLevel.FULL_DETAIL: 8000,  # Maximum: complete entity state
 }
 
 
 class TemporalAgent:
     """Time as entity with goals in non-Forward modes"""
 
-    def __init__(self, mode: Optional[TemporalMode] = None, config: Optional[Dict] = None,
-                 store=None, llm_client=None, temporal_config=None):
+    def __init__(
+        self,
+        mode: TemporalMode | None = None,
+        config: dict | None = None,
+        store=None,
+        llm_client=None,
+        temporal_config=None,
+    ):
         # Support both signatures
         if store is not None or llm_client is not None:
             # New signature with store and llm_client
@@ -79,7 +84,7 @@ class TemporalAgent:
         Returns:
             Token budget for this entity's generation
         """
-        resolution = getattr(entity, 'resolution_level', ResolutionLevel.SCENE)
+        resolution = getattr(entity, "resolution_level", ResolutionLevel.SCENE)
         return RESOLUTION_TOKEN_BUDGET.get(resolution, 500)  # Default to SCENE budget
 
     def track_token_usage(self, entity_id: str, tokens: int):
@@ -87,9 +92,9 @@ class TemporalAgent:
         self.tokens_used += tokens
         self.entity_token_usage[entity_id] = self.entity_token_usage.get(entity_id, 0) + tokens
 
-    def get_remaining_budget(self) -> Optional[int]:
+    def get_remaining_budget(self) -> int | None:
         """Get remaining token budget based on fidelity strategy"""
-        if self.fidelity_strategy and hasattr(self.fidelity_strategy, 'token_budget'):
+        if self.fidelity_strategy and hasattr(self.fidelity_strategy, "token_budget"):
             return max(0, self.fidelity_strategy.token_budget - self.tokens_used)
         return None  # No budget constraint
 
@@ -97,7 +102,7 @@ class TemporalAgent:
     def determine_fidelity_temporal_strategy(
         self,
         config,  # TemporalConfig
-        context: Dict
+        context: dict,
     ) -> "FidelityTemporalStrategy":
         """
         Determine optimal fidelity + temporal strategy based on:
@@ -117,7 +122,6 @@ class TemporalAgent:
         Returns:
             FidelityTemporalStrategy: Complete allocation strategy
         """
-        from schemas import FidelityTemporalStrategy, ResolutionLevel
 
         # Route to mode-specific strategy
         if self.mode == TemporalMode.PORTAL:
@@ -147,7 +151,12 @@ class TemporalAgent:
         - Adaptive based on causal necessity
         - Denser steps around pivots, sparser for stable periods
         """
-        from schemas import FidelityTemporalStrategy, FidelityPlanningMode, TokenBudgetMode, ResolutionLevel
+        from schemas import (
+            FidelityPlanningMode,
+            FidelityTemporalStrategy,
+            ResolutionLevel,
+            TokenBudgetMode,
+        )
 
         # Extract context
         portal_year = config.portal_year
@@ -155,32 +164,34 @@ class TemporalAgent:
         backward_steps = config.backward_steps  # Suggestion, not command
 
         # Get fidelity planning mode from config (default to HYBRID for portal)
-        planning_mode = getattr(config, 'fidelity_planning_mode', FidelityPlanningMode.HYBRID)
-        budget_mode = getattr(config, 'token_budget_mode', TokenBudgetMode.SOFT_GUIDANCE)
-        token_budget = getattr(config, 'token_budget', 15000)
+        planning_mode = getattr(config, "fidelity_planning_mode", FidelityPlanningMode.HYBRID)
+        budget_mode = getattr(config, "token_budget_mode", TokenBudgetMode.SOFT_GUIDANCE)
+        token_budget = getattr(config, "token_budget", 15000)
 
         # Calculate temporal strategy
         total_months = (portal_year - origin_year) * 12
 
         if planning_mode == FidelityPlanningMode.PROGRAMMATIC:
             # Pre-planned schedule using fidelity template
-            fidelity_template = getattr(config, 'fidelity_template', 'balanced')
-            strategy = self._apply_fidelity_template(fidelity_template, backward_steps, total_months)
+            fidelity_template = getattr(config, "fidelity_template", "balanced")
+            strategy = self._apply_fidelity_template(
+                fidelity_template, backward_steps, total_months
+            )
 
             return FidelityTemporalStrategy(
                 mode=self.mode,
                 planning_mode=planning_mode,
                 budget_mode=budget_mode,
                 token_budget=token_budget,
-                timepoint_count=len(strategy['fidelity_schedule']),
-                fidelity_schedule=strategy['fidelity_schedule'],
-                temporal_steps=strategy['temporal_steps'],
+                timepoint_count=len(strategy["fidelity_schedule"]),
+                fidelity_schedule=strategy["fidelity_schedule"],
+                temporal_steps=strategy["temporal_steps"],
                 adaptive_threshold=0.7,
                 min_resolution=ResolutionLevel.TENSOR_ONLY,
                 max_resolution=ResolutionLevel.TRAINED,
                 allocation_rationale=f"PORTAL mode programmatic: {fidelity_template} template",
-                estimated_tokens=strategy['estimated_tokens'],
-                estimated_cost_usd=strategy['estimated_tokens'] * 0.000002  # Rough estimate
+                estimated_tokens=strategy["estimated_tokens"],
+                estimated_cost_usd=strategy["estimated_tokens"] * 0.000002,  # Rough estimate
             )
 
         elif planning_mode == FidelityPlanningMode.ADAPTIVE:
@@ -199,31 +210,35 @@ class TemporalAgent:
                 max_resolution=ResolutionLevel.TRAINED,
                 allocation_rationale="PORTAL mode adaptive: fidelity determined per-step based on simulation state",
                 estimated_tokens=token_budget,  # Use budget as estimate
-                estimated_cost_usd=token_budget * 0.000002
+                estimated_cost_usd=token_budget * 0.000002,
             )
 
         else:  # HYBRID
             # Start with programmatic plan, allow upgrades
-            fidelity_template = getattr(config, 'fidelity_template', 'portal_pivots')
-            strategy = self._apply_fidelity_template(fidelity_template, backward_steps, total_months)
+            fidelity_template = getattr(config, "fidelity_template", "portal_pivots")
+            strategy = self._apply_fidelity_template(
+                fidelity_template, backward_steps, total_months
+            )
 
             return FidelityTemporalStrategy(
                 mode=self.mode,
                 planning_mode=planning_mode,
                 budget_mode=budget_mode,
                 token_budget=token_budget,
-                timepoint_count=len(strategy['fidelity_schedule']),
-                fidelity_schedule=strategy['fidelity_schedule'],
-                temporal_steps=strategy['temporal_steps'],
+                timepoint_count=len(strategy["fidelity_schedule"]),
+                fidelity_schedule=strategy["fidelity_schedule"],
+                temporal_steps=strategy["temporal_steps"],
                 adaptive_threshold=0.75,  # Higher threshold for upgrades in hybrid
                 min_resolution=ResolutionLevel.TENSOR_ONLY,
                 max_resolution=ResolutionLevel.TRAINED,
                 allocation_rationale=f"PORTAL mode hybrid: {fidelity_template} template with adaptive upgrades",
-                estimated_tokens=strategy['estimated_tokens'],
-                estimated_cost_usd=strategy['estimated_tokens'] * 0.000002
+                estimated_tokens=strategy["estimated_tokens"],
+                estimated_cost_usd=strategy["estimated_tokens"] * 0.000002,
             )
 
-    def _apply_fidelity_template(self, template_name: str, suggested_steps: int, total_months: int) -> Dict:
+    def _apply_fidelity_template(
+        self, template_name: str, suggested_steps: int, total_months: int
+    ) -> dict:
         """
         Apply a fidelity template to generate programmatic allocation.
 
@@ -241,9 +256,11 @@ class TemporalAgent:
             scene_count = max(1, int(n * 0.21))
             dialog_count = max(1, n - tensor_count - scene_count)
 
-            fidelity_schedule = ([ResolutionLevel.TENSOR_ONLY] * tensor_count +
-                               [ResolutionLevel.SCENE] * scene_count +
-                               [ResolutionLevel.DIALOG] * dialog_count)
+            fidelity_schedule = (
+                [ResolutionLevel.TENSOR_ONLY] * tensor_count
+                + [ResolutionLevel.SCENE] * scene_count
+                + [ResolutionLevel.DIALOG] * dialog_count
+            )
             # Even temporal distribution
             month_step = total_months // len(fidelity_schedule) if fidelity_schedule else 1
             temporal_steps = [month_step] * len(fidelity_schedule)
@@ -258,13 +275,17 @@ class TemporalAgent:
             graph_count = max(1, int(n * 0.20))
             dialog_count = max(1, n - tensor_count - scene_count - graph_count)
 
-            fidelity_schedule = ([ResolutionLevel.TENSOR_ONLY] * tensor_count +
-                               [ResolutionLevel.SCENE] * scene_count +
-                               [ResolutionLevel.GRAPH] * graph_count +
-                               [ResolutionLevel.DIALOG] * dialog_count)
+            fidelity_schedule = (
+                [ResolutionLevel.TENSOR_ONLY] * tensor_count
+                + [ResolutionLevel.SCENE] * scene_count
+                + [ResolutionLevel.GRAPH] * graph_count
+                + [ResolutionLevel.DIALOG] * dialog_count
+            )
             month_step = total_months // len(fidelity_schedule) if fidelity_schedule else 1
             temporal_steps = [month_step] * len(fidelity_schedule)
-            estimated_tokens = tensor_count * 200 + scene_count * 1000 + graph_count * 5000 + dialog_count * 10000
+            estimated_tokens = (
+                tensor_count * 200 + scene_count * 1000 + graph_count * 5000 + dialog_count * 10000
+            )
 
         elif template_name == "portal_pivots":
             # SCALED: Endpoint + Origin = TRAINED, middle = balanced distribution
@@ -280,11 +301,13 @@ class TemporalAgent:
                 scene_count = max(1, int(middle_count * 0.25))
                 dialog_count = max(0, middle_count - tensor_count - scene_count)
 
-                fidelity_schedule = ([ResolutionLevel.TRAINED] +
-                                   [ResolutionLevel.TENSOR_ONLY] * tensor_count +
-                                   [ResolutionLevel.SCENE] * scene_count +
-                                   [ResolutionLevel.DIALOG] * dialog_count +
-                                   [ResolutionLevel.TRAINED])
+                fidelity_schedule = (
+                    [ResolutionLevel.TRAINED]
+                    + [ResolutionLevel.TENSOR_ONLY] * tensor_count
+                    + [ResolutionLevel.SCENE] * scene_count
+                    + [ResolutionLevel.DIALOG] * dialog_count
+                    + [ResolutionLevel.TRAINED]
+                )
 
             month_step = total_months // len(fidelity_schedule) if fidelity_schedule else 1
             temporal_steps = [month_step] * len(fidelity_schedule)
@@ -296,8 +319,9 @@ class TemporalAgent:
             dialog_count = max(1, int(n * 0.66))
             trained_count = max(1, n - dialog_count)
 
-            fidelity_schedule = ([ResolutionLevel.DIALOG] * dialog_count +
-                               [ResolutionLevel.TRAINED] * trained_count)
+            fidelity_schedule = [ResolutionLevel.DIALOG] * dialog_count + [
+                ResolutionLevel.TRAINED
+            ] * trained_count
             month_step = total_months // len(fidelity_schedule) if fidelity_schedule else 1
             temporal_steps = [month_step] * len(fidelity_schedule)
             estimated_tokens = dialog_count * 10000 + trained_count * 50000
@@ -310,9 +334,9 @@ class TemporalAgent:
             estimated_tokens = suggested_steps * 1000
 
         return {
-            'fidelity_schedule': fidelity_schedule,
-            'temporal_steps': temporal_steps,
-            'estimated_tokens': estimated_tokens
+            "fidelity_schedule": fidelity_schedule,
+            "temporal_steps": temporal_steps,
+            "estimated_tokens": estimated_tokens,
         }
 
     def _strategy_for_directorial_mode(self, config, context) -> "FidelityTemporalStrategy":
@@ -325,11 +349,16 @@ class TemporalAgent:
         - Setup/Resolution → SCENE (establish/resolve)
         - Bridge states → TENSOR_ONLY (minimal transitions)
         """
-        from schemas import FidelityTemporalStrategy, FidelityPlanningMode, TokenBudgetMode, ResolutionLevel
+        from schemas import (
+            FidelityPlanningMode,
+            FidelityTemporalStrategy,
+            ResolutionLevel,
+            TokenBudgetMode,
+        )
 
-        backward_steps = getattr(config, 'backward_steps', 15)
-        token_budget = getattr(config, 'token_budget', 15000)
-        dramatic_tension = getattr(config, 'dramatic_tension', 0.7)
+        backward_steps = getattr(config, "backward_steps", 15)
+        token_budget = getattr(config, "token_budget", 15000)
+        dramatic_tension = getattr(config, "dramatic_tension", 0.7)
 
         # Build fidelity schedule based on five-act narrative arc
         fidelity_schedule = []
@@ -388,7 +417,7 @@ class TemporalAgent:
             max_resolution=ResolutionLevel.TRAINED,
             allocation_rationale=f"DIRECTORIAL mode: five-act arc allocation (tension={dramatic_tension}). Climax=TRAINED, rising=DIALOG, setup/resolution=SCENE/TENSOR_ONLY",
             estimated_tokens=estimated_tokens,
-            estimated_cost_usd=estimated_tokens * 0.000002
+            estimated_cost_usd=estimated_tokens * 0.000002,
         )
 
     def _strategy_for_cyclical_mode(self, config, context) -> "FidelityTemporalStrategy":
@@ -400,12 +429,17 @@ class TemporalAgent:
         - Mid-cycle → SCENE (standard progression)
         - Prophecy states → TRAINED (high-detail prophecy moments)
         """
-        from schemas import FidelityTemporalStrategy, FidelityPlanningMode, TokenBudgetMode, ResolutionLevel
+        from schemas import (
+            FidelityPlanningMode,
+            FidelityTemporalStrategy,
+            ResolutionLevel,
+            TokenBudgetMode,
+        )
 
-        cycle_length = getattr(config, 'cycle_length', None) or 4
-        loop_count = getattr(config, 'path_count', 3)
-        token_budget = getattr(config, 'token_budget', 10000)
-        prophecy_accuracy = getattr(config, 'prophecy_accuracy', 0.5)
+        cycle_length = getattr(config, "cycle_length", None) or 4
+        loop_count = getattr(config, "path_count", 3)
+        token_budget = getattr(config, "token_budget", 10000)
+        prophecy_accuracy = getattr(config, "prophecy_accuracy", 0.5)
 
         total_steps = cycle_length * loop_count
         fidelity_schedule = []
@@ -448,7 +482,7 @@ class TemporalAgent:
             max_resolution=ResolutionLevel.TRAINED,
             allocation_rationale=f"CYCLICAL mode: {loop_count} cycles x {cycle_length} steps. Boundaries=DIALOG, prophecy=TRAINED, mid-cycle=SCENE",
             estimated_tokens=estimated_tokens,
-            estimated_cost_usd=estimated_tokens * 0.000002
+            estimated_cost_usd=estimated_tokens * 0.000002,
         )
 
     def _strategy_for_branching_mode(self, config, context) -> "FidelityTemporalStrategy":
@@ -460,11 +494,16 @@ class TemporalAgent:
         - Continuations → SCENE (standard forward progression)
         - Origin/endpoint → DIALOG (establishing context)
         """
-        from schemas import FidelityTemporalStrategy, FidelityPlanningMode, TokenBudgetMode, ResolutionLevel
+        from schemas import (
+            FidelityPlanningMode,
+            FidelityTemporalStrategy,
+            ResolutionLevel,
+            TokenBudgetMode,
+        )
 
-        backward_steps = getattr(config, 'backward_steps', 15)
-        path_count = getattr(config, 'path_count', 4)
-        token_budget = getattr(config, 'token_budget', 20000)
+        backward_steps = getattr(config, "backward_steps", 15)
+        path_count = getattr(config, "path_count", 4)
+        token_budget = getattr(config, "token_budget", 20000)
 
         # Calculate branch point intervals
         branch_interval = max(1, backward_steps // path_count)
@@ -506,12 +545,17 @@ class TemporalAgent:
             max_resolution=ResolutionLevel.TRAINED,
             allocation_rationale=f"BRANCHING mode: branch points every {branch_interval} steps get TRAINED, endpoints=DIALOG, continuations=SCENE",
             estimated_tokens=estimated_tokens,
-            estimated_cost_usd=estimated_tokens * 0.000002
+            estimated_cost_usd=estimated_tokens * 0.000002,
         )
 
     def _strategy_for_default_mode(self, config, context) -> "FidelityTemporalStrategy":
         """Default strategy for FORWARD and other modes"""
-        from schemas import FidelityTemporalStrategy, FidelityPlanningMode, TokenBudgetMode, ResolutionLevel
+        from schemas import (
+            FidelityPlanningMode,
+            FidelityTemporalStrategy,
+            ResolutionLevel,
+            TokenBudgetMode,
+        )
 
         return FidelityTemporalStrategy(
             mode=self.mode,
@@ -526,7 +570,7 @@ class TemporalAgent:
             max_resolution=ResolutionLevel.TRAINED,
             allocation_rationale="Default mode: balanced fidelity allocation",
             estimated_tokens=10000,
-            estimated_cost_usd=0.02
+            estimated_cost_usd=0.02,
         )
 
     def determine_next_step_fidelity_and_time(
@@ -534,8 +578,8 @@ class TemporalAgent:
         current_state,  # PortalState
         strategy: "FidelityTemporalStrategy",
         step_num: int,
-        context: Dict
-    ) -> Tuple[int, "ResolutionLevel"]:
+        context: dict,
+    ) -> tuple[int, "ResolutionLevel"]:
         """
         For ADAPTIVE or HYBRID modes: decide next step's time gap and fidelity level.
 
@@ -551,7 +595,7 @@ class TemporalAgent:
         Returns:
             Tuple of (months_to_next_state, resolution_level)
         """
-        from schemas import ResolutionLevel, FidelityPlanningMode
+        from schemas import FidelityPlanningMode, ResolutionLevel
 
         if strategy.planning_mode == FidelityPlanningMode.PROGRAMMATIC:
             # Use pre-planned schedule
@@ -566,7 +610,7 @@ class TemporalAgent:
             # Determine fidelity based on current simulation state
 
             # Check if this is a pivot point (high importance)
-            importance_score = context.get('importance_score', 0.5)
+            importance_score = context.get("importance_score", 0.5)
 
             if importance_score > strategy.adaptive_threshold:
                 resolution = ResolutionLevel.DIALOG
@@ -577,7 +621,7 @@ class TemporalAgent:
 
             # Determine temporal step based on state complexity
             # More complex states = shorter time gaps for granularity
-            complexity = context.get('state_complexity', 0.5)
+            complexity = context.get("state_complexity", 0.5)
             if complexity > 0.7:
                 month_step = 1  # Monthly granularity for complex periods
             elif complexity > 0.4:
@@ -597,17 +641,19 @@ class TemporalAgent:
                 planned_resolution = ResolutionLevel.SCENE
 
             # Check if we should upgrade due to pivot detection
-            pivot_detected = context.get('pivot_detected', False)
+            pivot_detected = context.get("pivot_detected", False)
 
             if pivot_detected and planned_resolution < ResolutionLevel.DIALOG:
                 # Upgrade to DIALOG for pivot points
-                print(f"  Pivot detected at step {step_num}: upgrading {planned_resolution} -> DIALOG")
+                print(
+                    f"  Pivot detected at step {step_num}: upgrading {planned_resolution} -> DIALOG"
+                )
                 return (planned_month_step, ResolutionLevel.DIALOG)
 
             # Otherwise, use planned allocation
             return (planned_month_step, planned_resolution)
 
-    def influence_event_probability(self, event: str, context: Dict) -> float:
+    def influence_event_probability(self, event: str, context: dict) -> float:
         """Adjust event probability based on temporal mode"""
         base_prob = context.get("base_probability", 0.5)
 
@@ -664,14 +710,14 @@ class TemporalAgent:
             "rising_action": ["conflict", "tension", "challenge", "rising"],
             "climax": ["peak", "crisis", "turning_point", "decision"],
             "falling_action": ["resolution", "aftermath", "consequence"],
-            "resolution": ["conclusion", "ending", "closure", "final"]
+            "resolution": ["conclusion", "ending", "closure", "final"],
         }
 
         event_lower = event.lower()
         keywords = arc_keywords.get(narrative_arc, [])
         return any(keyword in event_lower for keyword in keywords)
 
-    def _closes_causal_loop(self, event: str, context: Dict) -> bool:
+    def _closes_causal_loop(self, event: str, context: dict) -> bool:
         """Check if event closes a causal loop"""
         # Look for prophecy fulfillment patterns
         prophecy_indicators = ["prophecy", "prediction", "foretold", "destiny", "fate"]
@@ -684,7 +730,7 @@ class TemporalAgent:
         return has_prophecy and has_fulfillment
 
     @track_mechanism("M7", "causal_temporal_chains")
-    def generate_next_timepoint(self, current_timepoint, context: Dict = None) -> "Timepoint":
+    def generate_next_timepoint(self, current_timepoint, context: dict = None) -> "Timepoint":
         """
         Generate the next timepoint in the temporal sequence.
 
@@ -695,7 +741,7 @@ class TemporalAgent:
         Returns:
             New Timepoint object representing the next moment in time
         """
-        from schemas import Timepoint, ResolutionLevel
+        from schemas import ResolutionLevel, Timepoint
 
         context = context or {}
 
@@ -703,7 +749,7 @@ class TemporalAgent:
         # Extract sequence number from current ID or generate new one
         current_id = current_timepoint.timepoint_id
         # Try to extract sequence number (e.g., "tp_001" -> 1)
-        match = re.match(r'tp_(\d+)', current_id)
+        match = re.match(r"tp_(\d+)", current_id)
         if match:
             next_seq = int(match.group(1)) + 1
             next_id = f"tp_{next_seq:03d}"
@@ -753,7 +799,7 @@ class TemporalAgent:
         # M1 → M17: Determine resolution level from fidelity strategy
         # This connects fidelity decisions to generation granularity
         step_num = context.get("iteration", 0)
-        if self.fidelity_strategy and hasattr(self.fidelity_strategy, 'fidelity_schedule'):
+        if self.fidelity_strategy and hasattr(self.fidelity_strategy, "fidelity_schedule"):
             if step_num < len(self.fidelity_strategy.fidelity_schedule):
                 next_resolution = self.fidelity_strategy.fidelity_schedule[step_num]
             else:
@@ -781,13 +827,17 @@ class TemporalAgent:
         available_entities = context.get("available_entities", [])
         if not available_entities:
             # Fall back to entities from current timepoint as available pool
-            available_entities = list(current_timepoint.entities_present) if current_timepoint.entities_present else []
+            available_entities = (
+                list(current_timepoint.entities_present)
+                if current_timepoint.entities_present
+                else []
+            )
 
         # Infer entities for this new timepoint
         inferred_entities = self._infer_entities_for_timepoint(
             event_description=event_description,
             available_entities=available_entities,
-            context=context
+            context=context,
         )
 
         # Create next timepoint
@@ -797,7 +847,7 @@ class TemporalAgent:
             event_description=event_description,
             entities_present=inferred_entities,  # Use inferred entities, not blind copy
             causal_parent=current_timepoint.timepoint_id,
-            resolution_level=next_resolution  # M1 → M17: Use fidelity-determined resolution
+            resolution_level=next_resolution,  # M1 → M17: Use fidelity-determined resolution
         )
 
         # Save to store if available
@@ -811,11 +861,8 @@ class TemporalAgent:
         return next_timepoint
 
     def _infer_entities_for_timepoint(
-        self,
-        event_description: str,
-        available_entities: List[str],
-        context: Dict = None
-    ) -> List[str]:
+        self, event_description: str, available_entities: list[str], context: dict = None
+    ) -> list[str]:
         """
         Infer which entities should be present at a timepoint based on event description.
 
@@ -836,7 +883,9 @@ class TemporalAgent:
         if available_entities and self.llm_client:
             try:
                 # Build selection prompt
-                system_prompt = "You are an expert at identifying which entities are relevant to events."
+                system_prompt = (
+                    "You are an expert at identifying which entities are relevant to events."
+                )
 
                 user_prompt = f"""Given this event description, identify which entities from the available list should be present.
 
@@ -844,7 +893,7 @@ EVENT DESCRIPTION:
 {event_description[:500]}
 
 AVAILABLE ENTITIES:
-{', '.join(available_entities[:50])}
+{", ".join(available_entities[:50])}
 
 INSTRUCTIONS:
 1. Select 3-15 entities that would logically be present at or involved in this event
@@ -859,22 +908,22 @@ Return ONLY a JSON object with format:
                     model=self.llm_client.default_model,
                     messages=[
                         {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt}
+                        {"role": "user", "content": user_prompt},
                     ],
                     temperature=0.3,  # Lower temp for more consistent selection
-                    max_tokens=500
+                    max_tokens=500,
                 )
 
                 # Parse response - handle both OpenAI-style objects and raw dicts
                 # Some providers return dict, others return response objects
                 if isinstance(response, dict):
                     # Raw dict response (e.g., some OpenRouter providers)
-                    choices = response.get('choices', [])
+                    choices = response.get("choices", [])
                     if choices:
-                        message = choices[0].get('message', {})
-                        content = message.get('content', '')
+                        message = choices[0].get("message", {})
+                        content = message.get("content", "")
                     else:
-                        content = ''
+                        content = ""
                 else:
                     # OpenAI-style response object
                     content = response.choices[0].message.content
@@ -884,10 +933,10 @@ Return ONLY a JSON object with format:
                 import re
 
                 # Look for JSON in response
-                json_match = re.search(r'\{[^}]+\}', content)
+                json_match = re.search(r"\{[^}]+\}", content)
                 if json_match:
                     result = json.loads(json_match.group())
-                    selected = result.get('entities_present', [])
+                    selected = result.get("entities_present", [])
 
                     # Filter to only include valid entity IDs
                     valid_entities = [e for e in selected if e in available_entities]
@@ -911,9 +960,9 @@ Return ONLY a JSON object with format:
         potential_entities = []
 
         # Find capitalized words (potential proper nouns)
-        words = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', event_description)
+        words = re.findall(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b", event_description)
         for word in words[:5]:
-            entity_id = word.lower().replace(' ', '_')
+            entity_id = word.lower().replace(" ", "_")
             if len(entity_id) > 2:  # Skip very short matches
                 potential_entities.append(entity_id)
 
@@ -922,7 +971,7 @@ Return ONLY a JSON object with format:
             return list(set(potential_entities))[:10]
 
         # Final fallback: Return empty list with warning
-        print(f"    ⚠️  No entities could be inferred for timepoint")
+        print("    ⚠️  No entities could be inferred for timepoint")
         return []
 
     def _create_exposure_events_for_timepoint(self, timepoint):
@@ -936,7 +985,6 @@ Return ONLY a JSON object with format:
         Args:
             timepoint: The Timepoint object to create exposure events for
         """
-        from datetime import datetime
 
         # Create a knowledge item representing the event experience
         # This is a basic "entity experienced event" record
@@ -952,7 +1000,7 @@ Return ONLY a JSON object with format:
                 source=f"timepoint_{timepoint.timepoint_id}",
                 timestamp=timepoint.timestamp,
                 confidence=1.0,  # They were definitely present
-                timepoint_id=timepoint.timepoint_id
+                timepoint_id=timepoint.timepoint_id,
             )
 
             # Save to database
@@ -960,7 +1008,7 @@ Return ONLY a JSON object with format:
                 self.store.save_exposure_event(exposure_event)
 
     @track_mechanism("M17", "modal_temporal_causality")
-    def generate_antecedent_timepoint(self, current_timepoint, context: Dict = None) -> "Timepoint":
+    def generate_antecedent_timepoint(self, current_timepoint, context: dict = None) -> "Timepoint":
         """
         Generate a plausible antecedent (previous) timepoint in PORTAL mode.
 
@@ -978,10 +1026,12 @@ Return ONLY a JSON object with format:
             This method is primarily used by PortalStrategy for backward path exploration.
             In PORTAL mode, we work backward from endpoint to origin.
         """
-        from schemas import Timepoint, ResolutionLevel
+        from schemas import Timepoint
 
         if self.mode != TemporalMode.PORTAL:
-            raise ValueError(f"generate_antecedent_timepoint() requires mode=PORTAL, got {self.mode}")
+            raise ValueError(
+                f"generate_antecedent_timepoint() requires mode=PORTAL, got {self.mode}"
+            )
 
         context = context or {}
 
@@ -1006,20 +1056,26 @@ Return ONLY a JSON object with format:
             event_description = context["antecedent_description"]
         else:
             # Placeholder - in real implementation, LLM would generate this
-            event_description = f"Antecedent state preceding: {current_timepoint.event_description[:100]}"
+            event_description = (
+                f"Antecedent state preceding: {current_timepoint.event_description[:100]}"
+            )
 
         # ENTITY INFERENCE FIX: Instead of blindly copying entities from consequent,
         # infer which entities should be present based on the event description
         available_entities = context.get("available_entities", [])
         if not available_entities:
             # Fall back to entities from current timepoint as available pool
-            available_entities = list(current_timepoint.entities_present) if current_timepoint.entities_present else []
+            available_entities = (
+                list(current_timepoint.entities_present)
+                if current_timepoint.entities_present
+                else []
+            )
 
         # Infer entities for this antecedent event
         inferred_entities = self._infer_entities_for_timepoint(
             event_description=event_description,
             available_entities=available_entities,
-            context=context
+            context=context,
         )
 
         # Create antecedent timepoint
@@ -1029,7 +1085,7 @@ Return ONLY a JSON object with format:
             event_description=event_description,
             entities_present=inferred_entities,  # Use inferred entities, not blind copy
             causal_parent=None,  # Will be set during path reconstruction
-            resolution_level=current_timepoint.resolution_level
+            resolution_level=current_timepoint.resolution_level,
         )
 
         # Save to store if available
@@ -1041,7 +1097,7 @@ Return ONLY a JSON object with format:
 
         return antecedent_timepoint
 
-    def run_portal_simulation(self, config) -> List:
+    def run_portal_simulation(self, config) -> list:
         """
         Execute PORTAL mode backward simulation.
 
@@ -1073,7 +1129,7 @@ Return ONLY a JSON object with format:
             config=config,
             llm_client=self.llm_client,
             store=self.store,
-            entity_roster=getattr(self, 'entity_roster', None)
+            entity_roster=getattr(self, "entity_roster", None),
         )
 
         # Execute backward simulation
@@ -1081,7 +1137,7 @@ Return ONLY a JSON object with format:
 
         return paths
 
-    def run_branching_simulation(self, config) -> List:
+    def run_branching_simulation(self, config) -> list:
         """
         Execute BRANCHING mode forward simulation with counterfactual branches.
 
@@ -1112,8 +1168,8 @@ Return ONLY a JSON object with format:
             config=config,
             llm_client=self.llm_client,
             store=self.store,
-            scenario_description=getattr(self, 'scenario_description', None),
-            entity_roster=getattr(self, 'entity_roster', None)
+            scenario_description=getattr(self, "scenario_description", None),
+            entity_roster=getattr(self, "entity_roster", None),
         )
 
         # Execute forward simulation with branching
@@ -1121,7 +1177,7 @@ Return ONLY a JSON object with format:
 
         return paths
 
-    def run_directorial_simulation(self, config) -> List:
+    def run_directorial_simulation(self, config) -> list:
         """
         Execute DIRECTORIAL mode narrative-driven simulation.
 
@@ -1142,22 +1198,22 @@ Return ONLY a JSON object with format:
         from workflows.directorial_strategy import DirectorialStrategy
 
         if self.mode != TemporalMode.DIRECTORIAL:
-            raise ValueError(f"run_directorial_simulation() requires mode=DIRECTORIAL, got {self.mode}")
+            raise ValueError(
+                f"run_directorial_simulation() requires mode=DIRECTORIAL, got {self.mode}"
+            )
 
         if not isinstance(config, TemporalConfig):
             raise ValueError(f"config must be TemporalConfig, got {type(config)}")
 
         directorial_strategy = DirectorialStrategy(
-            config=config,
-            llm_client=self.llm_client,
-            store=self.store
+            config=config, llm_client=self.llm_client, store=self.store
         )
 
         paths = directorial_strategy.run()
 
         return paths
 
-    def run_cyclical_simulation(self, config) -> List:
+    def run_cyclical_simulation(self, config) -> list:
         """
         Execute CYCLICAL mode temporal simulation with cycles, prophecies, and causal loops.
 
@@ -1183,9 +1239,7 @@ Return ONLY a JSON object with format:
             raise ValueError(f"config must be TemporalConfig, got {type(config)}")
 
         cyclical_strategy = CyclicalStrategy(
-            config=config,
-            llm_client=self.llm_client,
-            store=self.store
+            config=config, llm_client=self.llm_client, store=self.store
         )
 
         paths = cyclical_strategy.run()

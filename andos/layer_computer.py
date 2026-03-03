@@ -18,13 +18,12 @@ Mathematical Definition:
     - Invariant: All interaction partners have tensors before dialog synthesis
 """
 
+from typing import Any
+
 import networkx as nx
-from typing import List, Dict, Tuple, Optional, Any
 
 
-def build_interaction_graph(
-    interaction_config: Dict[str, Any]
-) -> nx.DiGraph:
+def build_interaction_graph(interaction_config: dict[str, Any]) -> nx.DiGraph:
     """
     Build directed graph from interaction_graph configuration.
 
@@ -49,11 +48,11 @@ def build_interaction_graph(
     """
     G = nx.DiGraph()
 
-    interactions = interaction_config.get('interactions', [])
+    interactions = interaction_config.get("interactions", [])
 
     for interaction in interactions:
-        source = interaction['from']
-        targets = interaction['to']
+        source = interaction["from"]
+        targets = interaction["to"]
 
         # Handle both single target and list of targets
         if isinstance(targets, str):
@@ -66,10 +65,7 @@ def build_interaction_graph(
     return G
 
 
-def compute_entity_distances(
-    graph: nx.DiGraph,
-    target_entity_id: str
-) -> Dict[str, int]:
+def compute_entity_distances(graph: nx.DiGraph, target_entity_id: str) -> dict[str, int]:
     """
     Compute shortest path distance from each entity to target.
 
@@ -106,10 +102,7 @@ def compute_entity_distances(
         )
 
 
-def group_by_distance(
-    entity_ids: List[str],
-    distances: Dict[str, int]
-) -> List[List[str]]:
+def group_by_distance(entity_ids: list[str], distances: dict[str, int]) -> list[list[str]]:
     """
     Group entity IDs by distance into training layers.
 
@@ -159,10 +152,8 @@ def group_by_distance(
 
 
 def compute_andos_layers(
-    entities: List[Any],
-    target_entity_id: str,
-    interaction_graph: Dict[str, Any]
-) -> List[List[Any]]:
+    entities: list[Any], target_entity_id: str, interaction_graph: dict[str, Any]
+) -> list[list[Any]]:
     """
     Compute ANDOS training layers via reverse topological ordering.
 
@@ -215,9 +206,9 @@ def compute_andos_layers(
         raise ValueError(
             f"Interaction graph contains {len(cycles)} cycle(s). "
             f"ANDOS requires acyclic graph (DAG).\n\n"
-            f"Cycles found:\n" +
-            "\n".join(f"  - {path}" for path in cycle_paths) +
-            "\n\nPlease fix template configuration to remove cycles."
+            f"Cycles found:\n"
+            + "\n".join(f"  - {path}" for path in cycle_paths)
+            + "\n\nPlease fix template configuration to remove cycles."
         )
 
     # Step 3: Compute distances from target entity
@@ -226,7 +217,7 @@ def compute_andos_layers(
     except nx.NodeNotFound as e:
         # Target not in graph - use heuristic (all entities at distance 1)
         print(f"WARNING: {e}")
-        print(f"Using fallback: all entities at distance 1 from virtual target")
+        print("Using fallback: all entities at distance 1 from virtual target")
 
         # Create single layer with all entities
         return [entities]
@@ -249,9 +240,8 @@ def compute_andos_layers(
 
 
 def validate_andos_layers(
-    layers: List[List[Any]],
-    interaction_graph: Dict[str, Any]
-) -> Tuple[bool, List[str]]:
+    layers: list[list[Any]], interaction_graph: dict[str, Any]
+) -> tuple[bool, list[str]]:
     """
     Validate ANDOS layers satisfy dependency constraints.
 
@@ -282,11 +272,11 @@ def validate_andos_layers(
             entity_layer_map[entity.entity_id] = layer_idx
 
     # Check each interaction
-    interactions = interaction_graph.get('interactions', [])
+    interactions = interaction_graph.get("interactions", [])
 
     for interaction in interactions:
-        source = interaction['from']
-        targets = interaction['to']
+        source = interaction["from"]
+        targets = interaction["to"]
 
         # Handle both single target and list
         if isinstance(targets, str):
@@ -309,10 +299,7 @@ def validate_andos_layers(
     return (len(violations) == 0, violations)
 
 
-def print_andos_layers(
-    layers: List[List[Any]],
-    title: str = "ANDOS Training Layers"
-) -> None:
+def print_andos_layers(layers: list[list[Any]], title: str = "ANDOS Training Layers") -> None:
     """
     Pretty-print ANDOS layer structure for debugging.
 
@@ -320,9 +307,9 @@ def print_andos_layers(
         layers: List of entity lists from compute_andos_layers()
         title: Optional title for output
     """
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"{title}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"Total layers: {len(layers)}")
     print(f"Total entities: {sum(len(layer) for layer in layers)}")
     print()
@@ -331,4 +318,4 @@ def print_andos_layers(
         entity_ids = [e.entity_id for e in layer]
         print(f"Layer {idx} ({len(layer)} entities): {entity_ids}")
 
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")

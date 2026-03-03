@@ -4,20 +4,21 @@ LLM Service - Main facade coordinating all components
 This is the primary interface for making LLM calls throughout the application.
 """
 
-from typing import Type, Optional, Callable, Dict, Any
-from pydantic import BaseModel
 import logging
+from typing import Any
 
+from pydantic import BaseModel
+
+from llm_service.call_logger import CallLogger
 from llm_service.config import LLMServiceConfig, ServiceMode
+from llm_service.error_handler import ErrorHandler, RetryConfig
+from llm_service.model_selector import ActionType, ModelSelector
+from llm_service.prompt_manager import PromptManager
 from llm_service.provider import LLMProvider, LLMResponse
 from llm_service.providers.custom_provider import CustomOpenRouterProvider
 from llm_service.providers.mock_provider import MockProvider
-from llm_service.prompt_manager import PromptManager
 from llm_service.response_parser import ResponseParser
-from llm_service.error_handler import ErrorHandler, RetryConfig
-from llm_service.call_logger import CallLogger
 from llm_service.security_filter import SecurityFilter
-from llm_service.model_selector import ModelSelector, ActionType, ModelCapability
 
 
 class LLMService:
@@ -82,13 +83,13 @@ class LLMService:
         self,
         system: str,
         user: str,
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
-        top_p: Optional[float] = None,
-        model: Optional[str] = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        top_p: float | None = None,
+        model: str | None = None,
         call_type: str = "generic",
         apply_security: bool = True,
-        **kwargs
+        **kwargs,
     ) -> LLMResponse:
         """
         Make an LLM call with full service features.
@@ -127,7 +128,7 @@ class LLMService:
                 max_tokens=max_tokens,
                 top_p=top_p,
                 model=model,
-                **kwargs
+                **kwargs,
             )
 
         # Execute with retry logic
@@ -188,14 +189,14 @@ class LLMService:
         self,
         system: str,
         user: str,
-        schema: Type[BaseModel],
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
-        model: Optional[str] = None,
+        schema: type[BaseModel],
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        model: str | None = None,
         call_type: str = "structured",
         apply_security: bool = True,
         allow_partial: bool = True,
-        **kwargs
+        **kwargs,
     ) -> BaseModel:
         """
         Make an LLM call expecting structured output.
@@ -228,7 +229,7 @@ class LLMService:
             model=model,
             call_type=call_type,
             apply_security=apply_security,
-            **kwargs
+            **kwargs,
         )
 
         if not response.success:
@@ -241,9 +242,7 @@ class LLMService:
         # Parse response into schema
         try:
             return self.response_parser.parse_structured(
-                response.content,
-                schema,
-                allow_partial=allow_partial
+                response.content, schema, allow_partial=allow_partial
             )
         except Exception as e:
             # When failsoft is disabled, never return mocks - raise the error
@@ -256,7 +255,7 @@ class LLMService:
         self,
         workflow: str = "unknown",
         user: str = "system",
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: dict[str, Any] | None = None,
     ) -> str:
         """
         Start a logging session.
@@ -271,7 +270,7 @@ class LLMService:
         """
         return self.call_logger.start_session(workflow, user, metadata)
 
-    def end_session(self) -> Optional[Dict[str, Any]]:
+    def end_session(self) -> dict[str, Any] | None:
         """
         End the current session.
 
@@ -284,7 +283,7 @@ class LLMService:
         """Return the name of the active provider."""
         return self.provider.get_provider_name()
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get service statistics"""
         return {
             "total_calls": self.call_count,
@@ -353,12 +352,9 @@ class LLMService:
         """Register a reusable prompt template"""
         self.prompt_manager.register_template(name, template)
 
-    def build_prompt(self, template_name: str, variables: Dict[str, Any]) -> str:
+    def build_prompt(self, template_name: str, variables: dict[str, Any]) -> str:
         """Build a prompt from registered template"""
-        return self.prompt_manager.build_prompt(
-            template_name=template_name,
-            variables=variables
-        )
+        return self.prompt_manager.build_prompt(template_name=template_name, variables=variables)
 
     # =========================================================================
     # ACTION-BASED MODEL SELECTION METHODS
@@ -369,13 +365,13 @@ class LLMService:
         action: ActionType,
         system: str,
         user: str,
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
         prefer_quality: bool = False,
         prefer_speed: bool = False,
         prefer_cost: bool = False,
         use_fallback_chain: bool = True,
-        **kwargs
+        **kwargs,
     ) -> LLMResponse:
         """
         Make an LLM call with intelligent model selection based on action type.
@@ -427,7 +423,7 @@ class LLMService:
                 max_tokens=max_tokens,
                 models=fallback_models,
                 call_type=action.name.lower(),
-                **kwargs
+                **kwargs,
             )
         else:
             # Single model call
@@ -438,7 +434,7 @@ class LLMService:
                 max_tokens=max_tokens,
                 model=model,
                 call_type=action.name.lower(),
-                **kwargs
+                **kwargs,
             )
 
     def structured_call_with_action(
@@ -446,14 +442,14 @@ class LLMService:
         action: ActionType,
         system: str,
         user: str,
-        schema: Type[BaseModel],
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        schema: type[BaseModel],
+        temperature: float | None = None,
+        max_tokens: int | None = None,
         prefer_quality: bool = False,
         prefer_speed: bool = False,
         prefer_cost: bool = False,
         use_fallback_chain: bool = True,
-        **kwargs
+        **kwargs,
     ) -> BaseModel:
         """
         Make a structured LLM call with intelligent model selection.
@@ -504,7 +500,7 @@ class LLMService:
                 max_tokens=max_tokens,
                 models=fallback_models,
                 call_type=action.name.lower(),
-                **kwargs
+                **kwargs,
             )
         else:
             # Single model call
@@ -516,7 +512,7 @@ class LLMService:
                 max_tokens=max_tokens,
                 model=model,
                 call_type=action.name.lower(),
-                **kwargs
+                **kwargs,
             )
 
     def _call_with_fallback(
@@ -525,9 +521,9 @@ class LLMService:
         user: str,
         models: list,
         call_type: str = "generic",
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
-        **kwargs
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        **kwargs,
     ) -> LLMResponse:
         """
         Make an LLM call with fallback chain on failure.
@@ -556,20 +552,20 @@ class LLMService:
                     model=model,
                     temperature=temperature,
                     max_tokens=max_tokens,
-                    call_type=f"{call_type}_attempt_{i+1}",
-                    **kwargs
+                    call_type=f"{call_type}_attempt_{i + 1}",
+                    **kwargs,
                 )
                 if response.success:
                     if i > 0:
                         logging.getLogger("llm_service").info(
-                            f"Fallback succeeded on attempt {i+1} with model {model}"
+                            f"Fallback succeeded on attempt {i + 1} with model {model}"
                         )
                     return response
                 last_error = response.error
             except Exception as e:
                 last_error = str(e)
                 logging.getLogger("llm_service").warning(
-                    f"Model {model} failed (attempt {i+1}/{len(models)}): {e}"
+                    f"Model {model} failed (attempt {i + 1}/{len(models)}): {e}"
                 )
 
         # All models failed, return error response
@@ -587,12 +583,12 @@ class LLMService:
         self,
         system: str,
         user: str,
-        schema: Type[BaseModel],
+        schema: type[BaseModel],
         models: list,
         call_type: str = "structured",
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
-        **kwargs
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        **kwargs,
     ) -> BaseModel:
         """
         Make a structured LLM call with fallback chain.
@@ -623,18 +619,18 @@ class LLMService:
                     model=model,
                     temperature=temperature,
                     max_tokens=max_tokens,
-                    call_type=f"{call_type}_attempt_{i+1}",
-                    **kwargs
+                    call_type=f"{call_type}_attempt_{i + 1}",
+                    **kwargs,
                 )
                 if i > 0:
                     logging.getLogger("llm_service").info(
-                        f"Structured fallback succeeded on attempt {i+1} with model {model}"
+                        f"Structured fallback succeeded on attempt {i + 1} with model {model}"
                     )
                 return result
             except Exception as e:
                 last_error = str(e)
                 logging.getLogger("llm_service").warning(
-                    f"Structured call with {model} failed (attempt {i+1}/{len(models)}): {e}"
+                    f"Structured call with {model} failed (attempt {i + 1}/{len(models)}): {e}"
                 )
 
         # All models failed
@@ -643,11 +639,7 @@ class LLMService:
         else:
             raise Exception(f"All {len(models)} fallback models failed. Last error: {last_error}")
 
-    def select_model(
-        self,
-        action: ActionType,
-        **kwargs
-    ) -> str:
+    def select_model(self, action: ActionType, **kwargs) -> str:
         """
         Select the best model for an action without making a call.
 
@@ -662,7 +654,7 @@ class LLMService:
         """
         return self.model_selector.select_model(action, **kwargs)
 
-    def get_model_info(self, model_id: str) -> Optional[Dict[str, Any]]:
+    def get_model_info(self, model_id: str) -> dict[str, Any] | None:
         """
         Get information about a model.
 

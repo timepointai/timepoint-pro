@@ -8,32 +8,34 @@ Phase 6: Public API - Batch Submission
 
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional, Dict, Any
+from typing import Any
+
 from pydantic import BaseModel, Field, field_validator
 
 from .models_simulation import (
     SimulationCreateRequest,
     SimulationJobResponse,
-    SimulationStatus,
 )
-
 
 # ============================================================================
 # Enums
 # ============================================================================
 
+
 class BatchStatus(str, Enum):
     """Batch job status."""
-    PENDING = "pending"      # Not yet started
-    RUNNING = "running"      # Jobs are executing
-    PARTIAL = "partial"      # Some jobs complete, some still running
+
+    PENDING = "pending"  # Not yet started
+    RUNNING = "running"  # Jobs are executing
+    PARTIAL = "partial"  # Some jobs complete, some still running
     COMPLETED = "completed"  # All jobs finished (success or failure)
     CANCELLED = "cancelled"  # Batch was cancelled
-    FAILED = "failed"        # Batch-level failure (e.g., quota exceeded)
+    FAILED = "failed"  # Batch-level failure (e.g., quota exceeded)
 
 
 class BatchPriority(str, Enum):
     """Batch execution priority."""
+
     LOW = "low"
     NORMAL = "normal"
     HIGH = "high"
@@ -43,44 +45,27 @@ class BatchPriority(str, Enum):
 # Request Models
 # ============================================================================
 
+
 class BatchCreateRequest(BaseModel):
     """Request model for creating a batch of simulations."""
 
-    simulations: List[SimulationCreateRequest] = Field(
-        ...,
-        min_length=2,
-        max_length=100,
-        description="List of simulations to run (2-100)"
+    simulations: list[SimulationCreateRequest] = Field(
+        ..., min_length=2, max_length=100, description="List of simulations to run (2-100)"
     )
 
-    budget_cap_usd: Optional[float] = Field(
-        None,
-        ge=0.0,
-        le=1000.0,
-        description="Maximum total cost for this batch in USD"
+    budget_cap_usd: float | None = Field(
+        None, ge=0.0, le=1000.0, description="Maximum total cost for this batch in USD"
     )
 
-    priority: BatchPriority = Field(
-        default=BatchPriority.NORMAL,
-        description="Execution priority"
+    priority: BatchPriority = Field(default=BatchPriority.NORMAL, description="Execution priority")
+
+    fail_fast: bool = Field(default=False, description="Stop batch on first job failure")
+
+    parallel_jobs: int | None = Field(
+        None, ge=1, le=10, description="Max concurrent jobs (defaults to tier limit)"
     )
 
-    fail_fast: bool = Field(
-        default=False,
-        description="Stop batch on first job failure"
-    )
-
-    parallel_jobs: Optional[int] = Field(
-        None,
-        ge=1,
-        le=10,
-        description="Max concurrent jobs (defaults to tier limit)"
-    )
-
-    metadata: Optional[Dict[str, Any]] = Field(
-        None,
-        description="Additional metadata for the batch"
-    )
+    metadata: dict[str, Any] | None = Field(None, description="Additional metadata for the batch")
 
     @field_validator("simulations")
     @classmethod
@@ -96,21 +81,15 @@ class BatchCreateRequest(BaseModel):
 class BatchCancelRequest(BaseModel):
     """Request to cancel a batch."""
 
-    reason: Optional[str] = Field(
-        None,
-        max_length=500,
-        description="Optional reason for cancellation"
-    )
+    reason: str | None = Field(None, max_length=500, description="Optional reason for cancellation")
 
-    cancel_running: bool = Field(
-        default=True,
-        description="Also cancel currently running jobs"
-    )
+    cancel_running: bool = Field(default=True, description="Also cancel currently running jobs")
 
 
 # ============================================================================
 # Response Models
 # ============================================================================
+
 
 class BatchProgress(BaseModel):
     """Progress tracking for a batch."""
@@ -123,10 +102,7 @@ class BatchProgress(BaseModel):
     cancelled_jobs: int = Field(..., description="Cancelled jobs")
 
     progress_percent: float = Field(
-        ...,
-        ge=0.0,
-        le=100.0,
-        description="Overall progress percentage"
+        ..., ge=0.0, le=100.0, description="Overall progress percentage"
     )
 
 
@@ -135,8 +111,8 @@ class BatchCostSummary(BaseModel):
 
     estimated_cost_usd: float = Field(..., description="Estimated total cost")
     actual_cost_usd: float = Field(..., description="Actual cost so far")
-    budget_cap_usd: Optional[float] = Field(None, description="Budget cap if set")
-    budget_remaining_usd: Optional[float] = Field(None, description="Remaining budget")
+    budget_cap_usd: float | None = Field(None, description="Budget cap if set")
+    budget_remaining_usd: float | None = Field(None, description="Remaining budget")
     tokens_used: int = Field(default=0, description="Total tokens used")
 
 
@@ -146,8 +122,8 @@ class BatchJobResponse(BaseModel):
     batch_id: str = Field(..., description="Unique batch identifier")
     status: BatchStatus = Field(..., description="Current batch status")
     created_at: datetime = Field(..., description="Batch creation timestamp")
-    started_at: Optional[datetime] = Field(None, description="Batch start timestamp")
-    completed_at: Optional[datetime] = Field(None, description="Batch completion timestamp")
+    started_at: datetime | None = Field(None, description="Batch start timestamp")
+    completed_at: datetime | None = Field(None, description="Batch completion timestamp")
 
     # Configuration
     priority: BatchPriority = Field(..., description="Execution priority")
@@ -159,16 +135,16 @@ class BatchJobResponse(BaseModel):
     cost: BatchCostSummary = Field(..., description="Cost tracking")
 
     # Job references
-    job_ids: List[str] = Field(..., description="IDs of all jobs in batch")
+    job_ids: list[str] = Field(..., description="IDs of all jobs in batch")
 
     # Error info
-    error_message: Optional[str] = Field(None, description="Error if batch failed")
+    error_message: str | None = Field(None, description="Error if batch failed")
 
     # Owner info
     owner_id: str = Field(..., description="User who created the batch")
 
     # Metadata
-    metadata: Optional[Dict[str, Any]] = Field(None, description="Custom metadata")
+    metadata: dict[str, Any] | None = Field(None, description="Custom metadata")
 
     class Config:
         from_attributes = True
@@ -178,13 +154,13 @@ class BatchDetailResponse(BaseModel):
     """Detailed batch response including job list."""
 
     batch: BatchJobResponse = Field(..., description="Batch details")
-    jobs: List[SimulationJobResponse] = Field(..., description="All jobs in batch")
+    jobs: list[SimulationJobResponse] = Field(..., description="All jobs in batch")
 
 
 class BatchListResponse(BaseModel):
     """Response model for listing batches."""
 
-    batches: List[BatchJobResponse] = Field(..., description="List of batches")
+    batches: list[BatchJobResponse] = Field(..., description="List of batches")
     total: int = Field(..., description="Total batch count")
     page: int = Field(default=1, description="Current page")
     page_size: int = Field(default=20, description="Page size")
@@ -202,15 +178,13 @@ class BatchStatsResponse(BaseModel):
     total_jobs: int = Field(..., description="Total jobs across all batches")
     total_cost_usd: float = Field(..., description="Total cost")
     avg_jobs_per_batch: float = Field(..., description="Average jobs per batch")
-    avg_duration_seconds: Optional[float] = Field(
-        None,
-        description="Average batch duration"
-    )
+    avg_duration_seconds: float | None = Field(None, description="Average batch duration")
 
 
 # ============================================================================
 # Usage/Quota Response Models
 # ============================================================================
+
 
 class UsageResponse(BaseModel):
     """Current usage status for a user."""
@@ -239,14 +213,11 @@ class UsageResponse(BaseModel):
 
     # Status
     is_quota_exceeded: bool = Field(..., description="Whether quota is exceeded")
-    quota_exceeded_reason: Optional[str] = Field(
-        None,
-        description="Reason if quota exceeded"
-    )
+    quota_exceeded_reason: str | None = Field(None, description="Reason if quota exceeded")
 
 
 class UsageHistoryResponse(BaseModel):
     """Usage history for a user."""
 
     current: UsageResponse = Field(..., description="Current period usage")
-    history: List[Dict[str, Any]] = Field(..., description="Historical periods")
+    history: list[dict[str, Any]] = Field(..., description="Historical periods")

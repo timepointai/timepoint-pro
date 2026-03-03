@@ -8,10 +8,11 @@ Generates comprehensive reports from simulation data including:
 - Timeline reports (chronological events)
 """
 
-from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
+from typing import Any
+
+from .formatters import FormatterFactory
 from .query_engine import EnhancedQueryEngine
-from .formatters import FormatterFactory, OutputFormatter
 
 
 class ReportGenerator:
@@ -52,7 +53,7 @@ class ReportGenerator:
         world_id: str,
         format: str = "markdown",
         include_stats: bool = True,
-        **formatter_kwargs
+        **formatter_kwargs,
     ) -> str:
         """
         Generate high-level summary report.
@@ -67,10 +68,7 @@ class ReportGenerator:
             Formatted report string
         """
         # Get timeline summary
-        timeline = self.query_engine.timeline_summary(
-            world_id,
-            include_minor_events=False
-        )
+        timeline = self.query_engine.timeline_summary(world_id, include_minor_events=False)
 
         # Build report data structure
         data = {
@@ -78,10 +76,10 @@ class ReportGenerator:
             "metadata": {
                 "world_id": world_id,
                 "generated_at": datetime.now(timezone.utc).isoformat(),
-                "report_type": "summary"
+                "report_type": "summary",
             },
             "summary": self._generate_narrative_summary(timeline),
-            "sections": []
+            "sections": [],
         }
 
         # Add key moments section
@@ -91,7 +89,7 @@ class ReportGenerator:
                 "items": [
                     f"Timepoint {moment['timepoint']}: {moment['description']}"
                     for moment in timeline["key_moments"]
-                ]
+                ],
             }
             data["sections"].append(key_moments_section)
 
@@ -110,10 +108,10 @@ class ReportGenerator:
                         event["timepoint"],
                         event["type"],
                         event["description"],
-                        f"{event['importance']:.2f}"
+                        f"{event['importance']:.2f}",
                     ]
                     for event in timeline["events"]
-                ]
+                ],
             }
             data["tables"] = [timeline_table]
 
@@ -124,9 +122,9 @@ class ReportGenerator:
     def generate_relationship_report(
         self,
         world_id: str,
-        entity_ids: Optional[List[str]] = None,
+        entity_ids: list[str] | None = None,
         format: str = "markdown",
-        **formatter_kwargs
+        **formatter_kwargs,
     ) -> str:
         """
         Generate relationship analysis report.
@@ -142,8 +140,7 @@ class ReportGenerator:
         """
         # Get relationship data
         relationships = self.query_engine.summarize_relationships(
-            world_id,
-            entity_filter=entity_ids
+            world_id, entity_filter=entity_ids
         )
 
         # Build report data structure
@@ -153,10 +150,10 @@ class ReportGenerator:
                 "world_id": world_id,
                 "generated_at": datetime.now(timezone.utc).isoformat(),
                 "report_type": "relationships",
-                "entity_filter": entity_ids
+                "entity_filter": entity_ids,
             },
             "summary": self._generate_relationship_summary(relationships),
-            "sections": []
+            "sections": [],
         }
 
         # Add relationship stats section
@@ -165,10 +162,10 @@ class ReportGenerator:
             stats_section = {
                 "title": "Relationship Statistics",
                 "content": f"""
-Total Relationships: {stats.get('total_relationships', 0)}
-Average Strength: {stats.get('avg_strength', 0):.2f}
-Relationship Types: {', '.join(stats.get('relationship_types', []))}
-"""
+Total Relationships: {stats.get("total_relationships", 0)}
+Average Strength: {stats.get("avg_strength", 0):.2f}
+Relationship Types: {", ".join(stats.get("relationship_types", []))}
+""",
             }
             data["sections"].append(stats_section)
 
@@ -178,14 +175,9 @@ Relationship Types: {', '.join(stats.get('relationship_types', []))}
                 "title": "Entity Relationships",
                 "headers": ["Entity 1", "Entity 2", "Relationship Type", "Strength"],
                 "rows": [
-                    [
-                        pair["entity1"],
-                        pair["entity2"],
-                        pair["type"],
-                        f"{pair['strength']:.2f}"
-                    ]
+                    [pair["entity1"], pair["entity2"], pair["type"], f"{pair['strength']:.2f}"]
                     for pair in relationships["entity_pairs"]
-                ]
+                ],
             }
             data["tables"] = [relationship_table]
 
@@ -196,9 +188,9 @@ Relationship Types: {', '.join(stats.get('relationship_types', []))}
     def generate_knowledge_report(
         self,
         world_id: str,
-        timepoint_range: Optional[tuple] = None,
+        timepoint_range: tuple | None = None,
         format: str = "markdown",
-        **formatter_kwargs
+        **formatter_kwargs,
     ) -> str:
         """
         Generate knowledge flow analysis report.
@@ -214,8 +206,7 @@ Relationship Types: {', '.join(stats.get('relationship_types', []))}
         """
         # Get knowledge flow data
         knowledge_flow = self.query_engine.knowledge_flow_graph(
-            world_id,
-            timepoint_range=timepoint_range
+            world_id, timepoint_range=timepoint_range
         )
 
         # Build report data structure
@@ -225,10 +216,10 @@ Relationship Types: {', '.join(stats.get('relationship_types', []))}
                 "world_id": world_id,
                 "generated_at": datetime.now(timezone.utc).isoformat(),
                 "report_type": "knowledge_flow",
-                "timepoint_range": timepoint_range
+                "timepoint_range": timepoint_range,
             },
             "summary": self._generate_knowledge_summary(knowledge_flow),
-            "sections": []
+            "sections": [],
         }
 
         # Add flow metrics section
@@ -237,10 +228,10 @@ Relationship Types: {', '.join(stats.get('relationship_types', []))}
             metrics_section = {
                 "title": "Knowledge Flow Metrics",
                 "content": f"""
-Total Knowledge Transfers: {metrics.get('total_transfers', 0)}
-Average Hops: {metrics.get('avg_hops', 0):.2f}
-Knowledge Items: {', '.join(metrics.get('knowledge_items', []))}
-"""
+Total Knowledge Transfers: {metrics.get("total_transfers", 0)}
+Average Hops: {metrics.get("avg_hops", 0):.2f}
+Knowledge Items: {", ".join(metrics.get("knowledge_items", []))}
+""",
             }
             data["sections"].append(metrics_section)
 
@@ -250,14 +241,9 @@ Knowledge Items: {', '.join(metrics.get('knowledge_items', []))}
                 "title": "Knowledge Transfer Events",
                 "headers": ["Source", "Target", "Knowledge Item", "Timepoint"],
                 "rows": [
-                    [
-                        edge["source"],
-                        edge["target"],
-                        edge["knowledge"],
-                        edge["timepoint"]
-                    ]
+                    [edge["source"], edge["target"], edge["knowledge"], edge["timepoint"]]
                     for edge in knowledge_flow["edges"]
-                ]
+                ],
             }
             data["tables"] = [flow_table]
 
@@ -268,10 +254,10 @@ Knowledge Items: {', '.join(metrics.get('knowledge_items', []))}
     def generate_entity_comparison_report(
         self,
         world_id: str,
-        entity_ids: List[str],
-        aspects: Optional[List[str]] = None,
+        entity_ids: list[str],
+        aspects: list[str] | None = None,
         format: str = "markdown",
-        **formatter_kwargs
+        **formatter_kwargs,
     ) -> str:
         """
         Generate entity comparison report.
@@ -287,11 +273,7 @@ Knowledge Items: {', '.join(metrics.get('knowledge_items', []))}
             Formatted report string
         """
         # Get comparison data
-        comparison = self.query_engine.entity_comparison(
-            world_id,
-            entity_ids,
-            aspects=aspects
-        )
+        comparison = self.query_engine.entity_comparison(world_id, entity_ids, aspects=aspects)
 
         # Build report data structure
         data = {
@@ -301,10 +283,10 @@ Knowledge Items: {', '.join(metrics.get('knowledge_items', []))}
                 "generated_at": datetime.now(timezone.utc).isoformat(),
                 "report_type": "entity_comparison",
                 "entities": entity_ids,
-                "aspects": aspects or ["personality", "knowledge", "relationships"]
+                "aspects": aspects or ["personality", "knowledge", "relationships"],
             },
             "summary": self._generate_comparison_summary(comparison),
-            "sections": []
+            "sections": [],
         }
 
         # Add comparison sections for each aspect
@@ -312,7 +294,7 @@ Knowledge Items: {', '.join(metrics.get('knowledge_items', []))}
             for aspect, aspect_data in comparison["comparison_table"].items():
                 section = {
                     "title": f"{aspect.title()} Comparison",
-                    "content": self._format_comparison_aspect(aspect, aspect_data, entity_ids)
+                    "content": self._format_comparison_aspect(aspect, aspect_data, entity_ids),
                 }
                 data["sections"].append(section)
 
@@ -324,7 +306,7 @@ Knowledge Items: {', '.join(metrics.get('knowledge_items', []))}
                 "rows": [
                     [pair[0], pair[1], f"{score:.2f}"]
                     for pair, score in comparison["similarity_scores"].items()
-                ]
+                ],
             }
             data["tables"] = [similarity_table]
 
@@ -332,7 +314,7 @@ Knowledge Items: {', '.join(metrics.get('knowledge_items', []))}
         formatter = FormatterFactory.create(format, **formatter_kwargs)
         return formatter.format(data)
 
-    def _generate_narrative_summary(self, timeline: Dict[str, Any]) -> str:
+    def _generate_narrative_summary(self, timeline: dict[str, Any]) -> str:
         """Generate narrative summary from timeline data"""
         event_count = len(timeline.get("events", []))
         key_moment_count = len(timeline.get("key_moments", []))
@@ -349,7 +331,7 @@ Knowledge Items: {', '.join(metrics.get('knowledge_items', []))}
 
         return summary
 
-    def _generate_relationship_summary(self, relationships: Dict[str, Any]) -> str:
+    def _generate_relationship_summary(self, relationships: dict[str, Any]) -> str:
         """Generate relationship summary"""
         stats = relationships.get("summary_stats", {})
         total = stats.get("total_relationships", 0)
@@ -360,7 +342,7 @@ Knowledge Items: {', '.join(metrics.get('knowledge_items', []))}
             f"with an average strength of {avg_strength:.2f}."
         )
 
-    def _generate_knowledge_summary(self, knowledge_flow: Dict[str, Any]) -> str:
+    def _generate_knowledge_summary(self, knowledge_flow: dict[str, Any]) -> str:
         """Generate knowledge flow summary"""
         metrics = knowledge_flow.get("flow_metrics", {})
         transfers = metrics.get("total_transfers", 0)
@@ -371,16 +353,14 @@ Knowledge Items: {', '.join(metrics.get('knowledge_items', []))}
             f"involving {items} distinct knowledge items."
         )
 
-    def _generate_comparison_summary(self, comparison: Dict[str, Any]) -> str:
+    def _generate_comparison_summary(self, comparison: dict[str, Any]) -> str:
         """Generate entity comparison summary"""
         entity_count = len(comparison.get("entity_ids", []))
         aspect_count = len(comparison.get("aspects", []))
 
-        return (
-            f"Comparing {entity_count} entities across {aspect_count} aspects."
-        )
+        return f"Comparing {entity_count} entities across {aspect_count} aspects."
 
-    def _build_stats_section(self, world_id: str, timeline: Dict[str, Any]) -> Dict[str, Any]:
+    def _build_stats_section(self, world_id: str, timeline: dict[str, Any]) -> dict[str, Any]:
         """Build statistics section"""
         event_count = len(timeline.get("events", []))
         key_moment_count = len(timeline.get("key_moments", []))
@@ -390,15 +370,12 @@ Knowledge Items: {', '.join(metrics.get('knowledge_items', []))}
             "items": [
                 f"Total Events: {event_count}",
                 f"Key Moments: {key_moment_count}",
-                f"World ID: {world_id}"
-            ]
+                f"World ID: {world_id}",
+            ],
         }
 
     def _format_comparison_aspect(
-        self,
-        aspect: str,
-        aspect_data: Dict[str, Any],
-        entity_ids: List[str]
+        self, aspect: str, aspect_data: dict[str, Any], entity_ids: list[str]
     ) -> str:
         """Format comparison aspect data"""
         lines = []

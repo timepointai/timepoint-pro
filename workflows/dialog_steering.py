@@ -15,12 +15,11 @@ Also contains semantic quality gates (Component 6) that replace surface-level
 checks with frontier model evaluation.
 """
 
-from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional
-from datetime import datetime
 import json
 import logging
-import copy
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any
 
 from metadata.tracking import track_mechanism
 from schemas import DialogState
@@ -32,9 +31,11 @@ logger = logging.getLogger(__name__)
 # Semantic Quality Gates (Component 6)
 # ============================================================================
 
+
 @dataclass
 class SemanticQualityResult:
     """Result of semantic quality evaluation."""
+
     narrative_goals_advanced: bool = False
     specific_disagreement_present: bool = False
     character_voices_distinct: bool = False
@@ -42,18 +43,18 @@ class SemanticQualityResult:
     conflict_specificity_score: float = 0.0
     voice_distinctiveness_score: float = 0.0
     naturalness_score: float = 0.0
-    pattern_flags: List[str] = field(default_factory=list)
+    pattern_flags: list[str] = field(default_factory=list)
     evaluation_text: str = ""
     passed: bool = True
-    failures: List[str] = field(default_factory=list)
+    failures: list[str] = field(default_factory=list)
 
 
 def evaluate_dialog_semantically(
-    turns: List[Dict[str, Any]],
-    narrative_goals: List[str],
-    contexts: Dict[str, Any],
-    llm: 'LLMClient',
-    model: Optional[str] = None,
+    turns: list[dict[str, Any]],
+    narrative_goals: list[str],
+    contexts: dict[str, Any],
+    llm: "LLMClient",
+    model: str | None = None,
 ) -> SemanticQualityResult:
     """
     Per-dialog semantic quality evaluation.
@@ -68,10 +69,11 @@ def evaluate_dialog_semantically(
 
     # Build evaluation prompt
     turns_text = "\n".join(
-        f"  {t.get('speaker', '?')}: {t.get('content', '')[:200]}"
-        for t in turns
+        f"  {t.get('speaker', '?')}: {t.get('content', '')[:200]}" for t in turns
     )
-    goals_text = "\n".join(f"  - {g}" for g in narrative_goals) if narrative_goals else "  (none specified)"
+    goals_text = (
+        "\n".join(f"  - {g}" for g in narrative_goals) if narrative_goals else "  (none specified)"
+    )
 
     system_prompt = (
         "You are a dialog quality evaluator. Analyze the dialog and return a JSON "
@@ -151,11 +153,11 @@ Return JSON:
 
 
 def evaluate_cross_dialog_progression(
-    current_turns: List[Dict[str, Any]],
-    prior_beats: Optional[List[str]],
-    llm: 'LLMClient',
-    model: Optional[str] = None,
-) -> Dict[str, Any]:
+    current_turns: list[dict[str, Any]],
+    prior_beats: list[str] | None,
+    llm: "LLMClient",
+    model: str | None = None,
+) -> dict[str, Any]:
     """
     Cross-dialog progression check.
 
@@ -166,8 +168,7 @@ def evaluate_cross_dialog_progression(
 
     beats_text = "\n".join(f"  - {b}" for b in prior_beats[-5:])
     current_text = "\n".join(
-        f"  {t.get('speaker', '?')}: {t.get('content', '')[:100]}"
-        for t in current_turns[:5]
+        f"  {t.get('speaker', '?')}: {t.get('content', '')[:100]}" for t in current_turns[:5]
     )
 
     system_prompt = "You evaluate narrative progression between dialogs."
@@ -198,12 +199,12 @@ Return JSON: {{"progression_detected": bool, "score": float, "notes": "explanati
 
 
 def evaluate_full_run_coherence(
-    all_dialog_summaries: List[str],
-    llm: 'LLMClient',
-    model: Optional[str] = None,
-    character_arcs: Optional[Dict[str, Dict[str, Any]]] = None,
-    all_turns: Optional[List[List[Dict[str, Any]]]] = None,
-) -> Dict[str, Any]:
+    all_dialog_summaries: list[str],
+    llm: "LLMClient",
+    model: str | None = None,
+    character_arcs: dict[str, dict[str, Any]] | None = None,
+    all_turns: list[list[dict[str, Any]]] | None = None,
+) -> dict[str, Any]:
     """
     Full-run coherence check. Called once after all dialogs.
 
@@ -215,8 +216,8 @@ def evaluate_full_run_coherence(
     # Phase 6: Compute tactic evolution score
     if character_arcs:
         result["tactic_evolution_score"] = _compute_tactic_evolution_score(character_arcs)
-        result["information_asymmetry_utilization_score"] = _compute_info_asymmetry_utilization_score(
-            character_arcs, all_turns or []
+        result["information_asymmetry_utilization_score"] = (
+            _compute_info_asymmetry_utilization_score(character_arcs, all_turns or [])
         )
         result["subtext_density_score"] = _compute_subtext_density_score(
             all_turns or [], character_arcs
@@ -226,9 +227,7 @@ def evaluate_full_run_coherence(
         result.update({"coherent": True, "score": 1.0, "notes": "no_dialogs"})
         return result
 
-    summaries_text = "\n".join(
-        f"  {i+1}. {s}" for i, s in enumerate(all_dialog_summaries)
-    )
+    summaries_text = "\n".join(f"  {i + 1}. {s}" for i, s in enumerate(all_dialog_summaries))
 
     system_prompt = "You evaluate narrative coherence across a complete dialog sequence."
     user_prompt = f"""DIALOG SEQUENCE (in chronological order):
@@ -262,8 +261,9 @@ Return JSON: {{"coherent": bool, "score": float, "character_consistency": float,
 # Phase 6: Dialog Quality Evaluation Metrics
 # ============================================================================
 
+
 def _compute_tactic_evolution_score(
-    character_arcs: Dict[str, Dict[str, Any]],
+    character_arcs: dict[str, dict[str, Any]],
 ) -> float:
     """
     Tactic Evolution Score (0.0-1.0).
@@ -287,7 +287,7 @@ def _compute_tactic_evolution_score(
         variety = len(unique_tactics) / max(len(tactics), 1)
 
         # Count tactic transitions (changes between consecutive attempts)
-        transitions = sum(1 for i in range(1, len(tactics)) if tactics[i] != tactics[i-1])
+        transitions = sum(1 for i in range(1, len(tactics)) if tactics[i] != tactics[i - 1])
         transition_rate = transitions / max(len(tactics) - 1, 1)
 
         entity_scores.append(min(1.0, (variety + transition_rate) / 2))
@@ -299,8 +299,8 @@ def _compute_tactic_evolution_score(
 
 
 def _compute_info_asymmetry_utilization_score(
-    character_arcs: Dict[str, Dict[str, Any]],
-    all_turns: List[List[Dict[str, Any]]],
+    character_arcs: dict[str, dict[str, Any]],
+    all_turns: list[list[dict[str, Any]]],
 ) -> float:
     """
     Information Asymmetry Utilization Score (0.0-1.0).
@@ -342,8 +342,8 @@ def _compute_info_asymmetry_utilization_score(
 
 
 def _compute_subtext_density_score(
-    all_turns: List[List[Dict[str, Any]]],
-    character_arcs: Dict[str, Dict[str, Any]],
+    all_turns: list[list[dict[str, Any]]],
+    character_arcs: dict[str, dict[str, Any]],
 ) -> float:
     """
     Subtext Density Score (0.0-1.0).
@@ -374,8 +374,9 @@ def _compute_subtext_density_score(
 # LangGraph Nodes
 # ============================================================================
 
+
 @track_mechanism("M11", "dialog_steering")
-def steering_node(state: 'DialogState') -> 'DialogState':
+def steering_node(state: "DialogState") -> "DialogState":
     """
     Strategic dialog director modeling organizational power dynamics.
 
@@ -397,11 +398,12 @@ def steering_node(state: 'DialogState') -> 'DialogState':
     if turns:
         recent = turns[-6:]  # Last 6 turns for context
         turns_summary = "\n".join(
-            f"  {t.get('speaker', '?')}: {t.get('content', '')[:150]}"
-            for t in recent
+            f"  {t.get('speaker', '?')}: {t.get('content', '')[:150]}" for t in recent
         )
 
-    goals_text = "\n".join(f"  - {g}: {'DONE' if narrative_progress.get(g) else 'pending'}" for g in narrative_goals)
+    goals_text = "\n".join(
+        f"  - {g}: {'DONE' if narrative_progress.get(g) else 'pending'}" for g in narrative_goals
+    )
 
     # Proception awareness for steering
     proception_text = ""
@@ -423,7 +425,11 @@ def steering_node(state: 'DialogState') -> 'DialogState':
         for eid, arc in character_arcs.items():
             unspoken = arc.get("unspoken_accumulation", [])
             urgent = [u for u in unspoken if u.get("urgency", 0) > 0.4]
-            failures = [a for a in arc.get("dialog_attempts", []) if a.get("outcome") in ("dismissed", "ignored")]
+            failures = [
+                a
+                for a in arc.get("dialog_attempts", [])
+                if a.get("outcome") in ("dismissed", "ignored")
+            ]
             if urgent or failures:
                 line = f"  {eid}:"
                 if urgent:
@@ -444,7 +450,10 @@ def steering_node(state: 'DialogState') -> 'DialogState':
             if exclusive_items:
                 asym_lines.append(f"  {eid} exclusively knows: {exclusive_items[0][:60]}")
         if asym_lines:
-            info_asymmetry_text = "\nINFORMATION ASYMMETRY (who knows what others don't):\n" + "\n".join(asym_lines[:5])
+            info_asymmetry_text = (
+                "\nINFORMATION ASYMMETRY (who knows what others don't):\n"
+                + "\n".join(asym_lines[:5])
+            )
 
     # Phase 3: Tactic history
     tactic_history_text = ""
@@ -453,7 +462,9 @@ def steering_node(state: 'DialogState') -> 'DialogState':
         for eid, arc in character_arcs.items():
             attempts = arc.get("dialog_attempts", [])[-5:]
             if attempts:
-                summary = ", ".join(f"{a.get('tactic_used', '?')}→{a.get('outcome', '?')}" for a in attempts)
+                summary = ", ".join(
+                    f"{a.get('tactic_used', '?')}→{a.get('outcome', '?')}" for a in attempts
+                )
                 tactic_lines.append(f"  {eid}: {summary}")
         if tactic_lines:
             tactic_history_text = "\nTACTIC HISTORY:\n" + "\n".join(tactic_lines)
@@ -469,11 +480,11 @@ def steering_node(state: 'DialogState') -> 'DialogState':
     )
 
     user_prompt = f"""DIALOG SO FAR ({len(turns)} turns):
-{turns_summary or '(dialog starting)'}
+{turns_summary or "(dialog starting)"}
 
-AVAILABLE SPEAKERS: {', '.join(active_speakers)}
+AVAILABLE SPEAKERS: {", ".join(active_speakers)}
 NARRATIVE GOALS:
-{goals_text or '  (none)'}
+{goals_text or "  (none)"}
 CURRENT MOOD: {mood_register}
 {proception_text}
 {strategic_intents_text}
@@ -495,7 +506,7 @@ Decide the next action. Return JSON:
 Rules:
 - Don't use round-robin order. Some characters speak multiple times in a row.
 - If narrative goals are all done and tension has resolved, end the dialog.
-- If turn count exceeds {state.get('max_turns', 12)}, strongly consider ending.
+- If turn count exceeds {state.get("max_turns", 12)}, strongly consider ending.
 - Characters with high anxiety should speak more urgently.
 - Use "silence" to skip a character's turn but record a suppressed impulse.
 - If a character's tactic was just dismissed, choose a DIFFERENT move for them.
@@ -504,7 +515,7 @@ Rules:
     steering_model = state.get("steering_model")
 
     try:
-        if llm and hasattr(llm, 'service'):
+        if llm and hasattr(llm, "service"):
             response = llm.service.call(
                 system=system_prompt,
                 user=user_prompt,
@@ -532,9 +543,7 @@ Rules:
                 # Handle silence move: skip turn but record suppressed impulse
                 if dialog_move == "silence" and state["current_speaker"]:
                     speaker = state["current_speaker"]
-                    suppressed.setdefault(speaker, []).append(
-                        f"chose_silence_turn_{len(turns)}"
-                    )
+                    suppressed.setdefault(speaker, []).append(f"chose_silence_turn_{len(turns)}")
                     state["suppressed_impulses"] = suppressed
                     # Don't set current_speaker to None — let character_node handle it
                     # by checking the directive
@@ -548,9 +557,7 @@ Rules:
 
                 # Track suppressed speakers
                 for sid in decision.get("suppress_speaker", []):
-                    suppressed.setdefault(sid, []).append(
-                        f"steering_suppressed_turn_{len(turns)}"
-                    )
+                    suppressed.setdefault(sid, []).append(f"steering_suppressed_turn_{len(turns)}")
                 state["suppressed_impulses"] = suppressed
 
                 # Check end condition
@@ -580,6 +587,7 @@ Rules:
         candidates = [s for s in active_speakers if s != last_speaker]
         if candidates:
             import random
+
             state["current_speaker"] = random.choice(candidates)
         else:
             state["current_speaker"] = active_speakers[0]
@@ -594,7 +602,7 @@ Rules:
 
 
 @track_mechanism("M11", "character_generation")
-def character_node(state: 'DialogState') -> 'DialogState':
+def character_node(state: "DialogState") -> "DialogState":
     """
     Generates ONE dialog turn for current_speaker.
 
@@ -616,9 +624,7 @@ def character_node(state: 'DialogState') -> 'DialogState':
     if dialog_move == "silence":
         # Record that the character chose silence
         suppressed = state.get("suppressed_impulses", {})
-        suppressed.setdefault(current_speaker, []).append(
-            f"silence_at_turn_{len(turns)}"
-        )
+        suppressed.setdefault(current_speaker, []).append(f"silence_at_turn_{len(turns)}")
         state["suppressed_impulses"] = suppressed
         logger.info(f"[Character] {current_speaker}: *silence* (suppressed)")
         return state
@@ -644,8 +650,7 @@ def character_node(state: 'DialogState') -> 'DialogState':
     if turns:
         recent = turns[-8:]
         recent_turns = "\n".join(
-            f"  {t.get('speaker', '?')}: {t.get('content', '')}"
-            for t in recent
+            f"  {t.get('speaker', '?')}: {t.get('content', '')}" for t in recent
         )
 
     # Steering notes
@@ -657,10 +662,12 @@ def character_node(state: 'DialogState') -> 'DialogState':
 
     # Phase 4: Build subtext from back layer
     subtext_lines = []
-    if hasattr(ctx, 'back_layer'):
+    if hasattr(ctx, "back_layer"):
         bl = ctx.back_layer
         if directive.get("move_rationale"):
-            subtext_lines.append(f"- Steering directive: {dialog_move} targeting {move_target or 'general'}")
+            subtext_lines.append(
+                f"- Steering directive: {dialog_move} targeting {move_target or 'general'}"
+            )
         if bl.withheld_knowledge:
             wk_summary = "; ".join(w.get("content", str(w))[:50] for w in bl.withheld_knowledge[:2])
             subtext_lines.append(f"- What you're concealing: {wk_summary}")
@@ -669,11 +676,14 @@ def character_node(state: 'DialogState') -> 'DialogState':
 
     subtext_block = ""
     if subtext_lines:
-        subtext_block = "\n\nSUBTEXT (shapes your words — do NOT state any of this directly):\n" + "\n".join(subtext_lines)
+        subtext_block = (
+            "\n\nSUBTEXT (shapes your words — do NOT state any of this directly):\n"
+            + "\n".join(subtext_lines)
+        )
 
     # Phase 4: Rhetorical profile
     rhetorical_block = ""
-    if hasattr(ctx, 'back_layer') and ctx.back_layer.rhetorical_profile:
+    if hasattr(ctx, "back_layer") and ctx.back_layer.rhetorical_profile:
         rp = ctx.back_layer.rhetorical_profile
         rp_lines = []
         for key, val in rp.items():
@@ -689,7 +699,7 @@ def character_node(state: 'DialogState') -> 'DialogState':
 
     # Phase 4+: Voice anti-exemplar from archetype
     anti_exemplar_block = ""
-    if hasattr(ctx, 'back_layer') and ctx.back_layer.rhetorical_profile:
+    if hasattr(ctx, "back_layer") and ctx.back_layer.rhetorical_profile:
         anti_ex = ctx.back_layer.rhetorical_profile.get("voice_anti_exemplar", "")
         if anti_ex:
             anti_exemplar_block = f'\n\nNEVER SOUND LIKE THIS:\n"{anti_ex}"'
@@ -721,10 +731,10 @@ def character_node(state: 'DialogState') -> 'DialogState':
     user_prompt = f"""{context_text}
 
 CONVERSATION SO FAR:
-{recent_turns or '(conversation starting)'}
+{recent_turns or "(conversation starting)"}
 
 MOOD: {mood}
-TURN POSITION: {state.get('turn_count', 0)} of {state.get('max_turns', 12)}
+TURN POSITION: {state.get("turn_count", 0)} of {state.get("max_turns", 12)}
 {move_instruction}
 
 Generate {current_speaker}'s next line of dialog. Keep it natural and in-character.
@@ -802,7 +812,7 @@ def _get_move_instruction(dialog_move: str, move_target: str = "") -> str:
 
 
 @track_mechanism("M11", "dialog_quality_gate")
-def quality_gate_node(state: 'DialogState') -> 'DialogState':
+def quality_gate_node(state: "DialogState") -> "DialogState":
     """
     Semantic quality evaluation. Configurable per-turn or per-dialog.
 
@@ -823,6 +833,7 @@ def quality_gate_node(state: 'DialogState') -> 'DialogState':
 
     # First run cheap surface-level check
     from workflows.dialog_synthesis import _evaluate_dialog_quality
+
     surface_quality = _evaluate_dialog_quality(turns)
 
     if not surface_quality.get("passed", True):
@@ -851,7 +862,9 @@ def quality_gate_node(state: 'DialogState') -> 'DialogState':
                 "Characters speak to accomplish goals, not to narrate themes."
             )
             state.setdefault("quality_failures", []).append(repair_notes)
-            logger.info(f"[QualityGate] Naturalness failed ({semantic_result.naturalness_score:.2f}): {semantic_result.pattern_flags}")
+            logger.info(
+                f"[QualityGate] Naturalness failed ({semantic_result.naturalness_score:.2f}): {semantic_result.pattern_flags}"
+            )
         else:
             logger.info(f"[QualityGate] Semantic check: {semantic_result.evaluation_text}")
     else:
@@ -861,7 +874,7 @@ def quality_gate_node(state: 'DialogState') -> 'DialogState':
     return state
 
 
-def should_continue(state: 'DialogState') -> str:
+def should_continue(state: "DialogState") -> str:
     """
     Routing function for LangGraph conditional edges.
 
@@ -896,6 +909,7 @@ def should_continue(state: 'DialogState') -> str:
 # LangGraph Flow Builder
 # ============================================================================
 
+
 def build_dialog_graph():
     """
     Build the LangGraph StateGraph for per-turn dialog generation.
@@ -909,7 +923,7 @@ def build_dialog_graph():
         Compiled LangGraph StateGraph, or None if langgraph not available
     """
     try:
-        from langgraph.graph import StateGraph, END
+        from langgraph.graph import END, StateGraph
     except ImportError:
         logger.warning(
             "langgraph not installed. Per-turn dialog generation unavailable. "
@@ -937,7 +951,7 @@ def build_dialog_graph():
             "steering": "steering",
             "end": END,
             "quality_retry": "character",
-        }
+        },
     )
 
     # Compile without checkpointer — state contains non-serializable
@@ -948,9 +962,9 @@ def build_dialog_graph():
 
 
 def run_dialog_graph(
-    initial_state: 'DialogState',
-    config: Optional[Dict[str, Any]] = None,
-) -> 'DialogState':
+    initial_state: "DialogState",
+    config: dict[str, Any] | None = None,
+) -> "DialogState":
     """
     Execute the dialog generation graph.
 
@@ -971,7 +985,9 @@ def run_dialog_graph(
 
     if graph is not None:
         # LangGraph available — run the compiled graph
-        lconfig = config or {"configurable": {"thread_id": initial_state.get("timepoint_id", "dialog")}}
+        lconfig = config or {
+            "configurable": {"thread_id": initial_state.get("timepoint_id", "dialog")}
+        }
         try:
             final_state = graph.invoke(initial_state, lconfig)
             return final_state
@@ -982,7 +998,7 @@ def run_dialog_graph(
     return _run_sequential_fallback(initial_state)
 
 
-def _run_sequential_fallback(state: 'DialogState') -> 'DialogState':
+def _run_sequential_fallback(state: "DialogState") -> "DialogState":
     """
     Simple sequential fallback when LangGraph is not available.
 

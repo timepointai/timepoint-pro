@@ -4,25 +4,23 @@ Unit tests for rate limiting middleware.
 Tests the rate limiting configuration and key extraction logic.
 """
 
+from unittest.mock import Mock
+
 import pytest
-from unittest.mock import Mock, patch
-from datetime import datetime
 
 # Import the rate limit module
 from api.middleware.rate_limit import (
     RateLimitConfig,
-    get_rate_limit_config,
-    get_user_tier,
-    set_user_tier,
-    clear_user_tiers,
-    get_rate_limit_key,
-    get_dynamic_rate_limit,
     check_job_concurrency,
-    increment_job_count,
-    decrement_job_count,
-    get_job_count,
     clear_job_counts,
-    reset_limiter,
+    clear_user_tiers,
+    decrement_job_count,
+    get_dynamic_rate_limit,
+    get_job_count,
+    get_rate_limit_key,
+    get_user_tier,
+    increment_job_count,
+    set_user_tier,
 )
 
 
@@ -32,6 +30,7 @@ class TestRateLimitConfig:
     def test_default_config(self):
         """Test default configuration values (without env var interference)."""
         import os
+
         # RateLimitConfig reads from env vars at construction time;
         # clear any that other tests may have set to ensure clean defaults
         rate_env_vars = [k for k in os.environ if k.startswith("RATE_LIMIT_")]
@@ -175,11 +174,13 @@ class TestRateLimitKeyExtraction:
     def setup_method(self):
         """Clear API keys before each test."""
         from api.auth import clear_api_keys
+
         clear_api_keys()
 
     def teardown_method(self):
         """Clear API keys after each test."""
         from api.auth import clear_api_keys
+
         clear_api_keys()
 
     def test_key_from_ip_no_api_key(self):
@@ -223,12 +224,14 @@ class TestDynamicRateLimit:
     def setup_method(self):
         """Clear state before each test."""
         from api.auth import clear_api_keys
+
         clear_api_keys()
         clear_user_tiers()
 
     def teardown_method(self):
         """Clear state after each test."""
         from api.auth import clear_api_keys
+
         clear_api_keys()
         clear_user_tiers()
 

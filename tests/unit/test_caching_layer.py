@@ -6,22 +6,21 @@ Tests LRU cache for entities and TTL cache for query responses.
 
 import os
 import time
+from datetime import datetime
+
 import pytest
-from datetime import datetime, timedelta
-from schemas import Entity, Timepoint, ResolutionLevel
-from storage import GraphStore
-from query_interface import QueryInterface
+
 from llm_v2 import LLMClient  # Use new centralized service
+from query_interface import QueryInterface
+from schemas import Entity, ResolutionLevel, Timepoint
+from storage import GraphStore
 
 
 @pytest.mark.integration
 @pytest.mark.llm
 @pytest.mark.slow
 @pytest.mark.system
-@pytest.mark.skipif(
-    not os.getenv("OPENROUTER_API_KEY"),
-    reason="OPENROUTER_API_KEY not set"
-)
+@pytest.mark.skipif(not os.getenv("OPENROUTER_API_KEY"), reason="OPENROUTER_API_KEY not set")
 class TestCachingLayer:
     """Test caching layer functionality"""
 
@@ -39,7 +38,7 @@ class TestCachingLayer:
                 entity_type="person",
                 timepoint="test_tp",
                 resolution_level=ResolutionLevel.GRAPH,
-                entity_metadata={"role": f"role_{i}"}
+                entity_metadata={"role": f"role_{i}"},
             )
             entities.append(entity)
             store.save_entity(entity)
@@ -74,7 +73,9 @@ class TestCachingLayer:
         if second_access_time < first_access_time:
             print("✅ Entity caching working - second access was faster")
         else:
-            print("⚠️ Entity caching may not be significantly faster (could be due to test overhead)")
+            print(
+                "⚠️ Entity caching may not be significantly faster (could be due to test overhead)"
+            )
 
     def test_query_response_caching(self):
         """Test TTL caching for query responses"""
@@ -94,8 +95,8 @@ class TestCachingLayer:
             resolution_level=ResolutionLevel.GRAPH,
             entity_metadata={
                 "knowledge_state": ["Led Continental Army", "First President"],
-                "role": "president"
-            }
+                "role": "president",
+            },
         )
         store.save_entity(entity)
 
@@ -104,7 +105,7 @@ class TestCachingLayer:
             timepoint_id="test_tp",
             timestamp=datetime.now(),
             event_description="Test timepoint",
-            entities_present=["george_washington"]
+            entities_present=["george_washington"],
         )
         store.save_timepoint(timepoint)
 
@@ -180,4 +181,3 @@ class TestCachingLayer:
         else:
             print("❌ Some cache keys are identical")
             assert False, "Cache keys should be unique"
-

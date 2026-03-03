@@ -8,18 +8,15 @@ LLM now skip when OPENROUTER_API_KEY is not set.
 """
 
 import os
-import time
+
 import pytest
-from unittest.mock import Mock, patch
+
 from llm_v2 import LLMClient
 
 
 @pytest.mark.unit
 @pytest.mark.llm
-@pytest.mark.skipif(
-    not os.getenv("OPENROUTER_API_KEY"),
-    reason="OPENROUTER_API_KEY not set"
-)
+@pytest.mark.skipif(not os.getenv("OPENROUTER_API_KEY"), reason="OPENROUTER_API_KEY not set")
 def test_llm_client_retry_integration():
     """Test that LLM client methods use retry logic"""
     print("\n🧪 Testing LLM Client retry integration")
@@ -29,11 +26,12 @@ def test_llm_client_retry_integration():
 
     # Test populate_entity (should work with real LLM)
     from schemas import Entity, ResolutionLevel
+
     entity_schema = Entity(
         entity_id="test_entity",
         entity_type="human",
         timepoint="test_tp",
-        resolution_level=ResolutionLevel.TENSOR_ONLY
+        resolution_level=ResolutionLevel.TENSOR_ONLY,
     )
     context = {"test": "context"}
     result = llm_client.populate_entity(entity_schema, context)
@@ -61,6 +59,7 @@ def main():
 
     # Run pytest for this file
     import sys
+
     sys.exit(pytest.main([__file__, "-v"]))
 
 

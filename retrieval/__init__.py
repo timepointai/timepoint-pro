@@ -17,9 +17,9 @@ Usage:
     composed = rag.compose(results[:2])
 """
 
-from retrieval.embedding_index import EmbeddingIndex
 from retrieval.composition import TensorComposer
-from retrieval.tensor_rag import TensorRAG, SearchResult
+from retrieval.embedding_index import EmbeddingIndex
+from retrieval.tensor_rag import SearchResult, TensorRAG
 
 __all__ = [
     # Main class

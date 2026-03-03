@@ -4,8 +4,9 @@ Entity Evolution Formatter - Trains on entity state transitions across timepoint
 Generates prompt/completion pairs showing how entities evolve through temporal simulations.
 """
 
-from typing import List, Dict, Any, Optional
 import json
+from typing import Any
+
 from .context_manager import TrainingContextManager
 
 
@@ -36,7 +37,7 @@ class EntityEvolutionFormatter:
         if store and llm:
             self.context_manager = TrainingContextManager(store, llm)
 
-    def format_simulation(self, simulation_result: Dict[str, Any]) -> List[Dict[str, str]]:
+    def format_simulation(self, simulation_result: dict[str, Any]) -> list[dict[str, str]]:
         """
         Convert simulation result into entity evolution training examples.
 
@@ -70,21 +71,15 @@ class EntityEvolutionFormatter:
                 if entity.entity_id not in t1.entities_present:
                     continue
 
-                example = self._create_evolution_example(
-                    entity, t0, t1, simulation_result
-                )
+                example = self._create_evolution_example(entity, t0, t1, simulation_result)
                 if example:
                     training_examples.append(example)
 
         return training_examples
 
     def _create_evolution_example(
-        self,
-        entity: Any,
-        t0: Any,
-        t1: Any,
-        simulation_result: Dict[str, Any]
-    ) -> Dict[str, str]:
+        self, entity: Any, t0: Any, t1: Any, simulation_result: dict[str, Any]
+    ) -> dict[str, str]:
         """
         Create proper prompt/completion pairs for fine-tuning.
 
@@ -115,20 +110,27 @@ class EntityEvolutionFormatter:
 
         # Reconstruct T0 knowledge state: everything the entity knew up to and including t0
         t0_exposures = [
-            exp for exp in entity_exposures
-            if hasattr(exp, 'information') and (
-                (hasattr(exp, 'event_type') and exp.event_type == "initial") or
-                (hasattr(exp, 'timepoint_id') and exp.timepoint_id == t0.timepoint_id)
+            exp
+            for exp in entity_exposures
+            if hasattr(exp, "information")
+            and (
+                (hasattr(exp, "event_type") and exp.event_type == "initial")
+                or (hasattr(exp, "timepoint_id") and exp.timepoint_id == t0.timepoint_id)
             )
         ]
         t0_knowledge = [exp.information for exp in t0_exposures]
 
         # Reconstruct T1 knowledge state: T0 knowledge + anything learned at T1
         t1_exposures = [
-            exp for exp in entity_exposures
-            if hasattr(exp, 'information') and (
-                (hasattr(exp, 'event_type') and exp.event_type == "initial") or
-                (hasattr(exp, 'timepoint_id') and exp.timepoint_id in (t0.timepoint_id, t1.timepoint_id))
+            exp
+            for exp in entity_exposures
+            if hasattr(exp, "information")
+            and (
+                (hasattr(exp, "event_type") and exp.event_type == "initial")
+                or (
+                    hasattr(exp, "timepoint_id")
+                    and exp.timepoint_id in (t0.timepoint_id, t1.timepoint_id)
+                )
             )
         ]
         t1_knowledge = [exp.information for exp in t1_exposures]
@@ -137,7 +139,7 @@ class EntityEvolutionFormatter:
         new_knowledge = [k for k in t1_knowledge if k not in t0_knowledge]
 
         # Entity-specific energy cost based on actual cognitive state and activity
-        entity_metadata = getattr(entity, 'entity_metadata', {})
+        entity_metadata = getattr(entity, "entity_metadata", {})
         base_energy = entity_metadata.get("energy_budget", 100.0)
         cognitive_load = len(new_knowledge) * 5.0  # knowledge acquisition cost
         social_cost = len(t1.entities_present) * 2.0  # social interaction overhead
@@ -146,20 +148,23 @@ class EntityEvolutionFormatter:
         # Derive importance from event characteristics, not a fixed constant
         has_new_knowledge = len(new_knowledge) > 0
         entity_count = len(t1.entities_present)
-        event_desc_len = len(getattr(t1, 'event_description', '') or '')
-        importance = min(1.0, (
-            (0.3 if has_new_knowledge else 0.0) +
-            min(0.3, entity_count * 0.06) +
-            min(0.4, event_desc_len / 500.0)
-        ))
+        event_desc_len = len(getattr(t1, "event_description", "") or "")
+        importance = min(
+            1.0,
+            (
+                (0.3 if has_new_knowledge else 0.0)
+                + min(0.3, entity_count * 0.06)
+                + min(0.4, event_desc_len / 500.0)
+            ),
+        )
 
         # Get entity personality and state if available
-        personality_traits = getattr(entity, 'personality_traits', [0.0, 0.0, 0.0, 0.0, 0.0])
+        personality_traits = getattr(entity, "personality_traits", [0.0, 0.0, 0.0, 0.0, 0.0])
 
         # BUILD PROMPT: Rich Context + Entity State + Event + Question (NO ANSWER)
         prompt_parts = [
             "An entity experiences an event in a historical simulation. Predict how their state changes.",
-            ""
+            "",
         ]
 
         # Add rich context if available (M3, M6, M7, M10, M11, M13, M14)
@@ -172,7 +177,9 @@ class EntityEvolutionFormatter:
         prompt_parts.append(f"Identity: {entity.entity_id}")
         prompt_parts.append(f"Type: {entity.entity_type}")
         prompt_parts.append(f"Current Knowledge ({len(t0_knowledge)} items):")
-        prompt_parts.append(f"{json.dumps(t0_knowledge[:5], indent=2) if t0_knowledge else '[]'}  {f'... and {len(t0_knowledge) - 5} more' if len(t0_knowledge) > 5 else ''}")
+        prompt_parts.append(
+            f"{json.dumps(t0_knowledge[:5], indent=2) if t0_knowledge else '[]'}  {f'... and {len(t0_knowledge) - 5} more' if len(t0_knowledge) > 5 else ''}"
+        )
         # Use actual entity cognitive state if available
         current_energy = entity_metadata.get("energy_budget", 100.0)
         current_valence = entity_metadata.get("emotional_valence", 0.0)
@@ -198,17 +205,25 @@ class EntityEvolutionFormatter:
 
         # Add prediction task
         prompt_parts.append("=== PREDICTION TASK ===")
-        prompt_parts.append("Based on this entity's current state, personality, and the event occurring, predict:")
+        prompt_parts.append(
+            "Based on this entity's current state, personality, and the event occurring, predict:"
+        )
         prompt_parts.append("")
-        prompt_parts.append("1. NEW KNOWLEDGE: What specific information does this entity learn from experiencing this event?")
+        prompt_parts.append(
+            "1. NEW KNOWLEDGE: What specific information does this entity learn from experiencing this event?"
+        )
         prompt_parts.append("")
-        prompt_parts.append("2. ENERGY CHANGE: How much cognitive/physical energy is spent? (Consider: event complexity, social dynamics, emotional intensity)")
+        prompt_parts.append(
+            "2. ENERGY CHANGE: How much cognitive/physical energy is spent? (Consider: event complexity, social dynamics, emotional intensity)"
+        )
         prompt_parts.append("")
         prompt_parts.append("3. EMOTIONAL IMPACT: How do their emotions shift?")
         prompt_parts.append("   - Valence change (positive/negative feeling)")
         prompt_parts.append("   - Arousal change (calm/excited state)")
         prompt_parts.append("")
-        prompt_parts.append("4. CAUSAL REASONING: Explain WHY these changes occur based on the entity's personality, role, and the event's nature.")
+        prompt_parts.append(
+            "4. CAUSAL REASONING: Explain WHY these changes occur based on the entity's personality, role, and the event's nature."
+        )
         prompt_parts.append("")
         prompt_parts.append("Respond with a JSON object containing your predictions.")
 
@@ -220,7 +235,7 @@ class EntityEvolutionFormatter:
         trait_valence_bias = sum(personality_traits[:3]) / max(len(personality_traits[:3]), 1) * 0.1
         emotional_delta = {
             "valence": (importance - 0.5) * 0.3 + trait_valence_bias,
-            "arousal": importance * 0.4 * (1.0 + (len(new_knowledge) * 0.1))
+            "arousal": importance * 0.4 * (1.0 + (len(new_knowledge) * 0.1)),
         }
 
         # Generate reasoning based on actual simulation data
@@ -246,41 +261,40 @@ class EntityEvolutionFormatter:
 
         causal_reasoning = " ".join(reasoning_parts)
 
-        completion = json.dumps({
-            "new_knowledge_gained": new_knowledge,
-            "knowledge_count": len(new_knowledge),
-            "energy_change": round(-energy_cost, 1),
-            "remaining_energy": round(max(0.0, current_energy - energy_cost), 1),
-            "emotional_change": {
-                "valence_delta": round(emotional_delta["valence"], 3),
-                "arousal_delta": round(emotional_delta["arousal"], 3),
-                "final_valence": round(current_valence + emotional_delta["valence"], 3),
-                "final_arousal": round(min(1.0, max(0.0, current_arousal + emotional_delta["arousal"])), 3)
+        completion = json.dumps(
+            {
+                "new_knowledge_gained": new_knowledge,
+                "knowledge_count": len(new_knowledge),
+                "energy_change": round(-energy_cost, 1),
+                "remaining_energy": round(max(0.0, current_energy - energy_cost), 1),
+                "emotional_change": {
+                    "valence_delta": round(emotional_delta["valence"], 3),
+                    "arousal_delta": round(emotional_delta["arousal"], 3),
+                    "final_valence": round(current_valence + emotional_delta["valence"], 3),
+                    "final_arousal": round(
+                        min(1.0, max(0.0, current_arousal + emotional_delta["arousal"])), 3
+                    ),
+                },
+                "causal_reasoning": causal_reasoning,
+                "mechanism_explanation": {
+                    "knowledge_acquisition": "Direct participation in event led to information exposure",
+                    "energy_dynamics": "Cognitive processing and social interaction consume resources",
+                    "emotional_dynamics": "Event importance and participation drive affective response",
+                },
+                "metadata": {
+                    "entity_id": entity.entity_id,
+                    "entity_type": entity.entity_type,
+                    "timepoint_transition": f"{t0.timepoint_id} -> {t1.timepoint_id}",
+                    "co_present_entities": t1.entities_present,
+                    "event_causal_parent": t1.causal_parent,
+                },
             },
-            "causal_reasoning": causal_reasoning,
-            "mechanism_explanation": {
-                "knowledge_acquisition": "Direct participation in event led to information exposure",
-                "energy_dynamics": "Cognitive processing and social interaction consume resources",
-                "emotional_dynamics": "Event importance and participation drive affective response"
-            },
-            "metadata": {
-                "entity_id": entity.entity_id,
-                "entity_type": entity.entity_type,
-                "timepoint_transition": f"{t0.timepoint_id} -> {t1.timepoint_id}",
-                "co_present_entities": t1.entities_present,
-                "event_causal_parent": t1.causal_parent
-            }
-        }, indent=2)
+            indent=2,
+        )
 
-        return {
-            "prompt": prompt,
-            "completion": completion
-        }
+        return {"prompt": prompt, "completion": completion}
 
-    def format_batch(
-        self,
-        simulations: List[Dict[str, Any]]
-    ) -> List[Dict[str, str]]:
+    def format_batch(self, simulations: list[dict[str, Any]]) -> list[dict[str, str]]:
         """
         Format multiple simulations into training examples.
 
@@ -298,8 +312,8 @@ class EntityEvolutionFormatter:
 
         return all_examples
 
-    def export_jsonl(self, examples: List[Dict[str, str]], output_path: str):
+    def export_jsonl(self, examples: list[dict[str, str]], output_path: str):
         """Export training examples to JSONL format"""
-        with open(output_path, 'w') as f:
+        with open(output_path, "w") as f:
             for example in examples:
-                f.write(json.dumps(example) + '\n')
+                f.write(json.dumps(example) + "\n")

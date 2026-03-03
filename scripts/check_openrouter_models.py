@@ -1,19 +1,16 @@
 #!/usr/bin/env python3
 """Query OpenRouter API for available Llama models and pricing."""
 
-import httpx
-import json
 import os
+
+import httpx
 
 api_key = os.getenv("OPENROUTER_API_KEY")
 if not api_key:
     print("❌ No OPENROUTER_API_KEY found")
     exit(1)
 
-headers = {
-    "Authorization": f"Bearer {api_key}",
-    "Content-Type": "application/json"
-}
+headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
 with httpx.Client(timeout=10.0) as client:
     response = client.get("https://openrouter.ai/api/v1/models", headers=headers)
@@ -30,10 +27,14 @@ for model in all_models:
 
     # Look for Llama 3.1 70B or 405B models
     is_target = (
-        ("llama" in model_id.lower() or "llama" in name.lower()) and
-        ("3.1" in model_id or "3.1" in name or "3-1" in model_id) and
-        ("70b" in model_id.lower() or "405b" in model_id.lower() or
-         "70b" in name.lower() or "405b" in name.lower())
+        ("llama" in model_id.lower() or "llama" in name.lower())
+        and ("3.1" in model_id or "3.1" in name or "3-1" in model_id)
+        and (
+            "70b" in model_id.lower()
+            or "405b" in model_id.lower()
+            or "70b" in name.lower()
+            or "405b" in name.lower()
+        )
     )
 
     if is_target:
@@ -42,24 +43,28 @@ for model in all_models:
         completion_price = float(pricing.get("completion", "0"))
 
         # Determine if free (price = 0) or paid
-        is_free = (prompt_price == 0 and completion_price == 0)
+        is_free = prompt_price == 0 and completion_price == 0
 
-        target_models.append({
-            "id": model_id,
-            "name": name,
-            "context_length": model.get("context_length", 0),
-            "prompt_price": prompt_price,
-            "completion_price": completion_price,
-            "is_free": is_free,
-            "is_paid": not is_free,
-            "description": model.get("description", "")[:100]
-        })
+        target_models.append(
+            {
+                "id": model_id,
+                "name": name,
+                "context_length": model.get("context_length", 0),
+                "prompt_price": prompt_price,
+                "completion_price": completion_price,
+                "is_free": is_free,
+                "is_paid": not is_free,
+                "description": model.get("description", "")[:100],
+            }
+        )
 
 # Sort by size (70B first, then 405B) and price
-target_models.sort(key=lambda x: (
-    0 if "70b" in x["id"].lower() else 1,  # 70B models first
-    x["prompt_price"]  # Then by price
-))
+target_models.sort(
+    key=lambda x: (
+        0 if "70b" in x["id"].lower() else 1,  # 70B models first
+        x["prompt_price"],  # Then by price
+    )
+)
 
 print("=" * 80)
 print("🦙 LLAMA 3.1 MODELS ON OPENROUTER (70B & 405B)")
@@ -76,7 +81,7 @@ else:
         print(f"  ID: {model['id']}")
         print(f"  Name: {model['name']}")
         print(f"  Context: {model['context_length']:,} tokens")
-        print(f"  Pricing:")
+        print("  Pricing:")
         print(f"    - Prompt: ${model['prompt_price']:.6f} per token")
         print(f"    - Completion: ${model['completion_price']:.6f} per token")
         if model["description"]:

@@ -6,28 +6,27 @@ Tests the semantic search and composition capabilities for trained tensors.
 Phase 3: Retrieval System Implementation
 """
 
-import pytest
-import numpy as np
 import tempfile
-import os
 from pathlib import Path
-from datetime import datetime
+
+import numpy as np
+import pytest
 
 # These will be implemented
 from retrieval import (
-    TensorRAG,
     EmbeddingIndex,
-    TensorComposer,
     SearchResult,
+    TensorComposer,
+    TensorRAG,
 )
-from tensor_persistence import TensorDatabase, TensorRecord
-from tensor_serialization import serialize_tensor, deserialize_tensor
 from schemas import TTMTensor
-
+from tensor_persistence import TensorDatabase, TensorRecord
+from tensor_serialization import serialize_tensor
 
 # ============================================================================
 # Test Fixtures
 # ============================================================================
+
 
 @pytest.fixture
 def temp_db():
@@ -125,6 +124,7 @@ def tensor_rag(populated_db):
 # Test EmbeddingIndex
 # ============================================================================
 
+
 class TestEmbeddingIndex:
     """Tests for the embedding index component."""
 
@@ -216,6 +216,7 @@ class TestEmbeddingIndex:
 # Test TensorComposer
 # ============================================================================
 
+
 class TestTensorComposer:
     """Tests for tensor composition strategies."""
 
@@ -226,10 +227,7 @@ class TestTensorComposer:
         tensor1_values = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float32)
         tensor2_values = np.array([0.0, 1.0, 0.0, 0.0], dtype=np.float32)
 
-        result = composer.weighted_blend(
-            [tensor1_values, tensor2_values],
-            weights=[0.5, 0.5]
-        )
+        result = composer.weighted_blend([tensor1_values, tensor2_values], weights=[0.5, 0.5])
 
         expected = np.array([0.5, 0.5, 0.0, 0.0], dtype=np.float32)
         np.testing.assert_array_almost_equal(result, expected)
@@ -241,10 +239,7 @@ class TestTensorComposer:
         tensor1_values = np.array([1.0, 0.0], dtype=np.float32)
         tensor2_values = np.array([0.0, 1.0], dtype=np.float32)
 
-        result = composer.weighted_blend(
-            [tensor1_values, tensor2_values],
-            weights=[0.8, 0.2]
-        )
+        result = composer.weighted_blend([tensor1_values, tensor2_values], weights=[0.8, 0.2])
 
         expected = np.array([0.8, 0.2], dtype=np.float32)
         np.testing.assert_array_almost_equal(result, expected)
@@ -284,9 +279,7 @@ class TestTensorComposer:
         tensor2 = sample_tensors[1]["tensor"]
 
         result = composer.compose_tensors(
-            [tensor1, tensor2],
-            method="weighted_blend",
-            weights=[0.6, 0.4]
+            [tensor1, tensor2], method="weighted_blend", weights=[0.6, 0.4]
         )
 
         assert isinstance(result, TTMTensor)
@@ -297,6 +290,7 @@ class TestTensorComposer:
 # ============================================================================
 # Test TensorRAG Main Class
 # ============================================================================
+
 
 class TestTensorRAGBasic:
     """Basic tests for TensorRAG functionality."""
@@ -336,9 +330,9 @@ class TestTensorRAGSearch:
 
         if results:
             result = results[0]
-            assert hasattr(result, 'tensor_id')
-            assert hasattr(result, 'score')
-            assert hasattr(result, 'tensor_record')
+            assert hasattr(result, "tensor_id")
+            assert hasattr(result, "score")
+            assert hasattr(result, "tensor_record")
             assert 0.0 <= result.score <= 1.0
 
     def test_search_relevance(self, tensor_rag):
@@ -400,11 +394,7 @@ class TestTensorRAGComposition:
         results = tensor_rag.search("professional", n_results=2)
 
         if len(results) >= 2:
-            composed = tensor_rag.compose(
-                results[:2],
-                weights=[0.7, 0.3],
-                method="weighted_blend"
-            )
+            composed = tensor_rag.compose(results[:2], weights=[0.7, 0.3], method="weighted_blend")
             assert isinstance(composed, TTMTensor)
 
     def test_compose_different_methods(self, tensor_rag):
@@ -424,7 +414,7 @@ class TestTensorRAGResolution:
         """Test resolving tensor for entity description."""
         tensor = tensor_rag.resolve_for_entity(
             entity_description="Sherlock Holmes, a brilliant detective",
-            scenario_context="Victorian London"
+            scenario_context="Victorian London",
         )
 
         assert isinstance(tensor, TTMTensor)
@@ -433,8 +423,7 @@ class TestTensorRAGResolution:
         """Test resolution when no good match exists."""
         # Query for something not in our sample data
         tensor = tensor_rag.resolve_for_entity(
-            entity_description="Alien spacecraft pilot",
-            scenario_context="Year 3000 space station"
+            entity_description="Alien spacecraft pilot", scenario_context="Year 3000 space station"
         )
 
         # Should return a valid tensor (even if newly created)
@@ -445,7 +434,7 @@ class TestTensorRAGResolution:
         tensor = tensor_rag.resolve_for_entity(
             entity_description="Technology startup executive",
             scenario_context="Modern business environment",
-            min_maturity=0.95
+            min_maturity=0.95,
         )
 
         assert isinstance(tensor, TTMTensor)
@@ -456,7 +445,7 @@ class TestTensorRAGResolution:
         tensor = tensor_rag.resolve_for_entity(
             entity_description="Victorian businessman inventor",
             scenario_context="Industrial revolution England",
-            allow_composition=True
+            allow_composition=True,
         )
 
         assert isinstance(tensor, TTMTensor)
@@ -465,6 +454,7 @@ class TestTensorRAGResolution:
 # ============================================================================
 # Test Index Persistence
 # ============================================================================
+
 
 class TestIndexPersistence:
     """Tests for index save/load functionality."""
@@ -497,6 +487,7 @@ class TestIndexPersistence:
 # ============================================================================
 # Test Edge Cases
 # ============================================================================
+
 
 class TestEdgeCases:
     """Tests for edge cases and error handling."""
@@ -551,6 +542,7 @@ class TestEdgeCases:
 # Test Integration with Training Pipeline
 # ============================================================================
 
+
 class TestPipelineIntegration:
     """Tests for integration with the training pipeline."""
 
@@ -569,7 +561,7 @@ class TestPipelineIntegration:
             tensor_id="new_trained_tensor",
             tensor=new_tensor,
             description="Newly trained medieval knight",
-            maturity=0.96
+            maturity=0.96,
         )
 
         assert tensor_rag.index_size == initial_size + 1
@@ -598,7 +590,7 @@ class TestPipelineIntegration:
                 tensor_id=tensor_id,
                 tensor=updated_tensor,
                 description="Highly trained Victorian detective expert",
-                maturity=0.99
+                maturity=0.99,
             )
 
             # Search should still find it

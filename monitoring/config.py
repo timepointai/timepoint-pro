@@ -5,11 +5,11 @@ Configuration dataclasses for the simulation monitor.
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Optional
 
 
 class DisplayMode(Enum):
     """Display mode for monitor output"""
+
     RAW = "raw"  # Show only raw subprocess output
     LLM = "llm"  # Show only LLM summaries
     BOTH = "both"  # Show both raw and LLM summaries
@@ -17,6 +17,7 @@ class DisplayMode(Enum):
 
 class OutputFormat(Enum):
     """Output format for monitor"""
+
     CONSOLE = "console"  # Human-readable console output
     JSON = "json"  # JSON format
     MARKDOWN = "markdown"  # Markdown format
@@ -40,7 +41,7 @@ class MonitorConfig:
     update_interval: int = 300  # seconds (5 minutes)
 
     # Prompt configuration
-    system_prompt_file: Optional[Path] = None
+    system_prompt_file: Path | None = None
 
     # Database inspection
     enable_db_inspection: bool = True
@@ -48,7 +49,7 @@ class MonitorConfig:
     datasets_dir: Path = field(default_factory=lambda: Path("datasets"))
 
     # API keys
-    openrouter_api_key: Optional[str] = None
+    openrouter_api_key: str | None = None
 
     # Auto-confirmation
     auto_confirm: bool = False
@@ -75,22 +76,22 @@ class MonitorState:
     """Current state of the monitor"""
 
     # Template tracking
-    current_template: Optional[str] = None
-    current_run_id: Optional[str] = None
+    current_template: str | None = None
+    current_run_id: str | None = None
     templates_completed: int = 0
-    templates_total: Optional[int] = None
+    templates_total: int | None = None
 
     # Cost tracking
     total_cost_usd: float = 0.0
     llm_api_cost_usd: float = 0.0
 
     # Performance tracking
-    start_time: Optional[float] = None
-    last_update_time: Optional[float] = None
+    start_time: float | None = None
+    last_update_time: float | None = None
 
     # Accumulated logs since last LLM update
     log_buffer: list[str] = field(default_factory=list)
 
     # Status
     is_running: bool = False
-    error_message: Optional[str] = None
+    error_message: str | None = None

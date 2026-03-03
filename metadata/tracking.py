@@ -9,10 +9,11 @@ Usage:
 This automatically records when mechanisms are used.
 """
 
-from functools import wraps
-from typing import Optional, Callable, Any
-from .run_tracker import MetadataManager
 import threading
+from collections.abc import Callable
+from functools import wraps
+
+from .run_tracker import MetadataManager
 
 # Thread-local storage for current run_id
 _thread_local = threading.local()
@@ -23,22 +24,22 @@ def set_current_run_id(run_id: str):
     _thread_local.run_id = run_id
 
 
-def get_current_run_id() -> Optional[str]:
+def get_current_run_id() -> str | None:
     """Get the run_id for the current thread"""
-    return getattr(_thread_local, 'run_id', None)
+    return getattr(_thread_local, "run_id", None)
 
 
 def clear_current_run_id():
     """Clear the run_id for the current thread"""
-    if hasattr(_thread_local, 'run_id'):
+    if hasattr(_thread_local, "run_id"):
         del _thread_local.run_id
 
 
 # Global metadata manager instance
-_metadata_manager: Optional[MetadataManager] = None
+_metadata_manager: MetadataManager | None = None
 
 
-def get_metadata_manager() -> Optional[MetadataManager]:
+def get_metadata_manager() -> MetadataManager | None:
     """Get the global metadata manager"""
     return _metadata_manager
 
@@ -62,6 +63,7 @@ def track_mechanism(mechanism: str, description: str = ""):
         def assign_resolution(entity, resolution):
             ...
     """
+
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -78,7 +80,7 @@ def track_mechanism(mechanism: str, description: str = ""):
                         "description": description,
                         "function": func.__name__,
                         "args_count": len(args),
-                        "kwargs_count": len(kwargs)
+                        "kwargs_count": len(kwargs),
                     }
                     manager.record_mechanism(run_id, mechanism, func.__name__, context)
                 except Exception as e:
@@ -92,6 +94,7 @@ def track_mechanism(mechanism: str, description: str = ""):
         wrapper._mechanism_description = description
 
         return wrapper
+
     return decorator
 
 
@@ -109,7 +112,9 @@ def track_resolution(run_id: str, entity_id: str, resolution, timepoint_id: str)
             print(f"Warning: Failed to track resolution: {e}")
 
 
-def track_validation(run_id: str, validator_name: str, passed: bool, message: str = None, violations: list = None):
+def track_validation(
+    run_id: str, validator_name: str, passed: bool, message: str = None, violations: list = None
+):
     """
     Manually track validation execution.
 

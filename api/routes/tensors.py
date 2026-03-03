@@ -7,30 +7,28 @@ Phase 6: Public API
 """
 
 import uuid
+
 import numpy as np
-from datetime import datetime
-from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from tensor_persistence import TensorDatabase, TensorRecord
-from tensor_serialization import serialize_tensor, deserialize_tensor
-from access.permissions import PermissionEnforcer, PermissionDenied
 from access.audit import AuditLogger
+from access.permissions import PermissionEnforcer
 from schemas import TTMTensor
+from tensor_persistence import TensorDatabase, TensorRecord
+from tensor_serialization import deserialize_tensor, serialize_tensor
 
-from ..models import (
-    TensorCreate,
-    TensorUpdate,
-    TensorResponse,
-    TensorListResponse,
-    TensorValues,
-    ShareRequest,
-    AccessLevelRequest,
-    StatsResponse,
-)
 from ..auth import get_current_user
-from ..deps import get_tensor_db, get_enforcer, get_audit_logger
-
+from ..deps import get_audit_logger, get_enforcer, get_tensor_db
+from ..models import (
+    AccessLevelRequest,
+    ShareRequest,
+    StatsResponse,
+    TensorCreate,
+    TensorListResponse,
+    TensorResponse,
+    TensorUpdate,
+    TensorValues,
+)
 
 router = APIRouter(prefix="/tensors", tags=["tensors"])
 
@@ -38,6 +36,7 @@ router = APIRouter(prefix="/tensors", tags=["tensors"])
 # ============================================================================
 # Helper Functions
 # ============================================================================
+
 
 def tensor_to_values(tensor: TTMTensor) -> TensorValues:
     """Convert TTMTensor to TensorValues model."""
@@ -85,12 +84,13 @@ def record_to_response(
 # CRUD Endpoints
 # ============================================================================
 
+
 @router.get("", response_model=TensorListResponse)
 async def list_tensors(
     page: int = Query(default=1, ge=1, description="Page number"),
     page_size: int = Query(default=50, ge=1, le=100, description="Page size"),
-    entity_id: Optional[str] = Query(default=None, description="Filter by entity"),
-    world_id: Optional[str] = Query(default=None, description="Filter by world"),
+    entity_id: str | None = Query(default=None, description="Filter by entity"),
+    world_id: str | None = Query(default=None, description="Filter by world"),
     user_id: str = Depends(get_current_user),
     db: TensorDatabase = Depends(get_tensor_db),
     enforcer: PermissionEnforcer = Depends(get_enforcer),
@@ -108,10 +108,7 @@ async def list_tensors(
     all_records = db.list_tensors(entity_id=entity_id, world_id=world_id)
 
     # Filter to accessible ones
-    accessible_records = [
-        r for r in all_records
-        if r.tensor_id in accessible_ids
-    ]
+    accessible_records = [r for r in all_records if r.tensor_id in accessible_ids]
 
     # Paginate
     total = len(accessible_records)
@@ -124,13 +121,15 @@ async def list_tensors(
     for record in page_records:
         perm = enforcer.get_permission(record.tensor_id)
         if perm:
-            tensors.append(record_to_response(
-                record,
-                {
-                    "access_level": perm.access_level,
-                    "owner_id": perm.owner_id,
-                }
-            ))
+            tensors.append(
+                record_to_response(
+                    record,
+                    {
+                        "access_level": perm.access_level,
+                        "owner_id": perm.owner_id,
+                    },
+                )
+            )
 
     return TensorListResponse(
         tensors=tensors,
@@ -161,7 +160,7 @@ async def create_tensor(
     if existing is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Tensor with ID '{tensor_id}' already exists"
+            detail=f"Tensor with ID '{tensor_id}' already exists",
         )
 
     # Convert values to tensor
@@ -189,10 +188,7 @@ async def create_tensor(
     logger.log_access(tensor_id, user_id, "create", True)
 
     # Return response
-    return record_to_response(
-        record,
-        {"access_level": data.access_level, "owner_id": user_id}
-    )
+    return record_to_response(record, {"access_level": data.access_level, "owner_id": user_id})
 
 
 @router.get("/{tensor_id}", response_model=TensorResponse)
@@ -212,16 +208,14 @@ async def get_tensor(
     record = db.get_tensor(tensor_id)
     if record is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Tensor '{tensor_id}' not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Tensor '{tensor_id}' not found"
         )
 
     # Check permission
     if not enforcer.can_read(user_id, tensor_id):
         logger.log_access(tensor_id, user_id, "read", False)
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"No read access to tensor '{tensor_id}'"
+            status_code=status.HTTP_403_FORBIDDEN, detail=f"No read access to tensor '{tensor_id}'"
         )
 
     # Log access
@@ -236,7 +230,7 @@ async def get_tensor(
         {
             "access_level": perm.access_level if perm else "private",
             "owner_id": perm.owner_id if perm else "",
-        }
+        },
     )
 
 
@@ -258,16 +252,14 @@ async def update_tensor(
     record = db.get_tensor(tensor_id)
     if record is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Tensor '{tensor_id}' not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Tensor '{tensor_id}' not found"
         )
 
     # Check permission
     if not enforcer.can_write(user_id, tensor_id):
         logger.log_access(tensor_id, user_id, "write", False)
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"No write access to tensor '{tensor_id}'"
+            status_code=status.HTTP_403_FORBIDDEN, detail=f"No write access to tensor '{tensor_id}'"
         )
 
     # Update fields
@@ -305,7 +297,7 @@ async def update_tensor(
         {
             "access_level": perm.access_level if perm else "private",
             "owner_id": perm.owner_id if perm else user_id,
-        }
+        },
     )
 
 
@@ -326,8 +318,7 @@ async def delete_tensor(
     record = db.get_tensor(tensor_id)
     if record is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Tensor '{tensor_id}' not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Tensor '{tensor_id}' not found"
         )
 
     # Check permission
@@ -335,7 +326,7 @@ async def delete_tensor(
         logger.log_access(tensor_id, user_id, "delete", False)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"No delete access to tensor '{tensor_id}'"
+            detail=f"No delete access to tensor '{tensor_id}'",
         )
 
     # Delete
@@ -349,6 +340,7 @@ async def delete_tensor(
 # ============================================================================
 # Sharing Endpoints
 # ============================================================================
+
 
 @router.post("/{tensor_id}/share", status_code=status.HTTP_200_OK)
 async def share_tensor(
@@ -367,22 +359,17 @@ async def share_tensor(
     perm = enforcer.get_permission(tensor_id)
     if perm is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Tensor '{tensor_id}' not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Tensor '{tensor_id}' not found"
         )
 
     # Grant access
     result = enforcer.grant_access(user_id, tensor_id, data.user_id)
     if not result:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the owner can share this tensor"
+            status_code=status.HTTP_403_FORBIDDEN, detail="Only the owner can share this tensor"
         )
 
-    logger.log_access(
-        tensor_id, user_id, "share",
-        True, {"shared_with": data.user_id}
-    )
+    logger.log_access(tensor_id, user_id, "share", True, {"shared_with": data.user_id})
 
     return {"message": f"Tensor shared with {data.user_id}"}
 
@@ -403,14 +390,10 @@ async def unshare_tensor(
     result = enforcer.revoke_access(user_id, tensor_id, target_user_id)
     if not result:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the owner can revoke sharing"
+            status_code=status.HTTP_403_FORBIDDEN, detail="Only the owner can revoke sharing"
         )
 
-    logger.log_access(
-        tensor_id, user_id, "unshare",
-        True, {"revoked_from": target_user_id}
-    )
+    logger.log_access(tensor_id, user_id, "unshare", True, {"revoked_from": target_user_id})
 
     return {"message": f"Sharing revoked from {target_user_id}"}
 
@@ -431,14 +414,10 @@ async def set_access_level(
     result = enforcer.set_access_level(user_id, tensor_id, data.access_level)
     if not result:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the owner can change access level"
+            status_code=status.HTTP_403_FORBIDDEN, detail="Only the owner can change access level"
         )
 
-    logger.log_access(
-        tensor_id, user_id, "set_access",
-        True, {"access_level": data.access_level}
-    )
+    logger.log_access(tensor_id, user_id, "set_access", True, {"access_level": data.access_level})
 
     return {"message": f"Access level set to {data.access_level}"}
 
@@ -447,10 +426,13 @@ async def set_access_level(
 # Fork Endpoint
 # ============================================================================
 
-@router.post("/{tensor_id}/fork", response_model=TensorResponse, status_code=status.HTTP_201_CREATED)
+
+@router.post(
+    "/{tensor_id}/fork", response_model=TensorResponse, status_code=status.HTTP_201_CREATED
+)
 async def fork_tensor(
     tensor_id: str,
-    new_id: Optional[str] = Query(default=None, description="ID for the forked tensor"),
+    new_id: str | None = Query(default=None, description="ID for the forked tensor"),
     user_id: str = Depends(get_current_user),
     db: TensorDatabase = Depends(get_tensor_db),
     enforcer: PermissionEnforcer = Depends(get_enforcer),
@@ -466,16 +448,14 @@ async def fork_tensor(
     source = db.get_tensor(tensor_id)
     if source is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Tensor '{tensor_id}' not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Tensor '{tensor_id}' not found"
         )
 
     # Check permission
     if not enforcer.can_fork(user_id, tensor_id):
         logger.log_access(tensor_id, user_id, "fork", False)
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"No fork access to tensor '{tensor_id}'"
+            status_code=status.HTTP_403_FORBIDDEN, detail=f"No fork access to tensor '{tensor_id}'"
         )
 
     # Generate fork ID
@@ -485,7 +465,7 @@ async def fork_tensor(
     if db.get_tensor(fork_id) is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Tensor with ID '{fork_id}' already exists"
+            detail=f"Tensor with ID '{fork_id}' already exists",
         )
 
     # Create fork
@@ -509,15 +489,13 @@ async def fork_tensor(
     logger.log_access(tensor_id, user_id, "fork", True, {"fork_id": fork_id})
     logger.log_access(fork_id, user_id, "create", True, {"source_id": tensor_id})
 
-    return record_to_response(
-        fork_record,
-        {"access_level": "private", "owner_id": user_id}
-    )
+    return record_to_response(fork_record, {"access_level": "private", "owner_id": user_id})
 
 
 # ============================================================================
 # Stats Endpoint
 # ============================================================================
+
 
 @router.get("/stats/summary", response_model=StatsResponse)
 async def get_stats(

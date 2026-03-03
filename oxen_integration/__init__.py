@@ -21,51 +21,52 @@ Fine-tuning workflow:
     >>> instructions = launcher.launch_via_notebook(job)
 """
 
-from .client import OxenClient
 from .auth import AuthManager
-from .config import OxenConfig, ConfigManager
-from .models import UploadResult, RepositoryInfo, GenerationPipelineResult
+from .client import OxenClient
+from .config import ConfigManager, OxenConfig
+from .evaluation import (
+    EvaluationExample,
+    EvaluationResults,
+    ModelEvaluator,
+    TimepointEvaluator,
+)
 from .exceptions import (
-    OxenError,
     AuthenticationError,
-    UploadError,
-    RepositoryError,
     ConfigurationError,
+    OxenError,
+    RepositoryError,
+    UploadError,
 )
 from .finetune import (
+    DataFormatter,
     FineTuneConfig,
     FineTuneJob,
     FineTuneLauncher,
-    DataFormatter,
 )
-from .evaluation import (
-    ModelEvaluator,
-    TimepointEvaluator,
-    EvaluationResults,
-    EvaluationExample,
-)
+from .models import GenerationPipelineResult, RepositoryInfo, UploadResult
 
 # Phase 4: Tensor versioning (optional - requires pyarrow)
 try:
     from .parquet_schemas import (
-        get_template_schema,
         get_instance_schema,
-        tensor_record_to_parquet_row,
+        get_template_schema,
         parquet_row_to_tensor_record,
-        write_templates_parquet,
-        write_instances_parquet,
-        read_templates_parquet,
         read_instances_parquet,
-    )
-    from .tensor_versioning import (
-        TensorVersionController,
-        SyncResult,
-        FetchResult,
+        read_templates_parquet,
+        tensor_record_to_parquet_row,
+        write_instances_parquet,
+        write_templates_parquet,
     )
     from .sync import (
-        TensorSyncManager,
         SyncState,
+        TensorSyncManager,
     )
+    from .tensor_versioning import (
+        FetchResult,
+        SyncResult,
+        TensorVersionController,
+    )
+
     TENSOR_VERSIONING_AVAILABLE = True
 except ImportError:
     TENSOR_VERSIONING_AVAILABLE = False

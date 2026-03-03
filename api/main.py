@@ -17,33 +17,31 @@ import os
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
-from typing import Optional
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from .models import HealthResponse, ErrorResponse
-from .routes import tensors_router, search_router, simulations_router, batch_router
 from .deps import (
+    cleanup_dependencies,
     get_settings,
     get_tensor_db,
-    cleanup_dependencies,
 )
 from .middleware.rate_limit import (
     get_limiter,
-    rate_limit_exceeded_handler,
     get_rate_limit_config,
+    rate_limit_exceeded_handler,
 )
 from .middleware.usage_quota import get_quota_config
+from .models import ErrorResponse, HealthResponse
+from .routes import batch_router, search_router, simulations_router, tensors_router
 from .usage_storage import get_usage_database
-
 
 # ============================================================================
 # Lifespan Management
 # ============================================================================
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -89,9 +87,10 @@ async def lifespan(app: FastAPI):
 # Application Factory
 # ============================================================================
 
+
 def create_app(
-    title: Optional[str] = None,
-    version: Optional[str] = None,
+    title: str | None = None,
+    version: str | None = None,
     debug: bool = False,
 ) -> FastAPI:
     """

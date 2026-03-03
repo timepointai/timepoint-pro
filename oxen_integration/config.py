@@ -1,29 +1,30 @@
 """
 Configuration management for Oxen.ai integration.
 """
-import os
+
 import json
+import os
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Optional, Dict, Any
-from dataclasses import dataclass, asdict
+from typing import Any
 
 
 @dataclass
 class OxenConfig:
     """Configuration for Oxen.ai integration."""
 
-    api_token: Optional[str] = None
-    default_namespace: Optional[str] = None
-    default_repo: Optional[str] = None
+    api_token: str | None = None
+    default_namespace: str | None = None
+    default_repo: str | None = None
     hub_url: str = "https://www.oxen.ai"
     api_base_url: str = "https://api.oxen.ai"
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "OxenConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "OxenConfig":
         """Create config from dictionary."""
         return cls(**{k: v for k, v in data.items() if k in cls.__annotations__})
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert config to dictionary."""
         return {k: v for k, v in asdict(self).items() if v is not None}
 
@@ -34,7 +35,7 @@ class ConfigManager:
     DEFAULT_CONFIG_DIR = Path.home() / ".oxen"
     DEFAULT_CONFIG_FILE = "config.json"
 
-    def __init__(self, config_path: Optional[Path] = None):
+    def __init__(self, config_path: Path | None = None):
         """
         Initialize config manager.
 
@@ -65,7 +66,7 @@ class ConfigManager:
         # Load from file if it exists
         if self.config_path.exists():
             try:
-                with open(self.config_path, "r") as f:
+                with open(self.config_path) as f:
                     data = json.load(f)
                     file_config = OxenConfig.from_dict(data)
 
@@ -83,7 +84,7 @@ class ConfigManager:
                     if file_config.api_base_url:
                         config.api_base_url = file_config.api_base_url
 
-            except (json.JSONDecodeError, IOError) as e:
+            except (OSError, json.JSONDecodeError):
                 # Config file is corrupted or unreadable, continue with env/empty config
                 pass
 

@@ -8,12 +8,12 @@ Tests the storyboard/script export mechanism including:
 - ExportPipeline integration
 """
 
-import pytest
 from pathlib import Path
-from storage import GraphStore
-from reporting.script_generator import ScriptGenerator
+
 from reporting.export_pipeline import ExportPipeline
 from reporting.query_engine import EnhancedQueryEngine
+from reporting.script_generator import ScriptGenerator
+from storage import GraphStore
 
 
 def test_script_generator_basic():
@@ -25,10 +25,7 @@ def test_script_generator_basic():
     generator = ScriptGenerator(store)
 
     # Generate script (should handle empty gracefully)
-    script_data = generator.generate_script_structure(
-        world_id="test_world",
-        title="Test Script"
-    )
+    script_data = generator.generate_script_structure(world_id="test_world", title="Test Script")
 
     # Verify structure
     assert script_data.title == "Test Script"
@@ -57,7 +54,7 @@ def test_fountain_export_empty():
             report_type="script",
             export_format="fountain",
             output_path=output_path,
-            title="Empty Test Script"
+            title="Empty Test Script",
         )
 
         # Verify metadata
@@ -102,7 +99,7 @@ def test_storyboard_export_empty():
             report_type="script",
             export_format="storyboard",
             output_path=output_path,
-            title="Empty Test Storyboard"
+            title="Empty Test Storyboard",
         )
 
         # Verify metadata
@@ -115,6 +112,7 @@ def test_storyboard_export_empty():
 
         # Read and verify JSON structure
         import json
+
         with open(result["output_path"]) as f:
             data = json.load(f)
 
@@ -154,7 +152,7 @@ def test_pdf_export_empty():
             report_type="script",
             export_format="pdf",
             output_path=output_path,
-            title="Empty Test Script PDF"
+            title="Empty Test Script PDF",
         )
 
         # Verify metadata
@@ -166,9 +164,9 @@ def test_pdf_export_empty():
         assert Path(result["output_path"]).exists()
 
         # Verify it's a PDF (starts with PDF magic bytes)
-        with open(result["output_path"], 'rb') as f:
+        with open(result["output_path"], "rb") as f:
             header = f.read(4)
-            assert header == b'%PDF', "File is not a valid PDF"
+            assert header == b"%PDF", "File is not a valid PDF"
 
         print("✅ PDF export test passed")
         print(f"   Output: {result['output_path']}")
@@ -200,7 +198,7 @@ def test_batch_export():
             report_types=["script"],
             export_formats=["fountain", "storyboard"],
             output_dir=output_dir,
-            title="Batch Test Script"
+            title="Batch Test Script",
         )
 
         # Verify results
@@ -210,7 +208,10 @@ def test_batch_export():
         fountain_path = Path(output_dir) / "test_world_script.fountain"
         storyboard_path = Path(output_dir) / "test_world_script.storyboard"
 
-        assert fountain_path.exists() or (Path(output_dir) / "test_world_script.fountain.fountain").exists()
+        assert (
+            fountain_path.exists()
+            or (Path(output_dir) / "test_world_script.fountain.fountain").exists()
+        )
 
         print("✅ Batch export test passed")
         print(f"   Exported {len(results)} files")
@@ -220,6 +221,7 @@ def test_batch_export():
     finally:
         # Cleanup
         import shutil
+
         if Path(output_dir).exists():
             shutil.rmtree(output_dir)
 
@@ -251,4 +253,5 @@ if __name__ == "__main__":
         print(f"❌ Test failed: {e}")
         print("=" * 60)
         import traceback
+
         traceback.print_exc()

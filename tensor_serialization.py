@@ -8,8 +8,9 @@ Provides functions for:
 
 Uses msgspec.msgpack for fast, compact binary encoding.
 """
+
 import base64
-from typing import Dict, Any
+from typing import Any
 
 import msgspec
 import numpy as np
@@ -71,7 +72,7 @@ def deserialize_tensor(blob: bytes) -> TTMTensor:
     return TTMTensor.from_arrays(context, biology, behavior)
 
 
-def tensor_to_dict(tensor: TTMTensor) -> Dict[str, Any]:
+def tensor_to_dict(tensor: TTMTensor) -> dict[str, Any]:
     """
     Convert TTMTensor to JSON-serializable dict.
 
@@ -95,7 +96,7 @@ def tensor_to_dict(tensor: TTMTensor) -> Dict[str, Any]:
     }
 
 
-def dict_to_tensor(d: Dict[str, Any]) -> TTMTensor:
+def dict_to_tensor(d: dict[str, Any]) -> TTMTensor:
     """
     Convert dict back to TTMTensor.
 

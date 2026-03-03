@@ -8,20 +8,18 @@ decisions are changed — this is observation-only shadow mode.
 Part of the SynthasAIzer control paradigm.
 """
 
-import time
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any
+from typing import Any
 
+from synth.events import SynthEvent, get_emitter
 from synth.fidelity_envelope import (
-    ADPRSComposite,
-    ADPRSEnvelope,
-    FidelityBand,
     _BAND_ORDINAL,
     _RESOLUTION_TO_BAND,
+    ADPRSComposite,
+    FidelityBand,
 )
-from synth.events import SynthEvent, get_emitter
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +38,7 @@ _BAND_MIDPOINT = {
 @dataclass
 class ShadowRecord:
     """One shadow evaluation comparing ADPRS band to actual resolution."""
+
     entity_id: str
     timepoint_id: str
     timestamp: datetime
@@ -54,7 +53,8 @@ class ShadowRecord:
 @dataclass
 class ShadowEvaluationReport:
     """Aggregate report from a shadow evaluation pass."""
-    records: List[ShadowRecord] = field(default_factory=list)
+
+    records: list[ShadowRecord] = field(default_factory=list)
     total_evaluations: int = 0
     divergent_count: int = 0
     mean_divergence: float = 0.0
@@ -62,7 +62,11 @@ class ShadowEvaluationReport:
 
     def summary(self) -> dict:
         """Return a summary dict for logging/printing."""
-        rate = (self.divergent_count / self.total_evaluations * 100.0) if self.total_evaluations > 0 else 0.0
+        rate = (
+            (self.divergent_count / self.total_evaluations * 100.0)
+            if self.total_evaluations > 0
+            else 0.0
+        )
         return {
             "total_evaluations": self.total_evaluations,
             "divergent_count": self.divergent_count,
@@ -106,15 +110,15 @@ class ShadowEvaluator:
     def __init__(self, run_id: str, prediction_mode: bool = False):
         self.run_id = run_id
         self.prediction_mode = prediction_mode
-        self._envelopes: Dict[str, ADPRSComposite] = {}
-        self._records: List[ShadowRecord] = []
-        self._prediction_log: List[Dict[str, Any]] = []
+        self._envelopes: dict[str, ADPRSComposite] = {}
+        self._records: list[ShadowRecord] = []
+        self._prediction_log: list[dict[str, Any]] = []
 
     def register_entity_envelopes(self, entity_id: str, composite: ADPRSComposite):
         """Register an ADPRS composite envelope for an entity."""
         self._envelopes[entity_id] = composite
 
-    def register_from_metadata(self, entity_id: str, entity_metadata: Dict[str, Any]):
+    def register_from_metadata(self, entity_id: str, entity_metadata: dict[str, Any]):
         """
         Load and register envelopes from entity_metadata["adprs_envelopes"].
 
@@ -138,7 +142,7 @@ class ShadowEvaluator:
         actual_resolution_value: str,
         timepoint_id: str,
         timestamp: datetime,
-    ) -> Optional[ShadowRecord]:
+    ) -> ShadowRecord | None:
         """
         Evaluate ADPRS shadow for a single entity at a single timepoint.
 
@@ -185,14 +189,16 @@ class ShadowEvaluator:
 
         # Phase 3.5: In prediction_mode, log prediction BEFORE actual for validation
         if self.prediction_mode:
-            self._prediction_log.append({
-                "entity_id": entity_id,
-                "timepoint_id": timepoint_id,
-                "predicted_phi": round(phi, 6),
-                "predicted_band": adprs_band.value,
-                "actual_level": actual_resolution_value,
-                "divergence": divergence,
-            })
+            self._prediction_log.append(
+                {
+                    "entity_id": entity_id,
+                    "timepoint_id": timepoint_id,
+                    "predicted_phi": round(phi, 6),
+                    "predicted_band": adprs_band.value,
+                    "actual_level": actual_resolution_value,
+                    "divergence": divergence,
+                }
+            )
 
         # Emit synth event for monitoring (source: "adprs_shadow" to distinguish from ADSR)
         emitter = get_emitter()
@@ -229,6 +235,6 @@ class ShadowEvaluator:
 
         return report
 
-    def get_prediction_log(self) -> List[Dict[str, Any]]:
+    def get_prediction_log(self) -> list[dict[str, Any]]:
         """Return the prediction log (Phase 3.5 validation mode only)."""
         return list(self._prediction_log)

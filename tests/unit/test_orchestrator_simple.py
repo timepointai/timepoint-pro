@@ -5,18 +5,20 @@ Simple test to verify orchestrator imports and basic functionality.
 Note: Tests requiring LLM calls use the real_llm_client fixture and are
 marked with @pytest.mark.llm to skip when OPENROUTER_API_KEY is not set.
 """
+
 import os
+
 import pytest
 
+from llm import LLMClient
 from orchestrator import (
-    OrchestratorAgent,
-    SceneParser,
     KnowledgeSeeder,
+    OrchestratorAgent,
     RelationshipExtractor,
     ResolutionAssigner,
-    simulate_event
+    SceneParser,
+    simulate_event,
 )
-from llm import LLMClient
 from storage import GraphStore
 
 
@@ -51,10 +53,7 @@ def test_graph_store_memory():
 
 @pytest.mark.unit
 @pytest.mark.llm
-@pytest.mark.skipif(
-    not os.getenv("OPENROUTER_API_KEY"),
-    reason="OPENROUTER_API_KEY not set"
-)
+@pytest.mark.skipif(not os.getenv("OPENROUTER_API_KEY"), reason="OPENROUTER_API_KEY not set")
 def test_llm_client_creation():
     """Test LLMClient can be created with real API key."""
     api_key = os.getenv("OPENROUTER_API_KEY")
@@ -65,10 +64,7 @@ def test_llm_client_creation():
 
 @pytest.mark.unit
 @pytest.mark.llm
-@pytest.mark.skipif(
-    not os.getenv("OPENROUTER_API_KEY"),
-    reason="OPENROUTER_API_KEY not set"
-)
+@pytest.mark.skipif(not os.getenv("OPENROUTER_API_KEY"), reason="OPENROUTER_API_KEY not set")
 def test_orchestrator_agent_creation():
     """Test OrchestratorAgent can be instantiated with real LLM."""
     api_key = os.getenv("OPENROUTER_API_KEY")
@@ -81,10 +77,7 @@ def test_orchestrator_agent_creation():
 
 @pytest.mark.integration
 @pytest.mark.llm
-@pytest.mark.skipif(
-    not os.getenv("OPENROUTER_API_KEY"),
-    reason="OPENROUTER_API_KEY not set"
-)
+@pytest.mark.skipif(not os.getenv("OPENROUTER_API_KEY"), reason="OPENROUTER_API_KEY not set")
 def test_scene_parsing():
     """Test scene parsing with real LLM."""
     api_key = os.getenv("OPENROUTER_API_KEY")
@@ -102,10 +95,7 @@ def test_scene_parsing():
 
 @pytest.mark.integration
 @pytest.mark.llm
-@pytest.mark.skipif(
-    not os.getenv("OPENROUTER_API_KEY"),
-    reason="OPENROUTER_API_KEY not set"
-)
+@pytest.mark.skipif(not os.getenv("OPENROUTER_API_KEY"), reason="OPENROUTER_API_KEY not set")
 def test_full_orchestration():
     """Test full orchestration with real LLM."""
     api_key = os.getenv("OPENROUTER_API_KEY")
@@ -116,13 +106,13 @@ def test_full_orchestration():
     result = orchestrator.orchestrate(
         "simulate a small historical meeting",
         context={"max_entities": 3, "max_timepoints": 2},
-        save_to_db=False
+        save_to_db=False,
     )
 
     assert result is not None
-    assert 'entities' in result
-    assert 'timepoints' in result
-    assert 'graph' in result
+    assert "entities" in result
+    assert "timepoints" in result
+    assert "graph" in result
 
     print("✓ Orchestration successful")
     print(f"  - Entities created: {len(result['entities'])}")
@@ -133,25 +123,17 @@ def test_full_orchestration():
 
 @pytest.mark.integration
 @pytest.mark.llm
-@pytest.mark.skipif(
-    not os.getenv("OPENROUTER_API_KEY"),
-    reason="OPENROUTER_API_KEY not set"
-)
+@pytest.mark.skipif(not os.getenv("OPENROUTER_API_KEY"), reason="OPENROUTER_API_KEY not set")
 def test_simulate_event():
     """Test convenience function simulate_event with real LLM."""
     api_key = os.getenv("OPENROUTER_API_KEY")
     llm_client = LLMClient(api_key=api_key)
     store = GraphStore("sqlite:///:memory:")
 
-    result = simulate_event(
-        "simulate a brief gathering",
-        llm_client,
-        store,
-        save_to_db=False
-    )
+    result = simulate_event("simulate a brief gathering", llm_client, store, save_to_db=False)
 
     assert result is not None
-    assert 'specification' in result
+    assert "specification" in result
     print("✓ simulate_event() successful")
     print(f"  - Scene: {result['specification'].scene_title}")
 

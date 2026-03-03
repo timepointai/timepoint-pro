@@ -15,12 +15,12 @@ Schema:
 - tensor_versions: Full version history
 - training_jobs: Queue for parallel training (Phase 2)
 """
+
 import sqlite3
-from dataclasses import dataclass, field
+from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
-from contextlib import contextmanager
 
 
 @dataclass
@@ -39,19 +39,20 @@ class TensorRecord:
         created_at: Creation timestamp
         updated_at: Last update timestamp
     """
+
     tensor_id: str
     entity_id: str
-    world_id: Optional[str] = None
+    world_id: str | None = None
     tensor_blob: bytes = b""
     maturity: float = 0.0
     training_cycles: int = 0
     version: int = 1
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
     # Phase 3: Retrieval fields
-    description: Optional[str] = None  # Natural language description for RAG
-    category: Optional[str] = None     # Category path (e.g., "profession/detective")
-    embedding_blob: Optional[bytes] = None  # Cached embedding for search
+    description: str | None = None  # Natural language description for RAG
+    category: str | None = None  # Category path (e.g., "profession/detective")
+    embedding_blob: bytes | None = None  # Cached embedding for search
 
     def __post_init__(self):
         now = datetime.utcnow()
@@ -74,6 +75,7 @@ class TensorVersion:
         training_cycles: Training cycles at this version
         created_at: When this version was created
     """
+
     tensor_id: str
     version: int
     tensor_blob: bytes
@@ -168,17 +170,11 @@ class TensorDatabase:
             columns = {row[1] for row in cursor.fetchall()}
 
             if "description" not in columns:
-                conn.execute(
-                    "ALTER TABLE tensor_records ADD COLUMN description TEXT"
-                )
+                conn.execute("ALTER TABLE tensor_records ADD COLUMN description TEXT")
             if "category" not in columns:
-                conn.execute(
-                    "ALTER TABLE tensor_records ADD COLUMN category TEXT"
-                )
+                conn.execute("ALTER TABLE tensor_records ADD COLUMN category TEXT")
             if "embedding_blob" not in columns:
-                conn.execute(
-                    "ALTER TABLE tensor_records ADD COLUMN embedding_blob BLOB"
-                )
+                conn.execute("ALTER TABLE tensor_records ADD COLUMN embedding_blob BLOB")
 
             # Index for category lookups
             conn.execute("""
@@ -223,12 +219,10 @@ class TensorDatabase:
                 ON training_jobs(status)
             """)
 
-    def list_tables(self) -> List[str]:
+    def list_tables(self) -> list[str]:
         """List all tables in database."""
         with self._transaction() as conn:
-            cursor = conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            )
+            cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
             return [row["name"] for row in cursor.fetchall()]
 
     # =========================================================================
@@ -250,15 +244,15 @@ class TensorDatabase:
         with self._transaction() as conn:
             # Check if exists
             cursor = conn.execute(
-                "SELECT version FROM tensor_records WHERE tensor_id = ?",
-                (record.tensor_id,)
+                "SELECT version FROM tensor_records WHERE tensor_id = ?", (record.tensor_id,)
             )
             existing = cursor.fetchone()
 
             if existing:
                 # Update existing - increment version
                 new_version = existing["version"] + 1
-                conn.execute("""
+                conn.execute(
+                    """
                     UPDATE tensor_records
                     SET entity_id = ?,
                         world_id = ?,
@@ -271,59 +265,67 @@ class TensorDatabase:
                         category = ?,
                         embedding_blob = ?
                     WHERE tensor_id = ?
-                """, (
-                    record.entity_id,
-                    record.world_id,
-                    record.tensor_blob,
-                    record.maturity,
-                    record.training_cycles,
-                    new_version,
-                    now,
-                    record.description,
-                    record.category,
-                    record.embedding_blob,
-                    record.tensor_id,
-                ))
+                """,
+                    (
+                        record.entity_id,
+                        record.world_id,
+                        record.tensor_blob,
+                        record.maturity,
+                        record.training_cycles,
+                        new_version,
+                        now,
+                        record.description,
+                        record.category,
+                        record.embedding_blob,
+                        record.tensor_id,
+                    ),
+                )
                 record.version = new_version
             else:
                 # Insert new
                 record.version = 1
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT INTO tensor_records
                     (tensor_id, entity_id, world_id, tensor_blob, maturity,
                      training_cycles, version, created_at, updated_at,
                      description, category, embedding_blob)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    record.tensor_id,
-                    record.entity_id,
-                    record.world_id,
-                    record.tensor_blob,
-                    record.maturity,
-                    record.training_cycles,
-                    record.version,
-                    now,
-                    now,
-                    record.description,
-                    record.category,
-                    record.embedding_blob,
-                ))
+                """,
+                    (
+                        record.tensor_id,
+                        record.entity_id,
+                        record.world_id,
+                        record.tensor_blob,
+                        record.maturity,
+                        record.training_cycles,
+                        record.version,
+                        now,
+                        now,
+                        record.description,
+                        record.category,
+                        record.embedding_blob,
+                    ),
+                )
 
             # Always create version entry
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO tensor_versions
                 (tensor_id, version, tensor_blob, maturity, training_cycles, created_at)
                 VALUES (?, ?, ?, ?, ?, ?)
-            """, (
-                record.tensor_id,
-                record.version,
-                record.tensor_blob,
-                record.maturity,
-                record.training_cycles,
-                now,
-            ))
+            """,
+                (
+                    record.tensor_id,
+                    record.version,
+                    record.tensor_blob,
+                    record.maturity,
+                    record.training_cycles,
+                    now,
+                ),
+            )
 
-    def get_tensor(self, tensor_id: str) -> Optional[TensorRecord]:
+    def get_tensor(self, tensor_id: str) -> TensorRecord | None:
         """
         Get tensor by ID.
 
@@ -334,10 +336,7 @@ class TensorDatabase:
             TensorRecord if found, None otherwise
         """
         with self._transaction() as conn:
-            cursor = conn.execute(
-                "SELECT * FROM tensor_records WHERE tensor_id = ?",
-                (tensor_id,)
-            )
+            cursor = conn.execute("SELECT * FROM tensor_records WHERE tensor_id = ?", (tensor_id,))
             row = cursor.fetchone()
             if row is None:
                 return None
@@ -369,21 +368,15 @@ class TensorDatabase:
         """
         with self._transaction() as conn:
             # Delete versions first (foreign key)
-            conn.execute(
-                "DELETE FROM tensor_versions WHERE tensor_id = ?",
-                (tensor_id,)
-            )
-            cursor = conn.execute(
-                "DELETE FROM tensor_records WHERE tensor_id = ?",
-                (tensor_id,)
-            )
+            conn.execute("DELETE FROM tensor_versions WHERE tensor_id = ?", (tensor_id,))
+            cursor = conn.execute("DELETE FROM tensor_records WHERE tensor_id = ?", (tensor_id,))
             return cursor.rowcount > 0
 
     def list_tensors(
         self,
-        entity_id: Optional[str] = None,
-        world_id: Optional[str] = None,
-    ) -> List[TensorRecord]:
+        entity_id: str | None = None,
+        world_id: str | None = None,
+    ) -> list[TensorRecord]:
         """
         List tensors with optional filtering.
 
@@ -429,8 +422,8 @@ class TensorDatabase:
     def get_by_maturity(
         self,
         min_maturity: float = 0.0,
-        max_maturity: Optional[float] = None,
-    ) -> List[TensorRecord]:
+        max_maturity: float | None = None,
+    ) -> list[TensorRecord]:
         """
         Get tensors by maturity range.
 
@@ -472,7 +465,7 @@ class TensorDatabase:
     # Version History
     # =========================================================================
 
-    def get_version_history(self, tensor_id: str) -> List[TensorVersion]:
+    def get_version_history(self, tensor_id: str) -> list[TensorVersion]:
         """
         Get all versions of a tensor.
 
@@ -483,11 +476,14 @@ class TensorDatabase:
             List of versions in chronological order
         """
         with self._transaction() as conn:
-            cursor = conn.execute("""
+            cursor = conn.execute(
+                """
                 SELECT * FROM tensor_versions
                 WHERE tensor_id = ?
                 ORDER BY version ASC
-            """, (tensor_id,))
+            """,
+                (tensor_id,),
+            )
 
             return [
                 TensorVersion(
@@ -501,11 +497,7 @@ class TensorDatabase:
                 for row in cursor.fetchall()
             ]
 
-    def get_tensor_version(
-        self,
-        tensor_id: str,
-        version: int
-    ) -> Optional[TensorVersion]:
+    def get_tensor_version(self, tensor_id: str, version: int) -> TensorVersion | None:
         """
         Get specific version of a tensor.
 
@@ -517,10 +509,13 @@ class TensorDatabase:
             TensorVersion if found, None otherwise
         """
         with self._transaction() as conn:
-            cursor = conn.execute("""
+            cursor = conn.execute(
+                """
                 SELECT * FROM tensor_versions
                 WHERE tensor_id = ? AND version = ?
-            """, (tensor_id, version))
+            """,
+                (tensor_id, version),
+            )
 
             row = cursor.fetchone()
             if row is None:
@@ -535,7 +530,7 @@ class TensorDatabase:
                 created_at=datetime.fromisoformat(row["created_at"]),
             )
 
-    def get_training_history(self, tensor_id: str) -> List[TensorVersion]:
+    def get_training_history(self, tensor_id: str) -> list[TensorVersion]:
         """
         Get training progression history.
 
@@ -553,7 +548,7 @@ class TensorDatabase:
     # Batch Operations
     # =========================================================================
 
-    def save_tensors_batch(self, records: List[TensorRecord]) -> None:
+    def save_tensors_batch(self, records: list[TensorRecord]) -> None:
         """
         Save multiple tensors in single transaction.
 
@@ -571,56 +566,77 @@ class TensorDatabase:
             for record in records:
                 # Validate required fields
                 if record.tensor_blob is None:
-                    raise ValueError(
-                        f"tensor_blob is required for {record.tensor_id}"
-                    )
+                    raise ValueError(f"tensor_blob is required for {record.tensor_id}")
 
                 # Check if exists
                 cursor = conn.execute(
-                    "SELECT version FROM tensor_records WHERE tensor_id = ?",
-                    (record.tensor_id,)
+                    "SELECT version FROM tensor_records WHERE tensor_id = ?", (record.tensor_id,)
                 )
                 existing = cursor.fetchone()
 
                 if existing:
                     new_version = existing["version"] + 1
-                    conn.execute("""
+                    conn.execute(
+                        """
                         UPDATE tensor_records
                         SET entity_id = ?, world_id = ?, tensor_blob = ?,
                             maturity = ?, training_cycles = ?, version = ?,
                             updated_at = ?
                         WHERE tensor_id = ?
-                    """, (
-                        record.entity_id, record.world_id, record.tensor_blob,
-                        record.maturity, record.training_cycles, new_version,
-                        now, record.tensor_id,
-                    ))
+                    """,
+                        (
+                            record.entity_id,
+                            record.world_id,
+                            record.tensor_blob,
+                            record.maturity,
+                            record.training_cycles,
+                            new_version,
+                            now,
+                            record.tensor_id,
+                        ),
+                    )
                     record.version = new_version
                 else:
                     record.version = 1
-                    conn.execute("""
+                    conn.execute(
+                        """
                         INSERT INTO tensor_records
                         (tensor_id, entity_id, world_id, tensor_blob, maturity,
                          training_cycles, version, created_at, updated_at)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        record.tensor_id, record.entity_id, record.world_id,
-                        record.tensor_blob, record.maturity, record.training_cycles,
-                        record.version, now, now,
-                    ))
+                    """,
+                        (
+                            record.tensor_id,
+                            record.entity_id,
+                            record.world_id,
+                            record.tensor_blob,
+                            record.maturity,
+                            record.training_cycles,
+                            record.version,
+                            now,
+                            now,
+                        ),
+                    )
 
                 # Create version entry
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT INTO tensor_versions
                     (tensor_id, version, tensor_blob, maturity, training_cycles,
                      created_at)
                     VALUES (?, ?, ?, ?, ?, ?)
-                """, (
-                    record.tensor_id, record.version, record.tensor_blob,
-                    record.maturity, record.training_cycles, now,
-                ))
+                """,
+                    (
+                        record.tensor_id,
+                        record.version,
+                        record.tensor_blob,
+                        record.maturity,
+                        record.training_cycles,
+                        now,
+                    ),
+                )
 
-    def get_tensors_batch(self, tensor_ids: List[str]) -> List[TensorRecord]:
+    def get_tensors_batch(self, tensor_ids: list[str]) -> list[TensorRecord]:
         """
         Get multiple tensors by IDs.
 
@@ -657,11 +673,7 @@ class TensorDatabase:
     # Optimistic Locking
     # =========================================================================
 
-    def save_tensor_with_lock(
-        self,
-        record: TensorRecord,
-        expected_version: int
-    ) -> bool:
+    def save_tensor_with_lock(self, record: TensorRecord, expected_version: int) -> bool:
         """
         Save tensor only if version matches (optimistic locking).
 
@@ -679,8 +691,7 @@ class TensorDatabase:
         with self._transaction() as conn:
             # Check current version
             cursor = conn.execute(
-                "SELECT version FROM tensor_records WHERE tensor_id = ?",
-                (record.tensor_id,)
+                "SELECT version FROM tensor_records WHERE tensor_id = ?", (record.tensor_id,)
             )
             row = cursor.fetchone()
 
@@ -689,16 +700,25 @@ class TensorDatabase:
                 if expected_version != 0:
                     return False
                 record.version = 1
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT INTO tensor_records
                     (tensor_id, entity_id, world_id, tensor_blob, maturity,
                      training_cycles, version, created_at, updated_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    record.tensor_id, record.entity_id, record.world_id,
-                    record.tensor_blob, record.maturity, record.training_cycles,
-                    record.version, now, now,
-                ))
+                """,
+                    (
+                        record.tensor_id,
+                        record.entity_id,
+                        record.world_id,
+                        record.tensor_blob,
+                        record.maturity,
+                        record.training_cycles,
+                        record.version,
+                        now,
+                        now,
+                    ),
+                )
             else:
                 current_version = row["version"]
                 if current_version != expected_version:
@@ -706,29 +726,45 @@ class TensorDatabase:
                     return False
 
                 new_version = current_version + 1
-                conn.execute("""
+                conn.execute(
+                    """
                     UPDATE tensor_records
                     SET entity_id = ?, world_id = ?, tensor_blob = ?,
                         maturity = ?, training_cycles = ?, version = ?,
                         updated_at = ?
                     WHERE tensor_id = ? AND version = ?
-                """, (
-                    record.entity_id, record.world_id, record.tensor_blob,
-                    record.maturity, record.training_cycles, new_version,
-                    now, record.tensor_id, expected_version,
-                ))
+                """,
+                    (
+                        record.entity_id,
+                        record.world_id,
+                        record.tensor_blob,
+                        record.maturity,
+                        record.training_cycles,
+                        new_version,
+                        now,
+                        record.tensor_id,
+                        expected_version,
+                    ),
+                )
                 record.version = new_version
 
             # Create version entry
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO tensor_versions
                 (tensor_id, version, tensor_blob, maturity, training_cycles,
                  created_at)
                 VALUES (?, ?, ?, ?, ?, ?)
-            """, (
-                record.tensor_id, record.version, record.tensor_blob,
-                record.maturity, record.training_cycles, now,
-            ))
+            """,
+                (
+                    record.tensor_id,
+                    record.version,
+                    record.tensor_blob,
+                    record.maturity,
+                    record.training_cycles,
+                    now,
+                ),
+            )
 
             return True
 

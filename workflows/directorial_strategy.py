@@ -17,17 +17,16 @@ Architecture:
     - Tension Curve: Programmatic + LLM-adjusted tension targeting per step
 """
 
-from typing import List, Dict, Tuple, Optional, Any
-from dataclasses import dataclass, field
-from enum import Enum
-from datetime import datetime
-import numpy as np
 import uuid
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from typing import Any, Optional
 
-from schemas import Entity, Timepoint, TemporalMode, ResolutionLevel
-from generation.config_schema import TemporalConfig
-from llm_service.model_selector import ActionType, get_token_estimator
 from pydantic import BaseModel
+
+from generation.config_schema import TemporalConfig
+from schemas import Entity, ResolutionLevel, TemporalMode
 
 # Directorial mode requires a model with reliable structured JSON output.
 # Llama 4 Scout frequently returns malformed JSON for complex schemas.
@@ -38,8 +37,10 @@ DIRECTORIAL_MODEL = "qwen/qwen-2.5-72b-instruct"
 # Pydantic Response Models
 # ============================================================================
 
+
 class ActDescription(BaseModel):
     """Description of a single act in the narrative plan"""
+
     name: str
     start_pct: float
     end_pct: float
@@ -48,23 +49,26 @@ class ActDescription(BaseModel):
 
 class CharacterArc(BaseModel):
     """Character arc description"""
+
     entity_id: str
     arc_type: str  # "protagonist", "antagonist", "supporting", "catalyst"
     arc_description: str
-    key_moments: List[str]
+    key_moments: list[str]
 
 
 class NarrativePlan(BaseModel):
     """LLM-generated five-act narrative structure"""
-    acts: List[ActDescription]
-    beats: List[str]
-    character_arcs: List[CharacterArc]
+
+    acts: list[ActDescription]
+    beats: list[str]
+    character_arcs: list[CharacterArc]
     central_conflict: str
-    thematic_elements: List[str]
+    thematic_elements: list[str]
 
 
 class POVEntry(BaseModel):
     """Single POV rotation entry"""
+
     act: str
     pov_entity: str
     framing: str
@@ -73,23 +77,26 @@ class POVEntry(BaseModel):
 
 class StorylineThread(BaseModel):
     """A parallel storyline thread"""
+
     thread_id: str
     thread_name: str
-    entities: List[str]
-    acts_active: List[str]
+    entities: list[str]
+    acts_active: list[str]
 
 
 class CameraPlan(BaseModel):
     """LLM-generated camera/POV plan"""
-    pov_rotation: List[POVEntry]
-    framing_by_act: Dict[str, str]
-    storyline_threads: List[StorylineThread]
+
+    pov_rotation: list[POVEntry]
+    framing_by_act: dict[str, str]
+    storyline_threads: list[StorylineThread]
 
 
 class DirectorialStateSchema(BaseModel):
     """Schema for LLM-generated directorial state"""
+
     description: str
-    key_events: List[str]
+    key_events: list[str]
     tension_assessment: float
     irony_potential: str
     emotional_beat: str
@@ -97,33 +104,38 @@ class DirectorialStateSchema(BaseModel):
 
 class NarrativeValidation(BaseModel):
     """LLM validation of narrative coherence"""
+
     arc_score: float
     tension_fit: float
     pov_notes: str
-    issues: List[str]
+    issues: list[str]
 
 
 class TensionAdjustment(BaseModel):
     """LLM adjustment of tension for a specific state"""
+
     adjusted_tension: float
     reasoning: str
 
 
 class IronyDetection(BaseModel):
     """LLM detection of dramatic irony"""
+
     has_irony: bool
     irony_description: str
-    audience_knows: List[str]
-    character_unaware: List[str]
-    irony_entities: List[str]
+    audience_knows: list[str]
+    character_unaware: list[str]
+    irony_entities: list[str]
 
 
 # ============================================================================
 # Dataclasses
 # ============================================================================
 
+
 class ActPhase(str, Enum):
     """Five-act structure phases"""
+
     SETUP = "setup"
     RISING = "rising"
     CLIMAX = "climax"
@@ -133,6 +145,7 @@ class ActPhase(str, Enum):
 
 class Framing(str, Enum):
     """Camera framing types"""
+
     WIDE = "wide"
     CLOSE = "close"
     OVERHEAD = "overhead"
@@ -143,14 +156,15 @@ class Framing(str, Enum):
 @dataclass
 class DirectorialState:
     """A state in the directorial simulation with arc and camera metadata"""
+
     year: int
     month: int
     description: str
-    entities: List[Entity]
-    world_state: Dict[str, Any]
+    entities: list[Entity]
+    world_state: dict[str, Any]
     plausibility_score: float = 0.0
-    parent_state: Optional['DirectorialState'] = None
-    children_states: List['DirectorialState'] = field(default_factory=list)
+    parent_state: Optional["DirectorialState"] = None
+    children_states: list["DirectorialState"] = field(default_factory=list)
     resolution_level: ResolutionLevel = None
 
     # Arc engine fields
@@ -159,7 +173,7 @@ class DirectorialState:
     tension_score: float = 0.3
     tension_delta: float = 0.0
     dramatic_irony: bool = False
-    irony_entities: List[str] = field(default_factory=list)
+    irony_entities: list[str] = field(default_factory=list)
     narrative_beat: str = ""
 
     # Camera fields
@@ -182,9 +196,21 @@ class DirectorialState:
             self.irony_entities = []
 
     def to_year_month_str(self) -> str:
-        month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-        return f"{month_names[self.month-1]} {self.year}"
+        month_names = [
+            "Jan",
+            "Feb",
+            "Mar",
+            "Apr",
+            "May",
+            "Jun",
+            "Jul",
+            "Aug",
+            "Sep",
+            "Oct",
+            "Nov",
+            "Dec",
+        ]
+        return f"{month_names[self.month - 1]} {self.year}"
 
     def to_total_months(self) -> int:
         return self.year * 12 + self.month
@@ -193,16 +219,17 @@ class DirectorialState:
 @dataclass
 class DirectorialPath:
     """Complete narrative path through the directorial simulation"""
+
     path_id: str
-    states: List[DirectorialState]
+    states: list[DirectorialState]
     coherence_score: float
     arc_completion_score: float = 0.0
-    tension_curve: List[float] = field(default_factory=list)
-    act_boundaries: Dict[str, int] = field(default_factory=dict)
-    pov_distribution: Dict[str, int] = field(default_factory=dict)
-    storyline_threads: List[str] = field(default_factory=list)
+    tension_curve: list[float] = field(default_factory=list)
+    act_boundaries: dict[str, int] = field(default_factory=dict)
+    pov_distribution: dict[str, int] = field(default_factory=dict)
+    storyline_threads: list[str] = field(default_factory=list)
     explanation: str = ""
-    validation_details: Dict[str, Any] = field(default_factory=dict)
+    validation_details: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         if self.tension_curve is None:
@@ -220,6 +247,7 @@ class DirectorialPath:
 # ============================================================================
 # DirectorialStrategy
 # ============================================================================
+
 
 class DirectorialStrategy:
     """
@@ -243,28 +271,28 @@ class DirectorialStrategy:
         self.config = config
         self.llm = llm_client
         self.store = store
-        self.paths: List[DirectorialPath] = []
-        self.all_paths: List[DirectorialPath] = []
+        self.paths: list[DirectorialPath] = []
+        self.all_paths: list[DirectorialPath] = []
 
         # Directorial parameters
-        self.forward_steps = getattr(config, 'backward_steps', 15)
-        self.path_count = getattr(config, 'path_count', 3)
-        self.dramatic_tension = getattr(config, 'dramatic_tension', 0.7)
-        self.narrative_arc = getattr(config, 'narrative_arc', 'rising_action')
+        self.forward_steps = getattr(config, "backward_steps", 15)
+        self.path_count = getattr(config, "path_count", 3)
+        self.dramatic_tension = getattr(config, "dramatic_tension", 0.7)
+        self.narrative_arc = getattr(config, "narrative_arc", "rising_action")
 
         # Narrative plan (populated during run)
-        self.narrative_plan: Optional[NarrativePlan] = None
-        self.camera_plan: Optional[CameraPlan] = None
-        self.tension_targets: List[float] = []
+        self.narrative_plan: NarrativePlan | None = None
+        self.camera_plan: CameraPlan | None = None
+        self.tension_targets: list[float] = []
 
-    def run(self) -> List[DirectorialPath]:
+    def run(self) -> list[DirectorialPath]:
         """Execute directorial narrative simulation."""
-        print(f"\n{'='*80}")
-        print(f"DIRECTORIAL MODE: Narrative-Driven Simulation")
+        print(f"\n{'=' * 80}")
+        print("DIRECTORIAL MODE: Narrative-Driven Simulation")
         print(f"Steps: {self.forward_steps}")
         print(f"Target paths: {self.path_count}")
         print(f"Dramatic tension: {self.dramatic_tension}")
-        print(f"{'='*80}\n")
+        print(f"{'=' * 80}\n")
 
         # Step 1: Plan narrative structure
         print("Step 1: Planning narrative structure...")
@@ -309,13 +337,17 @@ class DirectorialStrategy:
             self._populate_path_metadata(path)
 
         self.all_paths = ranked_paths
-        self.paths = ranked_paths[:self.path_count]
+        self.paths = ranked_paths[: self.path_count]
 
-        print(f"\n{'='*80}")
-        print(f"DIRECTORIAL SIMULATION COMPLETE")
+        print(f"\n{'=' * 80}")
+        print("DIRECTORIAL SIMULATION COMPLETE")
         print(f"Total paths: {len(self.all_paths)}")
-        print(f"Best arc completion: {self.all_paths[0].arc_completion_score:.3f}" if self.all_paths else "")
-        print(f"{'='*80}\n")
+        print(
+            f"Best arc completion: {self.all_paths[0].arc_completion_score:.3f}"
+            if self.all_paths
+            else ""
+        )
+        print(f"{'=' * 80}\n")
 
         return self.all_paths
 
@@ -325,13 +357,16 @@ class DirectorialStrategy:
 
     def _plan_narrative_structure(self) -> NarrativePlan:
         """LLM structured call to plan five-act structure with beats and character arcs."""
-        description = getattr(self.config, 'portal_description', None) or \
-                     getattr(self.config, 'scenario_description', 'A dramatic narrative unfolds')
+        description = getattr(self.config, "portal_description", None) or getattr(
+            self.config, "scenario_description", "A dramatic narrative unfolds"
+        )
 
         entity_names = []
         if self.store:
             try:
-                all_entities = self.store.list_entities() if hasattr(self.store, 'list_entities') else []
+                all_entities = (
+                    self.store.list_entities() if hasattr(self.store, "list_entities") else []
+                )
                 entity_names = [e.entity_id for e in all_entities[:10]]
             except Exception:
                 pass
@@ -345,7 +380,7 @@ class DirectorialStrategy:
 SCENARIO:
 {description[:500]}
 
-ENTITIES: {', '.join(entity_names[:8]) if entity_names else 'To be determined'}
+ENTITIES: {", ".join(entity_names[:8]) if entity_names else "To be determined"}
 
 Create a narrative plan with:
 1. Five acts (setup, rising, climax, falling, resolution) with percentage boundaries
@@ -365,7 +400,7 @@ Each beat should be a SHORT STRING describing the moment, e.g.:
 Do NOT use objects for beats — return a flat list of strings.
 
 Each character_arc should have these exact fields:
-- entity_id: The entity name from the ENTITIES list above (e.g. "{entity_names[0] if entity_names else 'protagonist'}")
+- entity_id: The entity name from the ENTITIES list above (e.g. "{entity_names[0] if entity_names else "protagonist"}")
 - arc_type: One of "protagonist", "antagonist", "supporting", "catalyst"
 - arc_description: A sentence describing this character's journey
 - key_moments: A list of strings naming key moments (e.g. ["introduction", "crisis", "resolution"])
@@ -379,28 +414,48 @@ Return structured JSON matching this exact schema."""
                 model=DIRECTORIAL_MODEL,
                 system_prompt=system_prompt,
                 temperature=0.5,
-                max_tokens=2000
+                max_tokens=2000,
             )
             return result
         except Exception as e:
             print(f"    Narrative planning failed: {e}")
             return self._fallback_narrative_plan(entity_names)
 
-    def _fallback_narrative_plan(self, entity_names: List[str]) -> NarrativePlan:
+    def _fallback_narrative_plan(self, entity_names: list[str]) -> NarrativePlan:
         """Generate a fallback narrative plan without LLM."""
         protagonist = entity_names[0] if entity_names else "protagonist"
         return NarrativePlan(
             acts=[
-                ActDescription(name="setup", start_pct=0.0, end_pct=0.2,
-                             description="Establishing the world and introducing characters"),
-                ActDescription(name="rising", start_pct=0.2, end_pct=0.5,
-                             description="Tensions escalate and conflicts emerge"),
-                ActDescription(name="climax", start_pct=0.5, end_pct=0.7,
-                             description="The central confrontation or crisis point"),
-                ActDescription(name="falling", start_pct=0.7, end_pct=0.85,
-                             description="Consequences unfold and tensions begin to resolve"),
-                ActDescription(name="resolution", start_pct=0.85, end_pct=1.0,
-                             description="New equilibrium established"),
+                ActDescription(
+                    name="setup",
+                    start_pct=0.0,
+                    end_pct=0.2,
+                    description="Establishing the world and introducing characters",
+                ),
+                ActDescription(
+                    name="rising",
+                    start_pct=0.2,
+                    end_pct=0.5,
+                    description="Tensions escalate and conflicts emerge",
+                ),
+                ActDescription(
+                    name="climax",
+                    start_pct=0.5,
+                    end_pct=0.7,
+                    description="The central confrontation or crisis point",
+                ),
+                ActDescription(
+                    name="falling",
+                    start_pct=0.7,
+                    end_pct=0.85,
+                    description="Consequences unfold and tensions begin to resolve",
+                ),
+                ActDescription(
+                    name="resolution",
+                    start_pct=0.85,
+                    end_pct=1.0,
+                    description="New equilibrium established",
+                ),
             ],
             beats=[
                 "Introduction of setting",
@@ -418,14 +473,14 @@ Return structured JSON matching this exact schema."""
                     entity_id=protagonist,
                     arc_type="protagonist",
                     arc_description=f"{protagonist} faces the central challenge",
-                    key_moments=["introduction", "decision", "climax", "resolution"]
+                    key_moments=["introduction", "decision", "climax", "resolution"],
                 )
             ],
             central_conflict="The central tension driving events forward",
-            thematic_elements=["conflict", "change", "consequence"]
+            thematic_elements=["conflict", "change", "consequence"],
         )
 
-    def _plan_tension_curve(self) -> List[float]:
+    def _plan_tension_curve(self) -> list[float]:
         """
         Programmatic tension target per step based on act boundaries.
 
@@ -495,7 +550,7 @@ Return structured JSON matching this exact schema."""
 
         return ActPhase.RESOLUTION
 
-    def _get_act_step_range(self, act: ActPhase) -> Tuple[int, int]:
+    def _get_act_step_range(self, act: ActPhase) -> tuple[int, int]:
         """Get the step index range for a given act."""
         if not self.narrative_plan or not self.narrative_plan.acts:
             act_ranges = {
@@ -548,7 +603,7 @@ ACT: {state.act.value}
 SCENE:
 {state.description[:300]}
 
-KEY EVENTS: {state.world_state.get('key_events', [])}
+KEY EVENTS: {state.world_state.get("key_events", [])}
 
 Adjust the tension score based on:
 - Does the scene content match the target tension?
@@ -562,7 +617,7 @@ Adjust the tension score based on:
                 model=DIRECTORIAL_MODEL,
                 system_prompt=system_prompt,
                 temperature=0.3,
-                max_tokens=300
+                max_tokens=300,
             )
 
             # Blend target with LLM adjustment (70% target, 30% LLM)
@@ -572,7 +627,7 @@ Adjust the tension score based on:
         except Exception:
             return target
 
-    def _detect_dramatic_irony(self, state: DirectorialState) -> Tuple[bool, str, List[str]]:
+    def _detect_dramatic_irony(self, state: DirectorialState) -> tuple[bool, str, list[str]]:
         """
         LLM identifies audience-vs-character knowledge gaps.
 
@@ -591,7 +646,7 @@ SCENE ({state.act.value} act, tension {state.tension_score:.2f}):
 {state.description[:400]}
 
 NARRATIVE CONTEXT:
-{self.narrative_plan.central_conflict if self.narrative_plan else 'Unknown conflict'}
+{self.narrative_plan.central_conflict if self.narrative_plan else "Unknown conflict"}
 
 Identify:
 1. Whether dramatic irony exists in this scene
@@ -605,7 +660,7 @@ Identify:
                 model=DIRECTORIAL_MODEL,
                 system_prompt=system_prompt,
                 temperature=0.4,
-                max_tokens=500
+                max_tokens=500,
             )
 
             return result.has_irony, result.irony_description, result.irony_entities
@@ -622,7 +677,9 @@ Identify:
         entity_names = []
         if self.store:
             try:
-                all_entities = self.store.list_entities() if hasattr(self.store, 'list_entities') else []
+                all_entities = (
+                    self.store.list_entities() if hasattr(self.store, "list_entities") else []
+                )
                 entity_names = [e.entity_id for e in all_entities[:10]]
             except Exception:
                 pass
@@ -634,10 +691,10 @@ Identify:
         user_prompt = f"""Plan the camera/POV schedule for this narrative.
 
 NARRATIVE PLAN:
-{self.narrative_plan.central_conflict if self.narrative_plan else 'Dramatic narrative'}
-Acts: {[a.name for a in self.narrative_plan.acts] if self.narrative_plan else ['setup', 'rising', 'climax', 'falling', 'resolution']}
+{self.narrative_plan.central_conflict if self.narrative_plan else "Dramatic narrative"}
+Acts: {[a.name for a in self.narrative_plan.acts] if self.narrative_plan else ["setup", "rising", "climax", "falling", "resolution"]}
 
-ENTITIES: {', '.join(entity_names[:8])}
+ENTITIES: {", ".join(entity_names[:8])}
 
 Plan:
 1. POV rotation: Which character's perspective for each act?
@@ -660,29 +717,49 @@ For each POV entry, provide:
                 model=DIRECTORIAL_MODEL,
                 system_prompt=system_prompt,
                 temperature=0.5,
-                max_tokens=1500
+                max_tokens=1500,
             )
             return result
         except Exception as e:
             print(f"    Camera planning failed: {e}")
             return self._fallback_camera_plan(entity_names)
 
-    def _fallback_camera_plan(self, entity_names: List[str]) -> CameraPlan:
+    def _fallback_camera_plan(self, entity_names: list[str]) -> CameraPlan:
         """Generate fallback camera plan without LLM."""
         protagonist = entity_names[0] if entity_names else "protagonist"
         secondary = entity_names[1] if len(entity_names) > 1 else protagonist
 
         pov_rotation = [
-            POVEntry(act="setup", pov_entity=protagonist, framing="wide",
-                    rationale="Establish world through protagonist's eyes"),
-            POVEntry(act="rising", pov_entity=secondary, framing="close",
-                    rationale="Build tension through alternate perspective"),
-            POVEntry(act="climax", pov_entity=protagonist, framing="subjective",
-                    rationale="Immersive protagonist POV for peak tension"),
-            POVEntry(act="falling", pov_entity=protagonist, framing="overhead",
-                    rationale="Pull back to show consequences"),
-            POVEntry(act="resolution", pov_entity=protagonist, framing="ensemble",
-                    rationale="Show all characters in resolution"),
+            POVEntry(
+                act="setup",
+                pov_entity=protagonist,
+                framing="wide",
+                rationale="Establish world through protagonist's eyes",
+            ),
+            POVEntry(
+                act="rising",
+                pov_entity=secondary,
+                framing="close",
+                rationale="Build tension through alternate perspective",
+            ),
+            POVEntry(
+                act="climax",
+                pov_entity=protagonist,
+                framing="subjective",
+                rationale="Immersive protagonist POV for peak tension",
+            ),
+            POVEntry(
+                act="falling",
+                pov_entity=protagonist,
+                framing="overhead",
+                rationale="Pull back to show consequences",
+            ),
+            POVEntry(
+                act="resolution",
+                pov_entity=protagonist,
+                framing="ensemble",
+                rationale="Show all characters in resolution",
+            ),
         ]
 
         threads = [
@@ -690,7 +767,7 @@ For each POV entry, provide:
                 thread_id="main",
                 thread_name="Main storyline",
                 entities=[protagonist],
-                acts_active=["setup", "rising", "climax", "falling", "resolution"]
+                acts_active=["setup", "rising", "climax", "falling", "resolution"],
             )
         ]
 
@@ -701,12 +778,12 @@ For each POV entry, provide:
                 "rising": "close",
                 "climax": "subjective",
                 "falling": "overhead",
-                "resolution": "ensemble"
+                "resolution": "ensemble",
             },
-            storyline_threads=threads
+            storyline_threads=threads,
         )
 
-    def _select_pov_for_state(self, step: int, act: ActPhase) -> Tuple[str, Framing]:
+    def _select_pov_for_state(self, step: int, act: ActPhase) -> tuple[str, Framing]:
         """
         Programmatic POV selection:
         - Main POV for climax
@@ -720,7 +797,11 @@ For each POV entry, provide:
         for entry in self.camera_plan.pov_rotation:
             try:
                 if entry.act == act.value:
-                    framing = Framing(entry.framing) if entry.framing in [f.value for f in Framing] else Framing.WIDE
+                    framing = (
+                        Framing(entry.framing)
+                        if entry.framing in [f.value for f in Framing]
+                        else Framing.WIDE
+                    )
                     return entry.pov_entity, framing
             except (ValueError, AttributeError):
                 continue
@@ -739,7 +820,7 @@ For each POV entry, provide:
         act: ActPhase,
         pov_entity: str,
         framing: Framing,
-        tension_target: float
+        tension_target: float,
     ) -> DirectorialState:
         """
         Core generation method: LLM generates scene from specific POV
@@ -749,11 +830,17 @@ For each POV entry, provide:
         """
         if not self.llm:
             return self._generate_placeholder_state(
-                current_state, target_year, target_month, step, act,
-                pov_entity, framing, tension_target
+                current_state,
+                target_year,
+                target_month,
+                step,
+                act,
+                pov_entity,
+                framing,
+                tension_target,
             )
 
-        target_time_str = f"{['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][target_month-1]} {target_year}"
+        target_time_str = f"{['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][target_month - 1]} {target_year}"
 
         # Find relevant narrative beat
         relevant_beat = ""
@@ -767,7 +854,9 @@ For each POV entry, provide:
         system_prompt = """You are a narrative director generating scenes for a dramatic temporal simulation.
 Generate vivid, specific scenes that serve the dramatic arc and follow the specified POV and framing."""
 
-        entity_names = [e.entity_id for e in current_state.entities[:10]] if current_state.entities else []
+        entity_names = (
+            [e.entity_id for e in current_state.entities[:10]] if current_state.entities else []
+        )
 
         user_prompt = f"""Generate the next scene in this narrative simulation.
 
@@ -776,13 +865,13 @@ CURRENT STATE ({current_state.to_year_month_str()}):
 
 TARGET TIME: {target_time_str}
 ACT: {act.value.upper()} (tension target: {tension_target:.2f})
-POV: {pov_entity if pov_entity else 'omniscient'}
+POV: {pov_entity if pov_entity else "omniscient"}
 FRAMING: {framing.value}
 {"NARRATIVE BEAT: " + relevant_beat if relevant_beat else ""}
 
-ENTITIES PRESENT: {', '.join(entity_names[:8])}
+ENTITIES PRESENT: {", ".join(entity_names[:8])}
 
-CENTRAL CONFLICT: {self.narrative_plan.central_conflict if self.narrative_plan else 'The unfolding drama'}
+CENTRAL CONFLICT: {self.narrative_plan.central_conflict if self.narrative_plan else "The unfolding drama"}
 
 INSTRUCTIONS:
 1. Write from the specified POV character's perspective
@@ -809,7 +898,7 @@ Provide:
                 model=DIRECTORIAL_MODEL,
                 system_prompt=system_prompt,
                 temperature=temperature,
-                max_tokens=1000
+                max_tokens=1000,
             )
 
             # Compute dramatic importance
@@ -844,15 +933,19 @@ Provide:
         except Exception as e:
             print(f"    Scene generation failed: {e}")
             return self._generate_placeholder_state(
-                current_state, target_year, target_month, step, act,
-                pov_entity, framing, tension_target
+                current_state,
+                target_year,
+                target_month,
+                step,
+                act,
+                pov_entity,
+                framing,
+                tension_target,
             )
 
     def _merge_parallel_storylines(
-        self,
-        a_plot_states: List[DirectorialState],
-        b_plot_states: List[DirectorialState]
-    ) -> List[DirectorialState]:
+        self, a_plot_states: list[DirectorialState], b_plot_states: list[DirectorialState]
+    ) -> list[DirectorialState]:
         """Programmatic interleave of A/B plot states."""
         if not b_plot_states:
             return a_plot_states
@@ -879,12 +972,7 @@ Provide:
     # Fidelity Mapping (2 methods)
     # ========================================================================
 
-    def _compute_dramatic_importance(
-        self,
-        act: ActPhase,
-        tension: float,
-        beat: str
-    ) -> float:
+    def _compute_dramatic_importance(self, act: ActPhase, tension: float, beat: str) -> float:
         """
         Compute dramatic importance based on act, tension, and narrative beat.
 
@@ -933,8 +1021,8 @@ Provide:
 
     def _generate_origin_state(self) -> DirectorialState:
         """Generate the opening scene with entity inference."""
-        origin_year = getattr(self.config, 'origin_year', None) or datetime.now().year
-        description = getattr(self.config, 'portal_description', None)
+        origin_year = getattr(self.config, "origin_year", None) or datetime.now().year
+        description = getattr(self.config, "portal_description", None)
         if not description:
             description = "The narrative begins. Characters assemble and the stage is set."
 
@@ -955,32 +1043,36 @@ Provide:
             dramatic_importance=0.3,
         )
 
-    def _infer_entities_from_description(self, description: str) -> List[Entity]:
+    def _infer_entities_from_description(self, description: str) -> list[Entity]:
         """Infer entities from description using LLM or regex fallback."""
         if not self.llm:
             import re
-            potential_names = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', description)
+
+            potential_names = re.findall(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b", description)
             entities = []
             seen = set()
             for name in potential_names[:10]:
-                entity_id = name.lower().replace(' ', '_')
+                entity_id = name.lower().replace(" ", "_")
                 if entity_id not in seen and len(entity_id) > 2:
                     seen.add(entity_id)
-                    entities.append(Entity(
-                        entity_id=entity_id,
-                        entity_type="person",
-                        entity_metadata={"name": name, "source": "inferred"}
-                    ))
+                    entities.append(
+                        Entity(
+                            entity_id=entity_id,
+                            entity_type="person",
+                            entity_metadata={"name": name, "source": "inferred"},
+                        )
+                    )
             return entities
 
         try:
+
             class EntityInfo(BaseModel):
                 name: str
                 type: str
                 role: str
 
             class EntityList(BaseModel):
-                entities: List[EntityInfo]
+                entities: list[EntityInfo]
 
             result = self.llm.generate_structured(
                 prompt=f"Identify key entities in: {description[:500]}",
@@ -988,28 +1080,30 @@ Provide:
                 model=DIRECTORIAL_MODEL,
                 system_prompt="Identify entities (people, places, things) in the description.",
                 temperature=0.3,
-                max_tokens=500
+                max_tokens=500,
             )
 
             entities = []
             for info in result.entities[:10]:
-                entity_id = info.name.lower().replace(' ', '_').replace("'", "")
-                entities.append(Entity(
-                    entity_id=entity_id,
-                    entity_type=info.type,
-                    entity_metadata={"name": info.name, "role": info.role}
-                ))
+                entity_id = info.name.lower().replace(" ", "_").replace("'", "")
+                entities.append(
+                    Entity(
+                        entity_id=entity_id,
+                        entity_type=info.type,
+                        entity_metadata={"name": info.name, "role": info.role},
+                    )
+                )
             return entities
         except Exception as e:
             print(f"    Entity inference failed: {e}")
             return []
 
-    def _explore_directed_paths(self, origin: DirectorialState) -> List[DirectorialPath]:
+    def _explore_directed_paths(self, origin: DirectorialState) -> list[DirectorialPath]:
         """Forward generation with act-aware prompting."""
         all_paths = []
 
         # Calculate time stepping
-        portal_year = getattr(self.config, 'portal_year', None)
+        portal_year = getattr(self.config, "portal_year", None)
         if portal_year is None:
             portal_year = origin.year + 3
         total_months = max(12, (portal_year - origin.year) * 12)
@@ -1036,7 +1130,9 @@ Provide:
                 pov_entity, framing = self._select_pov_for_state(step, act)
 
                 # Get tension target
-                tension_target = self.tension_targets[step] if step < len(self.tension_targets) else 0.5
+                tension_target = (
+                    self.tension_targets[step] if step < len(self.tension_targets) else 0.5
+                )
 
                 # Generate scene
                 new_state = self._generate_interleaved_state(
@@ -1047,7 +1143,7 @@ Provide:
                     act=act,
                     pov_entity=pov_entity,
                     framing=framing,
-                    tension_target=tension_target
+                    tension_target=tension_target,
                 )
 
                 # Compute actual tension
@@ -1058,13 +1154,15 @@ Provide:
                 new_state.dramatic_irony = has_irony
                 new_state.irony_entities = irony_ents
                 if has_irony:
-                    new_state.world_state['dramatic_irony'] = irony_desc
+                    new_state.world_state["dramatic_irony"] = irony_desc
 
                 states.append(new_state)
                 current_state = new_state
 
                 if step % 5 == 0:
-                    print(f"    Step {step}/{self.forward_steps}: {act.value} @ tension {new_state.tension_score:.2f}")
+                    print(
+                        f"    Step {step}/{self.forward_steps}: {act.value} @ tension {new_state.tension_score:.2f}"
+                    )
 
             # Build path
             path = DirectorialPath(
@@ -1077,7 +1175,7 @@ Provide:
 
         return all_paths
 
-    def _validate_narrative_coherence(self, paths: List[DirectorialPath]) -> List[DirectorialPath]:
+    def _validate_narrative_coherence(self, paths: list[DirectorialPath]) -> list[DirectorialPath]:
         """LLM + programmatic validation: arc completion, tension fit, POV coherence."""
         validated = []
 
@@ -1098,17 +1196,18 @@ Provide:
                 try:
                     llm_validation = self._llm_validate_narrative(path)
                     # Blend programmatic and LLM scores
-                    path.coherence_score = validation_score * 0.6 + (
-                        (llm_validation.arc_score + llm_validation.tension_fit) / 2
-                    ) * 0.4
-                    path.validation_details['llm_notes'] = llm_validation.pov_notes
-                    path.validation_details['llm_issues'] = llm_validation.issues
+                    path.coherence_score = (
+                        validation_score * 0.6
+                        + ((llm_validation.arc_score + llm_validation.tension_fit) / 2) * 0.4
+                    )
+                    path.validation_details["llm_notes"] = llm_validation.pov_notes
+                    path.validation_details["llm_issues"] = llm_validation.issues
                 except Exception:
                     pass
 
-            path.validation_details['arc_completion'] = arc_score
-            path.validation_details['tension_fit'] = tension_fit
-            path.validation_details['pov_coherence'] = pov_coherence
+            path.validation_details["arc_completion"] = arc_score
+            path.validation_details["tension_fit"] = tension_fit
+            path.validation_details["pov_coherence"] = pov_coherence
 
             validated.append(path)
 
@@ -1176,12 +1275,12 @@ Provide:
         user_prompt = f"""Evaluate this narrative path for coherence.
 
 NARRATIVE PLAN:
-{self.narrative_plan.central_conflict if self.narrative_plan else 'Unknown'}
+{self.narrative_plan.central_conflict if self.narrative_plan else "Unknown"}
 
 PATH SUMMARY ({len(path.states)} states):
 {chr(10).join(state_summaries)}
 
-TENSION CURVE: {[f'{t:.2f}' for t in path.tension_curve[:10]]}
+TENSION CURVE: {[f"{t:.2f}" for t in path.tension_curve[:10]]}
 
 Evaluate:
 1. arc_score (0.0-1.0): Does the narrative complete a satisfying dramatic arc?
@@ -1195,18 +1294,16 @@ Evaluate:
             model=DIRECTORIAL_MODEL,
             system_prompt=system_prompt,
             temperature=0.3,
-            max_tokens=500
+            max_tokens=500,
         )
         return result
 
-    def _rank_paths(self, paths: List[DirectorialPath]) -> List[DirectorialPath]:
+    def _rank_paths(self, paths: list[DirectorialPath]) -> list[DirectorialPath]:
         """Composite ranking: 0.4 coherence + 0.3 arc_completion + 0.3 tension_fit."""
         for path in paths:
             tension_fit = self._compute_tension_fit(path)
             path.coherence_score = (
-                path.coherence_score * 0.4 +
-                path.arc_completion_score * 0.3 +
-                tension_fit * 0.3
+                path.coherence_score * 0.4 + path.arc_completion_score * 0.3 + tension_fit * 0.3
             )
 
         return sorted(paths, key=lambda p: p.coherence_score, reverse=True)
@@ -1226,7 +1323,7 @@ Evaluate:
             path.tension_curve = [s.tension_score for s in path.states]
 
         # POV distribution
-        pov_counts: Dict[str, int] = {}
+        pov_counts: dict[str, int] = {}
         for state in path.states:
             if state.pov_entity:
                 pov_counts[state.pov_entity] = pov_counts.get(state.pov_entity, 0) + 1
@@ -1249,7 +1346,7 @@ Evaluate:
         act: ActPhase,
         pov_entity: str,
         framing: Framing,
-        tension_target: float
+        tension_target: float,
     ) -> DirectorialState:
         """Generate placeholder state when LLM is unavailable."""
         importance = self._compute_dramatic_importance(act, tension_target, "")

@@ -3,10 +3,10 @@ LLM-powered explanation generation for simulation monitoring.
 """
 
 import os
-from pathlib import Path
-from typing import Optional
-import requests
 from datetime import datetime
+from pathlib import Path
+
+import requests
 
 
 class LLMExplainer:
@@ -15,10 +15,10 @@ class LLMExplainer:
     def __init__(
         self,
         model: str = "meta-llama/llama-3.1-8b-instruct:free",
-        system_prompt_file: Optional[Path] = None,
+        system_prompt_file: Path | None = None,
         max_input_tokens: int = 4000,
         max_output_tokens: int = 150,
-        api_key: Optional[str] = None
+        api_key: str | None = None,
     ):
         self.model = model
         self.max_input_tokens = max_input_tokens
@@ -42,10 +42,8 @@ class LLMExplainer:
 **CRITICAL**: ONLY report data that is EXPLICITLY present in the logs. NEVER make up run IDs, template numbers, mechanisms, percentages, or any other data. If information is not in the logs, say "not yet available" instead of inventing plausible-sounding values."""
 
     def generate_explanation(
-        self,
-        log_buffer: list[str],
-        db_snapshot_text: Optional[str] = None
-    ) -> Optional[str]:
+        self, log_buffer: list[str], db_snapshot_text: str | None = None
+    ) -> str | None:
         """
         Generate LLM explanation from logs and database snapshot.
 
@@ -64,7 +62,7 @@ class LLMExplainer:
 
         # Truncate if too long
         if len(user_message) > self.max_input_tokens * 4:  # Rough char estimate
-            user_message = user_message[:self.max_input_tokens * 4]
+            user_message = user_message[: self.max_input_tokens * 4]
 
         try:
             response = requests.post(
@@ -72,18 +70,18 @@ class LLMExplainer:
                 headers={
                     "Authorization": f"Bearer {self.api_key}",
                     "HTTP-Referer": "https://github.com/timepoint-ai/timepoint-pro",
-                    "X-Title": "Timepoint Monitor"
+                    "X-Title": "Timepoint Monitor",
                 },
                 json={
                     "model": self.model,
                     "messages": [
                         {"role": "system", "content": self.system_prompt},
-                        {"role": "user", "content": user_message}
+                        {"role": "user", "content": user_message},
                     ],
                     "max_tokens": self.max_output_tokens,
-                    "temperature": 0.3
+                    "temperature": 0.3,
                 },
-                timeout=30
+                timeout=30,
             )
 
             if response.status_code == 200:
@@ -95,7 +93,7 @@ class LLMExplainer:
         except Exception as e:
             return f"[LLM Error: {str(e)[:100]}]"
 
-    def generate_explanation_with_context(self, context: str) -> Optional[str]:
+    def generate_explanation_with_context(self, context: str) -> str | None:
         """
         Generate LLM explanation from pre-formatted context.
         Used for chat responses where context is already built.
@@ -111,7 +109,7 @@ class LLMExplainer:
 
         # Truncate if too long
         if len(context) > self.max_input_tokens * 4:
-            context = context[:self.max_input_tokens * 4]
+            context = context[: self.max_input_tokens * 4]
 
         try:
             # Use higher token limit for chat responses to allow more detailed answers
@@ -120,18 +118,22 @@ class LLMExplainer:
                 headers={
                     "Authorization": f"Bearer {self.api_key}",
                     "HTTP-Referer": "https://github.com/timepoint-ai/timepoint-pro",
-                    "X-Title": "Timepoint Monitor Chat"
+                    "X-Title": "Timepoint Monitor Chat",
                 },
                 json={
                     "model": self.model,
                     "messages": [
-                        {"role": "system", "content": self.system_prompt + "\n\nYou are in CHAT mode. Answer the user's question based on the provided simulation state and logs. Be specific and helpful."},
-                        {"role": "user", "content": context}
+                        {
+                            "role": "system",
+                            "content": self.system_prompt
+                            + "\n\nYou are in CHAT mode. Answer the user's question based on the provided simulation state and logs. Be specific and helpful.",
+                        },
+                        {"role": "user", "content": context},
                     ],
                     "max_tokens": max(300, self.max_output_tokens),  # More tokens for chat
-                    "temperature": 0.3
+                    "temperature": 0.3,
                 },
-                timeout=30
+                timeout=30,
             )
 
             if response.status_code == 200:
@@ -143,14 +145,10 @@ class LLMExplainer:
         except Exception as e:
             return f"[LLM Error: {str(e)[:100]}]"
 
-    def _build_user_message(
-        self,
-        log_buffer: list[str],
-        db_snapshot_text: Optional[str]
-    ) -> str:
+    def _build_user_message(self, log_buffer: list[str], db_snapshot_text: str | None) -> str:
         """Build user message from logs and database snapshot"""
         lines = []
-        lines.append(f"=== TIMEPOINT MONITOR UPDATE ===")
+        lines.append("=== TIMEPOINT MONITOR UPDATE ===")
         lines.append(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         lines.append("")
 

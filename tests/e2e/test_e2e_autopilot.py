@@ -12,27 +12,16 @@ from end to end, including:
 
 This replaces the old autopilot.py script with a proper pytest-based E2E test suite.
 """
-import os
-import tempfile
+
 import time
 from datetime import datetime
-from pathlib import Path
-from typing import List, Dict, Any
 
 import pytest
 
-from schemas import (
-    Entity, Timepoint, ResolutionLevel, TemporalMode,
-    AnimalEntity, BuildingEntity, AbstractEntity, KamiEntity, AIEntity
-)
-from llm_v2 import LLMClient
-from workflows import (
-    create_animistic_entity, generate_animistic_entities_for_scene,
-    TemporalAgent
-)
-from storage import GraphStore
+from ai_entity_service import AIEntityService
+from schemas import AIEntity, Entity, ResolutionLevel, TemporalMode, Timepoint
 from validation import Validator
-from ai_entity_service import AIEntityService, AIEntityRunner
+from workflows import TemporalAgent, generate_animistic_entities_for_scene
 
 
 @pytest.mark.e2e
@@ -58,7 +47,7 @@ class TestE2EEntityGeneration:
             timestamp=datetime(1789, 4, 30),
             event_description="Washington's Presidential Inauguration",
             entities_present=["washington", "hamilton", "crowd"],
-            resolution_level=ResolutionLevel.FULL_DETAIL
+            resolution_level=ResolutionLevel.FULL_DETAIL,
         )
         graph_store.save_timepoint(timepoint)
 
@@ -67,7 +56,7 @@ class TestE2EEntityGeneration:
             entity_type="human",
             timepoint="e2e_tp_001",
             resolution_level=ResolutionLevel.FULL_DETAIL,
-            entity_metadata={"role": "president", "historical": True}
+            entity_metadata={"role": "president", "historical": True},
         )
 
         # Step 2: Populate with LLM
@@ -77,36 +66,38 @@ class TestE2EEntityGeneration:
             context={
                 "timepoint": timepoint.timestamp.isoformat(),
                 "event": timepoint.event_description,
-                "role": "first president of the United States"
-            }
+                "role": "first president of the United States",
+            },
         )
         llm_time = time.time() - start_time
 
         # Step 3: Convert EntityPopulation to Entity and save to database
         from schemas import entity_population_to_entity
+
         entity_to_save = entity_population_to_entity(
             population=populated_entity,
             entity_id="washington",
             entity_type="human",
             timepoint="e2e_tp_001",
-            resolution_level=ResolutionLevel.FULL_DETAIL
+            resolution_level=ResolutionLevel.FULL_DETAIL,
         )
         graph_store.save_entity(entity_to_save)
 
         # Step 4: Validate (validate the converted entity, not the EntityPopulation)
         validator = Validator()
         validation_result = validator.validate_entity(entity_to_save)
-        assert validation_result["valid"] or len(validation_result["violations"]) == 0, \
+        assert validation_result["valid"] or len(validation_result["violations"]) == 0, (
             f"Entity validation failed: {validation_result.get('violations', [])}"
+        )
 
         # Step 5: Verify retrieval
         retrieved = graph_store.get_entity("washington", "e2e_tp_001")
         assert retrieved is not None
         assert retrieved.entity_id == "washington"
         # Knowledge state is stored in cognitive_tensor
-        assert 'cognitive_tensor' in retrieved.entity_metadata
-        cognitive = retrieved.entity_metadata.get('cognitive_tensor', {})
-        assert 'knowledge_state' in cognitive
+        assert "cognitive_tensor" in retrieved.entity_metadata
+        cognitive = retrieved.entity_metadata.get("cognitive_tensor", {})
+        assert "knowledge_state" in cognitive
 
         # Performance assertion
         assert llm_time < 30, f"LLM population took too long: {llm_time:.2f}s"
@@ -124,9 +115,7 @@ class TestE2EEntityGeneration:
 
         # Generate entities for scene
         entities = generate_animistic_entities_for_scene(
-            scene_description=scene_description,
-            llm_client=real_llm_client,
-            entity_count=5
+            scene_description=scene_description, llm_client=real_llm_client, entity_count=5
         )
 
         assert len(entities) == 5, "Should generate 5 entities"
@@ -135,8 +124,9 @@ class TestE2EEntityGeneration:
         for entity in entities:
             validator = Validator()
             result = validator.validate_entity(entity)
-            assert result["valid"] or len(result.get("violations", [])) == 0, \
+            assert result["valid"] or len(result.get("violations", [])) == 0, (
                 f"Entity {entity.entity_id} validation failed: {result.get('violations', [])}"
+            )
 
             graph_store.save_entity(entity)
 
@@ -175,7 +165,7 @@ class TestE2ETemporalWorkflows:
             timestamp=datetime(1776, 7, 4),
             event_description="Declaration of Independence signing",
             entities_present=["jefferson", "franklin", "adams"],
-            resolution_level=ResolutionLevel.FULL_DETAIL
+            resolution_level=ResolutionLevel.FULL_DETAIL,
         )
         graph_store.save_timepoint(t0)
 
@@ -184,8 +174,7 @@ class TestE2ETemporalWorkflows:
 
         # Generate successor timepoint
         t1 = agent.generate_next_timepoint(
-            current_timepoint=t0,
-            context={"next_event": "Ratification debates"}
+            current_timepoint=t0, context={"next_event": "Ratification debates"}
         )
 
         assert t1 is not None
@@ -221,7 +210,7 @@ class TestE2ETemporalWorkflows:
             timestamp=datetime(1800, 1, 1),
             event_description="Base timeline event",
             entities_present=["entity_a"],
-            resolution_level=ResolutionLevel.TENSOR_ONLY
+            resolution_level=ResolutionLevel.TENSOR_ONLY,
         )
         graph_store.save_timepoint(base_tp)
 
@@ -268,7 +257,7 @@ class TestE2EAIEntityService:
         ai_config = AIEntity(
             model_name="gpt-3.5-turbo",
             system_prompt="You are a historical advisor specializing in the American Revolution.",
-            temperature=0.7
+            temperature=0.7,
         )
 
         ai_entity = Entity(
@@ -279,22 +268,21 @@ class TestE2EAIEntityService:
             entity_metadata={
                 "role": "historical_advisor",
                 "specialization": "american_revolution",
-                "ai_config": ai_config.model_dump()
-            }
+                "ai_config": ai_config.model_dump(),
+            },
         )
         service.register_entity(ai_entity)
 
         # Step 2: Train with context
         training_data = [
             {"query": "What happened in 1776?", "response": "Declaration of Independence"},
-            {"query": "Who was George Washington?", "response": "First president and general"}
+            {"query": "Who was George Washington?", "response": "First president and general"},
         ]
         service.train_entity(ai_entity.entity_id, training_data)
 
         # Step 3: Generate response
         response = service.generate_response(
-            entity_id=ai_entity.entity_id,
-            query="Tell me about the American Revolution"
+            entity_id=ai_entity.entity_id, query="Tell me about the American Revolution"
         )
         assert response is not None
         assert len(response) > 10, "Response should be substantial"
@@ -331,7 +319,7 @@ class TestE2ESystemPerformance:
                 entity_type="test",
                 timepoint="bulk_tp",
                 resolution_level=ResolutionLevel.TENSOR_ONLY,
-                entity_metadata={"index": i}
+                entity_metadata={"index": i},
             )
             graph_store.save_entity(entity)
             entities.append(entity)
@@ -354,7 +342,7 @@ class TestE2ESystemPerformance:
         avg_creation = (creation_time / entity_count) * 1000
         avg_retrieval = (retrieval_time / entity_count) * 1000
 
-        print(f"\n✅ Performance metrics:")
+        print("\n✅ Performance metrics:")
         print(f"   Creation: {avg_creation:.2f}ms per entity")
         print(f"   Retrieval: {avg_retrieval:.2f}ms per entity")
 
@@ -372,7 +360,7 @@ class TestE2ESystemPerformance:
             timestamp=datetime(2000, 1, 1),
             event_description="Concurrent access test",
             entities_present=[],
-            resolution_level=ResolutionLevel.TENSOR_ONLY
+            resolution_level=ResolutionLevel.TENSOR_ONLY,
         )
         graph_store.save_timepoint(timepoint)
 
@@ -425,7 +413,7 @@ class TestE2ESystemValidation:
             timestamp=datetime(1800, 1, 1),
             event_description="Consistency test",
             entities_present=["entity_1", "entity_2"],
-            resolution_level=ResolutionLevel.FULL_DETAIL
+            resolution_level=ResolutionLevel.FULL_DETAIL,
         )
         graph_store.save_timepoint(timepoint)
 
@@ -436,11 +424,12 @@ class TestE2ESystemValidation:
                 entity_type="test",
                 timepoint="consistency_tp",
                 resolution_level=ResolutionLevel.FULL_DETAIL,
-                entity_metadata={"related_to": f"entity_{3-i}"}
+                entity_metadata={"related_to": f"entity_{3 - i}"},
             )
             result = validator.validate_entity(entity)
-            assert result["valid"] or len(result.get("violations", [])) == 0, \
+            assert result["valid"] or len(result.get("violations", [])) == 0, (
                 f"Entity {entity.entity_id} validation failed: {result.get('violations', [])}"
+            )
             graph_store.save_entity(entity)
             entities.append(entity)
 
@@ -467,35 +456,36 @@ class TestE2ESystemValidation:
             entity_type="human",
             timepoint="safety_tp",
             resolution_level=ResolutionLevel.FULL_DETAIL,
-            entity_metadata={"role": "test_subject"}
+            entity_metadata={"role": "test_subject"},
         )
 
         populated_entity_pop = real_llm_client.populate_entity(
-            entity_schema=entity,
-            context={"test": "safety_validation"}
+            entity_schema=entity, context={"test": "safety_validation"}
         )
 
         # Convert to Entity for validation
         from schemas import entity_population_to_entity
+
         populated = entity_population_to_entity(
             population=populated_entity_pop,
             entity_id="safety_test_entity",
             entity_type="human",
             timepoint="safety_tp",
-            resolution_level=ResolutionLevel.FULL_DETAIL
+            resolution_level=ResolutionLevel.FULL_DETAIL,
         )
 
         # Validate generated content
         result = validator.validate_entity(populated)
-        assert result["valid"] or len(result.get("violations", [])) == 0, \
+        assert result["valid"] or len(result.get("violations", [])) == 0, (
             f"LLM-generated entity failed validation: {result.get('violations', [])}"
+        )
 
         # Check for required safety attributes
-        cognitive_tensor = populated.entity_metadata.get('cognitive_tensor', {})
-        assert 'knowledge_state' in cognitive_tensor
-        assert len(cognitive_tensor['knowledge_state']) > 0
+        cognitive_tensor = populated.entity_metadata.get("cognitive_tensor", {})
+        assert "knowledge_state" in cognitive_tensor
+        assert len(cognitive_tensor["knowledge_state"]) > 0
 
-        print(f"\n✅ LLM safety validation passed")
+        print("\n✅ LLM safety validation passed")
 
 
 @pytest.mark.e2e
@@ -515,9 +505,9 @@ class TestE2ESystemIntegration:
         4. Validate all components
         5. Generate final report
         """
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("STARTING COMPLETE SIMULATION WORKFLOW")
-        print("="*70)
+        print("=" * 70)
 
         # Phase 1: Initialize
         print("\n[Phase 1] Initializing simulation...")
@@ -526,7 +516,7 @@ class TestE2ESystemIntegration:
             timestamp=datetime(1776, 7, 4),
             event_description="Declaration of Independence",
             entities_present=["jefferson", "franklin"],
-            resolution_level=ResolutionLevel.FULL_DETAIL
+            resolution_level=ResolutionLevel.FULL_DETAIL,
         )
         graph_store.save_timepoint(initial_tp)
         print(f"  ✓ Created initial timepoint: {initial_tp.timepoint_id}")
@@ -536,7 +526,7 @@ class TestE2ESystemIntegration:
         entities = generate_animistic_entities_for_scene(
             scene_description=initial_tp.event_description,
             llm_client=real_llm_client,
-            entity_count=3
+            entity_count=3,
         )
         for entity in entities:
             graph_store.save_entity(entity)
@@ -546,8 +536,7 @@ class TestE2ESystemIntegration:
         print("\n[Phase 3] Creating temporal progression...")
         agent = TemporalAgent(store=graph_store, llm_client=real_llm_client)
         next_tp = agent.generate_next_timepoint(
-            current_timepoint=initial_tp,
-            context={"progression": "historical_sequence"}
+            current_timepoint=initial_tp, context={"progression": "historical_sequence"}
         )
         graph_store.save_timepoint(next_tp)
         print(f"  ✓ Generated next timepoint: {next_tp.timepoint_id}")
@@ -571,23 +560,23 @@ class TestE2ESystemIntegration:
             "timepoints_created": total_timepoints,
             "entities_created": total_entities,
             "validation_success_rate": sum(validation_results) / len(validation_results),
-            "temporal_chain_length": 2
+            "temporal_chain_length": 2,
         }
 
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("SIMULATION COMPLETE")
-        print("="*70)
+        print("=" * 70)
         print(f"Timepoints: {report['timepoints_created']}")
         print(f"Entities: {report['entities_created']}")
-        print(f"Validation Rate: {report['validation_success_rate']*100:.1f}%")
+        print(f"Validation Rate: {report['validation_success_rate'] * 100:.1f}%")
         print(f"Temporal Chain: {report['temporal_chain_length']} links")
-        print("="*70)
+        print("=" * 70)
 
         # Final assertions
-        assert report['timepoints_created'] >= 2
-        assert report['entities_created'] >= 3
-        assert report['validation_success_rate'] == 1.0
-        assert report['temporal_chain_length'] >= 2
+        assert report["timepoints_created"] >= 2
+        assert report["entities_created"] >= 3
+        assert report["validation_success_rate"] == 1.0
+        assert report["temporal_chain_length"] >= 2
 
 
 @pytest.mark.e2e
@@ -609,9 +598,9 @@ class TestE2EOrchestratorIntegration:
         from orchestrator import simulate_event
         from workflows import create_entity_training_workflow
 
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("TEST: Orchestrator + Entity Generation Workflow")
-        print("="*70)
+        print("=" * 70)
 
         # Phase 1: Orchestrate scene
         print("\n[Phase 1] Orchestrating scene from natural language...")
@@ -620,7 +609,7 @@ class TestE2EOrchestratorIntegration:
             real_llm_client,
             graph_store,
             context={"max_entities": 4, "max_timepoints": 2, "temporal_mode": "forward"},
-            save_to_db=True
+            save_to_db=True,
         )
 
         print(f"  ✓ Scene: {result['specification'].scene_title}")
@@ -632,17 +621,19 @@ class TestE2EOrchestratorIntegration:
         print("\n[Phase 2] Running LangGraph entity training workflow...")
         workflow = create_entity_training_workflow(real_llm_client, graph_store)
 
-        workflow_result = workflow.invoke({
-            "graph": result["graph"],
-            "entities": result["entities"],
-            "timepoint": result["timepoints"][0].timepoint_id,
-            "resolution": ResolutionLevel.FULL_DETAIL,
-            "violations": [],
-            "results": {},
-            "entity_populations": {}
-        })
+        workflow_result = workflow.invoke(
+            {
+                "graph": result["graph"],
+                "entities": result["entities"],
+                "timepoint": result["timepoints"][0].timepoint_id,
+                "resolution": ResolutionLevel.FULL_DETAIL,
+                "violations": [],
+                "results": {},
+                "entity_populations": {},
+            }
+        )
 
-        print(f"  ✓ Workflow completed")
+        print("  ✓ Workflow completed")
         print(f"  ✓ Entities processed: {len(workflow_result['entities'])}")
         print(f"  ✓ Violations: {len(workflow_result['violations'])}")
 
@@ -653,10 +644,7 @@ class TestE2EOrchestratorIntegration:
 
         for entity in result["entities"]:
             exposure_events = graph_store.get_exposure_events(entity.entity_id)
-            context = {
-                "exposure_history": exposure_events,
-                "graph": result["graph"]
-            }
+            context = {"exposure_history": exposure_events, "graph": result["graph"]}
             validation_result = validator.validate_entity(entity, context)
             if validation_result["valid"] or len(validation_result.get("violations", [])) == 0:
                 validation_count += 1
@@ -664,14 +652,14 @@ class TestE2EOrchestratorIntegration:
         print(f"  ✓ Validated {validation_count}/{len(result['entities'])} entities")
 
         # Assertions
-        assert len(result['entities']) >= 2, "Should generate at least 2 entities"
-        assert len(result['timepoints']) >= 1, "Should generate at least 1 timepoint"
-        assert result['graph'].number_of_nodes() >= 2, "Graph should have nodes"
-        assert validation_count >= len(result['entities']) * 0.8, "80% validation success"
+        assert len(result["entities"]) >= 2, "Should generate at least 2 entities"
+        assert len(result["timepoints"]) >= 1, "Should generate at least 1 timepoint"
+        assert result["graph"].number_of_nodes() >= 2, "Graph should have nodes"
+        assert validation_count >= len(result["entities"]) * 0.8, "80% validation success"
 
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("✅ ORCHESTRATOR → WORKFLOW INTEGRATION SUCCESS")
-        print("="*70)
+        print("=" * 70)
 
     @pytest.mark.llm
     def test_orchestrator_temporal_chain_creation(self, real_llm_client, graph_store):
@@ -685,9 +673,9 @@ class TestE2EOrchestratorIntegration:
         """
         from orchestrator import simulate_event
 
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("TEST: Orchestrator + Temporal Chain Creation")
-        print("="*70)
+        print("=" * 70)
 
         # Phase 1: Orchestrate scene
         print("\n[Phase 1] Orchestrating temporal scene...")
@@ -696,7 +684,7 @@ class TestE2EOrchestratorIntegration:
             real_llm_client,
             graph_store,
             context={"max_entities": 3, "max_timepoints": 3, "temporal_mode": "forward"},
-            save_to_db=True
+            save_to_db=True,
         )
 
         initial_timepoints = result["timepoints"]
@@ -708,8 +696,7 @@ class TestE2EOrchestratorIntegration:
         last_tp = initial_timepoints[-1]
 
         next_tp = temporal_agent.generate_next_timepoint(
-            current_timepoint=last_tp,
-            context={"next_event": "Continuation of events"}
+            current_timepoint=last_tp, context={"next_event": "Continuation of events"}
         )
 
         print(f"  ✓ Generated successor: {next_tp.timepoint_id}")
@@ -721,16 +708,16 @@ class TestE2EOrchestratorIntegration:
         assert len(successors) >= 1, "Should have at least one successor"
         assert any(s.timepoint_id == next_tp.timepoint_id for s in successors)
 
-        print(f"  ✓ Temporal chain validated")
+        print("  ✓ Temporal chain validated")
 
         # Assertions
         assert len(initial_timepoints) >= 2
         assert next_tp.causal_parent == last_tp.timepoint_id
         assert result["temporal_agent"].mode == TemporalMode.FORWARD
 
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("✅ ORCHESTRATOR → TEMPORAL CHAIN SUCCESS")
-        print("="*70)
+        print("=" * 70)
 
     @pytest.mark.llm
     def test_full_pipeline_with_orchestrator(self, real_llm_client, graph_store):
@@ -746,13 +733,14 @@ class TestE2EOrchestratorIntegration:
         6. Storage persistence
         7. Performance metrics
         """
-        from orchestrator import simulate_event
-        from workflows import create_entity_training_workflow
         import time
 
-        print("\n" + "="*70)
+        from orchestrator import simulate_event
+        from workflows import create_entity_training_workflow
+
+        print("\n" + "=" * 70)
         print("ULTIMATE TEST: Full Pipeline with Orchestrator")
-        print("="*70)
+        print("=" * 70)
 
         start_time = time.time()
 
@@ -765,7 +753,7 @@ class TestE2EOrchestratorIntegration:
             real_llm_client,
             graph_store,
             context={"max_entities": 5, "max_timepoints": 3, "temporal_mode": "forward"},
-            save_to_db=True
+            save_to_db=True,
         )
 
         orchestration_time = time.time() - orchestration_start
@@ -779,15 +767,17 @@ class TestE2EOrchestratorIntegration:
         workflow_start = time.time()
 
         workflow = create_entity_training_workflow(real_llm_client, graph_store)
-        workflow_result = workflow.invoke({
-            "graph": result["graph"],
-            "entities": result["entities"],
-            "timepoint": result["timepoints"][0].timepoint_id,
-            "resolution": ResolutionLevel.FULL_DETAIL,
-            "violations": [],
-            "results": {},
-            "entity_populations": {}
-        })
+        workflow_result = workflow.invoke(
+            {
+                "graph": result["graph"],
+                "entities": result["entities"],
+                "timepoint": result["timepoints"][0].timepoint_id,
+                "resolution": ResolutionLevel.FULL_DETAIL,
+                "violations": [],
+                "results": {},
+                "entity_populations": {},
+            }
+        )
 
         workflow_time = time.time() - workflow_start
         print(f"  ✓ Workflow completed in {workflow_time:.2f}s")
@@ -803,13 +793,14 @@ class TestE2EOrchestratorIntegration:
         for i in range(2):  # Extend by 2 more timepoints
             current = result["timepoints"][i] if i == 0 else extended_timepoints[-1]
             next_tp = temporal_agent.generate_next_timepoint(
-                current_timepoint=current,
-                context={"next_event": f"Historical progression {i+1}"}
+                current_timepoint=current, context={"next_event": f"Historical progression {i + 1}"}
             )
             extended_timepoints.append(next_tp)
 
         temporal_time = time.time() - temporal_start
-        print(f"  ✓ Extended chain by {len(extended_timepoints)} timepoints in {temporal_time:.2f}s")
+        print(
+            f"  ✓ Extended chain by {len(extended_timepoints)} timepoints in {temporal_time:.2f}s"
+        )
 
         # Phase 4: Comprehensive Validation
         print("\n[Phase 4] Comprehensive validation...")
@@ -823,7 +814,7 @@ class TestE2EOrchestratorIntegration:
             context = {
                 "exposure_history": exposure_events,
                 "graph": result["graph"],
-                "timepoint_id": entity.timepoint
+                "timepoint_id": entity.timepoint,
             }
             validation_result = validator.validate_entity(entity, context)
             validation_results.append(
@@ -831,10 +822,12 @@ class TestE2EOrchestratorIntegration:
             )
 
         validation_time = time.time() - validation_start
-        validation_rate = sum(validation_results) / len(validation_results) if validation_results else 0
+        validation_rate = (
+            sum(validation_results) / len(validation_results) if validation_results else 0
+        )
 
         print(f"  ✓ Validation completed in {validation_time:.2f}s")
-        print(f"  ✓ Success rate: {validation_rate*100:.1f}%")
+        print(f"  ✓ Success rate: {validation_rate * 100:.1f}%")
 
         # Phase 5: Storage Verification
         print("\n[Phase 5] Verifying storage persistence...")
@@ -847,19 +840,19 @@ class TestE2EOrchestratorIntegration:
         # Phase 6: Performance Report
         total_time = time.time() - start_time
 
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("PERFORMANCE METRICS")
-        print("="*70)
+        print("=" * 70)
         print(f"Orchestration: {orchestration_time:.2f}s")
         print(f"LangGraph Workflow: {workflow_time:.2f}s")
         print(f"Temporal Extension: {temporal_time:.2f}s")
         print(f"Validation: {validation_time:.2f}s")
         print(f"Total: {total_time:.2f}s")
-        print("="*70)
+        print("=" * 70)
 
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("FINAL RESULTS")
-        print("="*70)
+        print("=" * 70)
         print(f"Scene Title: {result['specification'].scene_title}")
         print(f"Entities Created: {len(result['entities'])}")
         print(f"Initial Timepoints: {len(result['timepoints'])}")
@@ -867,22 +860,24 @@ class TestE2EOrchestratorIntegration:
         print(f"Total Timepoints: {len(result['timepoints']) + len(extended_timepoints)}")
         print(f"Graph Nodes: {result['graph'].number_of_nodes()}")
         print(f"Graph Edges: {result['graph'].number_of_edges()}")
-        print(f"Validation Rate: {validation_rate*100:.1f}%")
-        print(f"Exposure Events: {sum(len(graph_store.get_exposure_events(e.entity_id)) for e in result['entities'])}")
-        print("="*70)
+        print(f"Validation Rate: {validation_rate * 100:.1f}%")
+        print(
+            f"Exposure Events: {sum(len(graph_store.get_exposure_events(e.entity_id)) for e in result['entities'])}"
+        )
+        print("=" * 70)
 
         # Final Assertions
-        assert len(result['entities']) >= 3, "Should generate at least 3 entities"
-        assert len(result['timepoints']) >= 2, "Should generate at least 2 timepoints"
+        assert len(result["entities"]) >= 3, "Should generate at least 3 entities"
+        assert len(result["timepoints"]) >= 2, "Should generate at least 2 timepoints"
         assert len(extended_timepoints) == 2, "Should extend by 2 timepoints"
         assert validation_rate >= 0.8, "At least 80% validation success"
         assert stored_entities >= 3, "Should persist entities"
         assert stored_timepoints >= 4, "Should persist timepoints"
         assert total_time < 120, f"Total time should be under 2 minutes, got {total_time:.2f}s"
 
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("✅ FULL PIPELINE WITH ORCHESTRATOR SUCCESS")
-        print("="*70)
+        print("=" * 70)
 
 
 if __name__ == "__main__":

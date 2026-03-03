@@ -10,18 +10,15 @@ from pathlib import Path
 # Add the project root to the Python path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from schemas import Timeline, Timepoint, Intervention, BranchComparison
+from schemas import Intervention, Timeline, Timepoint
+from validation import validate_branch_consistency, validate_intervention_plausibility
 from workflows import (
-    create_counterfactual_branch,
     apply_intervention_to_timepoint,
     compare_timelines,
-    find_first_divergence
+    create_counterfactual_branch,
+    find_first_divergence,
 )
-from validation import (
-    validate_branch_consistency,
-    validate_intervention_plausibility,
-    validate_timeline_divergence
-)
+
 
 class MockStore:
     """Mock store for testing branching functionality"""
@@ -38,12 +35,15 @@ class MockStore:
         return self.timelines.get(timeline_id)
 
     def get_timepoints(self, timeline_id):
-        return [tp for tp in self.timepoints.values() if getattr(tp, 'timeline_id', None) == timeline_id]
+        return [
+            tp for tp in self.timepoints.values() if getattr(tp, "timeline_id", None) == timeline_id
+        ]
 
     def save_timepoint(self, timepoint):
         # Use timepoint_id as key
         self.timepoints[timepoint.timepoint_id] = timepoint
         return timepoint
+
 
 def test_intervention_schema():
     """Test Intervention schema creation"""
@@ -53,7 +53,7 @@ def test_intervention_schema():
     intervention1 = Intervention(
         type="entity_removal",
         target="hamilton",
-        description="Remove Hamilton from the cabinet meeting"
+        description="Remove Hamilton from the cabinet meeting",
     )
 
     assert intervention1.type == "entity_removal"
@@ -65,7 +65,7 @@ def test_intervention_schema():
         type="entity_modification",
         target="washington",
         parameters={"modifications": {"personality": "more_decisive"}},
-        description="Make Washington more decisive"
+        description="Make Washington more decisive",
     )
 
     assert intervention2.type == "entity_modification"
@@ -75,13 +75,14 @@ def test_intervention_schema():
     intervention3 = Intervention(
         type="event_cancellation",
         target="cabinet_meeting",
-        description="Cancel the cabinet meeting"
+        description="Cancel the cabinet meeting",
     )
 
     assert intervention3.type == "event_cancellation"
     assert intervention3.target == "cabinet_meeting"
 
     print("✅ Intervention schema tests passed!")
+
 
 def test_apply_intervention():
     """Test applying interventions to timepoints"""
@@ -92,14 +93,12 @@ def test_apply_intervention():
         timepoint_id="test_meeting",
         timestamp=datetime(1789, 4, 20, 14, 0),  # April 20, 1789, 2 PM
         event_description="Cabinet meeting with Hamilton, Jefferson, and Washington",
-        entities_present=["washington", "hamilton", "jefferson"]
+        entities_present=["washington", "hamilton", "jefferson"],
     )
 
     # Test entity removal intervention
     intervention1 = Intervention(
-        type="entity_removal",
-        target="hamilton",
-        description="Remove Hamilton from meeting"
+        type="entity_removal", target="hamilton", description="Remove Hamilton from meeting"
     )
 
     modified_tp1 = apply_intervention_to_timepoint(timepoint, intervention1, "branch_001")
@@ -113,7 +112,7 @@ def test_apply_intervention():
     intervention2 = Intervention(
         type="event_cancellation",
         target="cabinet_meeting",
-        description="Cancel the cabinet meeting"
+        description="Cancel the cabinet meeting",
     )
 
     modified_tp2 = apply_intervention_to_timepoint(timepoint, intervention2, "branch_002")
@@ -125,7 +124,7 @@ def test_apply_intervention():
         type="entity_modification",
         target="washington",
         parameters={"modifications": {"confidence": "higher", "mood": "serious"}},
-        description="Modify Washington's demeanor"
+        description="Modify Washington's demeanor",
     )
 
     modified_tp3 = apply_intervention_to_timepoint(timepoint, intervention3, "branch_003")
@@ -133,6 +132,7 @@ def test_apply_intervention():
     assert "Modified: washington confidence=higher, mood=serious" in modified_tp3.event_description
 
     print("✅ Intervention application tests passed!")
+
 
 def test_branch_creation():
     """Test creating counterfactual branches"""
@@ -149,7 +149,7 @@ def test_branch_creation():
         timestamp=datetime(1789, 4, 30, 12, 0),
         event_description="Washington's inauguration ceremony",
         entities_present=["washington", "adams", "jefferson"],
-        timeline_id=baseline_timeline_id
+        timeline_id=baseline_timeline_id,
     )
 
     tp2 = Timepoint(
@@ -157,7 +157,7 @@ def test_branch_creation():
         timestamp=datetime(1789, 5, 1, 14, 0),
         event_description="First cabinet meeting with Hamilton and Jefferson",
         entities_present=["washington", "hamilton", "jefferson"],
-        timeline_id=baseline_timeline_id
+        timeline_id=baseline_timeline_id,
     )
 
     store.save_timepoint(tp1)
@@ -169,7 +169,7 @@ def test_branch_creation():
         timepoint_id="inauguration",
         timestamp=datetime(1789, 4, 30, 12, 0),
         resolution="day",
-        entities_present=["washington", "adams", "jefferson"]
+        entities_present=["washington", "adams", "jefferson"],
     )
     store.save_timeline(baseline_timeline)
 
@@ -177,15 +177,12 @@ def test_branch_creation():
     intervention = Intervention(
         type="entity_removal",
         target="hamilton",
-        description="Hamilton absent from first cabinet meeting"
+        description="Hamilton absent from first cabinet meeting",
     )
 
     # Create counterfactual branch
     branch_timeline_id = create_counterfactual_branch(
-        baseline_timeline_id,
-        "cabinet_meeting",
-        intervention,
-        store
+        baseline_timeline_id, "cabinet_meeting", intervention, store
     )
 
     # Verify branch was created
@@ -212,6 +209,7 @@ def test_branch_creation():
 
     print("✅ Branch creation tests passed!")
 
+
 def test_timeline_comparison():
     """Test comparing timeline branches"""
     print("\n🧪 Testing timeline comparison...")
@@ -228,7 +226,7 @@ def test_timeline_comparison():
         timestamp=datetime(1789, 1, 1),
         event_description="Original event 1",
         entities_present=["a", "b", "c"],
-        timeline_id=baseline_id
+        timeline_id=baseline_id,
     )
 
     baseline_tp2 = Timepoint(
@@ -236,7 +234,7 @@ def test_timeline_comparison():
         timestamp=datetime(1789, 1, 2),
         event_description="Original event 2",
         entities_present=["a", "b", "c"],
-        timeline_id=baseline_id
+        timeline_id=baseline_id,
     )
 
     # Counterfactual timepoints (diverge at event2)
@@ -245,7 +243,7 @@ def test_timeline_comparison():
         timestamp=datetime(1789, 1, 1),
         event_description="Original event 1",
         entities_present=["a", "b", "c"],
-        timeline_id=counterfactual_id
+        timeline_id=counterfactual_id,
     )
 
     counterfactual_tp2 = Timepoint(
@@ -253,7 +251,7 @@ def test_timeline_comparison():
         timestamp=datetime(1789, 1, 2),
         event_description="Modified event 2 - entity removed",
         entities_present=["a", "c"],  # b removed
-        timeline_id=counterfactual_id
+        timeline_id=counterfactual_id,
     )
 
     # Save timepoints
@@ -277,10 +275,14 @@ def test_timeline_comparison():
     # Check metrics
     assert "entity_count" in comparison.metrics
     # Entity count should be the same (both have entities a,c, and baseline also has b)
-    assert comparison.metrics["entity_count"]["baseline"] >= comparison.metrics["entity_count"]["counterfactual"]
+    assert (
+        comparison.metrics["entity_count"]["baseline"]
+        >= comparison.metrics["entity_count"]["counterfactual"]
+    )
     assert len(comparison.entity_states_differed) > 0  # Should detect the entity difference
 
     print("✅ Timeline comparison tests passed!")
+
 
 def test_branch_validation():
     """Test branching validation functions"""
@@ -288,20 +290,14 @@ def test_branch_validation():
 
     # Test intervention plausibility
     valid_intervention = Intervention(
-        type="entity_removal",
-        target="hamilton",
-        description="Remove Hamilton from meeting"
+        type="entity_removal", target="hamilton", description="Remove Hamilton from meeting"
     )
 
     result = validate_intervention_plausibility(valid_intervention)
     assert result["valid"] == True
 
     # Test invalid intervention
-    invalid_intervention = Intervention(
-        type="invalid_type",
-        target="",
-        description=""
-    )
+    invalid_intervention = Intervention(type="invalid_type", target="", description="")
 
     result = validate_intervention_plausibility(invalid_intervention)
     assert result["valid"] == False
@@ -315,7 +311,7 @@ def test_branch_validation():
         intervention_description="Test intervention",
         timepoint_id="branch_root",
         timestamp=datetime(1789, 1, 1),
-        resolution="day"
+        resolution="day",
     )
 
     result = validate_branch_consistency(valid_branch)
@@ -327,13 +323,14 @@ def test_branch_validation():
         # missing parent_timeline_id and other fields
         timepoint_id="invalid_root",
         timestamp=datetime(1789, 1, 1),
-        resolution="day"
+        resolution="day",
     )
 
     result = validate_branch_consistency(invalid_branch)
     assert result["valid"] == False
 
     print("✅ Branch validation tests passed!")
+
 
 def test_first_divergence():
     """Test finding first divergence point"""
@@ -343,13 +340,17 @@ def test_first_divergence():
     baseline = [
         Timepoint(timepoint_id="tp1", event_description="Same event", entities_present=["a", "b"]),
         Timepoint(timepoint_id="tp2", event_description="Same event", entities_present=["a", "b"]),
-        Timepoint(timepoint_id="tp3", event_description="Different event", entities_present=["a", "b"])
+        Timepoint(
+            timepoint_id="tp3", event_description="Different event", entities_present=["a", "b"]
+        ),
     ]
 
     counterfactual = [
         Timepoint(timepoint_id="tp1", event_description="Same event", entities_present=["a", "b"]),
         Timepoint(timepoint_id="tp2", event_description="Same event", entities_present=["a", "b"]),
-        Timepoint(timepoint_id="tp3", event_description="Modified event", entities_present=["a", "c"])  # Different
+        Timepoint(
+            timepoint_id="tp3", event_description="Modified event", entities_present=["a", "c"]
+        ),  # Different
     ]
 
     divergence = find_first_divergence(baseline, counterfactual)
@@ -360,6 +361,7 @@ def test_first_divergence():
     assert identical_divergence is None
 
     print("✅ First divergence detection tests passed!")
+
 
 def main():
     """Run all counterfactual branching tests"""
@@ -385,8 +387,10 @@ def main():
     except Exception as e:
         print(f"\n❌ Test failed: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

@@ -25,17 +25,15 @@ Audit logging:
 Phase 5: Access Control
 """
 
-from .permissions import (
-    TensorPermission,
-    PermissionEnforcer,
-    PermissionDenied,
-)
-
 from .audit import (
     AccessAuditLog,
     AuditLogger,
 )
-
+from .permissions import (
+    PermissionDenied,
+    PermissionEnforcer,
+    TensorPermission,
+)
 
 __all__ = [
     # Permissions

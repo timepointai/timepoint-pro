@@ -1,18 +1,18 @@
 """
 Main client for Oxen.ai integration.
 """
-import os
+
 from pathlib import Path
-from typing import Optional
+
 from .auth import AuthManager
-from .config import OxenConfig, ConfigManager
-from .models import UploadResult, RepositoryInfo
+from .config import ConfigManager, OxenConfig
 from .exceptions import (
     AuthenticationError,
-    UploadError,
-    RepositoryError,
     ConfigurationError,
+    RepositoryError,
+    UploadError,
 )
+from .models import RepositoryInfo, UploadResult
 
 
 class OxenClient:
@@ -20,9 +20,9 @@ class OxenClient:
 
     def __init__(
         self,
-        repo_name: Optional[str] = None,
-        namespace: Optional[str] = None,
-        config: Optional[OxenConfig] = None,
+        repo_name: str | None = None,
+        namespace: str | None = None,
+        config: OxenConfig | None = None,
         interactive_auth: bool = True,
     ):
         """
@@ -87,18 +87,16 @@ class OxenClient:
 
         if RemoteRepo is None:
             raise ConfigurationError(
-                f"oxenai package import failed: {import_error}. "
-                "Install with: pip install oxenai"
+                f"oxenai package import failed: {import_error}. Install with: pip install oxenai"
             )
 
         try:
             self.remote_repo = RemoteRepo(f"{self.namespace}/{self.repo_name}")
         except AttributeError as e:
             raise ConfigurationError(
-                f"oxenai package API mismatch: {e}. "
-                "Try: pip install --upgrade oxenai"
+                f"oxenai package API mismatch: {e}. Try: pip install --upgrade oxenai"
             )
-        except Exception as e:
+        except Exception:
             # Remote repo initialization failure is not critical
             # User might want to create the repo first
             pass
@@ -116,7 +114,7 @@ class OxenClient:
         return self.auth_manager.verify_authentication()
 
     def create_repo(
-        self, name: Optional[str] = None, description: str = "", empty: bool = False
+        self, name: str | None = None, description: str = "", empty: bool = False
     ) -> RepositoryInfo:
         """
         Create a new Oxen repository.
@@ -150,8 +148,7 @@ class OxenClient:
 
         if RemoteRepo is None:
             raise ConfigurationError(
-                f"oxenai package import failed: {import_error}. "
-                "Install with: pip install oxenai"
+                f"oxenai package import failed: {import_error}. Install with: pip install oxenai"
             )
 
         try:
@@ -160,9 +157,7 @@ class OxenClient:
                 raise RepositoryError("Repository name required")
 
             if not self.namespace:
-                raise RepositoryError(
-                    "Namespace required. Set namespace in constructor or config."
-                )
+                raise RepositoryError("Namespace required. Set namespace in constructor or config.")
 
             full_name = f"{self.namespace}/{repo_name}"
 
@@ -191,8 +186,7 @@ class OxenClient:
             raise
         except AttributeError as e:
             raise ConfigurationError(
-                f"oxenai package API mismatch: {e}. "
-                "Try: pip install --upgrade oxenai"
+                f"oxenai package API mismatch: {e}. Try: pip install --upgrade oxenai"
             )
         except Exception as e:
             raise RepositoryError(f"Failed to create repository: {e}")
@@ -201,7 +195,7 @@ class OxenClient:
         self,
         file_path: str,
         commit_message: str,
-        dst_path: Optional[str] = None,
+        dst_path: str | None = None,
         create_repo_if_missing: bool = True,
     ) -> UploadResult:
         """
@@ -237,8 +231,7 @@ class OxenClient:
 
         if RemoteRepo is None:
             raise ConfigurationError(
-                f"oxenai package import failed: {import_error}. "
-                "Install with: pip install oxenai"
+                f"oxenai package import failed: {import_error}. Install with: pip install oxenai"
             )
 
         try:
@@ -249,9 +242,7 @@ class OxenClient:
 
             # Ensure we have a repository
             if not self.namespace or not self.repo_name:
-                raise UploadError(
-                    "Repository not specified. Set namespace and repo_name."
-                )
+                raise UploadError("Repository not specified. Set namespace and repo_name.")
 
             # Check if repo exists - try to access it
             if not self.remote_repo or not self.repo_exists():
@@ -303,15 +294,14 @@ class OxenClient:
             raise
         except AttributeError as e:
             raise ConfigurationError(
-                f"oxenai package API mismatch: {e}. "
-                "Try: pip install --upgrade oxenai"
+                f"oxenai package API mismatch: {e}. Try: pip install --upgrade oxenai"
             )
         except (UploadError, RepositoryError):
             raise
         except Exception as e:
             raise UploadError(f"Upload failed: {e}")
 
-    def get_hub_url(self, file_path: Optional[str] = None) -> str:
+    def get_hub_url(self, file_path: str | None = None) -> str:
         """
         Get Oxen Hub URL for repository or file.
 
@@ -331,7 +321,7 @@ class OxenClient:
         else:
             return base_url
 
-    def get_finetune_url(self, file_path: Optional[str] = None) -> str:
+    def get_finetune_url(self, file_path: str | None = None) -> str:
         """
         Get fine-tuning URL for dataset.
 
@@ -370,9 +360,7 @@ class OxenClient:
 
     # Branch Management Methods
 
-    def create_branch(
-        self, branch_name: str, from_branch: str = "main"
-    ) -> str:
+    def create_branch(self, branch_name: str, from_branch: str = "main") -> str:
         """
         Create a new branch from an existing branch.
 
@@ -411,7 +399,7 @@ class OxenClient:
         try:
             branches = self.remote_repo.branches()
             # Extract branch names from branch objects
-            return [b.name if hasattr(b, 'name') else str(b) for b in branches]
+            return [b.name if hasattr(b, "name") else str(b) for b in branches]
         except Exception as e:
             raise RepositoryError(f"Failed to list branches: {e}")
 
@@ -430,7 +418,7 @@ class OxenClient:
 
         try:
             branch = self.remote_repo.branch()
-            return branch.name if hasattr(branch, 'name') else str(branch)
+            return branch.name if hasattr(branch, "name") else str(branch)
         except Exception as e:
             raise RepositoryError(f"Failed to get current branch: {e}")
 
@@ -492,7 +480,7 @@ class OxenClient:
             raise RepositoryError(f"Failed to delete branch '{branch_name}': {e}")
 
     def merge_branch(
-        self, source_branch: str, target_branch: str, message: Optional[str] = None
+        self, source_branch: str, target_branch: str, message: str | None = None
     ) -> str:
         """
         Merge source branch into target branch.
@@ -523,7 +511,9 @@ class OxenClient:
                 )
 
             # Perform merge
-            merge_result = self.remote_repo.merge(source_branch, message or f"Merge {source_branch} into {target_branch}")
+            merge_result = self.remote_repo.merge(
+                source_branch, message or f"Merge {source_branch} into {target_branch}"
+            )
             return getattr(merge_result, "id", "unknown")
         except Exception as e:
             raise RepositoryError(f"Failed to merge '{source_branch}' into '{target_branch}': {e}")
@@ -564,7 +554,7 @@ class OxenClient:
 
     # Workspace Management Methods
 
-    def create_workspace(self, workspace_id: Optional[str] = None, branch: str = "main"):
+    def create_workspace(self, workspace_id: str | None = None, branch: str = "main"):
         """
         Create a workspace for making changes.
 

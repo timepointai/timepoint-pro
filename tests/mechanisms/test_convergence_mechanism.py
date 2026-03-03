@@ -10,16 +10,15 @@ Tests the core convergence module components:
 """
 
 import pytest
-from typing import List, Set, Tuple
 
 from evaluation.convergence import (
     CausalEdge,
     CausalGraph,
-    DivergencePoint,
     ConvergenceResult,
-    graph_similarity,
-    find_divergence_points,
+    DivergencePoint,
     compute_convergence_from_graphs,
+    find_divergence_points,
+    graph_similarity,
 )
 
 
@@ -163,7 +162,7 @@ class TestGraphSimilarity:
         )
 
         sim = graph_similarity(g1, g2)
-        assert abs(sim - 1/3) < 0.01, f"Expected ~0.33, got {sim}"
+        assert abs(sim - 1 / 3) < 0.01, f"Expected ~0.33, got {sim}"
 
     def test_fifty_percent_overlap(self):
         """50% overlap should give Jaccard = 1/3."""
@@ -180,7 +179,7 @@ class TestGraphSimilarity:
         )
 
         sim = graph_similarity(g1, g2)
-        assert abs(sim - 1/3) < 0.01
+        assert abs(sim - 1 / 3) < 0.01
 
     def test_mixed_edge_types(self):
         """Similarity should consider both temporal and knowledge edges."""
@@ -197,7 +196,7 @@ class TestGraphSimilarity:
 
         # 1 shared (temporal), 3 total
         sim = graph_similarity(g1, g2)
-        assert abs(sim - 1/3) < 0.01
+        assert abs(sim - 1 / 3) < 0.01
 
 
 class TestFindDivergencePoints:
@@ -206,10 +205,7 @@ class TestFindDivergencePoints:
     def test_no_divergence_identical_graphs(self):
         """Identical graphs should have no divergence points."""
         edges = {("a", "b"), ("b", "c")}
-        graphs = [
-            CausalGraph(run_id=f"r{i}", temporal_edges=edges)
-            for i in range(3)
-        ]
+        graphs = [CausalGraph(run_id=f"r{i}", temporal_edges=edges) for i in range(3)]
 
         divergence = find_divergence_points(graphs)
         assert len(divergence) == 0
@@ -272,8 +268,7 @@ class TestComputeConvergence:
     def test_perfect_convergence(self):
         """Identical graphs should yield perfect convergence."""
         graphs = [
-            CausalGraph(run_id=f"r{i}", temporal_edges={("a", "b"), ("b", "c")})
-            for i in range(3)
+            CausalGraph(run_id=f"r{i}", temporal_edges={("a", "b"), ("b", "c")}) for i in range(3)
         ]
 
         result = compute_convergence_from_graphs(graphs)
@@ -333,23 +328,26 @@ class TestComputeConvergence:
 class TestRobustnessGrades:
     """Unit tests for grading thresholds."""
 
-    @pytest.mark.parametrize("score,expected_grade", [
-        (1.0, "A"),
-        (0.95, "A"),
-        (0.90, "A"),
-        (0.89, "B"),
-        (0.85, "B"),
-        (0.80, "B"),
-        (0.79, "C"),
-        (0.75, "C"),
-        (0.70, "C"),
-        (0.69, "D"),
-        (0.60, "D"),
-        (0.50, "D"),
-        (0.49, "F"),
-        (0.25, "F"),
-        (0.0, "F"),
-    ])
+    @pytest.mark.parametrize(
+        "score,expected_grade",
+        [
+            (1.0, "A"),
+            (0.95, "A"),
+            (0.90, "A"),
+            (0.89, "B"),
+            (0.85, "B"),
+            (0.80, "B"),
+            (0.79, "C"),
+            (0.75, "C"),
+            (0.70, "C"),
+            (0.69, "D"),
+            (0.60, "D"),
+            (0.50, "D"),
+            (0.49, "F"),
+            (0.25, "F"),
+            (0.0, "F"),
+        ],
+    )
     def test_grade_thresholds(self, score, expected_grade):
         """Test all grade threshold boundaries."""
         result = ConvergenceResult(
@@ -363,8 +361,9 @@ class TestRobustnessGrades:
             contested_edges=set(),
         )
 
-        assert result.robustness_grade == expected_grade, \
+        assert result.robustness_grade == expected_grade, (
             f"Score {score} should get grade {expected_grade}, got {result.robustness_grade}"
+        )
 
 
 class TestConvergenceResultSerialization:
@@ -386,10 +385,18 @@ class TestConvergenceResultSerialization:
         d = result.to_dict()
 
         expected_keys = {
-            "run_ids", "template_id", "mean_similarity", "min_similarity",
-            "max_similarity", "convergence_score", "robustness_grade",
-            "divergence_points", "consensus_edges", "contested_edges",
-            "computed_at", "run_count"
+            "run_ids",
+            "template_id",
+            "mean_similarity",
+            "min_similarity",
+            "max_similarity",
+            "convergence_score",
+            "robustness_grade",
+            "divergence_points",
+            "consensus_edges",
+            "contested_edges",
+            "computed_at",
+            "run_count",
         }
         assert set(d.keys()) == expected_keys
 
@@ -424,6 +431,7 @@ class TestConvergenceResultSerialization:
 
 if __name__ == "__main__":
     import sys
+
     pytest_args = [__file__, "-v"]
     exit_code = pytest.main(pytest_args)
     sys.exit(exit_code)

@@ -4,10 +4,11 @@ Tests for Checkpoint Management (Sprint 1.4)
 Tests checkpoint creation, resume functionality, cleanup, and corruption handling.
 """
 
-import pytest
-import tempfile
 import json
+import tempfile
 from pathlib import Path
+
+import pytest
 
 from generation.checkpoint_manager import CheckpointManager
 
@@ -20,10 +21,7 @@ class TestCheckpointCreation:
         with tempfile.TemporaryDirectory() as tmpdir:
             manager = CheckpointManager(checkpoint_dir=tmpdir)
 
-            metadata = {
-                "config": {"entities": 100},
-                "random_seed": 42
-            }
+            metadata = {"config": {"entities": 100}, "random_seed": 42}
 
             manager.create_checkpoint(job_id="job_1", metadata=metadata)
 
@@ -34,10 +32,7 @@ class TestCheckpointCreation:
         with tempfile.TemporaryDirectory() as tmpdir:
             manager = CheckpointManager(checkpoint_dir=tmpdir)
 
-            metadata = {
-                "config": {"entities": 100},
-                "random_seed": 42
-            }
+            metadata = {"config": {"entities": 100}, "random_seed": 42}
 
             manager.create_checkpoint(job_id="job_1", metadata=metadata)
 
@@ -46,7 +41,7 @@ class TestCheckpointCreation:
             assert metadata_path.exists()
 
             # Verify metadata content
-            with open(metadata_path, 'r') as f:
+            with open(metadata_path) as f:
                 saved_metadata = json.load(f)
 
             assert saved_metadata["job_id"] == "job_1"
@@ -99,7 +94,7 @@ class TestCheckpointSaving:
 
             # Save 3 checkpoints
             for i in range(3):
-                manager.update_progress("job_1", items_completed=(i+1)*10)
+                manager.update_progress("job_1", items_completed=(i + 1) * 10)
                 manager.save_checkpoint("job_1", state={"step": i})
 
             # Verify all 3 checkpoint files exist
@@ -174,10 +169,7 @@ class TestCheckpointCleanup:
     def test_automatic_cleanup_old_checkpoints(self):
         """Test automatic cleanup of old checkpoints"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            manager = CheckpointManager(
-                checkpoint_dir=tmpdir,
-                max_checkpoints_per_job=3
-            )
+            manager = CheckpointManager(checkpoint_dir=tmpdir, max_checkpoints_per_job=3)
 
             manager.create_checkpoint(job_id="job_1", metadata={})
 
@@ -236,10 +228,7 @@ class TestProgressTracking:
     def test_should_save_checkpoint(self):
         """Test auto-save interval checking"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            manager = CheckpointManager(
-                checkpoint_dir=tmpdir,
-                auto_save_interval=10
-            )
+            manager = CheckpointManager(checkpoint_dir=tmpdir, auto_save_interval=10)
 
             manager.create_checkpoint(job_id="job_1", metadata={})
 
@@ -328,7 +317,7 @@ class TestCheckpointIntegrity:
 
             # Corrupt the checkpoint file
             checkpoint_path = Path(tmpdir) / "job_1_checkpoint_0.json"
-            with open(checkpoint_path, 'w') as f:
+            with open(checkpoint_path, "w") as f:
                 f.write("invalid json{{{")
 
             result = manager.verify_checkpoint_integrity("job_1")
@@ -351,9 +340,9 @@ class TestCheckpointResume:
             processed_items = []
             for i in range(50):
                 processed_items.append(f"item_{i}")
-                manager.update_progress("job_1", items_completed=i+1)
+                manager.update_progress("job_1", items_completed=i + 1)
 
-                if (i+1) % 10 == 0:
+                if (i + 1) % 10 == 0:
                     manager.save_checkpoint("job_1", state={"processed": processed_items})
 
             # Simulate restart - load checkpoint

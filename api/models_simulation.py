@@ -8,16 +8,18 @@ Phase 6: Public API - Simulation Endpoints
 
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field, field_validator
+from typing import Any
 
+from pydantic import BaseModel, Field, field_validator
 
 # ============================================================================
 # Enums
 # ============================================================================
 
+
 class SimulationStatus(str, Enum):
     """Simulation job status."""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -27,6 +29,7 @@ class SimulationStatus(str, Enum):
 
 class TemporalModeAPI(str, Enum):
     """Temporal mode options for API."""
+
     FORWARD = "forward"
     DIRECTORIAL = "directorial"
     CYCLICAL = "cyclical"
@@ -38,58 +41,45 @@ class TemporalModeAPI(str, Enum):
 # Request Models
 # ============================================================================
 
+
 class SimulationCreateRequest(BaseModel):
     """Request model for creating a simulation job."""
 
     # Natural language description OR template
-    description: Optional[str] = Field(
-        None,
-        max_length=2000,
-        description="Natural language description of the simulation scenario"
+    description: str | None = Field(
+        None, max_length=2000, description="Natural language description of the simulation scenario"
     )
-    template_id: Optional[str] = Field(
-        None,
-        description="Template ID to use (e.g., 'board_meeting', 'detective_interrogation')"
+    template_id: str | None = Field(
+        None, description="Template ID to use (e.g., 'board_meeting', 'detective_interrogation')"
     )
 
     # Entity configuration
     entity_count: int = Field(
-        default=4,
-        ge=1,
-        le=20,
-        description="Number of entities to generate (1-20)"
+        default=4, ge=1, le=20, description="Number of entities to generate (1-20)"
     )
-    entity_types: Optional[List[str]] = Field(
-        None,
-        description="Types of entities (e.g., ['human', 'organization'])"
+    entity_types: list[str] | None = Field(
+        None, description="Types of entities (e.g., ['human', 'organization'])"
     )
 
     # Temporal configuration
     timepoint_count: int = Field(
-        default=5,
-        ge=1,
-        le=20,
-        description="Number of timepoints to generate (1-20)"
+        default=5, ge=1, le=20, description="Number of timepoints to generate (1-20)"
     )
     temporal_mode: TemporalModeAPI = Field(
-        default=TemporalModeAPI.FORWARD,
-        description="Temporal reasoning mode"
+        default=TemporalModeAPI.FORWARD, description="Temporal reasoning mode"
     )
 
     # Output configuration
     generate_summaries: bool = Field(
-        default=True,
-        description="Generate LLM-powered narrative summaries"
+        default=True, description="Generate LLM-powered narrative summaries"
     )
-    export_formats: List[str] = Field(
-        default=["json", "markdown"],
-        description="Export formats: 'json', 'markdown', 'pdf'"
+    export_formats: list[str] = Field(
+        default=["json", "markdown"], description="Export formats: 'json', 'markdown', 'pdf'"
     )
 
     # Optional metadata
-    metadata: Optional[Dict[str, Any]] = Field(
-        None,
-        description="Additional metadata for the simulation"
+    metadata: dict[str, Any] | None = Field(
+        None, description="Additional metadata for the simulation"
     )
 
     @field_validator("export_formats")
@@ -110,16 +100,14 @@ class SimulationCreateRequest(BaseModel):
 
 class SimulationCancelRequest(BaseModel):
     """Request to cancel a running simulation."""
-    reason: Optional[str] = Field(
-        None,
-        max_length=500,
-        description="Optional reason for cancellation"
-    )
+
+    reason: str | None = Field(None, max_length=500, description="Optional reason for cancellation")
 
 
 # ============================================================================
 # Response Models
 # ============================================================================
+
 
 class SimulationJobResponse(BaseModel):
     """Response model for a simulation job."""
@@ -127,34 +115,31 @@ class SimulationJobResponse(BaseModel):
     job_id: str = Field(..., description="Unique job identifier")
     status: SimulationStatus = Field(..., description="Current job status")
     created_at: datetime = Field(..., description="Job creation timestamp")
-    started_at: Optional[datetime] = Field(None, description="Job start timestamp")
-    completed_at: Optional[datetime] = Field(None, description="Job completion timestamp")
+    started_at: datetime | None = Field(None, description="Job start timestamp")
+    completed_at: datetime | None = Field(None, description="Job completion timestamp")
 
     # Configuration echo
-    template_id: Optional[str] = Field(None, description="Template used")
-    description: Optional[str] = Field(None, description="Description used")
+    template_id: str | None = Field(None, description="Template used")
+    description: str | None = Field(None, description="Description used")
     entity_count: int = Field(..., description="Configured entity count")
     timepoint_count: int = Field(..., description="Configured timepoint count")
     temporal_mode: str = Field(..., description="Temporal mode")
 
     # Progress
     progress_percent: float = Field(
-        default=0.0,
-        ge=0.0,
-        le=100.0,
-        description="Progress percentage (0-100)"
+        default=0.0, ge=0.0, le=100.0, description="Progress percentage (0-100)"
     )
-    current_step: Optional[str] = Field(None, description="Current processing step")
+    current_step: str | None = Field(None, description="Current processing step")
 
     # Results (populated when completed)
-    run_id: Optional[str] = Field(None, description="Internal run ID")
-    entities_created: Optional[int] = Field(None, description="Entities created")
-    timepoints_created: Optional[int] = Field(None, description="Timepoints created")
-    cost_usd: Optional[float] = Field(None, description="API cost in USD")
-    tokens_used: Optional[int] = Field(None, description="Tokens consumed")
+    run_id: str | None = Field(None, description="Internal run ID")
+    entities_created: int | None = Field(None, description="Entities created")
+    timepoints_created: int | None = Field(None, description="Timepoints created")
+    cost_usd: float | None = Field(None, description="API cost in USD")
+    tokens_used: int | None = Field(None, description="Tokens consumed")
 
     # Error info (populated on failure)
-    error_message: Optional[str] = Field(None, description="Error message if failed")
+    error_message: str | None = Field(None, description="Error message if failed")
 
     # Owner info
     owner_id: str = Field(..., description="User who created the job")
@@ -169,41 +154,23 @@ class SimulationResultResponse(BaseModel):
     job: SimulationJobResponse = Field(..., description="Job details")
 
     # Simulation outputs
-    entities: Optional[List[Dict[str, Any]]] = Field(
-        None,
-        description="Generated entities"
-    )
-    timepoints: Optional[List[Dict[str, Any]]] = Field(
-        None,
-        description="Generated timepoints"
-    )
-    relationships: Optional[List[Dict[str, Any]]] = Field(
-        None,
-        description="Entity relationships"
-    )
+    entities: list[dict[str, Any]] | None = Field(None, description="Generated entities")
+    timepoints: list[dict[str, Any]] | None = Field(None, description="Generated timepoints")
+    relationships: list[dict[str, Any]] | None = Field(None, description="Entity relationships")
 
     # Narrative outputs
-    summary: Optional[str] = Field(None, description="Narrative summary")
-    narrative_exports: Optional[Dict[str, str]] = Field(
-        None,
-        description="Export file URLs by format"
-    )
+    summary: str | None = Field(None, description="Narrative summary")
+    narrative_exports: dict[str, str] | None = Field(None, description="Export file URLs by format")
 
     # Metrics
-    convergence_score: Optional[float] = Field(
-        None,
-        description="Causal consistency score (0-1)"
-    )
-    robustness_grade: Optional[str] = Field(
-        None,
-        description="Robustness grade (A-F)"
-    )
+    convergence_score: float | None = Field(None, description="Causal consistency score (0-1)")
+    robustness_grade: str | None = Field(None, description="Robustness grade (A-F)")
 
 
 class SimulationListResponse(BaseModel):
     """Response model for listing simulation jobs."""
 
-    jobs: List[SimulationJobResponse] = Field(..., description="List of jobs")
+    jobs: list[SimulationJobResponse] = Field(..., description="List of jobs")
     total: int = Field(..., description="Total job count")
     page: int = Field(default=1, description="Current page")
     page_size: int = Field(default=20, description="Page size")
@@ -221,15 +188,13 @@ class SimulationStatsResponse(BaseModel):
 
     total_cost_usd: float = Field(..., description="Total API cost")
     total_tokens: int = Field(..., description="Total tokens used")
-    avg_duration_seconds: Optional[float] = Field(
-        None,
-        description="Average job duration"
-    )
+    avg_duration_seconds: float | None = Field(None, description="Average job duration")
 
 
 # ============================================================================
 # Template Models
 # ============================================================================
+
 
 class TemplateInfo(BaseModel):
     """Information about an available template."""
@@ -239,7 +204,7 @@ class TemplateInfo(BaseModel):
     description: str = Field(..., description="Template description")
     category: str = Field(..., description="Template category")
     tier: str = Field(..., description="Complexity tier: quick, standard, comprehensive")
-    mechanisms: List[str] = Field(..., description="Mechanisms exercised (M1-M18)")
+    mechanisms: list[str] = Field(..., description="Mechanisms exercised (M1-M18)")
     default_entity_count: int = Field(..., description="Default entity count")
     default_timepoint_count: int = Field(..., description="Default timepoint count")
     estimated_cost_usd: float = Field(..., description="Estimated cost")
@@ -249,6 +214,6 @@ class TemplateInfo(BaseModel):
 class TemplateListResponse(BaseModel):
     """Response model for listing available templates."""
 
-    templates: List[TemplateInfo] = Field(..., description="Available templates")
+    templates: list[TemplateInfo] = Field(..., description="Available templates")
     total: int = Field(..., description="Total template count")
-    categories: List[str] = Field(..., description="Available categories")
+    categories: list[str] = Field(..., description="Available categories")

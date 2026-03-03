@@ -1,19 +1,17 @@
 # ============================================================================
 # llm.py - LLM integration with OpenRouter API (no OpenAI dependency)
 # ============================================================================
-from typing import List, Dict, Callable, TypeVar, Optional, Any
-from datetime import datetime, timedelta
-from pydantic import BaseModel
-import httpx
 import json
-import numpy as np
-import hashlib
-import time
-from functools import lru_cache
 import threading
+import time
 from collections import deque
+from collections.abc import Callable
+from datetime import datetime, timedelta
+from typing import Any, TypeVar
 
-T = TypeVar('T')
+import httpx
+
+T = TypeVar("T")
 
 
 class RateLimiter:
@@ -27,6 +25,7 @@ class RateLimiter:
     - "free": Conservative limits for free tier (20 req/min, burst 5)
     - "paid": Aggressive limits for paid tier (1000 req/min, burst 50)
     """
+
     # Class-level (global) tracking across all instances
     _global_lock = threading.Lock()
     _global_request_times: deque = deque()
@@ -34,10 +33,7 @@ class RateLimiter:
     _global_mode = "paid"  # Current mode: "free" or "paid" (DEFAULT: paid)
 
     def __init__(
-        self,
-        max_requests_per_minute: int = 1000,
-        burst_size: int = 50,
-        mode: str = "paid"
+        self, max_requests_per_minute: int = 1000, burst_size: int = 50, mode: str = "paid"
     ):
         """
         Initialize rate limiter.
@@ -66,8 +62,10 @@ class RateLimiter:
             now = time.time()
 
             # Remove requests older than 60 seconds (sliding window)
-            while RateLimiter._global_request_times and \
-                  now - RateLimiter._global_request_times[0] > 60.0:
+            while (
+                RateLimiter._global_request_times
+                and now - RateLimiter._global_request_times[0] > 60.0
+            ):
                 RateLimiter._global_request_times.popleft()
 
             # Check if we're at the rate limit
@@ -77,7 +75,9 @@ class RateLimiter:
                 wait_time = 60.0 - (now - oldest_request) + 0.1  # Add 100ms buffer
 
                 if wait_time > 0:
-                    print(f"    ⏱️  Rate limit reached ({len(RateLimiter._global_request_times)}/{self.max_requests_per_minute} requests/min)")
+                    print(
+                        f"    ⏱️  Rate limit reached ({len(RateLimiter._global_request_times)}/{self.max_requests_per_minute} requests/min)"
+                    )
                     print(f"    ⏳ Waiting {wait_time:.1f}s before next API call...")
                     time.sleep(wait_time)
                     now = time.time()
@@ -133,7 +133,7 @@ class RateLimiter:
             print("🔄 Rate limiter reset")
 
     @classmethod
-    def get_stats(cls) -> Dict[str, Any]:
+    def get_stats(cls) -> dict[str, Any]:
         """Get current rate limiting statistics"""
         with cls._global_lock:
             now = time.time()
@@ -158,28 +158,23 @@ class OpenRouterClient:
         base_url: str = "https://openrouter.ai/api/v1",
         max_requests_per_minute: int = 1000,
         burst_size: int = 50,
-        mode: str = "paid"
+        mode: str = "paid",
     ):
         self.api_key = api_key
-        self.base_url = base_url.rstrip('/')
+        self.base_url = base_url.rstrip("/")
         # Explicit timeout configuration to prevent hangs:
         # - connect: 10s for connection establishment
         # - read: 120s for slow LLM responses (increased from 60s)
         # - write: 30s for request body upload
         # - pool: 10s for getting a connection from the pool
-        self.client = httpx.Client(timeout=httpx.Timeout(
-            connect=10.0,
-            read=120.0,
-            write=30.0,
-            pool=10.0
-        ))
+        self.client = httpx.Client(
+            timeout=httpx.Timeout(connect=10.0, read=120.0, write=30.0, pool=10.0)
+        )
 
         # Initialize rate limiter
         self.mode = mode
         self.rate_limiter = RateLimiter(
-            max_requests_per_minute=max_requests_per_minute,
-            burst_size=burst_size,
-            mode=mode
+            max_requests_per_minute=max_requests_per_minute, burst_size=burst_size, mode=mode
         )
 
     @property
@@ -202,7 +197,7 @@ class OpenRouterClient:
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
             "HTTP-Referer": "https://github.com/your-repo",  # Optional
-            "X-Title": "Timepoint-Pro"  # Optional
+            "X-Title": "Timepoint-Pro",  # Optional
         }
 
         data = {
@@ -229,19 +224,23 @@ class OpenRouterClient:
                 # Handle rate limit errors (429) with exponential backoff
                 if e.response.status_code == 429:
                     if attempt < max_retries - 1:
-                        wait_time = retry_delay * (2 ** attempt)
+                        wait_time = retry_delay * (2**attempt)
                         print(f"    ⚠️  Rate limit (429) from API - waiting {wait_time:.1f}s...")
                         time.sleep(wait_time)
                         continue
                     else:
-                        raise Exception(f"OpenRouter API rate limit exceeded after {max_retries} retries")
+                        raise Exception(
+                            f"OpenRouter API rate limit exceeded after {max_retries} retries"
+                        )
 
                 # Handle other HTTP errors
-                raise Exception(f"OpenRouter API error: {e.response.status_code} - {e.response.text}")
+                raise Exception(
+                    f"OpenRouter API error: {e.response.status_code} - {e.response.text}"
+                )
 
             except Exception as e:
                 if attempt < max_retries - 1:
-                    wait_time = retry_delay * (2 ** attempt)
+                    wait_time = retry_delay * (2**attempt)
                     print(f"    ⚠️  Request failed (attempt {attempt + 1}/{max_retries}): {e}")
                     print(f"    ⏳ Retrying in {wait_time:.1f}s...")
                     time.sleep(wait_time)
@@ -251,7 +250,7 @@ class OpenRouterClient:
 
     def __del__(self):
         """Clean up HTTP client"""
-        if hasattr(self, 'client'):
+        if hasattr(self, "client"):
             self.client.close()
 
 
@@ -262,10 +261,10 @@ class ModelManager:
         self.api_key = api_key
         self.base_url = "https://openrouter.ai/api/v1"
         self.cache_ttl = timedelta(hours=cache_ttl_hours)
-        self._models_cache: Optional[Dict] = None
-        self._cache_timestamp: Optional[datetime] = None
+        self._models_cache: dict | None = None
+        self._cache_timestamp: datetime | None = None
 
-    def get_llama_models(self, force_refresh: bool = False) -> List[Dict]:
+    def get_llama_models(self, force_refresh: bool = False) -> list[dict]:
         """
         Get all available Llama models from OpenRouter.
         Uses caching to avoid excessive API calls.
@@ -273,16 +272,18 @@ class ModelManager:
         now = datetime.now()
 
         # Check if we have valid cached data
-        if (not force_refresh and
-            self._models_cache is not None and
-            self._cache_timestamp is not None and
-            now - self._cache_timestamp < self.cache_ttl):
+        if (
+            not force_refresh
+            and self._models_cache is not None
+            and self._cache_timestamp is not None
+            and now - self._cache_timestamp < self.cache_ttl
+        ):
             return self._models_cache
 
         try:
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
             }
 
             # Create a temporary httpx client for this request
@@ -299,21 +300,27 @@ class ModelManager:
                 model_id = model.get("id", "").lower()
                 # More specific filtering for actual Llama models
                 is_llama = (
-                    "meta-llama/llama" in model_id or
-                    "meta-llama/llama3" in model_id or
-                    "meta-llama/llama-3" in model_id or
-                    ("llama" in model_id and not any(skip in model_id for skip in [
-                        "deepseek", "distill", "guard", "codellama", "llama-cpp"
-                    ]))
+                    "meta-llama/llama" in model_id
+                    or "meta-llama/llama3" in model_id
+                    or "meta-llama/llama-3" in model_id
+                    or (
+                        "llama" in model_id
+                        and not any(
+                            skip in model_id
+                            for skip in ["deepseek", "distill", "guard", "codellama", "llama-cpp"]
+                        )
+                    )
                 )
                 if is_llama:
-                    llama_models.append({
-                        "id": model["id"],
-                        "name": model.get("name", model["id"]),
-                        "description": model.get("description", ""),
-                        "context_length": model.get("context_length", 0),
-                        "pricing": model.get("pricing", {})
-                    })
+                    llama_models.append(
+                        {
+                            "id": model["id"],
+                            "name": model.get("name", model["id"]),
+                            "description": model.get("description", ""),
+                            "context_length": model.get("context_length", 0),
+                            "pricing": model.get("pricing", {}),
+                        }
+                    )
 
             # Sort by context length (higher first) and then by name
             llama_models.sort(key=lambda x: (-x["context_length"], x["name"]))
@@ -424,10 +431,10 @@ class FreeModelSelector:
         self.api_key = api_key
         self.base_url = "https://openrouter.ai/api/v1"
         self.cache_ttl = timedelta(hours=cache_ttl_hours)
-        self._models_cache: Optional[List[Dict]] = None
-        self._cache_timestamp: Optional[datetime] = None
+        self._models_cache: list[dict] | None = None
+        self._cache_timestamp: datetime | None = None
 
-    def get_free_models(self, force_refresh: bool = False) -> List[Dict]:
+    def get_free_models(self, force_refresh: bool = False) -> list[dict]:
         """
         Get all currently available free models from OpenRouter.
 
@@ -437,16 +444,18 @@ class FreeModelSelector:
         now = datetime.now()
 
         # Check cache
-        if (not force_refresh and
-            self._models_cache is not None and
-            self._cache_timestamp is not None and
-            now - self._cache_timestamp < self.cache_ttl):
+        if (
+            not force_refresh
+            and self._models_cache is not None
+            and self._cache_timestamp is not None
+            and now - self._cache_timestamp < self.cache_ttl
+        ):
             return self._models_cache
 
         try:
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
             }
 
             with httpx.Client(timeout=15.0) as http_client:
@@ -461,14 +470,16 @@ class FreeModelSelector:
             for model in all_models:
                 model_id = model.get("id", "")
                 if model_id.endswith(":free"):
-                    free_models.append({
-                        "id": model_id,
-                        "name": model.get("name", model_id),
-                        "context_length": model.get("context_length", 0),
-                        "description": model.get("description", ""),
-                        "pricing": model.get("pricing", {}),
-                        "top_provider": model.get("top_provider", {})
-                    })
+                    free_models.append(
+                        {
+                            "id": model_id,
+                            "name": model.get("name", model_id),
+                            "context_length": model.get("context_length", 0),
+                            "description": model.get("description", ""),
+                            "pricing": model.get("pricing", {}),
+                            "top_provider": model.get("top_provider", {}),
+                        }
+                    )
 
             # Sort by context length (higher first)
             free_models.sort(key=lambda x: -x["context_length"])
@@ -487,7 +498,7 @@ class FreeModelSelector:
                 return self._models_cache
             return []
 
-    def get_best_free_model(self) -> Optional[str]:
+    def get_best_free_model(self) -> str | None:
         """
         Get the best available free model (quality-focused).
 
@@ -518,7 +529,7 @@ class FreeModelSelector:
 
         return None
 
-    def get_fastest_free_model(self) -> Optional[str]:
+    def get_fastest_free_model(self) -> str | None:
         """
         Get the fastest available free model (speed-focused).
 
@@ -561,10 +572,7 @@ class FreeModelSelector:
         if not models:
             return "🆓 No free models currently available on OpenRouter"
 
-        lines = [
-            "🆓 Available FREE Models on OpenRouter:",
-            "-" * 60
-        ]
+        lines = ["🆓 Available FREE Models on OpenRouter:", "-" * 60]
 
         for i, model in enumerate(models, 1):
             ctx_k = model["context_length"] // 1024 if model["context_length"] else 0
@@ -584,6 +592,7 @@ class FreeModelSelector:
         lines.append("Usage: --free (best quality) or --free-fast (speed)")
 
         return "\n".join(lines)
+
 
 def retry_with_backoff(func: Callable[..., T], max_retries: int = 3, base_delay: float = 1.0) -> T:
     """
@@ -614,12 +623,13 @@ def retry_with_backoff(func: Callable[..., T], max_retries: int = 3, base_delay:
                 raise e
 
             # Calculate delay with exponential backoff
-            delay = base_delay * (2 ** attempt)
+            delay = base_delay * (2**attempt)
             print(f"⚠️ Attempt {attempt + 1} failed: {e}. Retrying in {delay:.1f} seconds...")
             time.sleep(delay)
 
     # This should never be reached, but just in case
     raise last_exception
+
 
 # ============================================================================
 # Backward Compatibility Re-exports (classes now live in schemas.py)
@@ -629,6 +639,7 @@ def retry_with_backoff(func: Callable[..., T], max_retries: int = 3, base_delay:
 # The canonical location is now schemas.py to break circular dependencies.
 from schemas import EntityPopulation, ValidationResult
 
+
 class LLMClient:
     """Unified LLM client with cost tracking and model selection (REAL LLM only)"""
 
@@ -636,11 +647,11 @@ class LLMClient:
         self,
         api_key: str,
         base_url: str = "https://openrouter.ai/api/v1",
-        default_model: Optional[str] = None,
+        default_model: str | None = None,
         model_cache_ttl_hours: int = 24,
         max_requests_per_minute: int = 1000,
         burst_size: int = 50,
-        mode: str = "paid"
+        mode: str = "paid",
     ):
         # VALIDATION: API key is required
         if not api_key:
@@ -692,23 +703,33 @@ class LLMClient:
             base_url=base_url,
             max_requests_per_minute=max_requests_per_minute,
             burst_size=burst_size,
-            mode=mode
+            mode=mode,
         )
 
         # Print rate limit configuration
         if mode == "paid":
-            print(f"⏱️  Rate limiting: {max_requests_per_minute} requests/min (PAID - unlimited tier)")
+            print(
+                f"⏱️  Rate limiting: {max_requests_per_minute} requests/min (PAID - unlimited tier)"
+            )
         else:
-            print(f"⏱️  Rate limiting: {max_requests_per_minute} requests/min, burst size: {burst_size}")
-    
-    def populate_entity(self, entity_schema: Dict, context: Dict, previous_knowledge: List[str] = None, model: Optional[str] = None) -> EntityPopulation:
+            print(
+                f"⏱️  Rate limiting: {max_requests_per_minute} requests/min, burst size: {burst_size}"
+            )
+
+    def populate_entity(
+        self,
+        entity_schema: dict,
+        context: dict,
+        previous_knowledge: list[str] = None,
+        model: str | None = None,
+    ) -> EntityPopulation:
         """Populate entity with structured output (REAL LLM only)"""
         # Include previous knowledge in the prompt for causal evolution
         previous_context = ""
         if previous_knowledge:
             previous_context = f"\nPrevious knowledge state: {previous_knowledge}\nGenerate how this entity has evolved - what new information they've acquired and how their state has changed."
 
-        prompt = f"""Generate entity information for {entity_schema['entity_id']}.
+        prompt = f"""Generate entity information for {entity_schema["entity_id"]}.
 Context: {context}{previous_context}
 
 Return a JSON object with these exact fields:
@@ -729,7 +750,7 @@ Return only valid JSON, no other text."""
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.7,
                 max_tokens=12000,  # Increased from 1000 for Llama 4 Scout
-                response_format={"type": "json_object"}  # Force JSON mode
+                response_format={"type": "json_object"},  # Force JSON mode
             )
             # Extract content from response
             content = response["choices"][0]["message"]["content"]
@@ -744,13 +765,15 @@ Return only valid JSON, no other text."""
 
         # FIX: Explicitly set entity_id from schema if not in LLM response or empty
         if not response.entity_id or response.entity_id == "":
-            response.entity_id = entity_schema.get('entity_id', '')
+            response.entity_id = entity_schema.get("entity_id", "")
 
         self.token_count += 1000  # Estimate
         self.cost += 0.01  # Estimate
         return response
-    
-    def validate_consistency(self, entities: List[Dict], timepoint: datetime, model: Optional[str] = None) -> ValidationResult:
+
+    def validate_consistency(
+        self, entities: list[dict], timepoint: datetime, model: str | None = None
+    ) -> ValidationResult:
         """Validate temporal consistency (REAL LLM only)"""
         prompt = f"""Validate temporal consistency of entities at {timepoint}.
 Entities: {entities}
@@ -773,7 +796,7 @@ Return only valid JSON, no other text."""
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.1,
                 max_tokens=8000,  # Increased from 800 for Llama 4 Scout
-                response_format={"type": "json_object"}  # Force JSON mode
+                response_format={"type": "json_object"},  # Force JSON mode
             )
             # Extract content from response
             content = response["choices"][0]["message"]["content"]
@@ -790,7 +813,7 @@ Return only valid JSON, no other text."""
         self.cost += 0.008
         return response
 
-    def score_relevance(self, query: str, knowledge_item: str, model: Optional[str] = None) -> float:
+    def score_relevance(self, query: str, knowledge_item: str, model: str | None = None) -> float:
         """Score how relevant a knowledge item is to a query (0.0-1.0) (REAL LLM only)"""
         prompt = f"""Rate how relevant this knowledge item is to the query on a scale of 0.0 to 1.0.
 
@@ -813,7 +836,7 @@ Relevance score:"""
                 model=selected_model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.1,  # Low temperature for consistent scoring
-                max_tokens=10
+                max_tokens=10,
             )
             return response
 
@@ -833,7 +856,9 @@ Relevance score:"""
             print(f"LLM relevance scoring failed after retries: {e}")
             return self._heuristic_relevance_score(query, knowledge_item)
 
-    def generate_dialog(self, prompt: str, max_tokens: int = 16000, model: Optional[str] = None):  # Increased from 2000
+    def generate_dialog(
+        self, prompt: str, max_tokens: int = 16000, model: str | None = None
+    ):  # Increased from 2000
         """Generate dialog with structured output (REAL LLM only)"""
         # Use provided model or default to Llama model
         selected_model = model or self.default_model
@@ -871,13 +896,14 @@ Return only valid JSON matching this schema exactly, no other text."""
                 messages=[{"role": "user", "content": structured_prompt}],
                 temperature=0.7,
                 max_tokens=max_tokens,
-                response_format={"type": "json_object"}  # Force JSON mode
+                response_format={"type": "json_object"},  # Force JSON mode
             )
             # Extract content from response
             content = response["choices"][0]["message"]["content"]
             # Parse JSON manually
             try:
                 from schemas import DialogData
+
                 data = json.loads(content.strip())
                 return DialogData(**data)
             except (json.JSONDecodeError, ValueError) as e:
@@ -893,11 +919,11 @@ Return only valid JSON matching this schema exactly, no other text."""
         self,
         prompt: str,
         response_model: type,
-        model: Optional[str] = None,
-        system_prompt: Optional[str] = None,
+        model: str | None = None,
+        system_prompt: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 24000,  # Increased from 4000 for Llama 4 Scout
-        timeout: float = 120.0
+        timeout: float = 120.0,
     ):
         """
         Generate structured output conforming to a Pydantic model.
@@ -929,7 +955,7 @@ Return only valid JSON matching this schema exactly, no other text."""
                 connect=10.0,
                 read=timeout,  # Main timeout for slow LLM responses
                 write=30.0,
-                pool=10.0
+                pool=10.0,
             )
 
             try:
@@ -943,7 +969,7 @@ Return only valid JSON matching this schema exactly, no other text."""
                     messages=messages,
                     temperature=temperature,
                     max_tokens=max_tokens,
-                    response_format={"type": "json_object"}  # Force JSON mode
+                    response_format={"type": "json_object"},  # Force JSON mode
                 )
                 # Extract content from response
                 content = response["choices"][0]["message"]["content"]
@@ -969,7 +995,9 @@ Return only valid JSON matching this schema exactly, no other text."""
                             raise ValueError(f"Expected JSON object, got array: {content[:200]}")
                     return response_model(**data)
                 except (json.JSONDecodeError, ValueError) as e:
-                    raise Exception(f"Failed to parse LLM response as JSON: {e}. Content preview: {content[:500]}")
+                    raise Exception(
+                        f"Failed to parse LLM response as JSON: {e}. Content preview: {content[:500]}"
+                    )
             finally:
                 # Restore original timeout
                 self.client.client.timeout = original_timeout
@@ -993,7 +1021,7 @@ Return only valid JSON matching this schema exactly, no other text."""
             try:
                 fields = response_model.model_fields
                 field_hints = [f"  - {name}: {field.annotation}" for name, field in fields.items()]
-                return f"Expected fields:\n" + "\n".join(field_hints)
+                return "Expected fields:\n" + "\n".join(field_hints)
             except:
                 return "Return a valid JSON object matching the expected structure."
 
@@ -1004,5 +1032,3 @@ Return only valid JSON matching this schema exactly, no other text."""
         overlap = len(query_words.intersection(knowledge_words))
         total_words = len(query_words.union(knowledge_words))
         return min(1.0, overlap / max(1, total_words / 2))
-    
-

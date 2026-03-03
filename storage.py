@@ -1,14 +1,25 @@
 # ============================================================================
 # storage.py - Database and graph persistence
 # ============================================================================
-from sqlmodel import Session, create_engine, select, SQLModel
-from typing import Optional, Generator
-from contextlib import contextmanager
-import networkx as nx
 import json
+from collections.abc import Generator
+from contextlib import contextmanager
 from functools import lru_cache
 
-from schemas import Entity, Timeline, SystemPrompt, ExposureEvent, Timepoint, Dialog, RelationshipTrajectory, QueryHistory, ConvergenceSet
+import networkx as nx
+from sqlmodel import Session, SQLModel, create_engine, select
+
+from schemas import (
+    ConvergenceSet,
+    Dialog,
+    Entity,
+    ExposureEvent,
+    QueryHistory,
+    RelationshipTrajectory,
+    SystemPrompt,
+    Timeline,
+    Timepoint,
+)
 
 
 class TransactionContext:
@@ -76,7 +87,9 @@ class TransactionContext:
         self._session.add(dialog)
         return dialog
 
-    def save_relationship_trajectory(self, trajectory: RelationshipTrajectory) -> RelationshipTrajectory:
+    def save_relationship_trajectory(
+        self, trajectory: RelationshipTrajectory
+    ) -> RelationshipTrajectory:
         """Save a relationship trajectory within the transaction"""
         self._session.add(trajectory)
         return trajectory
@@ -96,6 +109,7 @@ class TransactionContext:
         self._session.add(prospective_state)
         return prospective_state
 
+
 class GraphStore:
     """Unified storage for entities, timelines, and graphs"""
 
@@ -110,6 +124,7 @@ class GraphStore:
         # (allows multiple readers + one writer simultaneously)
         if "sqlite" in db_url:
             from sqlalchemy import text
+
             with self.engine.connect() as conn:
                 conn.execute(text("PRAGMA journal_mode=WAL"))
                 conn.commit()
@@ -144,6 +159,7 @@ class GraphStore:
 
     def save_entity(self, entity: Entity) -> Entity:
         from sqlalchemy.orm.attributes import flag_modified
+
         with Session(self.engine) as session:
             # Check if entity already exists by entity_id (unique constraint)
             existing = session.exec(
@@ -191,7 +207,7 @@ class GraphStore:
                 session.add(event)
             session.commit()
 
-    def get_exposure_events(self, entity_id: str, limit: Optional[int] = None) -> list[ExposureEvent]:
+    def get_exposure_events(self, entity_id: str, limit: int | None = None) -> list[ExposureEvent]:
         """
         Get exposure events for an entity.
 
@@ -220,7 +236,7 @@ class GraphStore:
             return timepoint
 
     @lru_cache(maxsize=500)
-    def get_timepoint(self, timepoint_id: str) -> Optional[Timepoint]:
+    def get_timepoint(self, timepoint_id: str) -> Timepoint | None:
         """Get a timepoint by ID with LRU caching"""
         with Session(self.engine) as session:
             statement = select(Timepoint).where(Timepoint.timepoint_id == timepoint_id)
@@ -235,24 +251,26 @@ class GraphStore:
     def get_timepoints(self, timeline_id: str) -> list[Timepoint]:
         """Get all timepoints for a given timeline."""
         with Session(self.engine) as session:
-            return list(session.exec(
-                select(Timepoint).where(Timepoint.timeline_id == timeline_id)
-            ).all())
+            return list(
+                session.exec(select(Timepoint).where(Timepoint.timeline_id == timeline_id)).all()
+            )
 
     def get_timepoints_by_run(self, run_id: str) -> list[Timepoint]:
         """Get all timepoints for a specific run, ordered by timestamp"""
         with Session(self.engine) as session:
-            statement = select(Timepoint).where(
-                Timepoint.run_id == run_id
-            ).order_by(Timepoint.timestamp)
+            statement = (
+                select(Timepoint).where(Timepoint.run_id == run_id).order_by(Timepoint.timestamp)
+            )
             return list(session.exec(statement).all())
 
     def get_exposure_events_by_run(self, run_id: str) -> list[ExposureEvent]:
         """Get all exposure events for a specific run, ordered by timestamp"""
         with Session(self.engine) as session:
-            statement = select(ExposureEvent).where(
-                ExposureEvent.run_id == run_id
-            ).order_by(ExposureEvent.timestamp)
+            statement = (
+                select(ExposureEvent)
+                .where(ExposureEvent.run_id == run_id)
+                .order_by(ExposureEvent.timestamp)
+            )
             return list(session.exec(statement).all())
 
     def get_entity_knowledge_at_timepoint(self, entity_id: str, timepoint_id: str) -> list[str]:
@@ -267,10 +285,14 @@ class GraphStore:
                 return []
 
             # Get all exposure events for this entity up to and including this timepoint
-            statement = select(ExposureEvent).where(
-                ExposureEvent.entity_id == entity_id,
-                ExposureEvent.timestamp <= timepoint.timestamp
-            ).order_by(ExposureEvent.timestamp)
+            statement = (
+                select(ExposureEvent)
+                .where(
+                    ExposureEvent.entity_id == entity_id,
+                    ExposureEvent.timestamp <= timepoint.timestamp,
+                )
+                .order_by(ExposureEvent.timestamp)
+            )
 
             exposure_events = list(session.exec(statement).all())
             return [event.information for event in exposure_events]
@@ -284,7 +306,7 @@ class GraphStore:
     def _clear_database(self) -> None:
         """Clear all data from database (for testing)"""
         from sqlalchemy import text
-        from schemas import Timeline
+
         with Session(self.engine) as session:
             # Delete in order to respect foreign keys
             session.exec(text("DELETE FROM queryhistory"))
@@ -303,7 +325,7 @@ class GraphStore:
             session.exec(text("DELETE FROM validationrule"))
             session.commit()
 
-    def get_entity(self, entity_id: str, timepoint: Optional[str] = None) -> Optional[Entity]:
+    def get_entity(self, entity_id: str, timepoint: str | None = None) -> Entity | None:
         """
         Get entity by ID with optional timepoint filter.
 
@@ -319,7 +341,7 @@ class GraphStore:
             if timepoint:
                 statement = statement.where(Entity.timepoint == timepoint)
             return session.exec(statement).first()
-    
+
     def save_graph(self, graph: nx.Graph, timepoint_id: str):
         """Serialize NetworkX graph to database"""
         graph_dict = nx.to_dict_of_dicts(graph)
@@ -331,8 +353,8 @@ class GraphStore:
                 timeline.graph_data = json.dumps(graph_dict)
                 session.add(timeline)
                 session.commit()
-    
-    def load_graph(self, timepoint_id: str) -> Optional[nx.Graph]:
+
+    def load_graph(self, timepoint_id: str) -> nx.Graph | None:
         """Deserialize NetworkX graph from database"""
         with Session(self.engine) as session:
             timeline = session.exec(
@@ -342,12 +364,10 @@ class GraphStore:
                 graph_dict = json.loads(timeline.graph_data)
                 return nx.from_dict_of_dicts(graph_dict)
         return None
-    
-    def get_prompt(self, name: str) -> Optional[SystemPrompt]:
+
+    def get_prompt(self, name: str) -> SystemPrompt | None:
         with Session(self.engine) as session:
-            return session.exec(
-                select(SystemPrompt).where(SystemPrompt.name == name)
-            ).first()
+            return session.exec(select(SystemPrompt).where(SystemPrompt.name == name)).first()
 
     # ============================================================================
     # Dialog Storage (Mechanism 11)
@@ -368,7 +388,7 @@ class GraphStore:
                 session.add(dialog)
             session.commit()
 
-    def get_dialog(self, dialog_id: str) -> Optional[Dialog]:
+    def get_dialog(self, dialog_id: str) -> Dialog | None:
         """Get a dialog by ID"""
         with Session(self.engine) as session:
             statement = select(Dialog).where(Dialog.dialog_id == dialog_id)
@@ -407,7 +427,9 @@ class GraphStore:
     # Relationship Trajectory Storage (Mechanism 13)
     # ============================================================================
 
-    def save_relationship_trajectory(self, trajectory: RelationshipTrajectory) -> RelationshipTrajectory:
+    def save_relationship_trajectory(
+        self, trajectory: RelationshipTrajectory
+    ) -> RelationshipTrajectory:
         """Save a relationship trajectory"""
         with Session(self.engine) as session:
             session.add(trajectory)
@@ -415,27 +437,35 @@ class GraphStore:
             session.refresh(trajectory)
             return trajectory
 
-    def get_relationship_trajectory(self, trajectory_id: str) -> Optional[RelationshipTrajectory]:
+    def get_relationship_trajectory(self, trajectory_id: str) -> RelationshipTrajectory | None:
         """Get a relationship trajectory by ID"""
         with Session(self.engine) as session:
-            statement = select(RelationshipTrajectory).where(RelationshipTrajectory.trajectory_id == trajectory_id)
+            statement = select(RelationshipTrajectory).where(
+                RelationshipTrajectory.trajectory_id == trajectory_id
+            )
             return session.exec(statement).first()
 
-    def get_relationship_trajectory_between(self, entity_a: str, entity_b: str) -> Optional[RelationshipTrajectory]:
+    def get_relationship_trajectory_between(
+        self, entity_a: str, entity_b: str
+    ) -> RelationshipTrajectory | None:
         """Get the most recent relationship trajectory between two entities"""
         with Session(self.engine) as session:
-            statement = select(RelationshipTrajectory).where(
-                RelationshipTrajectory.entity_a == entity_a,
-                RelationshipTrajectory.entity_b == entity_b
-            ).order_by(RelationshipTrajectory.id.desc())  # Most recent first
+            statement = (
+                select(RelationshipTrajectory)
+                .where(
+                    RelationshipTrajectory.entity_a == entity_a,
+                    RelationshipTrajectory.entity_b == entity_b,
+                )
+                .order_by(RelationshipTrajectory.id.desc())
+            )  # Most recent first
             return session.exec(statement).first()
 
     def get_entity_relationships(self, entity_id: str) -> list[RelationshipTrajectory]:
         """Get all relationship trajectories involving an entity"""
         with Session(self.engine) as session:
             statement = select(RelationshipTrajectory).where(
-                (RelationshipTrajectory.entity_a == entity_id) |
-                (RelationshipTrajectory.entity_b == entity_id)
+                (RelationshipTrajectory.entity_a == entity_id)
+                | (RelationshipTrajectory.entity_b == entity_id)
             )
             return list(session.exec(statement).all())
 
@@ -443,7 +473,7 @@ class GraphStore:
     # Additional Helper Methods
     # ============================================================================
 
-    def get_entity_at_timepoint(self, entity_id: str, timepoint_id: str) -> Optional[Entity]:
+    def get_entity_at_timepoint(self, entity_id: str, timepoint_id: str) -> Entity | None:
         """Get entity state at a specific timepoint"""
         # For now, return current entity state (could be enhanced to track historical states)
         return self.get_entity(entity_id)
@@ -471,12 +501,10 @@ class GraphStore:
             session.refresh(timeline)
         return timeline
 
-    def get_timeline(self, timeline_id: str) -> Optional[Timeline]:
+    def get_timeline(self, timeline_id: str) -> Timeline | None:
         """Get a timeline by ID"""
         with Session(self.engine) as session:
-            return session.exec(
-                select(Timeline).where(Timeline.timeline_id == timeline_id)
-            ).first()
+            return session.exec(select(Timeline).where(Timeline.timeline_id == timeline_id)).first()
 
     def get_timelines(self) -> list[Timeline]:
         """Get all timelines"""
@@ -486,9 +514,11 @@ class GraphStore:
     def get_child_timelines(self, parent_timeline_id: str) -> list[Timeline]:
         """Get all child timelines of a parent timeline"""
         with Session(self.engine) as session:
-            return list(session.exec(
-                select(Timeline).where(Timeline.parent_timeline_id == parent_timeline_id)
-            ).all())
+            return list(
+                session.exec(
+                    select(Timeline).where(Timeline.parent_timeline_id == parent_timeline_id)
+                ).all()
+            )
 
     def get_successor_timepoints(self, timepoint_id: str) -> list[Timepoint]:
         """Get all timepoints that have the given timepoint as their causal parent"""
@@ -529,9 +559,12 @@ class GraphStore:
     def get_query_history_for_entity(self, entity_id: str, limit: int = 100) -> list[QueryHistory]:
         """Get query history for an entity (most recent first)"""
         with Session(self.engine) as session:
-            statement = select(QueryHistory).where(
-                QueryHistory.entity_id == entity_id
-            ).order_by(QueryHistory.timestamp.desc()).limit(limit)
+            statement = (
+                select(QueryHistory)
+                .where(QueryHistory.entity_id == entity_id)
+                .order_by(QueryHistory.timestamp.desc())
+                .limit(limit)
+            )
             return list(session.exec(statement).all())
 
     def get_entity_query_count(self, entity_id: str) -> int:
@@ -544,8 +577,7 @@ class GraphStore:
         """Get number of times resolution was elevated for an entity"""
         with Session(self.engine) as session:
             statement = select(QueryHistory).where(
-                QueryHistory.entity_id == entity_id,
-                QueryHistory.resolution_elevated == True
+                QueryHistory.entity_id == entity_id, QueryHistory.resolution_elevated == True
             )
             return len(list(session.exec(statement).all()))
 
@@ -555,7 +587,6 @@ class GraphStore:
 
     def save_prospective_state(self, prospective_state) -> None:
         """Save a prospective state for an entity"""
-        from schemas import ProspectiveState
         with Session(self.engine) as session:
             session.add(prospective_state)
             session.commit()
@@ -565,17 +596,23 @@ class GraphStore:
     def get_prospective_state(self, prospective_id: str):
         """Get a prospective state by ID"""
         from schemas import ProspectiveState
+
         with Session(self.engine) as session:
-            statement = select(ProspectiveState).where(ProspectiveState.prospective_id == prospective_id)
+            statement = select(ProspectiveState).where(
+                ProspectiveState.prospective_id == prospective_id
+            )
             return session.exec(statement).first()
 
     def get_prospective_states_for_entity(self, entity_id: str):
         """Get all prospective states for an entity"""
         from schemas import ProspectiveState
+
         with Session(self.engine) as session:
-            statement = select(ProspectiveState).where(
-                ProspectiveState.entity_id == entity_id
-            ).order_by(ProspectiveState.created_at.desc())
+            statement = (
+                select(ProspectiveState)
+                .where(ProspectiveState.entity_id == entity_id)
+                .order_by(ProspectiveState.created_at.desc())
+            )
             return list(session.exec(statement).all())
 
     # ============================================================================
@@ -598,17 +635,14 @@ class GraphStore:
             session.refresh(convergence_set)
             return convergence_set
 
-    def get_convergence_set(self, set_id: str) -> Optional[ConvergenceSet]:
+    def get_convergence_set(self, set_id: str) -> ConvergenceSet | None:
         """Get a convergence set by ID"""
         with Session(self.engine) as session:
             statement = select(ConvergenceSet).where(ConvergenceSet.set_id == set_id)
             return session.exec(statement).first()
 
     def get_convergence_sets(
-        self,
-        template_id: Optional[str] = None,
-        min_score: Optional[float] = None,
-        limit: int = 100
+        self, template_id: str | None = None, min_score: float | None = None, limit: int = 100
     ) -> list[ConvergenceSet]:
         """
         Get convergence sets with optional filtering.
@@ -648,7 +682,7 @@ class GraphStore:
                     "total_sets": 0,
                     "average_score": 0.0,
                     "grade_distribution": {},
-                    "template_coverage": {}
+                    "template_coverage": {},
                 }
 
             scores = [s.convergence_score for s in all_sets]
@@ -669,5 +703,5 @@ class GraphStore:
                 "min_score": min(scores),
                 "max_score": max(scores),
                 "grade_distribution": grade_distribution,
-                "template_coverage": template_coverage
+                "template_coverage": template_coverage,
             }

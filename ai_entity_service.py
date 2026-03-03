@@ -5,80 +5,81 @@ ai_entity_service.py - AI Entity Service with Internal/External API Support
 Provides a comprehensive service for running AI-powered entities with safety controls,
 rate limiting, caching, and both internal and public API endpoints.
 """
-import asyncio
+
 import hashlib
 import json
-import logging
 import re
 import time
-from collections import defaultdict
-from datetime import datetime, timedelta
-from functools import wraps
-from typing import Dict, List, Optional, Any, Tuple
 import uuid
+from collections import defaultdict
+from datetime import datetime
+from typing import Any
 
 import bleach
-from fastapi import FastAPI, HTTPException, Request, Depends, BackgroundTasks
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import uvicorn
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field, validator
+
 try:
     import redis
+
     REDIS_AVAILABLE = True
 except ImportError:
     redis = None
     REDIS_AVAILABLE = False
-import openai
 
-from schemas import AIEntity, Entity
 from llm_v2 import LLMClient  # Use new centralized service
+from schemas import AIEntity
 from storage import GraphStore
-from validation import Validator
-
 
 # =============================================================================
 # Data Models
 # =============================================================================
 
+
 class AIRequest(BaseModel):
     """Request model for AI entity interactions"""
+
     entity_id: str = Field(..., description="ID of the AI entity to interact with")
     message: str = Field(..., description="User message to send to the AI entity")
-    context: Dict[str, Any] = Field(default_factory=dict, description="Additional context")
-    session_id: Optional[str] = Field(None, description="Session ID for conversation continuity")
+    context: dict[str, Any] = Field(default_factory=dict, description="Additional context")
+    session_id: str | None = Field(None, description="Session ID for conversation continuity")
 
-    @validator('message')
+    @validator("message")
     def validate_message_length(cls, v):
         if len(v.strip()) == 0:
-            raise ValueError('Message cannot be empty')
+            raise ValueError("Message cannot be empty")
         if len(v) > 10000:  # 10KB limit
-            raise ValueError('Message too long (max 10000 characters)')
+            raise ValueError("Message too long (max 10000 characters)")
         return v
 
 
 class AIResponse(BaseModel):
     """Response model for AI entity interactions"""
+
     entity_id: str
     response: str
     session_id: str
-    metadata: Dict[str, Any] = Field(default_factory=dict)
-    safety_warnings: List[str] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    safety_warnings: list[str] = Field(default_factory=list)
 
 
 class ServiceHealth(BaseModel):
     """Health check response"""
+
     status: str
     timestamp: datetime
     entities_loaded: int
     active_sessions: int
-    cache_stats: Dict[str, Any]
+    cache_stats: dict[str, Any]
 
 
 # =============================================================================
 # Safety and Input Processing
 # =============================================================================
+
 
 class InputBleacher:
     """Handles input sanitization and safety filtering"""
@@ -86,24 +87,24 @@ class InputBleacher:
     def __init__(self):
         # Dangerous patterns to filter
         self.dangerous_patterns = [
-            r'<script[^>]*>.*?</script>',  # Script tags
-            r'javascript:',  # JavaScript URLs
-            r'on\w+\s*=',  # Event handlers
-            r'vbscript:',  # VBScript
-            r'data:text/html',  # Data URLs
+            r"<script[^>]*>.*?</script>",  # Script tags
+            r"javascript:",  # JavaScript URLs
+            r"on\w+\s*=",  # Event handlers
+            r"vbscript:",  # VBScript
+            r"data:text/html",  # Data URLs
         ]
 
         # Prompt injection patterns
         self.injection_patterns = [
-            r'(?i)ignore.*previous.*instructions',
-            r'(?i)forget.*system.*prompt',
-            r'(?i)you.*are.*not.*ai',
-            r'(?i)bypass.*safety',
-            r'(?i)jailbreak',
-            r'(?i)override.*restrictions',
+            r"(?i)ignore.*previous.*instructions",
+            r"(?i)forget.*system.*prompt",
+            r"(?i)you.*are.*not.*ai",
+            r"(?i)bypass.*safety",
+            r"(?i)jailbreak",
+            r"(?i)override.*restrictions",
         ]
 
-    def bleach_input(self, text: str, rules: List[str]) -> Tuple[str, List[str]]:
+    def bleach_input(self, text: str, rules: list[str]) -> tuple[str, list[str]]:
         """Apply input bleaching based on entity rules"""
         warnings = []
         cleaned_text = text
@@ -115,7 +116,7 @@ class InputBleacher:
         # Remove dangerous patterns
         for pattern in self.dangerous_patterns:
             if re.search(pattern, cleaned_text, re.IGNORECASE):
-                cleaned_text = re.sub(pattern, '[FILTERED]', cleaned_text, flags=re.IGNORECASE)
+                cleaned_text = re.sub(pattern, "[FILTERED]", cleaned_text, flags=re.IGNORECASE)
                 warnings.append("Dangerous content filtered")
 
         # Check for prompt injection
@@ -124,7 +125,7 @@ class InputBleacher:
                 if re.search(pattern, cleaned_text, re.IGNORECASE):
                     warnings.append("Potential prompt injection detected")
                     # Replace with safe version
-                    cleaned_text = re.sub(pattern, '[FILTERED]', cleaned_text, flags=re.IGNORECASE)
+                    cleaned_text = re.sub(pattern, "[FILTERED]", cleaned_text, flags=re.IGNORECASE)
 
         # Limit input length
         if "limit_input_length" in rules and len(cleaned_text) > 5000:
@@ -139,13 +140,13 @@ class OutputFilter:
 
     def __init__(self):
         self.harmful_patterns = [
-            r'(?i)hate.*speech',
-            r'(?i)violent.*content',
-            r'(?i)illegal.*activities',
-            r'(?i)personal.*information',
+            r"(?i)hate.*speech",
+            r"(?i)violent.*content",
+            r"(?i)illegal.*activities",
+            r"(?i)personal.*information",
         ]
 
-    def filter_output(self, text: str, rules: List[str]) -> Tuple[str, List[str]]:
+    def filter_output(self, text: str, rules: list[str]) -> tuple[str, list[str]]:
         """Apply output filtering based on entity rules"""
         warnings = []
         filtered_text = text
@@ -160,13 +161,17 @@ class OutputFilter:
         # PII removal (basic)
         if "remove_pii" in rules:
             # Basic email removal
-            filtered_text = re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '[EMAIL]', filtered_text)
+            filtered_text = re.sub(
+                r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", "[EMAIL]", filtered_text
+            )
             # Basic phone number removal
-            filtered_text = re.sub(r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b', '[PHONE]', filtered_text)
+            filtered_text = re.sub(r"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b", "[PHONE]", filtered_text)
 
         # Add disclaimers
         disclaimers = []
-        if "add_content_warnings" in rules and any(word in filtered_text.lower() for word in ['violence', 'death', 'injury']):
+        if "add_content_warnings" in rules and any(
+            word in filtered_text.lower() for word in ["violence", "death", "injury"]
+        ):
             disclaimers.append("⚠️ This content contains themes that may be disturbing.")
         if "validate_factual_accuracy" in rules:
             disclaimers.append("ℹ️ AI-generated content may not be factually accurate.")
@@ -180,6 +185,7 @@ class OutputFilter:
 # =============================================================================
 # Rate Limiting and Caching
 # =============================================================================
+
 
 class RateLimiter:
     """Simple rate limiter using Redis or in-memory storage"""
@@ -195,7 +201,7 @@ class RateLimiter:
         if self.redis:
             # Redis-based rate limiting
             pipeline = self.redis.pipeline()
-            pipeline.zremrangebyscore(key, '-inf', now - window_seconds)
+            pipeline.zremrangebyscore(key, "-inf", now - window_seconds)
             pipeline.zadd(key, {str(now): now})
             pipeline.zcard(key)
             pipeline.expire(key, window_seconds)
@@ -220,7 +226,7 @@ class ResponseCache:
         self.max_size = max_size
         self.memory_cache = {} if not self.redis else None
 
-    def get(self, key: str) -> Optional[str]:
+    def get(self, key: str) -> str | None:
         """Get cached response"""
         if self.redis:
             return self.redis.get(key)
@@ -252,10 +258,11 @@ class ResponseCache:
 # AI Entity Runner
 # =============================================================================
 
+
 class AIEntityRunner:
     """Manages AI entity execution with safety controls"""
 
-    def __init__(self, llm_client: LLMClient, store: GraphStore, config: Dict):
+    def __init__(self, llm_client: LLMClient, store: GraphStore, config: dict):
         self.llm_client = llm_client
         self.store = store
         self.config = config
@@ -270,7 +277,7 @@ class AIEntityRunner:
         self.active_sessions = {}
         self.session_timeout = 3600  # 1 hour
 
-    def load_entity(self, entity_id: str) -> Optional[AIEntity]:
+    def load_entity(self, entity_id: str) -> AIEntity | None:
         """Load AI entity from storage"""
         entity = self.store.get_entity(entity_id)
         if not entity or entity.entity_type != "ai":
@@ -281,7 +288,7 @@ class AIEntityRunner:
         except Exception:
             return None
 
-    def generate_cache_key(self, entity_id: str, message: str, context: Dict) -> str:
+    def generate_cache_key(self, entity_id: str, message: str, context: dict) -> str:
         """Generate cache key for request"""
         content = f"{entity_id}:{message}:{json.dumps(context, sort_keys=True)}"
         return hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()
@@ -311,7 +318,7 @@ class AIEntityRunner:
                 entity_id=request.entity_id,
                 response=cached_response,
                 session_id=request.session_id or str(uuid.uuid4()),
-                metadata={"cached": True, "bleach_warnings": bleach_warnings}
+                metadata={"cached": True, "bleach_warnings": bleach_warnings},
             )
 
         # Prepare context for AI
@@ -324,11 +331,15 @@ class AIEntityRunner:
                 temperature=entity.temperature,
                 top_p=entity.top_p,
                 max_tokens=entity.max_tokens,
-                model=entity.model_name
+                model=entity.model_name,
             )
-        except Exception as e:
+        except Exception:
             # Use fallback response
-            fallback = entity.fallback_responses[0] if entity.fallback_responses else "I need a moment to process that."
+            fallback = (
+                entity.fallback_responses[0]
+                if entity.fallback_responses
+                else "I need a moment to process that."
+            )
             ai_response = entity.error_handling.get("api_error", fallback)
 
         # Output filtering
@@ -350,19 +361,19 @@ class AIEntityRunner:
                 "bleach_warnings": bleach_warnings,
                 "filter_warnings": filter_warnings,
                 "model_used": entity.model_name,
-                "tokens_used": len(filtered_response.split())  # Rough estimate
+                "tokens_used": len(filtered_response.split()),  # Rough estimate
             },
-            safety_warnings=bleach_warnings + filter_warnings
+            safety_warnings=bleach_warnings + filter_warnings,
         )
 
-    def _build_ai_context(self, entity: AIEntity, message: str, extra_context: Dict) -> Dict:
+    def _build_ai_context(self, entity: AIEntity, message: str, extra_context: dict) -> dict:
         """Build context for AI generation"""
         context = {
             "system_prompt": entity.system_prompt,
             "user_message": message,
             "knowledge_base": entity.knowledge_base,
             "behavioral_constraints": entity.behavioral_constraints,
-            "safety_level": entity.safety_level
+            "safety_level": entity.safety_level,
         }
 
         # Add context injection if enabled
@@ -377,10 +388,16 @@ class AIEntityRunner:
 # API Service
 # =============================================================================
 
+
 class AIEntityService:
     """FastAPI service for AI entity interactions"""
 
-    def __init__(self, config: Optional[Dict] = None, store: Optional[GraphStore] = None, llm_client: Optional[LLMClient] = None):
+    def __init__(
+        self,
+        config: dict | None = None,
+        store: GraphStore | None = None,
+        llm_client: LLMClient | None = None,
+    ):
         # Support both old signature (config dict) and new signature (store, llm_client)
         if config is None and store is None and llm_client is None:
             # Default empty config
@@ -400,7 +417,7 @@ class AIEntityService:
         self.app = FastAPI(
             title="AI Entity Service",
             description="API for interacting with AI-powered entities",
-            version="1.0.0"
+            version="1.0.0",
         )
 
         # Initialize runner
@@ -459,11 +476,11 @@ class AIEntityService:
 
         # For now, just update metadata with training examples count
         # In a full implementation, this would fine-tune the model or update knowledge base
-        if 'training_examples' not in entity.entity_metadata:
-            entity.entity_metadata['training_examples'] = []
+        if "training_examples" not in entity.entity_metadata:
+            entity.entity_metadata["training_examples"] = []
 
-        entity.entity_metadata['training_examples'].extend(training_data)
-        entity.training_count = len(entity.entity_metadata['training_examples'])
+        entity.entity_metadata["training_examples"].extend(training_data)
+        entity.training_count = len(entity.entity_metadata["training_examples"])
 
         # Save updated entity
         if self.store:
@@ -472,7 +489,7 @@ class AIEntityService:
         return {
             "entity_id": entity_id,
             "training_examples_added": len(training_data),
-            "total_training_examples": entity.training_count
+            "total_training_examples": entity.training_count,
         }
 
     def generate_response(self, entity_id: str, query: str) -> str:
@@ -492,15 +509,15 @@ class AIEntityService:
             raise ValueError(f"Entity {entity_id} not found")
 
         # Get AI config from metadata
-        ai_config = entity.entity_metadata.get('ai_config', {})
-        system_prompt = ai_config.get('system_prompt', 'You are a helpful assistant.')
+        ai_config = entity.entity_metadata.get("ai_config", {})
+        system_prompt = ai_config.get("system_prompt", "You are a helpful assistant.")
 
         # Use LLM to generate response
         # For now, return a simple response based on training data
-        training_examples = entity.entity_metadata.get('training_examples', [])
+        training_examples = entity.entity_metadata.get("training_examples", [])
 
         # Simple mock response that uses training data
-        response = f"Based on my knowledge: "
+        response = "Based on my knowledge: "
         if training_examples:
             response += f"I have been trained on {len(training_examples)} examples. "
 
@@ -558,13 +575,13 @@ class AIEntityService:
                 timestamp=datetime.now(),
                 entities_loaded=len([]),  # Would track loaded entities
                 active_sessions=len(self.runner.active_sessions),
-                cache_stats={"enabled": self.config.get("cache_enabled", True)}
+                cache_stats={"enabled": self.config.get("cache_enabled", True)},
             )
 
         @self.app.post("/ai/chat", response_model=AIResponse)
         async def chat_with_ai(
             request: AIRequest,
-            credentials: Optional[HTTPAuthorizationCredentials] = Depends(self.security)
+            credentials: HTTPAuthorizationCredentials | None = Depends(self.security),
         ):
             """Chat with an AI entity"""
             # API key validation
@@ -593,16 +610,13 @@ class AIEntityService:
                 "model_name": entity.model_name,
                 "safety_level": entity.safety_level,
                 "max_tokens": entity.max_tokens,
-                "rate_limit_per_minute": entity.rate_limit_per_minute
+                "rate_limit_per_minute": entity.rate_limit_per_minute,
             }
 
     def run(self, host: str = "localhost", port: int = 8001):
         """Run the service"""
         uvicorn.run(
-            self.app,
-            host=host,
-            port=port,
-            log_level=self.config.get("log_level", "INFO").lower()
+            self.app, host=host, port=port, log_level=self.config.get("log_level", "INFO").lower()
         )
 
 
@@ -610,11 +624,10 @@ class AIEntityService:
 # CLI Interface
 # =============================================================================
 
+
 def main():
     """Main entry point for AI Entity Service"""
     import argparse
-    from hydra import compose, initialize_config_dir
-    from omegaconf import OmegaConf
 
     parser = argparse.ArgumentParser(description="AI Entity Service")
     parser.add_argument("--host", default="localhost", help="Host to bind to")
@@ -624,7 +637,7 @@ def main():
 
     # Load configuration
     try:
-        with open(args.config, 'r') as f:
+        with open(args.config) as f:
             config = json.load(f)
     except:
         # Fallback configuration
@@ -634,12 +647,9 @@ def main():
                 "port": args.port,
                 "enabled": True,
                 "api_keys_required": False,
-                "log_level": "INFO"
+                "log_level": "INFO",
             },
-            "llm": {
-                "api_key": "test",
-                "base_url": "https://api.openai.com/v1"
-            }
+            "llm": {"api_key": "test", "base_url": "https://api.openai.com/v1"},
         }
 
     # Initialize and run service

@@ -10,20 +10,22 @@ Tests cover:
 - Real detective_prospection graph structure
 """
 
-import pytest
 import networkx as nx
+import pytest
+
 from andos.layer_computer import (
     build_interaction_graph,
+    compute_andos_layers,
     compute_entity_distances,
     group_by_distance,
-    compute_andos_layers,
-    validate_andos_layers
+    validate_andos_layers,
 )
 
 
 # Test entity mock class
 class MockEntity:
     """Mock entity for testing"""
+
     def __init__(self, entity_id: str):
         self.entity_id = entity_id
 
@@ -40,13 +42,10 @@ def make_entity(entity_id: str) -> MockEntity:
 # Test: build_interaction_graph()
 # ============================================================================
 
+
 def test_build_graph_simple():
     """Build graph from simple interaction config"""
-    config = {
-        "interactions": [
-            {"from": "A", "to": "B"}
-        ]
-    }
+    config = {"interactions": [{"from": "A", "to": "B"}]}
 
     G = build_interaction_graph(config)
 
@@ -57,11 +56,7 @@ def test_build_graph_simple():
 
 def test_build_graph_multiple_targets():
     """Build graph with multiple targets per interaction"""
-    config = {
-        "interactions": [
-            {"from": "A", "to": ["B", "C"]}
-        ]
-    }
+    config = {"interactions": [{"from": "A", "to": ["B", "C"]}]}
 
     G = build_interaction_graph(config)
 
@@ -84,6 +79,7 @@ def test_build_graph_empty():
 # ============================================================================
 # Test: compute_entity_distances()
 # ============================================================================
+
 
 def test_compute_distances_chain():
     """Compute distances in simple chain A → B → C"""
@@ -114,6 +110,7 @@ def test_compute_distances_target_not_found():
 # ============================================================================
 # Test: group_by_distance()
 # ============================================================================
+
 
 def test_group_by_distance_chain():
     """Group entities by distance in chain"""
@@ -159,15 +156,11 @@ def test_group_by_distance_empty():
 # Test: compute_andos_layers() - Main Algorithm
 # ============================================================================
 
+
 def test_simple_chain():
     """A → B → C should give layers [[C], [B], [A]]"""
     entities = [make_entity("A"), make_entity("B"), make_entity("C")]
-    graph = {
-        "interactions": [
-            {"from": "A", "to": "B"},
-            {"from": "B", "to": "C"}
-        ]
-    }
+    graph = {"interactions": [{"from": "A", "to": "B"}, {"from": "B", "to": "C"}]}
 
     layers = compute_andos_layers(entities, "A", graph)
 
@@ -180,14 +173,17 @@ def test_simple_chain():
 def test_branching():
     """A → B,C; B → D; C → E should give [[D,E], [B,C], [A]]"""
     entities = [
-        make_entity("A"), make_entity("B"), make_entity("C"),
-        make_entity("D"), make_entity("E")
+        make_entity("A"),
+        make_entity("B"),
+        make_entity("C"),
+        make_entity("D"),
+        make_entity("E"),
     ]
     graph = {
         "interactions": [
             {"from": "A", "to": ["B", "C"]},
             {"from": "B", "to": "D"},
-            {"from": "C", "to": "E"}
+            {"from": "C", "to": "E"},
         ]
     }
 
@@ -206,7 +202,7 @@ def test_cycle_detection():
         "interactions": [
             {"from": "A", "to": "B"},
             {"from": "B", "to": "C"},
-            {"from": "C", "to": "A"}  # Creates cycle
+            {"from": "C", "to": "A"},  # Creates cycle
         ]
     }
 
@@ -216,15 +212,8 @@ def test_cycle_detection():
 
 def test_disconnected_entity():
     """Entity not in graph should be added to periphery"""
-    entities = [
-        make_entity("A"), make_entity("B"), make_entity("C"), make_entity("orphan")
-    ]
-    graph = {
-        "interactions": [
-            {"from": "A", "to": "B"},
-            {"from": "B", "to": "C"}
-        ]
-    }
+    entities = [make_entity("A"), make_entity("B"), make_entity("C"), make_entity("orphan")]
+    graph = {"interactions": [{"from": "A", "to": "B"}, {"from": "B", "to": "C"}]}
 
     layers = compute_andos_layers(entities, "A", graph)
 
@@ -248,11 +237,7 @@ def test_single_entity():
 def test_two_entity_interaction():
     """Two entities with one interaction"""
     entities = [make_entity("A"), make_entity("B")]
-    graph = {
-        "interactions": [
-            {"from": "A", "to": "B"}
-        ]
-    }
+    graph = {"interactions": [{"from": "A", "to": "B"}]}
 
     layers = compute_andos_layers(entities, "A", graph)
 
@@ -265,6 +250,7 @@ def test_two_entity_interaction():
 # Test: detective_prospection Graph Structure
 # ============================================================================
 
+
 def test_detective_prospection_structure():
     """Test real detective_prospection template structure"""
     entities = [
@@ -274,14 +260,14 @@ def test_detective_prospection_structure():
         make_entity("mrs_hudson"),
         make_entity("stamford"),
         make_entity("street_vendor_1"),
-        make_entity("street_vendor_2")
+        make_entity("street_vendor_2"),
     ]
 
     graph = {
         "interactions": [
             {"from": "sherlock_holmes", "to": ["watson", "lestrade"]},
             {"from": "watson", "to": ["mrs_hudson", "stamford"]},
-            {"from": "mrs_hudson", "to": ["street_vendor_1", "street_vendor_2"]}
+            {"from": "mrs_hudson", "to": ["street_vendor_1", "street_vendor_2"]},
         ]
     }
 
@@ -311,19 +297,11 @@ def test_detective_prospection_structure():
 # Test: validate_andos_layers()
 # ============================================================================
 
+
 def test_validate_correct_layers():
     """Validate correctly ordered layers"""
-    layers = [
-        [make_entity("C")],
-        [make_entity("B")],
-        [make_entity("A")]
-    ]
-    graph = {
-        "interactions": [
-            {"from": "A", "to": "B"},
-            {"from": "B", "to": "C"}
-        ]
-    }
+    layers = [[make_entity("C")], [make_entity("B")], [make_entity("A")]]
+    graph = {"interactions": [{"from": "A", "to": "B"}, {"from": "B", "to": "C"}]}
 
     valid, violations = validate_andos_layers(layers, graph)
 
@@ -336,13 +314,9 @@ def test_validate_incorrect_layers():
     layers = [
         [make_entity("A")],  # Should be last, not first
         [make_entity("B")],
-        [make_entity("C")]
+        [make_entity("C")],
     ]
-    graph = {
-        "interactions": [
-            {"from": "A", "to": "B"}
-        ]
-    }
+    graph = {"interactions": [{"from": "A", "to": "B"}]}
 
     valid, violations = validate_andos_layers(layers, graph)
 
@@ -356,15 +330,11 @@ def test_validate_incorrect_layers():
 # Integration Tests
 # ============================================================================
 
+
 def test_full_pipeline_simple():
     """Test complete ANDOS pipeline with simple graph"""
     entities = [make_entity("A"), make_entity("B"), make_entity("C")]
-    graph = {
-        "interactions": [
-            {"from": "A", "to": "B"},
-            {"from": "B", "to": "C"}
-        ]
-    }
+    graph = {"interactions": [{"from": "A", "to": "B"}, {"from": "B", "to": "C"}]}
 
     # Compute layers
     layers = compute_andos_layers(entities, "A", graph)
@@ -388,14 +358,14 @@ def test_full_pipeline_detective():
         make_entity("mrs_hudson"),
         make_entity("stamford"),
         make_entity("street_vendor_1"),
-        make_entity("street_vendor_2")
+        make_entity("street_vendor_2"),
     ]
 
     graph = {
         "interactions": [
             {"from": "sherlock_holmes", "to": ["watson", "lestrade"]},
             {"from": "watson", "to": ["mrs_hudson", "stamford"]},
-            {"from": "mrs_hudson", "to": ["street_vendor_1", "street_vendor_2"]}
+            {"from": "mrs_hudson", "to": ["street_vendor_1", "street_vendor_2"]},
         ]
     }
 
@@ -417,6 +387,7 @@ def test_full_pipeline_detective():
 # Edge Cases
 # ============================================================================
 
+
 def test_fully_connected_graph():
     """Test graph where everyone talks to everyone"""
     entities = [make_entity("A"), make_entity("B"), make_entity("C")]
@@ -424,7 +395,7 @@ def test_fully_connected_graph():
         "interactions": [
             {"from": "A", "to": ["B", "C"]},
             {"from": "B", "to": ["A", "C"]},
-            {"from": "C", "to": ["A", "B"]}
+            {"from": "C", "to": ["A", "B"]},
         ]
     }
 
@@ -436,11 +407,7 @@ def test_fully_connected_graph():
 def test_star_graph():
     """Test star graph where one entity talks to all others"""
     entities = [make_entity("center")] + [make_entity(f"spoke_{i}") for i in range(5)]
-    graph = {
-        "interactions": [
-            {"from": "center", "to": [f"spoke_{i}" for i in range(5)]}
-        ]
-    }
+    graph = {"interactions": [{"from": "center", "to": [f"spoke_{i}" for i in range(5)]}]}
 
     layers = compute_andos_layers(entities, "center", graph)
 
@@ -454,12 +421,7 @@ def test_linear_chain_long():
     """Test long linear chain A → B → C → D → E → F"""
     n = 6
     entities = [make_entity(chr(65 + i)) for i in range(n)]  # A, B, C, D, E, F
-    graph = {
-        "interactions": [
-            {"from": chr(65 + i), "to": chr(65 + i + 1)}
-            for i in range(n - 1)
-        ]
-    }
+    graph = {"interactions": [{"from": chr(65 + i), "to": chr(65 + i + 1)} for i in range(n - 1)]}
 
     layers = compute_andos_layers(entities, "A", graph)
 

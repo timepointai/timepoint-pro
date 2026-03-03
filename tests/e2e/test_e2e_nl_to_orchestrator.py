@@ -12,18 +12,20 @@ This test requires:
 - Valid API keys in environment
 """
 
-import pytest
 import os
-from nl_interface import NLConfigGenerator, InteractiveRefiner
+import shutil
+import tempfile
+
+import pytest
+
+from nl_interface import InteractiveRefiner, NLConfigGenerator
 from orchestrator import simulate_event
 from storage import GraphStore
-import tempfile
-import shutil
 
 
 @pytest.mark.skipif(
     os.getenv("LLM_SERVICE_ENABLED") != "true",
-    reason="LLM service not enabled - set LLM_SERVICE_ENABLED=true to run"
+    reason="LLM service not enabled - set LLM_SERVICE_ENABLED=true to run",
 )
 class TestE2ENLToOrchestrator:
     """E2E tests for NL → Config → Orchestrator pipeline with real LLM calls"""
@@ -41,7 +43,7 @@ class TestE2ENLToOrchestrator:
 
     def teardown_method(self):
         """Cleanup test environment"""
-        if hasattr(self, 'temp_dir') and os.path.exists(self.temp_dir):
+        if hasattr(self, "temp_dir") and os.path.exists(self.temp_dir):
             shutil.rmtree(self.temp_dir)
 
     def test_nl_simple_scenario_to_simulation(self):
@@ -73,32 +75,32 @@ class TestE2ENLToOrchestrator:
         print(f"✅ Config validated (confidence: {validation.confidence_score:.1%})")
 
         # 4. Use orchestrator to execute simulation
-        print(f"\n🔄 Executing simulation with orchestrator...")
+        print("\n🔄 Executing simulation with orchestrator...")
 
         llm_client = LLMClient()
 
         # Use the NL-generated scenario description for orchestrator
         result = simulate_event(
-            config['scenario'],
+            config["scenario"],
             llm_client,
             self.storage,
             context={
-                "max_entities": len(config['entities']),
-                "max_timepoints": min(config['timepoint_count'], 3),  # Limit for testing
-                "temporal_mode": config.get('temporal_mode', 'forward')
+                "max_entities": len(config["entities"]),
+                "max_timepoints": min(config["timepoint_count"], 3),  # Limit for testing
+                "temporal_mode": config.get("temporal_mode", "forward"),
             },
-            save_to_db=True
+            save_to_db=True,
         )
 
-        print(f"✅ Simulation executed")
+        print("✅ Simulation executed")
         print(f"   Entities: {len(result['entities'])}")
         print(f"   Timepoints: {len(result['timepoints'])}")
 
         # 5. Verify results
-        assert len(result['entities']) >= 1, "No entities generated"
-        assert len(result['timepoints']) >= 1, "No timepoints generated"
+        assert len(result["entities"]) >= 1, "No entities generated"
+        assert len(result["timepoints"]) >= 1, "No timepoints generated"
 
-        print(f"\n✅ Complete NL → Orchestrator → Simulation pipeline successful!")
+        print("\n✅ Complete NL → Orchestrator → Simulation pipeline successful!")
 
     def test_nl_interactive_refinement_to_simulation(self):
         """Test: Interactive refinement workflow → simulation with REAL LLM"""
@@ -123,37 +125,37 @@ class TestE2ENLToOrchestrator:
                 "entity_count": "5",
                 "timepoint_count": "3",
                 "focus": "dialog, decision_making",
-                "outputs": "dialog, decisions"
+                "outputs": "dialog, decisions",
             }
 
-            print(f"📝 Answering clarifications...")
+            print("📝 Answering clarifications...")
             result = refiner.answer_clarifications(answers)
 
         # 4. Approve config
         final_config = refiner.approve_config()
 
-        print(f"\n✅ Config generated and approved")
+        print("\n✅ Config generated and approved")
         print(f"   Entities: {len(final_config['entities'])}")
         print(f"   Timepoints: {final_config['timepoint_count']}")
 
         # 5. Execute with orchestrator
-        print(f"\n🔄 Executing with orchestrator...")
+        print("\n🔄 Executing with orchestrator...")
 
         llm_client = LLMClient()
         result = simulate_event(
-            final_config['scenario'],
+            final_config["scenario"],
             llm_client,
             self.storage,
             context={
-                "max_entities": len(final_config['entities']),
-                "max_timepoints": min(final_config['timepoint_count'], 3),
-                "temporal_mode": final_config.get('temporal_mode', 'forward')
+                "max_entities": len(final_config["entities"]),
+                "max_timepoints": min(final_config["timepoint_count"], 3),
+                "temporal_mode": final_config.get("temporal_mode", "forward"),
             },
-            save_to_db=True
+            save_to_db=True,
         )
 
-        print(f"✅ Simulation executed")
-        print(f"\n✅ Complete interactive refinement → simulation pipeline successful!")
+        print("✅ Simulation executed")
+        print("\n✅ Complete interactive refinement → simulation pipeline successful!")
 
     def test_nl_historical_scenario_with_orchestrator(self):
         """Test: Historical scenario via NL → simulation with REAL LLM"""
@@ -169,10 +171,10 @@ class TestE2ENLToOrchestrator:
         # 2. Generate config
         generator = NLConfigGenerator(api_key=self.api_key)
 
-        print(f"\n🔄 Generating historical scenario config...")
+        print("\n🔄 Generating historical scenario config...")
         config, confidence = generator.generate_config(description)
 
-        print(f"✅ Historical config generated")
+        print("✅ Historical config generated")
         print(f"   Scenario: {config['scenario']}")
         print(f"   Start Time: {config.get('start_time', 'Not specified')}")
 
@@ -181,17 +183,14 @@ class TestE2ENLToOrchestrator:
         assert validation.is_valid
 
         # 4. Create simulation
-        print(f"\n🔄 Creating historical simulation...")
+        print("\n🔄 Creating historical simulation...")
 
         simulation_id = self.orchestrator.create_simulation(
-            scenario=config['scenario'],
-            entities=[
-                {"name": e["name"], "role": e["role"]}
-                for e in config['entities']
-            ],
-            timepoint_count=config['timepoint_count'],
-            temporal_mode=config.get('temporal_mode', 'forward'),
-            start_time=config.get('start_time')
+            scenario=config["scenario"],
+            entities=[{"name": e["name"], "role": e["role"]} for e in config["entities"]],
+            timepoint_count=config["timepoint_count"],
+            temporal_mode=config.get("temporal_mode", "forward"),
+            start_time=config.get("start_time"),
         )
 
         print(f"✅ Historical simulation created: {simulation_id}")
@@ -200,21 +199,18 @@ class TestE2ENLToOrchestrator:
         result = self.orchestrator.generate_timepoint(simulation_id, 0)
         assert result is not None
 
-        print(f"✅ Historical timepoint generated")
-        print(f"\n✅ Historical NL → simulation pipeline successful!")
+        print("✅ Historical timepoint generated")
+        print("\n✅ Historical NL → simulation pipeline successful!")
 
     def test_nl_config_validation_prevents_bad_simulation(self):
         """Test: Validation catches bad configs before orchestrator"""
         # 1. Create intentionally problematic description
-        description = (
-            "Simulate a scenario with 200 people and 200 timepoints. "
-            "Focus on everything."
-        )
+        description = "Simulate a scenario with 200 people and 200 timepoints. Focus on everything."
 
         # 2. Try to generate config
         generator = NLConfigGenerator(api_key=self.api_key)
 
-        print(f"\n🔄 Generating config with problematic parameters...")
+        print("\n🔄 Generating config with problematic parameters...")
 
         # This should either:
         # - Fail validation (preferred)
@@ -227,7 +223,7 @@ class TestE2ENLToOrchestrator:
 
             # If it succeeded, it should have warnings or errors
             if not validation.is_valid:
-                print(f"✅ Validation correctly rejected bad config")
+                print("✅ Validation correctly rejected bad config")
                 print(f"   Errors: {len(validation.errors)}")
                 for error in validation.errors[:3]:
                     print(f"   - {error}")
@@ -240,18 +236,18 @@ class TestE2ENLToOrchestrator:
                 return  # Test passed
 
             # If no validation issues, LLM should have adjusted parameters
-            print(f"✅ LLM adjusted problematic parameters:")
+            print("✅ LLM adjusted problematic parameters:")
             print(f"   Entities: {len(config['entities'])} (requested 200)")
             print(f"   Timepoints: {config['timepoint_count']} (requested 200)")
 
             # Verify parameters were adjusted to reasonable values
-            assert len(config['entities']) <= 100
-            assert config['timepoint_count'] <= 100
+            assert len(config["entities"]) <= 100
+            assert config["timepoint_count"] <= 100
 
         except Exception as e:
             print(f"✅ Config generation failed appropriately: {e}")
 
-        print(f"\n✅ Validation system working correctly!")
+        print("\n✅ Validation system working correctly!")
 
     def test_nl_to_orchestrator_with_refinement_trace(self):
         """Test: Complete workflow with refinement trace export"""
@@ -260,7 +256,7 @@ class TestE2ENLToOrchestrator:
 
         description = "Simulate a negotiation between 2 parties. 5 timepoints."
 
-        print(f"\n🔄 Starting refinement with trace...")
+        print("\n🔄 Starting refinement with trace...")
 
         # 2. Refine config
         result = refiner.start_refinement(description, skip_clarifications=True)
@@ -271,32 +267,26 @@ class TestE2ENLToOrchestrator:
         # 4. Export trace
         trace = refiner.export_refinement_trace()
 
-        print(f"✅ Refinement trace exported")
+        print("✅ Refinement trace exported")
         print(f"   Steps: {len(trace['steps'])}")
         print(f"   Original: '{trace['original_description']}'")
 
         # 5. Create simulation
         simulation_id = self.orchestrator.create_simulation(
-            scenario=final_config['scenario'],
-            entities=[
-                {"name": e["name"], "role": e["role"]}
-                for e in final_config['entities']
-            ],
-            timepoint_count=final_config['timepoint_count']
+            scenario=final_config["scenario"],
+            entities=[{"name": e["name"], "role": e["role"]} for e in final_config["entities"]],
+            timepoint_count=final_config["timepoint_count"],
         )
 
         # 6. Generate timepoint
         result = self.orchestrator.generate_timepoint(simulation_id, 0)
         assert result is not None
 
-        print(f"✅ Simulation created from refined config")
-        print(f"\n✅ Complete workflow with trace successful!")
+        print("✅ Simulation created from refined config")
+        print("\n✅ Complete workflow with trace successful!")
 
 
-@pytest.mark.skipif(
-    os.getenv("LLM_SERVICE_ENABLED") != "true",
-    reason="LLM service not enabled"
-)
+@pytest.mark.skipif(os.getenv("LLM_SERVICE_ENABLED") != "true", reason="LLM service not enabled")
 class TestE2ENLMockMode:
     """E2E tests using mock mode (no LLM calls) for CI/CD"""
 
@@ -308,7 +298,7 @@ class TestE2ENLMockMode:
 
     def teardown_method(self):
         """Cleanup test environment"""
-        if hasattr(self, 'temp_dir') and os.path.exists(self.temp_dir):
+        if hasattr(self, "temp_dir") and os.path.exists(self.temp_dir):
             shutil.rmtree(self.temp_dir)
 
     def test_nl_mock_mode_to_orchestrator(self):
@@ -318,10 +308,10 @@ class TestE2ENLMockMode:
 
         description = "Simulate a crisis meeting with 3 people. 5 timepoints. Focus on dialog."
 
-        print(f"\n🔄 Generating config (mock mode)...")
+        print("\n🔄 Generating config (mock mode)...")
         config, confidence = generator.generate_config(description)
 
-        print(f"✅ Mock config generated")
+        print("✅ Mock config generated")
         print(f"   Entities: {len(config['entities'])}")
 
         # 2. Validate
@@ -330,12 +320,9 @@ class TestE2ENLMockMode:
 
         # 3. Create simulation
         simulation_id = self.orchestrator.create_simulation(
-            scenario=config['scenario'],
-            entities=[
-                {"name": e["name"], "role": e["role"]}
-                for e in config['entities']
-            ],
-            timepoint_count=config['timepoint_count']
+            scenario=config["scenario"],
+            entities=[{"name": e["name"], "role": e["role"]} for e in config["entities"]],
+            timepoint_count=config["timepoint_count"],
         )
 
         print(f"✅ Simulation created from mock config: {simulation_id}")
@@ -344,4 +331,4 @@ class TestE2ENLMockMode:
         result = self.orchestrator.generate_timepoint(simulation_id, 0)
         assert result is not None
 
-        print(f"✅ Mock mode → orchestrator pipeline successful!")
+        print("✅ Mock mode → orchestrator pipeline successful!")

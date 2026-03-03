@@ -11,9 +11,10 @@ Expected output:
 """
 
 import os
+
 import pytest
 
-from generation.config_schema import SimulationConfig, TemporalConfig, EntityConfig, CompanyConfig
+from generation.config_schema import CompanyConfig, EntityConfig, SimulationConfig, TemporalConfig
 from generation.resilience_orchestrator import ResilientE2EWorkflowRunner
 from metadata.run_tracker import MetadataManager
 from schemas import TemporalMode
@@ -32,36 +33,26 @@ def create_minimal_config() -> SimulationConfig:
     return SimulationConfig(
         world_id="andos_proof_test",
         scenario_description=scenario.strip(),
-
         temporal=TemporalConfig(
             mode=TemporalMode.FORWARD,
         ),
-
-        entities=EntityConfig(
-            count=3,
-            allow_animistic=False
-        ),
-
+        entities=EntityConfig(count=3, allow_animistic=False),
         timepoints=CompanyConfig(
             count=2  # Minimal for speed
         ),
-
-        metadata={}
+        metadata={},
     )
 
 
 @pytest.mark.integration
 @pytest.mark.llm
-@pytest.mark.skipif(
-    not os.getenv("OPENROUTER_API_KEY"),
-    reason="OPENROUTER_API_KEY not set"
-)
+@pytest.mark.skipif(not os.getenv("OPENROUTER_API_KEY"), reason="OPENROUTER_API_KEY not set")
 def test_andos_proof_of_concept():
     """Run ANDOS proof-of-concept test"""
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("ANDOS PROOF OF CONCEPT TEST")
-    print("="*80 + "\n")
+    print("=" * 80 + "\n")
 
     print("🎯 Goal: Demonstrate ANDOS layer-by-layer training")
     print("📊 Expected: 3 entities → 3 layers (charlie, bob, alice)")
@@ -80,9 +71,9 @@ def test_andos_proof_of_concept():
     print("🚀 Starting E2E workflow with ANDOS...\n")
     result = runner.run(config)
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("✅ ANDOS PROOF-OF-CONCEPT COMPLETE")
-    print("="*80)
+    print("=" * 80)
     print(f"Run ID: {result.run_id}")
     print(f"Entities Created: {result.entities_created}")
     print(f"Timepoints Created: {result.timepoints_created}")

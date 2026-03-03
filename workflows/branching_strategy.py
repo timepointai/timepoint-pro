@@ -16,23 +16,24 @@ Architecture:
     - Backward validation: forward-generated paths must make causal sense
 """
 
-from typing import List, Dict, Tuple, Optional, Any
-from dataclasses import dataclass, field
-from enum import Enum
-from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import json
+import re
 import threading
-import numpy as np
 import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from typing import Any, Optional
 
-from schemas import Entity, Timepoint, TemporalMode, ResolutionLevel
+import numpy as np
+
 from generation.config_schema import TemporalConfig
 from llm_service.model_selector import ActionType, get_token_estimator
-import re
-import json
+from schemas import Entity, ResolutionLevel, TemporalMode
 
 
-def _repair_malformed_json(raw_text: str) -> Optional[dict]:
+def _repair_malformed_json(raw_text: str) -> dict | None:
     """
     Attempt to repair common JSON formatting issues from LLM responses.
 
@@ -49,12 +50,12 @@ def _repair_malformed_json(raw_text: str) -> Optional[dict]:
         return None
 
     # Try to extract JSON block from response (handle markdown code blocks)
-    json_match = re.search(r'```(?:json)?\s*([\s\S]*?)```', raw_text)
+    json_match = re.search(r"```(?:json)?\s*([\s\S]*?)```", raw_text)
     if json_match:
         raw_text = json_match.group(1).strip()
 
     # Find the JSON object boundaries
-    start_idx = raw_text.find('{')
+    start_idx = raw_text.find("{")
     if start_idx == -1:
         return None
 
@@ -62,9 +63,9 @@ def _repair_malformed_json(raw_text: str) -> Optional[dict]:
     brace_count = 0
     end_idx = -1
     for i, char in enumerate(raw_text[start_idx:], start_idx):
-        if char == '{':
+        if char == "{":
             brace_count += 1
-        elif char == '}':
+        elif char == "}":
             brace_count -= 1
             if brace_count == 0:
                 end_idx = i
@@ -72,10 +73,10 @@ def _repair_malformed_json(raw_text: str) -> Optional[dict]:
 
     if end_idx == -1:
         # Try adding missing closing braces
-        raw_text = raw_text + '}' * brace_count
+        raw_text = raw_text + "}" * brace_count
         end_idx = len(raw_text) - 1
 
-    json_str = raw_text[start_idx:end_idx + 1]
+    json_str = raw_text[start_idx : end_idx + 1]
 
     # Try parsing as-is first
     try:
@@ -97,11 +98,11 @@ def _repair_malformed_json(raw_text: str) -> Optional[dict]:
     repaired = re.sub(
         r'"([^"]+)":\s*([A-Za-z][^,}\]"]*?)([,}\]])',
         lambda m: f'"{m.group(1)}": "{m.group(2).strip()}"{m.group(3)}',
-        json_str
+        json_str,
     )
 
     # Fix trailing commas
-    repaired = re.sub(r',\s*([}\]])', r'\1', repaired)
+    repaired = re.sub(r",\s*([}\]])", r"\1", repaired)
 
     # Try parsing the repaired JSON
     try:
@@ -111,42 +112,44 @@ def _repair_malformed_json(raw_text: str) -> Optional[dict]:
 
     # More aggressive repair: quote all unquoted values
     # This handles cases where values span multiple words
-    lines = repaired.split('\n')
+    lines = repaired.split("\n")
     fixed_lines = []
     for line in lines:
         # Check for unquoted string value pattern
-        colon_match = re.match(r'^(\s*"[^"]+"\s*:\s*)([^"\[\{0-9\-][^,\}\]]*?)(\s*[,\}\]]?\s*)$', line)
+        colon_match = re.match(
+            r'^(\s*"[^"]+"\s*:\s*)([^"\[\{0-9\-][^,\}\]]*?)(\s*[,\}\]]?\s*)$', line
+        )
         if colon_match:
             prefix = colon_match.group(1)
-            value = colon_match.group(2).strip().rstrip(',').rstrip('}').rstrip(']')
+            value = colon_match.group(2).strip().rstrip(",").rstrip("}").rstrip("]")
             suffix = colon_match.group(3)
             # Escape any quotes in the value
             value = value.replace('"', '\\"')
             line = f'{prefix}"{value}"{suffix}'
         fixed_lines.append(line)
 
-    repaired = '\n'.join(fixed_lines)
+    repaired = "\n".join(fixed_lines)
 
     try:
         return json.loads(repaired)
-    except json.JSONDecodeError as e:
+    except json.JSONDecodeError:
         pass
 
     # Handle truncated arrays - try to close them properly
     # Count unclosed brackets
-    open_brackets = repaired.count('[') - repaired.count(']')
-    open_braces = repaired.count('{') - repaired.count('}')
+    open_brackets = repaired.count("[") - repaired.count("]")
+    open_braces = repaired.count("{") - repaired.count("}")
 
     # If there are unclosed arrays/objects, try to close them
     if open_brackets > 0 or open_braces > 0:
         # Remove any trailing incomplete objects (after last complete one)
         # Find last complete object by looking for last "},"
-        last_complete = repaired.rfind('},')
+        last_complete = repaired.rfind("},")
         if last_complete > 0:
             # Keep everything up to and including the last complete object
-            repaired = repaired[:last_complete + 1]
+            repaired = repaired[: last_complete + 1]
             # Add proper closing
-            repaired += ']' * open_brackets + '}' * open_braces
+            repaired += "]" * open_brackets + "}" * open_braces
 
             try:
                 return json.loads(repaired)
@@ -159,6 +162,7 @@ def _repair_malformed_json(raw_text: str) -> Optional[dict]:
 
 class BranchingMode(str, Enum):
     """Strategies for exploring forward branches"""
+
     CHRONOLOGICAL = "chronological"  # T_0 → T_1 → T_2 → ...
     BREADTH_FIRST = "breadth_first"  # Explore all branches at each level before proceeding
     DEPTH_FIRST = "depth_first"  # Follow one branch to completion, then backtrack
@@ -168,14 +172,15 @@ class BranchingMode(str, Enum):
 @dataclass
 class BranchingState:
     """A state at a specific point in the forward simulation"""
+
     year: int
     month: int
     description: str
-    entities: List[Entity]
-    world_state: Dict[str, Any]
+    entities: list[Entity]
+    world_state: dict[str, Any]
     plausibility_score: float = 0.0
-    parent_state: Optional['BranchingState'] = None  # The state this came from (T-1)
-    children_states: List['BranchingState'] = field(default_factory=list)  # Possible T+1 states
+    parent_state: Optional["BranchingState"] = None  # The state this came from (T-1)
+    children_states: list["BranchingState"] = field(default_factory=list)  # Possible T+1 states
     branch_id: str = ""  # Identifies which branch this state belongs to
     is_branch_point: bool = False  # True if this state has multiple children
     resolution_level: ResolutionLevel = None
@@ -191,9 +196,21 @@ class BranchingState:
             self.branch_id = f"branch_{uuid.uuid4().hex[:8]}"
 
     def to_year_month_str(self) -> str:
-        month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-        return f"{month_names[self.month-1]} {self.year}"
+        month_names = [
+            "Jan",
+            "Feb",
+            "Mar",
+            "Apr",
+            "May",
+            "Jun",
+            "Jul",
+            "Aug",
+            "Sep",
+            "Oct",
+            "Nov",
+            "Dec",
+        ]
+        return f"{month_names[self.month - 1]} {self.year}"
 
     def to_total_months(self) -> int:
         return self.year * 12 + self.month
@@ -202,13 +219,14 @@ class BranchingState:
 @dataclass
 class BranchingPath:
     """Complete path from origin through one branch to endpoint"""
+
     path_id: str
     branch_name: str  # Human-readable branch description (e.g., "Holmes wins")
-    states: List[BranchingState]  # Ordered origin → endpoint
+    states: list[BranchingState]  # Ordered origin → endpoint
     coherence_score: float
-    branch_points: List[int] = field(default_factory=list)  # Indices where branches occurred
+    branch_points: list[int] = field(default_factory=list)  # Indices where branches occurred
     explanation: str = ""
-    validation_details: Dict[str, Any] = field(default_factory=dict)
+    validation_details: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         if self.branch_points is None:
@@ -230,16 +248,22 @@ class BranchingStrategy:
     6. Return all branches with rankings
     """
 
-    def __init__(self, config: TemporalConfig, llm_client, store,
-                 scenario_description: str = None, entity_roster: Dict = None):
+    def __init__(
+        self,
+        config: TemporalConfig,
+        llm_client,
+        store,
+        scenario_description: str = None,
+        entity_roster: dict = None,
+    ):
         if config.mode != TemporalMode.BRANCHING:
             raise ValueError(f"BranchingStrategy requires mode=BRANCHING, got {config.mode}")
 
         self.config = config
         self.llm = llm_client
         self.store = store
-        self.paths: List[BranchingPath] = []
-        self.all_paths: List[BranchingPath] = []
+        self.paths: list[BranchingPath] = []
+        self.all_paths: list[BranchingPath] = []
 
         # Scenario context for anchoring forward steps
         self.scenario_description = scenario_description
@@ -256,18 +280,22 @@ class BranchingStrategy:
         self._world_state_lock = threading.Lock()
 
         # Get branching parameters from config or use defaults
-        self.forward_steps = getattr(config, 'backward_steps', 15)  # Reuse backward_steps for forward
-        self.branch_count = getattr(config, 'path_count', 4)  # Number of branches at decision points
-        self.candidates_per_step = getattr(config, 'candidate_antecedents_per_step', 3)
-        self.max_parallel_workers = getattr(config, 'max_parallel_workers', 5)
+        self.forward_steps = getattr(
+            config, "backward_steps", 15
+        )  # Reuse backward_steps for forward
+        self.branch_count = getattr(
+            config, "path_count", 4
+        )  # Number of branches at decision points
+        self.candidates_per_step = getattr(config, "candidate_antecedents_per_step", 3)
+        self.max_parallel_workers = getattr(config, "max_parallel_workers", 5)
 
-    def run(self) -> List[BranchingPath]:
+    def run(self) -> list[BranchingPath]:
         """Execute forward simulation with branching."""
-        print(f"\n{'='*80}")
-        print(f"BRANCHING MODE: Forward Simulation with Counterfactuals")
+        print(f"\n{'=' * 80}")
+        print("BRANCHING MODE: Forward Simulation with Counterfactuals")
         print(f"Steps: {self.forward_steps}")
         print(f"Target branches: {self.branch_count}")
-        print(f"{'='*80}\n")
+        print(f"{'=' * 80}\n")
 
         # Step 1: Generate origin state
         print("Step 1: Generating origin state...")
@@ -287,7 +315,7 @@ class BranchingStrategy:
         # Step 4: Validate backward coherence
         print("\nStep 4: Validating backward coherence...")
         valid_paths = self._validate_backward_coherence(candidate_paths)
-        coherence_threshold = getattr(self.config, 'coherence_threshold', 0.65)
+        coherence_threshold = getattr(self.config, "coherence_threshold", 0.65)
         print(f"✓ {len(valid_paths)} paths passed coherence threshold ({coherence_threshold})")
 
         # Step 5: Rank paths
@@ -299,30 +327,34 @@ class BranchingStrategy:
         for i, path in enumerate(ranked_paths):
             path.branch_points = self._detect_branch_points(path)
             if i < 5:
-                print(f"  Path {i+1} ({path.branch_name}): {len(path.branch_points)} branch points")
+                print(
+                    f"  Path {i + 1} ({path.branch_name}): {len(path.branch_points)} branch points"
+                )
 
         self.all_paths = ranked_paths
-        self.paths = ranked_paths[:self.branch_count]
+        self.paths = ranked_paths[: self.branch_count]
 
-        print(f"\n{'='*80}")
-        print(f"BRANCHING SIMULATION COMPLETE")
+        print(f"\n{'=' * 80}")
+        print("BRANCHING SIMULATION COMPLETE")
         print(f"Total paths generated: {len(self.all_paths)}")
-        print(f"{'='*80}\n")
+        print(f"{'=' * 80}\n")
 
         return self.all_paths
 
     def _generate_origin_state(self) -> BranchingState:
         """Generate the starting state for forward simulation."""
         # Use origin_year if available, otherwise use current year from first timepoint
-        origin_year = getattr(self.config, 'origin_year', None)
+        origin_year = getattr(self.config, "origin_year", None)
         if origin_year is None:
             origin_year = datetime.now().year
 
         # Get initial description from config or generate placeholder
         # Priority: instance attribute > config.scenario_description > config.portal_description
-        description = (self.scenario_description
-                       or getattr(self.config, 'scenario_description', None)
-                       or getattr(self.config, 'portal_description', None))
+        description = (
+            self.scenario_description
+            or getattr(self.config, "scenario_description", None)
+            or getattr(self.config, "portal_description", None)
+        )
         if not description:
             description = "Initial state at the beginning of the branching simulation"
 
@@ -342,10 +374,10 @@ class BranchingStrategy:
             entities=entities,
             world_state={"phase": "origin"},
             plausibility_score=1.0,
-            branch_id="origin"
+            branch_id="origin",
         )
 
-    def _get_fallback_entities(self) -> List[Entity]:
+    def _get_fallback_entities(self) -> list[Entity]:
         """
         Get entities from the store when inference fails.
 
@@ -358,10 +390,14 @@ class BranchingStrategy:
         if self.store:
             try:
                 # Get all entities from the store
-                all_entities = self.store.list_entities() if hasattr(self.store, 'list_entities') else []
+                all_entities = (
+                    self.store.list_entities() if hasattr(self.store, "list_entities") else []
+                )
                 if all_entities:
                     # Filter to humans/persons (most relevant for narrative)
-                    human_entities = [e for e in all_entities if e.entity_type in ('human', 'person', 'character')]
+                    human_entities = [
+                        e for e in all_entities if e.entity_type in ("human", "person", "character")
+                    ]
                     if human_entities:
                         entities = human_entities[:10]  # Limit to 10 most relevant
                     else:
@@ -372,10 +408,8 @@ class BranchingStrategy:
         return entities
 
     def _ensure_entities_present(
-        self,
-        inferred_entities: List[Entity],
-        parent_entities: List[Entity]
-    ) -> List[Entity]:
+        self, inferred_entities: list[Entity], parent_entities: list[Entity]
+    ) -> list[Entity]:
         """
         Ensure we always have some entities by falling back to parent entities.
 
@@ -396,22 +430,25 @@ class BranchingStrategy:
         # Last resort: get from store
         return self._get_fallback_entities()
 
-    def _infer_entities_from_description(self, description: str) -> List[Entity]:
+    def _infer_entities_from_description(self, description: str) -> list[Entity]:
         """Infer entities from a state description using LLM or regex fallback."""
         if not self.llm:
             import re
-            potential_names = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', description)
+
+            potential_names = re.findall(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b", description)
             entities = []
             seen = set()
             for name in potential_names[:10]:
-                entity_id = name.lower().replace(' ', '_')
+                entity_id = name.lower().replace(" ", "_")
                 if entity_id not in seen and len(entity_id) > 2:
                     seen.add(entity_id)
-                    entities.append(Entity(
-                        entity_id=entity_id,
-                        entity_type="person",
-                        entity_metadata={"name": name, "source": "inferred"}
-                    ))
+                    entities.append(
+                        Entity(
+                            entity_id=entity_id,
+                            entity_type="person",
+                            entity_metadata={"name": name, "source": "inferred"},
+                        )
+                    )
             return entities
 
         try:
@@ -423,24 +460,26 @@ class BranchingStrategy:
                 role: str
 
             class EntityList(BaseModel):
-                entities: List[EntityInfo]
+                entities: list[EntityInfo]
 
             result = self.llm.generate_structured(
                 prompt=f"Identify key entities in: {description[:500]}",
                 response_model=EntityList,
                 system_prompt="Identify entities (people, places, things) in the description.",
                 temperature=0.3,
-                max_tokens=500
+                max_tokens=500,
             )
 
             entities = []
             for info in result.entities[:10]:
-                entity_id = info.name.lower().replace(' ', '_').replace("'", "")
-                entities.append(Entity(
-                    entity_id=entity_id,
-                    entity_type=info.type,
-                    entity_metadata={"name": info.name, "role": info.role}
-                ))
+                entity_id = info.name.lower().replace(" ", "_").replace("'", "")
+                entities.append(
+                    Entity(
+                        entity_id=entity_id,
+                        entity_type=info.type,
+                        entity_metadata={"name": info.name, "role": info.role},
+                    )
+                )
             return entities
         except Exception as e:
             print(f"    Entity inference failed: {e}")
@@ -453,10 +492,8 @@ class BranchingStrategy:
         return BranchingMode.CHRONOLOGICAL
 
     def _explore_forward_paths(
-        self,
-        origin: BranchingState,
-        strategy: BranchingMode
-    ) -> List[BranchingPath]:
+        self, origin: BranchingState, strategy: BranchingMode
+    ) -> list[BranchingPath]:
         """Explore forward paths with branching at decision points."""
         return self._explore_chronological(origin)
 
@@ -466,7 +503,7 @@ class BranchingStrategy:
         step: int,
         target_year: int,
         target_month: int,
-    ) -> List[BranchingState]:
+    ) -> list[BranchingState]:
         """Process a single state for forward stepping (thread-safe).
 
         Returns scored consequents for this state.
@@ -475,22 +512,22 @@ class BranchingStrategy:
 
         if is_branch_point:
             consequents = self._generate_consequents(
-                state, target_year, target_month,
+                state,
+                target_year,
+                target_month,
                 count=self.candidates_per_step,
-                is_branch_point=True
+                is_branch_point=True,
             )
             state.is_branch_point = True
         else:
             consequents = self._generate_consequents(
-                state, target_year, target_month,
-                count=1,
-                is_branch_point=False
+                state, target_year, target_month, count=1, is_branch_point=False
             )
 
         scored = self._score_consequents(consequents, state)
-        return scored[:self.candidates_per_step]
+        return scored[: self.candidates_per_step]
 
-    def _explore_chronological(self, origin: BranchingState) -> List[BranchingPath]:
+    def _explore_chronological(self, origin: BranchingState) -> list[BranchingPath]:
         """Standard forward stepping with branching: T_0 → T_1 → T_2 → ...
 
         Parallelizes LLM calls within each step using ThreadPoolExecutor.
@@ -503,7 +540,7 @@ class BranchingStrategy:
         current_states = [origin]
 
         # Calculate time step (months per step)
-        portal_year = getattr(self.config, 'portal_year', None)
+        portal_year = getattr(self.config, "portal_year", None)
         if portal_year is None:
             # Default to 6 years forward for BRANCHING mode
             portal_year = origin.year + 6
@@ -513,25 +550,33 @@ class BranchingStrategy:
         for step in range(self.forward_steps):
             # Compute max_workers per step (0 = max, no ceiling)
             n_items = max(1, len(current_states))
-            max_workers = n_items if self.max_parallel_workers == 0 else min(self.max_parallel_workers, n_items)
+            max_workers = (
+                n_items
+                if self.max_parallel_workers == 0
+                else min(self.max_parallel_workers, n_items)
+            )
             # Calculate target time
-            current_month_total = current_states[0].to_total_months() if current_states else origin.to_total_months()
+            current_month_total = (
+                current_states[0].to_total_months() if current_states else origin.to_total_months()
+            )
             target_month_total = current_month_total + month_step
             target_year = target_month_total // 12
             target_month = target_month_total % 12 or 12
 
-            temp_state = BranchingState(year=target_year, month=target_month, description="", entities=[], world_state={})
+            temp_state = BranchingState(
+                year=target_year, month=target_month, description="", entities=[], world_state={}
+            )
             n_states = len(current_states)
             parallel_note = f" ({n_states} states in parallel)" if n_states > 1 else ""
-            print(f"  Forward step {step+1}/{self.forward_steps}: {temp_state.to_year_month_str()}{parallel_note}")
+            print(
+                f"  Forward step {step + 1}/{self.forward_steps}: {temp_state.to_year_month_str()}{parallel_note}"
+            )
 
             if n_states <= 1:
                 # Single state — no threading overhead needed
                 next_states = []
                 for state in current_states:
-                    results = self._process_single_state(
-                        state, step, target_year, target_month
-                    )
+                    results = self._process_single_state(state, step, target_year, target_month)
                     next_states.extend(results)
             else:
                 # Multiple states — parallelize LLM calls
@@ -542,8 +587,7 @@ class BranchingStrategy:
                 with ThreadPoolExecutor(max_workers=max_workers) as executor:
                     future_to_state = {
                         executor.submit(
-                            self._process_single_state,
-                            state, step, target_year, target_month
+                            self._process_single_state, state, step, target_year, target_month
                         ): state
                         for state in current_states
                     }
@@ -590,8 +634,18 @@ class BranchingStrategy:
             return True
 
         # Check description for conflict/decision keywords
-        conflict_keywords = ["decide", "choice", "confront", "negotiate", "choose",
-                           "fork", "branch", "option", "alternative", "either"]
+        conflict_keywords = [
+            "decide",
+            "choice",
+            "confront",
+            "negotiate",
+            "choose",
+            "fork",
+            "branch",
+            "option",
+            "alternative",
+            "either",
+        ]
         desc_lower = state.description.lower()
         if any(kw in desc_lower for kw in conflict_keywords):
             return True
@@ -604,8 +658,8 @@ class BranchingStrategy:
         target_year: int,
         target_month: int,
         count: int = 3,
-        is_branch_point: bool = False
-    ) -> List[BranchingState]:
+        is_branch_point: bool = False,
+    ) -> list[BranchingState]:
         """
         Generate N plausible NEXT states using LLM.
 
@@ -613,9 +667,11 @@ class BranchingStrategy:
         Otherwise, generates continuations.
         """
         if not self.llm:
-            return self._generate_placeholder_consequents(current_state, target_year, target_month, count)
+            return self._generate_placeholder_consequents(
+                current_state, target_year, target_month, count
+            )
 
-        target_time_str = f"{['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][target_month-1]} {target_year}"
+        target_time_str = f"{['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][target_month - 1]} {target_year}"
 
         if is_branch_point:
             prompt_type = "DIVERGENT FUTURES (this is a decision/branch point)"
@@ -626,9 +682,13 @@ class BranchingStrategy:
 - Vary the outcomes significantly - these are alternate timelines"""
         else:
             prompt_type = "NATURAL CONTINUATION"
-            diversity_instruction = f"Generate {count} plausible continuations with slight variations"
+            diversity_instruction = (
+                f"Generate {count} plausible continuations with slight variations"
+            )
 
-        entity_names = [e.entity_id for e in current_state.entities[:10]] if current_state.entities else []
+        entity_names = (
+            [e.entity_id for e in current_state.entities[:10]] if current_state.entities else []
+        )
 
         # Build entity roles section from roster
         entity_roles_section = ""
@@ -642,7 +702,10 @@ class BranchingStrategy:
                 else:
                     role_lines.append(f"  - {eid}: {info}")
             if role_lines:
-                entity_roles_section = "ENTITY ROLES (use these characters, not invented ones):\n" + "\n".join(role_lines)
+                entity_roles_section = (
+                    "ENTITY ROLES (use these characters, not invented ones):\n"
+                    + "\n".join(role_lines)
+                )
 
         # Build scenario anchor (first 800 chars)
         scenario_anchor = ""
@@ -668,7 +731,7 @@ All events MUST remain grounded in this scenario. Do not introduce unrelated set
 CURRENT STATE ({current_state.to_year_month_str()}):
 {current_state.description}
 
-Entities present: {', '.join(entity_names[:5]) if entity_names else 'None specified'}
+Entities present: {", ".join(entity_names[:5]) if entity_names else "None specified"}
 World Context: {current_state.world_state}
 
 {world_state_summary}
@@ -700,27 +763,29 @@ Return ONLY valid JSON matching this exact structure. All strings must be quoted
 
             class ConsequentSchema(BaseModel):
                 description: str
-                key_events: List[str]
+                key_events: list[str]
                 outcome_type: str
                 causal_link: str
-                resource_updates: Optional[Dict[str, str]] = None
+                resource_updates: dict[str, str] | None = None
 
             class ConsequentList(BaseModel):
-                consequents: List[ConsequentSchema]
+                consequents: list[ConsequentSchema]
 
             token_estimator = get_token_estimator()
             token_estimate = token_estimator.estimate(
                 ActionType.BRANCHING_CONSEQUENT_GENERATION,
                 context={"num_consequents": count},
-                prompt_length=len(user_prompt)
+                prompt_length=len(user_prompt),
             )
 
             result = self.llm.generate_structured(
                 prompt=user_prompt,
                 response_model=ConsequentList,
                 system_prompt="You are an expert at forward temporal reasoning and counterfactual scenarios.",
-                temperature=0.9 if is_branch_point else 0.7,  # Higher temp for diversity at branch points
-                max_tokens=token_estimate.recommended_tokens
+                temperature=0.9
+                if is_branch_point
+                else 0.7,  # Higher temp for diversity at branch points
+                max_tokens=token_estimate.recommended_tokens,
             )
 
             consequents = []
@@ -736,12 +801,12 @@ Return ONLY valid JSON matching this exact structure. All strings must be quoted
                 # Ensure we have entities (inherit from parent if needed)
                 state_entities = self._ensure_entities_present(
                     [],  # No new inference for consequent descriptions
-                    current_state.entities if current_state.entities else []
+                    current_state.entities if current_state.entities else [],
                 )
 
                 # Build world_state with accumulated context
                 resource_updates = {}
-                if hasattr(data, 'resource_updates') and data.resource_updates:
+                if hasattr(data, "resource_updates") and data.resource_updates:
                     resource_updates = data.resource_updates
 
                 state = BranchingState(
@@ -757,7 +822,7 @@ Return ONLY valid JSON matching this exact structure. All strings must be quoted
                     },
                     plausibility_score=0.0,
                     parent_state=current_state,
-                    branch_id=branch_id
+                    branch_id=branch_id,
                 )
                 # Accumulate world state for next step
                 self._accumulate_world_state(state)
@@ -780,17 +845,17 @@ Return ONLY valid JSON matching this exact structure. All strings must be quoted
             if "JSON" in error_msg or "parse" in error_msg.lower() or "valid" in error_msg.lower():
                 # Extract raw response from error message if available
                 raw_text = error_msg
-                if hasattr(e, 'response'):
+                if hasattr(e, "response"):
                     raw_text = str(e.response)
 
                 # Try JSON repair
-                print(f"    Attempting JSON repair...")
+                print("    Attempting JSON repair...")
                 repaired = _repair_malformed_json(raw_text)
 
-                if repaired and 'consequents' in repaired:
-                    print(f"    ✓ JSON repair successful!")
+                if repaired and "consequents" in repaired:
+                    print("    ✓ JSON repair successful!")
                     consequents = []
-                    for i, data in enumerate(repaired['consequents'][:count]):
+                    for i, data in enumerate(repaired["consequents"][:count]):
                         try:
                             if is_branch_point:
                                 branch_id = f"{current_state.branch_id}_{data.get('outcome_type', 'unknown')}_{i}"
@@ -800,26 +865,30 @@ Return ONLY valid JSON matching this exact structure. All strings must be quoted
                             # Ensure we have entities (inherit from parent if needed)
                             state_entities = self._ensure_entities_present(
                                 [],  # No new inference for repaired descriptions
-                                current_state.entities if current_state.entities else []
+                                current_state.entities if current_state.entities else [],
                             )
 
                             state = BranchingState(
                                 year=target_year,
                                 month=target_month,
-                                description=data.get('description', f'Repaired state {i+1}'),
+                                description=data.get("description", f"Repaired state {i + 1}"),
                                 entities=state_entities,
                                 world_state={
-                                    "key_events": data.get('key_events', []),
-                                    "outcome_type": data.get('outcome_type', 'neutral'),
-                                    "causal_link": data.get('causal_link', 'Continuation from previous state')
+                                    "key_events": data.get("key_events", []),
+                                    "outcome_type": data.get("outcome_type", "neutral"),
+                                    "causal_link": data.get(
+                                        "causal_link", "Continuation from previous state"
+                                    ),
                                 },
                                 plausibility_score=0.0,
                                 parent_state=current_state,
-                                branch_id=branch_id
+                                branch_id=branch_id,
                             )
                             consequents.append(state)
                         except Exception as repair_error:
-                            print(f"    ⚠️  Failed to create state from repaired data: {repair_error}")
+                            print(
+                                f"    ⚠️  Failed to create state from repaired data: {repair_error}"
+                            )
 
                     if consequents:
                         # Pad with placeholders if needed
@@ -830,9 +899,11 @@ Return ONLY valid JSON matching this exact structure. All strings must be quoted
                             consequents.extend(placeholders)
                         return consequents
                 else:
-                    print(f"    ⚠️  JSON repair failed, using placeholders")
+                    print("    ⚠️  JSON repair failed, using placeholders")
 
-            return self._generate_placeholder_consequents(current_state, target_year, target_month, count)
+            return self._generate_placeholder_consequents(
+                current_state, target_year, target_month, count
+            )
 
     def _accumulate_world_state(self, state: BranchingState) -> None:
         """Merge key_events and resource_updates from a generated state into accumulated world state.
@@ -846,8 +917,9 @@ Return ONLY valid JSON matching this exact structure. All strings must be quoted
             events = ws.get("key_events", [])
             if events:
                 self.accumulated_world_state["key_events_history"].extend(events)
-                self.accumulated_world_state["key_events_history"] = \
-                    self.accumulated_world_state["key_events_history"][-10:]
+                self.accumulated_world_state["key_events_history"] = self.accumulated_world_state[
+                    "key_events_history"
+                ][-10:]
 
             # Merge resource updates
             resource_updates = ws.get("resource_updates", {})
@@ -879,12 +951,8 @@ Return ONLY valid JSON matching this exact structure. All strings must be quoted
         return "ACCUMULATED WORLD STATE:\n" + "\n".join(parts)
 
     def _generate_placeholder_consequents(
-        self,
-        current_state: BranchingState,
-        target_year: int,
-        target_month: int,
-        count: int
-    ) -> List[BranchingState]:
+        self, current_state: BranchingState, target_year: int, target_month: int, count: int
+    ) -> list[BranchingState]:
         """Generate placeholder consequents when LLM is unavailable."""
         consequents = []
         outcome_types = ["positive", "negative", "neutral", "twist"]
@@ -892,7 +960,7 @@ Return ONLY valid JSON matching this exact structure. All strings must be quoted
         # Ensure we have entities (inherit from parent if needed)
         state_entities = self._ensure_entities_present(
             [],  # No inference for placeholders
-            current_state.entities if current_state.entities else []
+            current_state.entities if current_state.entities else [],
         )
 
         for i in range(count):
@@ -900,22 +968,20 @@ Return ONLY valid JSON matching this exact structure. All strings must be quoted
             state = BranchingState(
                 year=target_year,
                 month=target_month,
-                description=f"Continuation {i+1} ({outcome}): Events progress from {current_state.description[:50]}...",
+                description=f"Continuation {i + 1} ({outcome}): Events progress from {current_state.description[:50]}...",
                 entities=state_entities.copy(),  # Use inherited entities
                 world_state={"outcome_type": outcome},
                 plausibility_score=0.5,
                 parent_state=current_state,
-                branch_id=f"{current_state.branch_id}_{outcome}_{i}"
+                branch_id=f"{current_state.branch_id}_{outcome}_{i}",
             )
             consequents.append(state)
 
         return consequents
 
     def _score_consequents(
-        self,
-        consequents: List[BranchingState],
-        antecedent: BranchingState
-    ) -> List[BranchingState]:
+        self, consequents: list[BranchingState], antecedent: BranchingState
+    ) -> list[BranchingState]:
         """Score consequents using hybrid scoring."""
         for cons in consequents:
             # Simple scoring based on outcome type diversity and description quality
@@ -926,7 +992,7 @@ Return ONLY valid JSON matching this exact structure. All strings must be quoted
                 base_score += 0.1
 
             # Boost for having key events
-            if cons.world_state.get('key_events'):
+            if cons.world_state.get("key_events"):
                 base_score += 0.1
 
             # Add some randomness for diversity
@@ -934,10 +1000,10 @@ Return ONLY valid JSON matching this exact structure. All strings must be quoted
 
         return sorted(consequents, key=lambda s: s.plausibility_score, reverse=True)
 
-    def _prune_low_scoring_paths(self, states: List[BranchingState]) -> List[BranchingState]:
+    def _prune_low_scoring_paths(self, states: list[BranchingState]) -> list[BranchingState]:
         """Prune low-scoring states to manage path explosion."""
         sorted_states = sorted(states, key=lambda s: s.plausibility_score, reverse=True)
-        return sorted_states[:self.branch_count * 2]
+        return sorted_states[: self.branch_count * 2]
 
     def _reconstruct_path(self, leaf_state: BranchingState) -> BranchingPath:
         """Reconstruct complete path from leaf state to origin."""
@@ -952,7 +1018,7 @@ Return ONLY valid JSON matching this exact structure. All strings must be quoted
         states.reverse()
 
         # Determine branch name from final state
-        outcome_type = leaf_state.world_state.get('outcome_type', 'unknown')
+        outcome_type = leaf_state.world_state.get("outcome_type", "unknown")
         branch_name = f"{outcome_type.title()} branch"
 
         return BranchingPath(
@@ -961,13 +1027,13 @@ Return ONLY valid JSON matching this exact structure. All strings must be quoted
             states=states,
             coherence_score=0.0,
             branch_points=[],
-            explanation=f"Path following {outcome_type} outcomes"
+            explanation=f"Path following {outcome_type} outcomes",
         )
 
-    def _validate_backward_coherence(self, paths: List[BranchingPath]) -> List[BranchingPath]:
+    def _validate_backward_coherence(self, paths: list[BranchingPath]) -> list[BranchingPath]:
         """Validate that forward-generated paths make causal sense looking backward."""
         valid_paths = []
-        coherence_threshold = getattr(self.config, 'coherence_threshold', 0.65)
+        coherence_threshold = getattr(self.config, "coherence_threshold", 0.65)
 
         for path in paths:
             # Compute coherence as average of state scores
@@ -987,11 +1053,11 @@ Return ONLY valid JSON matching this exact structure. All strings must be quoted
 
         return valid_paths
 
-    def _rank_paths(self, paths: List[BranchingPath]) -> List[BranchingPath]:
+    def _rank_paths(self, paths: list[BranchingPath]) -> list[BranchingPath]:
         """Rank paths by coherence score."""
         return sorted(paths, key=lambda p: p.coherence_score, reverse=True)
 
-    def _detect_branch_points(self, path: BranchingPath) -> List[int]:
+    def _detect_branch_points(self, path: BranchingPath) -> list[int]:
         """Identify indices where branches occurred."""
         branch_points = []
         for i, state in enumerate(path.states):

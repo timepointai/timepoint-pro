@@ -16,11 +16,9 @@ Part of the SynthasAIzer control paradigm.
 """
 
 import logging
-from typing import Dict, List, Optional, Any
 
 from synth.fidelity_envelope import (
     ADPRSComposite,
-    ADPRSEnvelope,
     FidelityBand,
     phi_to_resolution_band,
 )
@@ -45,9 +43,9 @@ class WaveformScheduler:
 
     def __init__(self, epsilon: float = 0.1):
         self.epsilon = epsilon
-        self._envelopes: Dict[str, ADPRSComposite] = {}
-        self._predictions: List[dict] = []
-        self._actuals: List[dict] = []
+        self._envelopes: dict[str, ADPRSComposite] = {}
+        self._predictions: list[dict] = []
+        self._actuals: list[dict] = []
 
     def register_envelopes(self, entity_id: str, composite: ADPRSComposite):
         """Register ADPRS envelopes for an entity."""
@@ -71,7 +69,7 @@ class WaveformScheduler:
         """Check if entity has registered envelopes."""
         return entity_id in self._envelopes
 
-    def schedule_entity(self, entity_id: str, tau: float) -> Optional[FidelityBand]:
+    def schedule_entity(self, entity_id: str, tau: float) -> FidelityBand | None:
         """
         Evaluate phi at tau for an entity and return the FidelityBand.
 
@@ -89,15 +87,13 @@ class WaveformScheduler:
         phi = _evaluate_composite_at_tau(composite, tau)
         return phi_to_resolution_band(phi)
 
-    def schedule_all(
-        self, entity_ids: List[str], tau: float
-    ) -> Dict[str, Optional[FidelityBand]]:
+    def schedule_all(self, entity_ids: list[str], tau: float) -> dict[str, FidelityBand | None]:
         """Batch schedule: evaluate all entities at a given tau."""
         return {eid: self.schedule_entity(eid, tau) for eid in entity_ids}
 
     def predict_activation_delta(
         self, entity_id: str, current_tau: float, next_tau: float
-    ) -> Optional[Dict[str, float]]:
+    ) -> dict[str, float] | None:
         """
         Predict cognitive tensor changes from waveform without LLM.
 
@@ -117,22 +113,24 @@ class WaveformScheduler:
         predicted_band: FidelityBand,
     ):
         """Record a prediction for WSR tracking."""
-        self._predictions.append({
-            "entity_id": entity_id,
-            "tau": tau,
-            "predicted_phi": predicted_phi,
-            "predicted_band": predicted_band,
-        })
+        self._predictions.append(
+            {
+                "entity_id": entity_id,
+                "tau": tau,
+                "predicted_phi": predicted_phi,
+                "predicted_band": predicted_band,
+            }
+        )
 
-    def record_actual(
-        self, entity_id: str, tau: float, actual_activation: float
-    ):
+    def record_actual(self, entity_id: str, tau: float, actual_activation: float):
         """Record actual result when LLM is called."""
-        self._actuals.append({
-            "entity_id": entity_id,
-            "tau": tau,
-            "actual_activation": actual_activation,
-        })
+        self._actuals.append(
+            {
+                "entity_id": entity_id,
+                "tau": tau,
+                "actual_activation": actual_activation,
+            }
+        )
 
     def sufficiency_report(self) -> dict:
         """
@@ -146,7 +144,7 @@ class WaveformScheduler:
         total_actuals = len(self._actuals)
 
         # Build lookup of actuals by (entity_id, tau)
-        actual_lookup: Dict[tuple, float] = {}
+        actual_lookup: dict[tuple, float] = {}
         for a in self._actuals:
             actual_lookup[(a["entity_id"], a["tau"])] = a["actual_activation"]
 
@@ -160,7 +158,8 @@ class WaveformScheduler:
 
         # Count skipped LLM calls (TENSOR or SCENE predictions)
         skipped = sum(
-            1 for p in self._predictions
+            1
+            for p in self._predictions
             if p["predicted_band"] in (FidelityBand.TENSOR, FidelityBand.SCENE)
         )
 
@@ -203,7 +202,7 @@ def _evaluate_composite_at_tau(composite: ADPRSComposite, tau: float) -> float:
 
 def predict_activation_delta(
     composite: ADPRSComposite, current_tau: float, next_tau: float
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """
     Predict cognitive tensor changes from waveform without LLM.
 

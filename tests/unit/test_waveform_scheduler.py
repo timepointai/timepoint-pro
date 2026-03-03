@@ -6,27 +6,31 @@ and the module-level predict_activation_delta convenience function —
 all without LLM/DB dependencies.
 """
 
-import math
 import pytest
 
 from synth.fidelity_envelope import (
-    ADPRSEnvelope,
     ADPRSComposite,
+    ADPRSEnvelope,
     FidelityBand,
 )
 from synth.waveform_scheduler import (
     WaveformScheduler,
-    predict_activation_delta,
     _evaluate_composite_at_tau,
+    predict_activation_delta,
 )
-
 
 # --- Helpers ---
 
+
 def make_envelope(**overrides) -> ADPRSEnvelope:
     defaults = dict(
-        A=1.0, D=1000.0, P=1.0, R=0, S=1.0,
-        t0="2025-01-01T00:00:00+00:00", baseline=0.0,
+        A=1.0,
+        D=1000.0,
+        P=1.0,
+        R=0,
+        S=1.0,
+        t0="2025-01-01T00:00:00+00:00",
+        baseline=0.0,
     )
     defaults.update(overrides)
     return ADPRSEnvelope(**defaults)
@@ -51,6 +55,7 @@ def make_scheduler(**kwargs) -> WaveformScheduler:
 
 
 # --- TestWaveformScheduler ---
+
 
 class TestWaveformScheduler:
     def test_schedule_entity_tensor_band(self):
@@ -93,8 +98,15 @@ class TestWaveformScheduler:
         metadata = {
             "adprs_envelopes": {
                 "envelopes": [
-                    {"A": 1.0, "D": 1000.0, "P": 1.0, "R": 0, "S": 1.0,
-                     "t0": "2025-01-01T00:00:00+00:00", "baseline": 0.8}
+                    {
+                        "A": 1.0,
+                        "D": 1000.0,
+                        "P": 1.0,
+                        "R": 0,
+                        "S": 1.0,
+                        "t0": "2025-01-01T00:00:00+00:00",
+                        "baseline": 0.8,
+                    }
                 ]
             }
         }
@@ -121,6 +133,7 @@ class TestWaveformScheduler:
 
 
 # --- TestPredictActivationDelta ---
+
 
 class TestPredictActivationDelta:
     def test_predict_returns_dict(self):
@@ -169,12 +182,8 @@ class TestPredictActivationDelta:
         comp = make_composite(make_envelope(A=0.0, P=1.0, S=1.0, baseline=0.0))
         scheduler.register_envelopes("e1", comp)
 
-        phi_early = _evaluate_composite_at_tau(
-            comp, 0.25
-        )
-        phi_late = _evaluate_composite_at_tau(
-            comp, 0.9
-        )
+        phi_early = _evaluate_composite_at_tau(comp, 0.25)
+        phi_late = _evaluate_composite_at_tau(comp, 0.9)
         # Verify our assumption: early phi is higher than late phi
         assert phi_early > phi_late
 
@@ -183,6 +192,7 @@ class TestPredictActivationDelta:
 
 
 # --- TestSufficiencyReport ---
+
 
 class TestSufficiencyReport:
     def test_empty_report(self):
@@ -200,8 +210,12 @@ class TestSufficiencyReport:
         """All predictions match actuals within epsilon -> WSR = 1.0."""
         scheduler = make_scheduler(epsilon=0.1)
 
-        scheduler.record_prediction("e1", tau=0.5, predicted_phi=0.3, predicted_band=FidelityBand.SCENE)
-        scheduler.record_prediction("e2", tau=0.5, predicted_phi=0.7, predicted_band=FidelityBand.DIALOG)
+        scheduler.record_prediction(
+            "e1", tau=0.5, predicted_phi=0.3, predicted_band=FidelityBand.SCENE
+        )
+        scheduler.record_prediction(
+            "e2", tau=0.5, predicted_phi=0.7, predicted_band=FidelityBand.DIALOG
+        )
 
         # Actuals match within epsilon
         scheduler.record_actual("e1", tau=0.5, actual_activation=0.32)
@@ -217,8 +231,12 @@ class TestSufficiencyReport:
         """No predictions match actuals -> WSR = 0.0."""
         scheduler = make_scheduler(epsilon=0.05)
 
-        scheduler.record_prediction("e1", tau=0.5, predicted_phi=0.1, predicted_band=FidelityBand.TENSOR)
-        scheduler.record_prediction("e2", tau=0.5, predicted_phi=0.9, predicted_band=FidelityBand.TRAINED)
+        scheduler.record_prediction(
+            "e1", tau=0.5, predicted_phi=0.1, predicted_band=FidelityBand.TENSOR
+        )
+        scheduler.record_prediction(
+            "e2", tau=0.5, predicted_phi=0.9, predicted_band=FidelityBand.TRAINED
+        )
 
         # Actuals are far from predictions
         scheduler.record_actual("e1", tau=0.5, actual_activation=0.8)
@@ -233,11 +251,15 @@ class TestSufficiencyReport:
         scheduler = make_scheduler(epsilon=0.1)
 
         # Prediction 1: matches
-        scheduler.record_prediction("e1", tau=0.5, predicted_phi=0.5, predicted_band=FidelityBand.GRAPH)
+        scheduler.record_prediction(
+            "e1", tau=0.5, predicted_phi=0.5, predicted_band=FidelityBand.GRAPH
+        )
         scheduler.record_actual("e1", tau=0.5, actual_activation=0.52)
 
         # Prediction 2: does not match
-        scheduler.record_prediction("e2", tau=0.5, predicted_phi=0.2, predicted_band=FidelityBand.SCENE)
+        scheduler.record_prediction(
+            "e2", tau=0.5, predicted_phi=0.2, predicted_band=FidelityBand.SCENE
+        )
         scheduler.record_actual("e2", tau=0.5, actual_activation=0.9)
 
         report = scheduler.sufficiency_report()
@@ -249,16 +271,25 @@ class TestSufficiencyReport:
         """Counts TENSOR and SCENE predictions as skipped LLM calls."""
         scheduler = make_scheduler()
 
-        scheduler.record_prediction("e1", tau=0.1, predicted_phi=0.05, predicted_band=FidelityBand.TENSOR)
-        scheduler.record_prediction("e2", tau=0.2, predicted_phi=0.25, predicted_band=FidelityBand.SCENE)
-        scheduler.record_prediction("e3", tau=0.5, predicted_phi=0.5, predicted_band=FidelityBand.GRAPH)
-        scheduler.record_prediction("e4", tau=0.7, predicted_phi=0.9, predicted_band=FidelityBand.TRAINED)
+        scheduler.record_prediction(
+            "e1", tau=0.1, predicted_phi=0.05, predicted_band=FidelityBand.TENSOR
+        )
+        scheduler.record_prediction(
+            "e2", tau=0.2, predicted_phi=0.25, predicted_band=FidelityBand.SCENE
+        )
+        scheduler.record_prediction(
+            "e3", tau=0.5, predicted_phi=0.5, predicted_band=FidelityBand.GRAPH
+        )
+        scheduler.record_prediction(
+            "e4", tau=0.7, predicted_phi=0.9, predicted_band=FidelityBand.TRAINED
+        )
 
         report = scheduler.sufficiency_report()
         assert report["skipped_llm_calls"] == 2  # TENSOR + SCENE only
 
 
 # --- TestModuleLevelPredictDelta ---
+
 
 class TestModuleLevelPredictDelta:
     def test_module_level_predict_returns_dict(self):
@@ -301,7 +332,7 @@ class TestModuleLevelPredictDelta:
         """Module-level function works with multi-envelope ADPRSComposite."""
         comp = make_composite(
             make_envelope(A=0.0, P=0.5, S=0.1, baseline=0.05),  # low phi
-            make_envelope(A=1.0, P=1.0, S=1.0, baseline=0.8),   # high phi
+            make_envelope(A=1.0, P=1.0, S=1.0, baseline=0.8),  # high phi
         )
 
         result = predict_activation_delta(comp, current_tau=0.0, next_tau=0.25)

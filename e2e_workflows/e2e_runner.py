@@ -12,33 +12,34 @@ This is the core application component that runs the full 6-step workflow:
 No test theater - this is the real application.
 """
 
+import json
 import os
 import tempfile
 import uuid
-from typing import Dict, List, Optional, Any
 from datetime import datetime
 from pathlib import Path
-import json
+from typing import Any, Optional
 
+from andos.layer_computer import compute_andos_layers, validate_andos_layers
 from generation.config_schema import SimulationConfig
-from orchestrator import simulate_event
 from llm_v2 import LLMClient
-from storage import GraphStore
-from schemas import Entity, Timepoint, TemporalMode, ResolutionLevel
-from workflows import TemporalAgent, create_entity_training_workflow, synthesize_dialog
-from query_interface import QueryInterface
+from metadata import logfire_setup
+from metadata.narrative_exporter import NarrativeExporter
+from metadata.run_summarizer import generate_run_summary
+from metadata.run_tracker import MetadataManager, RunMetadata
+from metadata.tracking import clear_current_run_id, set_current_run_id, set_metadata_manager
+from orchestrator import simulate_event
 from oxen_integration import OxenClient
 from oxen_integration.data_formatters import EntityEvolutionFormatter
-from metadata.run_tracker import MetadataManager, RunMetadata
-from metadata.tracking import set_current_run_id, clear_current_run_id, set_metadata_manager
-from metadata import logfire_setup
-from metadata.run_summarizer import generate_run_summary
-from metadata.narrative_exporter import NarrativeExporter
-from andos.layer_computer import compute_andos_layers, validate_andos_layers
+from query_interface import QueryInterface
+from schemas import Entity, ResolutionLevel, TemporalMode, Timepoint
+from storage import GraphStore
+from workflows import TemporalAgent, create_entity_training_workflow, synthesize_dialog
 
 # Usage bridge for API quota tracking (Phase 6 integration)
 try:
     from api.usage_bridge import UsageBridge, get_usage_bridge
+
     USAGE_TRACKING_AVAILABLE = True
 except ImportError:
     USAGE_TRACKING_AVAILABLE = False
@@ -49,7 +50,7 @@ except ImportError:
 SHARED_DB_PATH = "metadata/runs.db"
 
 
-def _infer_interaction_graph(entities: List[Entity]) -> Dict:
+def _infer_interaction_graph(entities: list[Entity]) -> dict:
     """
     Infer interaction graph for templates without explicit graph.
 
@@ -68,10 +69,7 @@ def _infer_interaction_graph(entities: List[Entity]) -> Dict:
     # Sequential chain: entity[0] → entity[1] → entity[2] → ...
     interactions = []
     for i in range(len(entities) - 1):
-        interactions.append({
-            "from": entities[i].entity_id,
-            "to": entities[i + 1].entity_id
-        })
+        interactions.append({"from": entities[i].entity_id, "to": entities[i + 1].entity_id})
 
     return {"interactions": interactions}
 
@@ -88,8 +86,8 @@ class FullE2EWorkflowRunner:
         metadata_manager: MetadataManager,
         generate_summary: bool = True,
         track_usage: bool = True,
-        user_id: Optional[str] = None,
-        user_tier: str = "basic"
+        user_id: str | None = None,
+        user_tier: str = "basic",
     ):
         """
         Initialize E2E runner.
@@ -107,7 +105,7 @@ class FullE2EWorkflowRunner:
         self.logfire = logfire_setup.get_logfire()
 
         # Initialize shared store for convergence analysis (persists timepoints/events across runs)
-        self._shared_store: Optional[GraphStore] = None
+        self._shared_store: GraphStore | None = None
 
         # Phase 1 Tensor Persistence: Initialize dedicated tensor database
         self._tensor_db = None  # Lazy initialization
@@ -152,6 +150,7 @@ class FullE2EWorkflowRunner:
         """
         if self._tensor_db is None:
             from tensor_persistence import TensorDatabase
+
             # Ensure metadata directory exists
             Path("metadata").mkdir(parents=True, exist_ok=True)
             tensor_db_path = "metadata/tensors.db"
@@ -167,19 +166,16 @@ class FullE2EWorkflowRunner:
         """
         if self._tensor_rag is None:
             from retrieval.tensor_rag import TensorRAG
+
             tensor_db = self._get_tensor_db()
             self._tensor_rag = TensorRAG(
                 tensor_db=tensor_db,
-                auto_build_index=True  # Build index from existing tensors
+                auto_build_index=True,  # Build index from existing tensors
             )
         return self._tensor_rag
 
     def _resolve_existing_tensor(
-        self,
-        entity: "Entity",
-        world_id: str,
-        scenario_context: str,
-        min_score: float = 0.75
+        self, entity: "Entity", world_id: str, scenario_context: str, min_score: float = 0.75
     ) -> Optional["TTMTensor"]:
         """
         Phase 7: Attempt to resolve an existing tensor for this entity.
@@ -205,9 +201,9 @@ class FullE2EWorkflowRunner:
 
             # Build entity description for search
             entity_description = f"{entity.entity_id} ({entity.entity_type})"
-            if hasattr(entity, 'entity_metadata') and entity.entity_metadata:
-                role = entity.entity_metadata.get('role', '')
-                background = entity.entity_metadata.get('background', '')
+            if hasattr(entity, "entity_metadata") and entity.entity_metadata:
+                role = entity.entity_metadata.get("role", "")
+                background = entity.entity_metadata.get("background", "")
                 if role:
                     entity_description += f" - {role}"
                 if background:
@@ -217,7 +213,7 @@ class FullE2EWorkflowRunner:
             results = tensor_rag.search(
                 query=f"{entity_description} in {scenario_context}",
                 n_results=3,
-                min_maturity=0.3  # Allow less mature tensors for adaptation
+                min_maturity=0.3,  # Allow less mature tensors for adaptation
             )
 
             if not results:
@@ -226,8 +222,11 @@ class FullE2EWorkflowRunner:
             # Check if best match meets threshold
             best_match = results[0]
             if best_match.score >= min_score:
-                print(f"    🔍 Found existing tensor: {best_match.tensor_id} (score: {best_match.score:.3f})")
+                print(
+                    f"    🔍 Found existing tensor: {best_match.tensor_id} (score: {best_match.score:.3f})"
+                )
                 from tensor_serialization import deserialize_tensor
+
                 return deserialize_tensor(best_match.tensor_record.tensor_blob)
 
             # Check for composition opportunity (multiple weaker matches)
@@ -244,12 +243,7 @@ class FullE2EWorkflowRunner:
             print(f"    ⚠️  Tensor resolution failed: {e}")
             return None
 
-    def _persist_tensor_to_db(
-        self,
-        entity: Entity,
-        world_id: str,
-        run_id: str
-    ) -> bool:
+    def _persist_tensor_to_db(self, entity: Entity, world_id: str, run_id: str) -> bool:
         """
         Persist an entity's tensor to the dedicated TensorDatabase.
 
@@ -268,11 +262,12 @@ class FullE2EWorkflowRunner:
             True if persisted successfully, False otherwise
         """
         try:
+            import base64
+            import json
+
+            from schemas import TTMTensor
             from tensor_persistence import TensorRecord
             from tensor_serialization import serialize_tensor
-            from schemas import TTMTensor
-            import json
-            import base64
 
             # Extract tensor from entity
             tensor_json = entity.tensor
@@ -285,7 +280,7 @@ class FullE2EWorkflowRunner:
             ttm_tensor = TTMTensor(
                 context_vector=base64.b64decode(tensor_data["context_vector"]),
                 biology_vector=base64.b64decode(tensor_data["biology_vector"]),
-                behavior_vector=base64.b64decode(tensor_data["behavior_vector"])
+                behavior_vector=base64.b64decode(tensor_data["behavior_vector"]),
             )
 
             # Create TensorRecord
@@ -295,8 +290,8 @@ class FullE2EWorkflowRunner:
                 entity_id=entity.entity_id,
                 world_id=world_id,
                 tensor_blob=serialize_tensor(ttm_tensor),
-                maturity=getattr(entity, 'tensor_maturity', 0.0),
-                training_cycles=getattr(entity, 'tensor_training_cycles', 0)
+                maturity=getattr(entity, "tensor_maturity", 0.0),
+                training_cycles=getattr(entity, "tensor_training_cycles", 0),
             )
 
             # Save to dedicated tensor database
@@ -331,17 +326,21 @@ class FullE2EWorkflowRunner:
             # IMPORTANT: Prefix timepoint_id with run_id to avoid UNIQUE constraint violations
             # when the same template is run multiple times (e.g., tp_001_opening exists in both runs)
             unique_tp_id = f"{run_id}_{timepoint.timepoint_id}"
-            unique_parent_id = f"{run_id}_{timepoint.causal_parent}" if timepoint.causal_parent else None
+            unique_parent_id = (
+                f"{run_id}_{timepoint.causal_parent}" if timepoint.causal_parent else None
+            )
 
             fresh_timepoint = Timepoint(
                 timepoint_id=unique_tp_id,
                 timeline_id=timepoint.timeline_id,
                 timestamp=timepoint.timestamp,
                 event_description=timepoint.event_description,
-                entities_present=list(timepoint.entities_present) if timepoint.entities_present else [],
+                entities_present=list(timepoint.entities_present)
+                if timepoint.entities_present
+                else [],
                 causal_parent=unique_parent_id,
                 resolution_level=timepoint.resolution_level,
-                run_id=run_id  # Set run_id for convergence filtering
+                run_id=run_id,  # Set run_id for convergence filtering
             )
 
             shared_store.save_timepoint(fresh_timepoint)
@@ -349,7 +348,7 @@ class FullE2EWorkflowRunner:
             # Non-fatal - log but don't fail the run
             print(f"  ⚠️  Failed to persist timepoint for convergence: {e}")
 
-    def _persist_exposure_events_for_convergence(self, scene_result: Dict, run_id: str) -> int:
+    def _persist_exposure_events_for_convergence(self, scene_result: dict, run_id: str) -> int:
         """
         Persist all exposure events from temp store to shared database for convergence.
 
@@ -381,6 +380,7 @@ class FullE2EWorkflowRunner:
             # Get all exposure events from temp store
             # Note: We need to query all events, not just for specific entities
             from sqlmodel import Session, select
+
             with Session(temp_store.engine) as session:
                 all_events = session.exec(select(ExposureEvent)).all()
 
@@ -389,16 +389,18 @@ class FullE2EWorkflowRunner:
                 # Create FRESH copies to avoid session detachment issues
                 fresh_events = []
                 for event in all_events:
-                    fresh_events.append(ExposureEvent(
-                        entity_id=event.entity_id,
-                        event_type=event.event_type,
-                        information=event.information,
-                        source=event.source,
-                        timestamp=event.timestamp,
-                        confidence=event.confidence,
-                        timepoint_id=event.timepoint_id,
-                        run_id=run_id,
-                    ))
+                    fresh_events.append(
+                        ExposureEvent(
+                            entity_id=event.entity_id,
+                            event_type=event.event_type,
+                            information=event.information,
+                            source=event.source,
+                            timestamp=event.timestamp,
+                            confidence=event.confidence,
+                            timepoint_id=event.timepoint_id,
+                            run_id=run_id,
+                        )
+                    )
 
             # Batch-persist in a single transaction to avoid lock thrashing
             if fresh_events:
@@ -419,7 +421,7 @@ class FullE2EWorkflowRunner:
             if events_persisted > 0:
                 print(f"  📊 Persisted {events_persisted} exposure events for convergence")
             else:
-                print(f"  ⚠️  No exposure events to persist (0 found in temp store)")
+                print("  ⚠️  No exposure events to persist (0 found in temp store)")
 
             if events_skipped > 0:
                 print(f"  ⚠️  Skipped {events_skipped} events (duplicates/errors)")
@@ -429,10 +431,11 @@ class FullE2EWorkflowRunner:
         except Exception as e:
             print(f"  ⚠️  Failed to persist exposure events for convergence: {e}")
             import traceback
+
             traceback.print_exc()
             return 0
 
-    def _persist_dialogs_for_convergence(self, scene_result: Dict, run_id: str) -> int:
+    def _persist_dialogs_for_convergence(self, scene_result: dict, run_id: str) -> int:
         """
         Persist all dialogs from temp store to shared database for convergence.
 
@@ -463,6 +466,7 @@ class FullE2EWorkflowRunner:
 
             # Get all dialogs from temp store
             from sqlmodel import Session, select
+
             with Session(temp_store.engine) as session:
                 all_dialogs = session.exec(select(Dialog)).all()
 
@@ -471,17 +475,19 @@ class FullE2EWorkflowRunner:
                 # Create FRESH copies to avoid session detachment issues
                 fresh_dialogs = []
                 for dialog in all_dialogs:
-                    fresh_dialogs.append(Dialog(
-                        dialog_id=f"{run_id}_{dialog.dialog_id}",
-                        timepoint_id=dialog.timepoint_id,
-                        participants=dialog.participants,
-                        turns=dialog.turns,
-                        context_used=dialog.context_used,
-                        duration_seconds=dialog.duration_seconds,
-                        information_transfer_count=dialog.information_transfer_count,
-                        created_at=dialog.created_at,
-                        run_id=run_id,
-                    ))
+                    fresh_dialogs.append(
+                        Dialog(
+                            dialog_id=f"{run_id}_{dialog.dialog_id}",
+                            timepoint_id=dialog.timepoint_id,
+                            participants=dialog.participants,
+                            turns=dialog.turns,
+                            context_used=dialog.context_used,
+                            duration_seconds=dialog.duration_seconds,
+                            information_transfer_count=dialog.information_transfer_count,
+                            created_at=dialog.created_at,
+                            run_id=run_id,
+                        )
+                    )
 
             # Batch-persist in a single transaction to avoid lock thrashing
             if fresh_dialogs:
@@ -502,7 +508,7 @@ class FullE2EWorkflowRunner:
             if dialogs_persisted > 0:
                 print(f"  📊 Persisted {dialogs_persisted} dialogs for convergence")
             else:
-                print(f"  ⚠️  No dialogs to persist (0 found in temp store)")
+                print("  ⚠️  No dialogs to persist (0 found in temp store)")
 
             if dialogs_skipped > 0:
                 print(f"  ⚠️  Skipped {dialogs_skipped} dialogs (duplicates/errors)")
@@ -512,6 +518,7 @@ class FullE2EWorkflowRunner:
         except Exception as e:
             print(f"  ⚠️  Failed to persist dialogs for convergence: {e}")
             import traceback
+
             traceback.print_exc()
             return 0
 
@@ -542,10 +549,10 @@ class FullE2EWorkflowRunner:
                 entity_type=entity.entity_type,
                 resolution_level=entity.resolution_level,
                 tensor=entity.tensor,
-                tensor_maturity=getattr(entity, 'tensor_maturity', 0.0),
-                tensor_training_cycles=getattr(entity, 'tensor_training_cycles', 0),
+                tensor_maturity=getattr(entity, "tensor_maturity", 0.0),
+                tensor_training_cycles=getattr(entity, "tensor_training_cycles", 0),
                 entity_metadata=dict(entity.entity_metadata) if entity.entity_metadata else {},
-                run_id=run_id  # Set run_id for convergence filtering
+                run_id=run_id,  # Set run_id for convergence filtering
             )
 
             shared_store.save_entity(fresh_entity)
@@ -554,7 +561,7 @@ class FullE2EWorkflowRunner:
             # Non-fatal - log but don't fail the run
             print(f"  ⚠️  Failed to persist entity for convergence: {e}")
 
-    def _persist_all_entities_for_convergence(self, entities: List[Entity], run_id: str) -> int:
+    def _persist_all_entities_for_convergence(self, entities: list[Entity], run_id: str) -> int:
         """
         Persist all entities to the shared database for convergence analysis.
 
@@ -579,11 +586,8 @@ class FullE2EWorkflowRunner:
         return persisted
 
     def _run_data_quality_check(
-        self,
-        timepoints: List[Timepoint],
-        entities: List[Entity],
-        run_id: str
-    ) -> Dict[str, Any]:
+        self, timepoints: list[Timepoint], entities: list[Entity], run_id: str
+    ) -> dict[str, Any]:
         """
         Run data quality validation on generated data.
 
@@ -606,12 +610,7 @@ class FullE2EWorkflowRunner:
         """
         print("\n  📊 Running data quality check...")
 
-        results = {
-            "passed": True,
-            "warnings": [],
-            "errors": [],
-            "stats": {}
-        }
+        results = {"passed": True, "warnings": [], "errors": [], "stats": {}}
 
         # Build entity ID set for validation
         entity_ids = {e.entity_id for e in entities}
@@ -678,7 +677,7 @@ class FullE2EWorkflowRunner:
         print(f"    Empty entities_present: {empty_entities_count}")
 
         if results["errors"]:
-            print(f"  ❌ Data quality check FAILED:")
+            print("  ❌ Data quality check FAILED:")
             for err in results["errors"]:
                 print(f"     ERROR: {err}")
             results["passed"] = False
@@ -689,14 +688,12 @@ class FullE2EWorkflowRunner:
             if len(results["warnings"]) > 5:
                 print(f"     ... and {len(results['warnings']) - 5} more")
         else:
-            print(f"  ✓ Data quality check passed")
+            print("  ✓ Data quality check passed")
 
         return results
 
     def _populate_fallback_entities(
-        self,
-        timepoints: List[Timepoint],
-        entities: List[Entity]
+        self, timepoints: list[Timepoint], entities: list[Entity]
     ) -> int:
         """
         Populate empty entities_present with fallback entities.
@@ -726,8 +723,7 @@ class FullE2EWorkflowRunner:
 
         # Build fallback entity lists
         human_entities = [
-            e.entity_id for e in entities
-            if e.entity_type in ('human', 'person', 'character')
+            e.entity_id for e in entities if e.entity_type in ("human", "person", "character")
         ]
         all_entity_ids = [e.entity_id for e in entities[:10]]  # Limit to 10
 
@@ -786,10 +782,10 @@ class FullE2EWorkflowRunner:
         if self._track_usage and self._usage_bridge:
             self._usage_bridge.record_simulation_start(run_id)
 
-        print(f"\n{'='*80}")
+        print(f"\n{'=' * 80}")
         print(f"STARTING E2E WORKFLOW: {run_id}")
         print(f"Template: {config.world_id}")
-        print(f"{'='*80}\n")
+        print(f"{'=' * 80}\n")
 
         try:
             with self.logfire.span(f"e2e_run:{run_id}", template=config.world_id):
@@ -819,9 +815,7 @@ class FullE2EWorkflowRunner:
                 self._initialize_waveform_scheduler(scene_result.get("entities", []))
 
                 # Step 3: Generate all timepoints
-                all_timepoints = self._generate_all_timepoints(
-                    scene_result, config, run_id
-                )
+                all_timepoints = self._generate_all_timepoints(scene_result, config, run_id)
 
                 # Step 3.5: Compute ANDOS training layers
                 entities = scene_result["entities"]
@@ -840,23 +834,26 @@ class FullE2EWorkflowRunner:
                 # Step 4.5: Synthesize dialogs (M11)
                 # Phase 1: Skip if inline dialog already completed (FORWARD mode)
                 if scene_result.get("dialog_inline_complete"):
-                    print("\nStep 4.5: Skipping post-hoc dialog synthesis (dialog_inline_complete=True)")
+                    print(
+                        "\nStep 4.5: Skipping post-hoc dialog synthesis (dialog_inline_complete=True)"
+                    )
                 else:
                     # Phase 2 ADPRS: Initialize trajectory tracker before dialog synthesis
                     try:
                         from synth.trajectory_tracker import TrajectoryTracker
+
                         self._trajectory_tracker = TrajectoryTracker()
                     except ImportError:
                         self._trajectory_tracker = None
 
                     self._synthesize_dialogs(
-                        trained_entities, all_timepoints, scene_result, run_id,
-                        config=config
+                        trained_entities, all_timepoints, scene_result, run_id, config=config
                     )
 
                 # Step 4.5a: Phase 6 - Full-run dialog evaluation metrics
                 try:
                     from workflows.dialog_steering import evaluate_full_run_coherence
+
                     llm = scene_result["llm_client"]
 
                     # Collect character arcs and dialog turns for evaluation
@@ -873,8 +870,12 @@ class FullE2EWorkflowRunner:
                     for tp in all_timepoints:
                         try:
                             dialogs = store.get_dialogs_for_timepoint(tp.timepoint_id)
-                            for d in (dialogs or []):
-                                turns = json.loads(d.turns) if isinstance(d.turns, str) else (d.turns or [])
+                            for d in dialogs or []:
+                                turns = (
+                                    json.loads(d.turns)
+                                    if isinstance(d.turns, str)
+                                    else (d.turns or [])
+                                )
                                 all_dialog_turns.append(turns)
                                 speakers = list(set(t.get("speaker", "?") for t in turns))
                                 dialog_summaries.append(
@@ -890,13 +891,19 @@ class FullE2EWorkflowRunner:
                             character_arcs=character_arcs,
                             all_turns=all_dialog_turns,
                         )
-                        print(f"\n  [Dialog Evaluation Metrics]")
+                        print("\n  [Dialog Evaluation Metrics]")
                         if "tactic_evolution_score" in eval_result:
-                            print(f"    Tactic Evolution: {eval_result['tactic_evolution_score']:.3f}")
+                            print(
+                                f"    Tactic Evolution: {eval_result['tactic_evolution_score']:.3f}"
+                            )
                         if "information_asymmetry_utilization_score" in eval_result:
-                            print(f"    Info Asymmetry Utilization: {eval_result['information_asymmetry_utilization_score']:.3f}")
+                            print(
+                                f"    Info Asymmetry Utilization: {eval_result['information_asymmetry_utilization_score']:.3f}"
+                            )
                         if "subtext_density_score" in eval_result:
-                            print(f"    Subtext Density: {eval_result['subtext_density_score']:.3f}")
+                            print(
+                                f"    Subtext Density: {eval_result['subtext_density_score']:.3f}"
+                            )
                         if "score" in eval_result:
                             print(f"    Overall Coherence: {eval_result['score']}")
 
@@ -905,14 +912,10 @@ class FullE2EWorkflowRunner:
                     print(f"  ⚠️  Dialog evaluation metrics failed: {eval_err}")
 
                 # Step 4.5b: Fit ADPRS envelopes from observed trajectories (Phase 2)
-                self._fit_adprs_envelopes(
-                    trained_entities, scene_result, run_id, config=config
-                )
+                self._fit_adprs_envelopes(trained_entities, scene_result, run_id, config=config)
 
                 # Step 4.6: Execute queries (M5)
-                self._execute_queries(
-                    trained_entities, all_timepoints, scene_result, run_id
-                )
+                self._execute_queries(trained_entities, all_timepoints, scene_result, run_id)
 
                 # Step 4.7: Persist exposure events to shared DB for convergence analysis
                 # This must happen AFTER dialogs and queries which create exposure events
@@ -948,7 +951,7 @@ class FullE2EWorkflowRunner:
                     all_timepoints,
                     training_data,
                     oxen_repo_url,
-                    oxen_dataset_url
+                    oxen_dataset_url,
                 )
 
                 # Step 8: Generate narrative summary (optional)
@@ -957,18 +960,18 @@ class FullE2EWorkflowRunner:
                         metadata,
                         training_data,
                         scene_result,
-                        all_timepoints,      # Pass full temporal arc
-                        trained_entities     # Pass character development
+                        all_timepoints,  # Pass full temporal arc
+                        trained_entities,  # Pass character development
                     )
                     if summary:
                         # Update metadata object with summary
                         metadata.summary = summary
                         metadata.summary_generated_at = datetime.now()
-                        print(f"\n{'='*80}")
-                        print(f"📝 NARRATIVE SUMMARY")
-                        print(f"{'='*80}")
+                        print(f"\n{'=' * 80}")
+                        print("📝 NARRATIVE SUMMARY")
+                        print(f"{'=' * 80}")
                         print(f"{summary}")
-                        print(f"{'='*80}\n")
+                        print(f"{'=' * 80}\n")
 
                 # Step 9: Generate narrative exports (CRITICAL DELIVERABLE)
                 try:
@@ -978,7 +981,7 @@ class FullE2EWorkflowRunner:
                         trained_entities=trained_entities,
                         scene_result=scene_result,
                         training_data=training_data,
-                        config=config
+                        config=config,
                     )
 
                     # Update metadata with export paths
@@ -998,22 +1001,20 @@ class FullE2EWorkflowRunner:
                 # Step 10: Optional Convergence Analysis (post-run)
                 if config.convergence and config.convergence.enabled:
                     self._run_convergence_analysis(
-                        run_id=run_id,
-                        template_id=config.world_id,
-                        config=config
+                        run_id=run_id, template_id=config.world_id, config=config
                     )
 
-                print(f"\n{'='*80}")
+                print(f"\n{'=' * 80}")
                 print(f"✅ E2E WORKFLOW COMPLETE: {run_id}")
-                print(f"{'='*80}\n")
+                print(f"{'=' * 80}\n")
 
                 return metadata
 
         except Exception as e:
-            print(f"\n{'='*80}")
+            print(f"\n{'=' * 80}")
             print(f"❌ E2E WORKFLOW FAILED: {run_id}")
             print(f"Error: {e}")
-            print(f"{'='*80}\n")
+            print(f"{'=' * 80}\n")
 
             # Record failure
             self.metadata_manager.complete_run(
@@ -1024,17 +1025,14 @@ class FullE2EWorkflowRunner:
                 cost_usd=0.0,
                 llm_calls=0,
                 tokens_used=0,
-                error_message=str(e)
+                error_message=str(e),
             )
 
             # Phase 6: Record failed simulation to usage tracking
             if self._track_usage and self._usage_bridge:
                 try:
                     self._usage_bridge.record_simulation(
-                        run_id=run_id,
-                        success=False,
-                        cost_usd=0.0,
-                        tokens=0
+                        run_id=run_id, success=False, cost_usd=0.0, tokens=0
                     )
                 except Exception as usage_err:
                     print(f"  ⚠️  Failed to record usage for failed run: {usage_err}")
@@ -1054,15 +1052,15 @@ class FullE2EWorkflowRunner:
                 template_id=config.world_id,
                 causal_mode=config.temporal.mode,
                 max_entities=config.entities.count,
-                max_timepoints=config.timepoints.count
+                max_timepoints=config.timepoints.count,
             )
 
             # Seed mechanisms from template metadata
-            if hasattr(config, 'metadata') and config.metadata:
-                featured = config.metadata.get('mechanisms_featured', [])
+            if hasattr(config, "metadata") and config.metadata:
+                featured = config.metadata.get("mechanisms_featured", [])
                 for m in featured:
                     # Extract mechanism ID (e.g., "M10" from "M10_atmospheric_entities")
-                    mech_id = m.split('_')[0] if '_' in m else m
+                    mech_id = m.split("_")[0] if "_" in m else m
                     self.metadata_manager.record_mechanism(run_id, mech_id, "template_metadata")
 
             self.logfire.info("Run tracking initialized", run_id=run_id)
@@ -1071,11 +1069,11 @@ class FullE2EWorkflowRunner:
     def _generate_summary(
         self,
         metadata: RunMetadata,
-        training_data: List[Dict],
-        scene_result: Dict,
-        all_timepoints: List[Timepoint],
-        trained_entities: List[Entity]
-    ) -> Optional[str]:
+        training_data: list[dict],
+        scene_result: dict,
+        all_timepoints: list[Timepoint],
+        trained_entities: list[Entity],
+    ) -> str | None:
         """Step 8: Generate LLM-powered narrative summary"""
         with self.logfire.span("step:generate_summary"):
             print("\nStep 8: Generating narrative summary...")
@@ -1091,11 +1089,13 @@ class FullE2EWorkflowRunner:
                 # Generate NARRATIVE summary using full simulation data
                 summary = generate_run_summary(
                     run_metadata=metadata,
-                    training_data=training_data[:5] if training_data else None,  # Sample for context
+                    training_data=training_data[:5]
+                    if training_data
+                    else None,  # Sample for context
                     llm_client=llm,
                     all_timepoints=all_timepoints,  # Full narrative arc
-                    entities=trained_entities,       # Character development
-                    store=store                      # For dialogs
+                    entities=trained_entities,  # Character development
+                    store=store,  # For dialogs
                 )
 
                 # Save summary to database
@@ -1104,9 +1104,7 @@ class FullE2EWorkflowRunner:
                 print(f"✓ Summary generated ({len(summary)} chars)")
 
                 self.logfire.info(
-                    "Run summary generated",
-                    run_id=metadata.run_id,
-                    summary_length=len(summary)
+                    "Run summary generated", run_id=metadata.run_id, summary_length=len(summary)
                 )
 
                 return summary
@@ -1119,12 +1117,12 @@ class FullE2EWorkflowRunner:
     def _generate_narrative_exports(
         self,
         metadata: RunMetadata,
-        all_timepoints: List[Timepoint],
-        trained_entities: List[Entity],
-        scene_result: Dict,
-        training_data: List[Dict],
-        config: SimulationConfig
-    ) -> Dict[str, str]:
+        all_timepoints: list[Timepoint],
+        trained_entities: list[Entity],
+        scene_result: dict,
+        training_data: list[dict],
+        config: SimulationConfig,
+    ) -> dict[str, str]:
         """
         Step 9: Generate narrative exports in configured formats.
 
@@ -1138,7 +1136,7 @@ class FullE2EWorkflowRunner:
             return {}
 
         with self.logfire.span("step:narrative_exports"):
-            print(f"\n🎬 Generating narrative exports...")
+            print("\n🎬 Generating narrative exports...")
 
             # Initialize exporter
             exporter = NarrativeExporter()
@@ -1150,7 +1148,7 @@ class FullE2EWorkflowRunner:
                 entities=trained_entities,
                 store=scene_result.get("store"),
                 training_data=training_data,
-                config=config
+                config=config,
             )
 
             # Optionally enhance with LLM
@@ -1159,7 +1157,7 @@ class FullE2EWorkflowRunner:
                     llm = scene_result.get("llm_client")
                     if llm:
                         narrative_data = exporter.enhance_with_llm(narrative_data, llm)
-                        print(f"  ✓ Executive summary enhanced with LLM")
+                        print("  ✓ Executive summary enhanced with LLM")
                 except Exception as e:
                     print(f"  ⚠️  LLM enhancement failed: {e}, using template only")
 
@@ -1186,7 +1184,7 @@ class FullE2EWorkflowRunner:
                             path = exporter.export_pdf(narrative_data, output_file, depth)
                             print(f"    ✓ PDF: {path.name} ({path.stat().st_size} bytes)")
                         except ImportError:
-                            print(f"    ⚠️  PDF skipped: reportlab not installed")
+                            print("    ⚠️  PDF skipped: reportlab not installed")
                             continue
 
                     exported_files[format_name] = str(path)
@@ -1201,14 +1199,12 @@ class FullE2EWorkflowRunner:
             self.logfire.info(
                 "Narrative exports generated",
                 formats=list(exported_files.keys()),
-                detail_level=depth
+                detail_level=depth,
             )
 
             return exported_files
 
-    def _generate_initial_scene(
-        self, config: SimulationConfig, run_id: str
-    ) -> Dict[str, Any]:
+    def _generate_initial_scene(self, config: SimulationConfig, run_id: str) -> dict[str, Any]:
         """Step 2: Generate initial scene specification"""
         with self.logfire.span("step:initial_scene"):
             print("\nStep 2: Generating initial scene...")
@@ -1244,10 +1240,10 @@ class FullE2EWorkflowRunner:
                     "entity_config": {
                         "count": config.entities.count,
                         "types": config.entities.types,
-                        "profiles": getattr(config.entities, 'profiles', [])
-                    }
+                        "profiles": getattr(config.entities, "profiles", []),
+                    },
                 },
-                save_to_db=True
+                save_to_db=True,
             )
 
             # Store for later steps
@@ -1256,19 +1252,19 @@ class FullE2EWorkflowRunner:
             result["db_path"] = db_path
             result["config"] = config  # Store config for prospection triggering
 
-            print(f"✓ Initial scene created:")
+            print("✓ Initial scene created:")
             print(f"  - Entities: {len(result['entities'])}")
             print(f"  - Timepoints: {len(result['timepoints'])}")
 
             self.logfire.info(
                 "Initial scene generated",
-                entities=len(result['entities']),
-                timepoints=len(result['timepoints'])
+                entities=len(result["entities"]),
+                timepoints=len(result["timepoints"]),
             )
 
             return result
 
-    def _initialize_qse(self, config, scene_result: Dict) -> None:
+    def _initialize_qse(self, config, scene_result: dict) -> None:
         """
         Step 2.4: Initialize Quantitative State Engine for deterministic resource propagation.
 
@@ -1285,21 +1281,23 @@ class FullE2EWorkflowRunner:
 
         if not self._qse.is_active:
             # Also try loading from the config object directly
-            if hasattr(config, 'to_dict'):
+            if hasattr(config, "to_dict"):
                 self._qse.load_from_template(config.to_dict())
 
         # Initialize per-entity resource state
         if self._qse.is_active:
             entities = scene_result.get("entities", [])
             for entity in entities:
-                entity_config = getattr(entity, 'entity_metadata', {}).get('key_state_variables', {})
+                entity_config = getattr(entity, "entity_metadata", {}).get(
+                    "key_state_variables", {}
+                )
                 self._qse.initialize_entity(entity.entity_id, entity_config)
-            print(f"  [QSE] Initialized {len(self._qse.resource_definitions)} tracked resources "
-                  f"for {len(entities)} entities")
+            print(
+                f"  [QSE] Initialized {len(self._qse.resource_definitions)} tracked resources "
+                f"for {len(entities)} entities"
+            )
 
-    def _initialize_baseline_tensors(
-        self, scene_result: Dict, run_id: str
-    ) -> None:
+    def _initialize_baseline_tensors(self, scene_result: dict, run_id: str) -> None:
         """
         Step 2.5: Initialize baseline tensors (Phase 7 + Phase 11 Architecture Pivot).
 
@@ -1328,9 +1326,10 @@ class FullE2EWorkflowRunner:
             scenario_context = config.scenario_description if config else ""
 
             # Import baseline tensor creation
-            from tensor_initialization import create_baseline_tensor, create_fallback_tensor
             import base64
             import json
+
+            from tensor_initialization import create_baseline_tensor, create_fallback_tensor
 
             entities_initialized = 0
             entities_failed = 0
@@ -1343,7 +1342,7 @@ class FullE2EWorkflowRunner:
                         entity=entity,
                         world_id=world_id,
                         scenario_context=scenario_context,
-                        min_score=0.75
+                        min_score=0.75,
                     )
 
                     if resolved_tensor is not None:
@@ -1352,7 +1351,9 @@ class FullE2EWorkflowRunner:
                         entities_resolved += 1
                         needs_population = False  # Already trained
                         inherited_maturity = 0.5  # Assume moderate maturity from cache
-                        print(f"  ✓ {entity.entity_id}: resolved from cache (maturity: {inherited_maturity:.2f})")
+                        print(
+                            f"  ✓ {entity.entity_id}: resolved from cache (maturity: {inherited_maturity:.2f})"
+                        )
                     else:
                         # Cache miss - create baseline tensor (instant, no LLM)
                         print(f"  Creating baseline tensor for {entity.entity_id}...")
@@ -1361,11 +1362,19 @@ class FullE2EWorkflowRunner:
                         inherited_maturity = 0.0
 
                     # Serialize tensor to entity.tensor
-                    entity.tensor = json.dumps({
-                        "context_vector": base64.b64encode(tensor.context_vector).decode('utf-8'),
-                        "biology_vector": base64.b64encode(tensor.biology_vector).decode('utf-8'),
-                        "behavior_vector": base64.b64encode(tensor.behavior_vector).decode('utf-8')
-                    })
+                    entity.tensor = json.dumps(
+                        {
+                            "context_vector": base64.b64encode(tensor.context_vector).decode(
+                                "utf-8"
+                            ),
+                            "biology_vector": base64.b64encode(tensor.biology_vector).decode(
+                                "utf-8"
+                            ),
+                            "behavior_vector": base64.b64encode(tensor.behavior_vector).decode(
+                                "utf-8"
+                            ),
+                        }
+                    )
 
                     # Set maturity and training metadata based on resolution result
                     entity.tensor_maturity = inherited_maturity
@@ -1373,7 +1382,9 @@ class FullE2EWorkflowRunner:
                     entity.entity_metadata["baseline_initialized"] = not needs_population
                     entity.entity_metadata["needs_llm_population"] = needs_population
                     entity.entity_metadata["needs_training"] = needs_population
-                    entity.entity_metadata["tensor_resolved_from_cache"] = (resolved_tensor is not None)
+                    entity.entity_metadata["tensor_resolved_from_cache"] = (
+                        resolved_tensor is not None
+                    )
 
                     # Save entity with tensor
                     store.save_entity(entity)
@@ -1383,7 +1394,9 @@ class FullE2EWorkflowRunner:
 
                     entities_initialized += 1
                     if needs_population:
-                        print(f"  ✓ {entity.entity_id}: baseline tensor created (maturity: {inherited_maturity:.2f})")
+                        print(
+                            f"  ✓ {entity.entity_id}: baseline tensor created (maturity: {inherited_maturity:.2f})"
+                        )
 
                 except Exception as e:
                     print(f"  ⚠️  Failed to create baseline for {entity.entity_id}: {e}")
@@ -1392,11 +1405,19 @@ class FullE2EWorkflowRunner:
                     # Fallback: create minimal tensor
                     try:
                         fallback_tensor = create_fallback_tensor()
-                        entity.tensor = json.dumps({
-                            "context_vector": base64.b64encode(fallback_tensor.context_vector).decode('utf-8'),
-                            "biology_vector": base64.b64encode(fallback_tensor.biology_vector).decode('utf-8'),
-                            "behavior_vector": base64.b64encode(fallback_tensor.behavior_vector).decode('utf-8')
-                        })
+                        entity.tensor = json.dumps(
+                            {
+                                "context_vector": base64.b64encode(
+                                    fallback_tensor.context_vector
+                                ).decode("utf-8"),
+                                "biology_vector": base64.b64encode(
+                                    fallback_tensor.biology_vector
+                                ).decode("utf-8"),
+                                "behavior_vector": base64.b64encode(
+                                    fallback_tensor.behavior_vector
+                                ).decode("utf-8"),
+                            }
+                        )
                         entity.tensor_maturity = 0.0
                         entity.tensor_training_cycles = 0
                         entity.entity_metadata["baseline_initialized"] = False
@@ -1410,52 +1431,57 @@ class FullE2EWorkflowRunner:
                         entities_initialized += 1
                         print(f"  ⚠️  {entity.entity_id}: using fallback tensor")
                     except Exception as fallback_err:
-                        print(f"  ❌ Fatal: Even fallback failed for {entity.entity_id}: {fallback_err}")
+                        print(
+                            f"  ❌ Fatal: Even fallback failed for {entity.entity_id}: {fallback_err}"
+                        )
 
             print(f"✓ Initialized {entities_initialized} entities with tensors")
             if entities_resolved > 0:
-                print(f"  🔍 Phase 7: {entities_resolved} tensors resolved from cache (reuse enabled)")
+                print(
+                    f"  🔍 Phase 7: {entities_resolved} tensors resolved from cache (reuse enabled)"
+                )
             if entities_failed > 0:
                 print(f"  ⚠️  {entities_failed} entities used fallback tensors")
             needs_pop_count = entities_initialized - entities_resolved
             if needs_pop_count > 0:
                 print(f"  📝 {needs_pop_count} entities need LLM-guided population (Step 4)")
-            print(f"  💾 Tensors persisted to dedicated database: metadata/tensors.db")
+            print("  💾 Tensors persisted to dedicated database: metadata/tensors.db")
 
             self.logfire.info(
                 "Baseline tensor initialization complete",
                 entities_initialized=entities_initialized,
                 entities_resolved=entities_resolved,
                 entities_failed=entities_failed,
-                cache_hit_rate=entities_resolved / max(1, entities_initialized)
+                cache_hit_rate=entities_resolved / max(1, entities_initialized),
             )
 
-    def _load_prior_adprs_envelopes(self, entities: List[Entity], world_id: str) -> int:
+    def _load_prior_adprs_envelopes(self, entities: list[Entity], world_id: str) -> int:
         """Load ADPRS envelopes from prior runs for warm-start fitting."""
         loaded = 0
         try:
             shared_store = self._get_shared_store()
             from sqlmodel import Session, select
+
             with Session(shared_store.engine) as session:
                 for entity in entities:
                     # Prior runs store entities as {run_id}_{entity_id}
                     # Search for any entity whose entity_id ends with _{entity.entity_id}
                     # and has adprs_envelopes in metadata
-                    statement = select(Entity).where(
-                        Entity.entity_id.like(f"%_{entity.entity_id}")
-                    )
+                    statement = select(Entity).where(Entity.entity_id.like(f"%_{entity.entity_id}"))
                     prior_entities = session.exec(statement).all()
                     # Find the most recent one with adprs_envelopes
                     best_prior = None
                     for prior in prior_entities:
-                        if (prior.entity_metadata
-                                and prior.entity_metadata.get("adprs_envelopes")
-                                and prior.entity_id != entity.entity_id):
+                        if (
+                            prior.entity_metadata
+                            and prior.entity_metadata.get("adprs_envelopes")
+                            and prior.entity_id != entity.entity_id
+                        ):
                             best_prior = prior
                     if best_prior:
-                        entity.entity_metadata["adprs_envelopes"] = (
-                            best_prior.entity_metadata["adprs_envelopes"]
-                        )
+                        entity.entity_metadata["adprs_envelopes"] = best_prior.entity_metadata[
+                            "adprs_envelopes"
+                        ]
                         loaded += 1
         except Exception as e:
             # Non-fatal — shared DB may not exist on first run
@@ -1465,9 +1491,7 @@ class FullE2EWorkflowRunner:
                 print(f"  [ADPRS Cross-Run] Partial load ({loaded} entities), error: {e}")
         return loaded
 
-    def _initialize_shadow_evaluator(
-        self, scene_result: Dict, config, run_id: str
-    ) -> None:
+    def _initialize_shadow_evaluator(self, scene_result: dict, config, run_id: str) -> None:
         """
         Step 2.6: Initialize ADPRS shadow evaluator (Phase 1 — shadow mode).
 
@@ -1476,8 +1500,8 @@ class FullE2EWorkflowRunner:
         If no envelopes are found, shadow evaluator stays None (no-op).
         """
         try:
+            from synth.fidelity_envelope import ADPRSComposite, ADPRSEnvelope
             from synth.shadow_evaluator import ShadowEvaluator
-            from synth.fidelity_envelope import ADPRSEnvelope, ADPRSComposite
         except ImportError:
             return
 
@@ -1506,9 +1530,7 @@ class FullE2EWorkflowRunner:
         else:
             self._shadow_evaluator = None
 
-    def _shadow_evaluate_all_timepoints(
-        self, all_timepoints: list, scene_result: Dict
-    ) -> None:
+    def _shadow_evaluate_all_timepoints(self, all_timepoints: list, scene_result: dict) -> None:
         """
         Run ADPRS shadow evaluation across all timepoints and print summary.
 
@@ -1559,9 +1581,11 @@ class FullE2EWorkflowRunner:
         report = self._shadow_evaluator.get_report()
         if report.total_evaluations > 0:
             summary = report.summary()
-            print(f"\n  [ADPRS Shadow Report]")
+            print("\n  [ADPRS Shadow Report]")
             print(f"    Total evaluations:  {summary['total_evaluations']}")
-            print(f"    Divergent:          {summary['divergent_count']} ({summary['divergence_rate_pct']}%)")
+            print(
+                f"    Divergent:          {summary['divergent_count']} ({summary['divergence_rate_pct']}%)"
+            )
             print(f"    Mean divergence:    {summary['mean_divergence']}")
             print(f"    Max divergence:     {summary['max_divergence']}")
 
@@ -1569,6 +1593,7 @@ class FullE2EWorkflowRunner:
             try:
                 import json
                 from pathlib import Path
+
                 config = scene_result.get("config")
                 world_id = config.world_id if config else "unknown"
                 output_dir = Path("datasets") / world_id
@@ -1584,8 +1609,12 @@ class FullE2EWorkflowRunner:
             scene_result["adprs_shadow_report"] = summary
 
     def _fit_adprs_envelopes(
-        self, entities: List[Entity], scene_result: Dict, run_id: str,
-        config=None, validation_mode: bool = False
+        self,
+        entities: list[Entity],
+        scene_result: dict,
+        run_id: str,
+        config=None,
+        validation_mode: bool = False,
     ) -> None:
         """
         Step 4.5b: Fit ADPRS envelopes to observed cognitive trajectories (Phase 2).
@@ -1612,8 +1641,10 @@ class FullE2EWorkflowRunner:
             print("  [ADPRS Fit] No trajectory data collected, skipping envelope fitting")
             return
 
-        print(f"\n  [ADPRS Fit] Trajectory summary: {tracker_summary['entities_tracked']} entities, "
-              f"{tracker_summary['total_snapshots']} total snapshots")
+        print(
+            f"\n  [ADPRS Fit] Trajectory summary: {tracker_summary['entities_tracked']} entities, "
+            f"{tracker_summary['total_snapshots']} total snapshots"
+        )
 
         fitter = ADPRSFitter(min_points=5)
         results = fitter.fit_all(self._trajectory_tracker, entities)
@@ -1623,13 +1654,16 @@ class FullE2EWorkflowRunner:
             return
 
         # Determine duration and t0 from timepoints/config
-        from datetime import datetime, timezone
         t0_iso = "2026-01-01T00:00:00+00:00"
         duration_ms = 31536000000.0  # 1 year default
 
         # Try to extract from scene_result or config
         if config and hasattr(config, "start_date") and config.start_date:
-            t0_iso = config.start_date if isinstance(config.start_date, str) else config.start_date.isoformat()
+            t0_iso = (
+                config.start_date
+                if isinstance(config.start_date, str)
+                else config.start_date.isoformat()
+            )
         if config and hasattr(config, "duration_ms") and config.duration_ms:
             duration_ms = float(config.duration_ms)
 
@@ -1639,9 +1673,11 @@ class FullE2EWorkflowRunner:
         for entity_id, fit_result in results.items():
             p = fit_result.params
             status = "converged" if fit_result.converged else "fallback"
-            print(f"    {entity_id}: A={p['A']:.3f} P={p['P']:.3f} S={p['S']:.3f} "
-                  f"baseline={p['baseline']:.3f} ({fit_result.method}, {status}, "
-                  f"MSE={fit_result.residual:.5f})")
+            print(
+                f"    {entity_id}: A={p['A']:.3f} P={p['P']:.3f} S={p['S']:.3f} "
+                f"baseline={p['baseline']:.3f} ({fit_result.method}, {status}, "
+                f"MSE={fit_result.residual:.5f})"
+            )
 
         # Re-initialize shadow evaluator with the fitted envelopes
         self._initialize_shadow_evaluator(scene_result, config, run_id)
@@ -1660,10 +1696,11 @@ class FullE2EWorkflowRunner:
                 if entity and "adprs_fit_metadata" in entity.entity_metadata:
                     entity.entity_metadata["adprs_fit_metadata"]["wsr"] = wsr_report.get("wsr")
 
-    def _initialize_waveform_scheduler(self, entities: List[Entity]) -> None:
+    def _initialize_waveform_scheduler(self, entities: list[Entity]) -> None:
         """Initialize waveform scheduler from entities with fitted ADPRS envelopes."""
         try:
             from synth.waveform_scheduler import WaveformScheduler
+
             self._waveform_scheduler = WaveformScheduler()
             registered = 0
             for entity in entities:
@@ -1683,9 +1720,9 @@ class FullE2EWorkflowRunner:
 
     def _waveform_resolution_schedule(
         self,
-        entities: List[Entity],
-        timepoints: List,
-    ) -> Dict:
+        entities: list[Entity],
+        timepoints: list,
+    ) -> dict:
         """
         Phase 3: Generate waveform-based resolution schedule.
 
@@ -1709,9 +1746,7 @@ class FullE2EWorkflowRunner:
                     schedule[(entity.entity_id, tp_idx)] = band
         return schedule
 
-    def _compute_andos_layers(
-        self, entities: List[Entity], run_id: str
-    ) -> List[List[Entity]]:
+    def _compute_andos_layers(self, entities: list[Entity], run_id: str) -> list[list[Entity]]:
         """Step 3.5: Compute ANDOS training layers via reverse topological ordering"""
         with self.logfire.span("step:andos_computation"):
             print("\nStep 3.5: Computing ANDOS training layers...")
@@ -1741,14 +1776,12 @@ class FullE2EWorkflowRunner:
                 # Validate layers
                 valid, violations = validate_andos_layers(layers, interaction_graph)
                 if not valid:
-                    print(f"  ⚠️  ANDOS validation failed:")
+                    print("  ⚠️  ANDOS validation failed:")
                     for v in violations[:3]:
                         print(f"    - {v}")
 
                 self.logfire.info(
-                    "ANDOS layers computed",
-                    num_layers=len(layers),
-                    total_entities=len(entities)
+                    "ANDOS layers computed", num_layers=len(layers), total_entities=len(entities)
                 )
 
                 return layers
@@ -1762,7 +1795,7 @@ class FullE2EWorkflowRunner:
     # Phase 1: Inline Dialog Infrastructure
     # ============================================================================
 
-    def _seed_entity_tensors(self, entities: List[Entity], scene_result: Dict) -> None:
+    def _seed_entity_tensors(self, entities: list[Entity], scene_result: dict) -> None:
         """
         Ensure every entity has physical_tensor and cognitive_tensor in entity_metadata
         BEFORE the inline dialog loop starts.
@@ -1771,7 +1804,7 @@ class FullE2EWorkflowRunner:
         cognitive_tensor dicts that synthesize_dialog() requires are normally populated by
         _train_entities() (Step 4). This seeds minimal values to break that dependency.
         """
-        from schemas import PhysicalTensor, CognitiveTensor
+        from schemas import CognitiveTensor, PhysicalTensor
 
         for entity in entities:
             # Seed physical_tensor if missing
@@ -1813,7 +1846,7 @@ class FullE2EWorkflowRunner:
         print(f"  [Tensor Seeding] Seeded physical/cognitive tensors for {len(entities)} entities")
 
     def _run_incremental_andos(
-        self, entity: Entity, timepoint: Timepoint, scene_result: Dict
+        self, entity: Entity, timepoint: Timepoint, scene_result: dict
     ) -> None:
         """
         Run a single-entity incremental ANDOS training pass using the current
@@ -1827,16 +1860,24 @@ class FullE2EWorkflowRunner:
         try:
             # Only run if entity needs LLM population
             if entity.entity_metadata.get("needs_llm_population", False):
-                from tensor_initialization import populate_tensor_llm_guided
                 import base64
-                refined_tensor, maturity = populate_tensor_llm_guided(
-                    entity, timepoint, graph, llm
+
+                from tensor_initialization import populate_tensor_llm_guided
+
+                refined_tensor, maturity = populate_tensor_llm_guided(entity, timepoint, graph, llm)
+                entity.tensor = json.dumps(
+                    {
+                        "context_vector": base64.b64encode(refined_tensor.context_vector).decode(
+                            "utf-8"
+                        ),
+                        "biology_vector": base64.b64encode(refined_tensor.biology_vector).decode(
+                            "utf-8"
+                        ),
+                        "behavior_vector": base64.b64encode(refined_tensor.behavior_vector).decode(
+                            "utf-8"
+                        ),
+                    }
                 )
-                entity.tensor = json.dumps({
-                    "context_vector": base64.b64encode(refined_tensor.context_vector).decode('utf-8'),
-                    "biology_vector": base64.b64encode(refined_tensor.biology_vector).decode('utf-8'),
-                    "behavior_vector": base64.b64encode(refined_tensor.behavior_vector).decode('utf-8')
-                })
                 entity.entity_metadata["needs_llm_population"] = False
                 entity.tensor_maturity = maturity
                 store.save_entity(entity)
@@ -1846,12 +1887,12 @@ class FullE2EWorkflowRunner:
     def _run_inline_dialog(
         self,
         timepoint: Timepoint,
-        entities: List[Entity],
-        scene_result: Dict,
+        entities: list[Entity],
+        scene_result: dict,
         run_id: str,
-        prior_dialog_beats: List[str],
+        prior_dialog_beats: list[str],
         timepoint_idx: int,
-        config: 'SimulationConfig',
+        config: "SimulationConfig",
     ) -> tuple:
         """
         Run dialog synthesis for a single timepoint during the inline loop.
@@ -1860,8 +1901,9 @@ class FullE2EWorkflowRunner:
             (dialog_or_none, updated_beats, dialog_outcome_context_or_none)
         """
         from workflows.dialog_synthesis import (
-            synthesize_dialog, _extract_dialog_outcome,
-            DialogOutcomeContext, _update_character_arc,
+            _extract_dialog_outcome,
+            _update_character_arc,
+            synthesize_dialog,
         )
 
         llm = scene_result["llm_client"]
@@ -1872,6 +1914,7 @@ class FullE2EWorkflowRunner:
 
         # Select dialog participants (up to 4)
         import random
+
         num_participants = min(4, len(entities))
         dialog_participants = random.sample(entities, num_participants)
 
@@ -1880,19 +1923,21 @@ class FullE2EWorkflowRunner:
         timeline = [
             {
                 "event_description": tp.event_description,
-                "timestamp": tp.timestamp.isoformat() if hasattr(tp.timestamp, 'isoformat') else str(tp.timestamp),
+                "timestamp": tp.timestamp.isoformat()
+                if hasattr(tp.timestamp, "isoformat")
+                else str(tp.timestamp),
             }
             for tp in all_timepoints
         ]
 
         # Get animism_level
         animism_level = 0
-        if config and hasattr(config, 'entities') and hasattr(config.entities, 'animism_level'):
+        if config and hasattr(config, "entities") and hasattr(config.entities, "animism_level"):
             animism_level = config.entities.animism_level
 
         # QSE resource state
         qse_state = None
-        if hasattr(self, '_qse') and self._qse and self._qse.is_active:
+        if hasattr(self, "_qse") and self._qse and self._qse.is_active:
             qse_state = self._qse.get_state_summary()
 
         try:
@@ -1906,9 +1951,9 @@ class FullE2EWorkflowRunner:
                 animism_level=animism_level,
                 prior_dialog_beats=prior_dialog_beats if prior_dialog_beats else None,
                 qse_state=qse_state,
-                voice_mixer=getattr(self, '_voice_mixer', None),
-                use_per_turn=getattr(self, '_use_per_turn_dialog', True),
-                steering_model=getattr(self, '_steering_model', None),
+                voice_mixer=getattr(self, "_voice_mixer", None),
+                use_per_turn=getattr(self, "_use_per_turn_dialog", True),
+                steering_model=getattr(self, "_steering_model", None),
             )
 
             # Save dialog to store
@@ -1933,7 +1978,7 @@ class FullE2EWorkflowRunner:
             outcome = _extract_dialog_outcome(dialog, dialog_participants, timepoint)
 
             # Record trajectory snapshots
-            if hasattr(self, '_trajectory_tracker') and self._trajectory_tracker is not None:
+            if hasattr(self, "_trajectory_tracker") and self._trajectory_tracker is not None:
                 for entity in dialog_participants:
                     self._trajectory_tracker.record_snapshot(entity, timepoint, timepoint_idx)
 
@@ -1944,8 +1989,8 @@ class FullE2EWorkflowRunner:
             return None, prior_dialog_beats, None
 
     def _generate_all_timepoints(
-        self, scene_result: Dict, config: SimulationConfig, run_id: str
-    ) -> List[Timepoint]:
+        self, scene_result: dict, config: SimulationConfig, run_id: str
+    ) -> list[Timepoint]:
         """Step 3: Generate all timepoints using TemporalAgent"""
         with self.logfire.span("step:temporal_generation"):
             print("\nStep 3: Generating all timepoints...")
@@ -1959,7 +2004,7 @@ class FullE2EWorkflowRunner:
                 mode=config.temporal.mode,
                 store=store,
                 llm_client=llm,
-                temporal_config=config.temporal  # Pass full TemporalConfig for fidelity awareness
+                temporal_config=config.temporal,  # Pass full TemporalConfig for fidelity awareness
             )
 
             # Store temporal_agent for fidelity metrics tracking (M1+M17)
@@ -1971,13 +2016,14 @@ class FullE2EWorkflowRunner:
                     strategy_context = {
                         "entities": scene_result["entities"],
                         "origin_year": datetime.now().year,
-                        "token_budget": config.temporal.token_budget
+                        "token_budget": config.temporal.token_budget,
                     }
-                    temporal_agent.fidelity_strategy = temporal_agent.determine_fidelity_temporal_strategy(
-                        config.temporal,
-                        strategy_context
+                    temporal_agent.fidelity_strategy = (
+                        temporal_agent.determine_fidelity_temporal_strategy(
+                            config.temporal, strategy_context
+                        )
                     )
-                    print(f"  📊 Fidelity strategy determined:")
+                    print("  📊 Fidelity strategy determined:")
                     print(f"     Planning mode: {config.temporal.fidelity_planning_mode.value}")
                     print(f"     Token budget: {config.temporal.token_budget:,}")
                     print(f"     Template: {config.temporal.fidelity_template}")
@@ -1986,15 +2032,17 @@ class FullE2EWorkflowRunner:
 
             # MODE DETECTION: Check if portal simulation
             if config.temporal.mode == TemporalMode.PORTAL:
-                print(f"\n{'='*80}")
-                print(f"PORTAL MODE DETECTED")
+                print(f"\n{'=' * 80}")
+                print("PORTAL MODE DETECTED")
                 print(f"Running backward simulation: {config.temporal.backward_steps} steps")
                 print(f"Target: {config.temporal.portal_description}")
                 print(f"Timeframe: {config.temporal.origin_year} → {config.temporal.portal_year}")
-                print(f"{'='*80}\n")
+                print(f"{'=' * 80}\n")
 
                 # Inject entity roster for portal entity creation (same as branching mode)
-                temporal_agent.entity_roster = config.metadata.get("entity_roster", {}) if config.metadata else {}
+                temporal_agent.entity_roster = (
+                    config.metadata.get("entity_roster", {}) if config.metadata else {}
+                )
 
                 # Run portal simulation
                 portal_paths = temporal_agent.run_portal_simulation(config.temporal)
@@ -2008,16 +2056,20 @@ class FullE2EWorkflowRunner:
                 scene_result["portal_paths"] = portal_paths
                 scene_result["is_portal_mode"] = True
 
-                print(f"✓ Portal simulation complete:")
+                print("✓ Portal simulation complete:")
                 print(f"  - Paths generated: {len(portal_paths)}")
                 print(f"  - Timepoints created: {len(all_timepoints)}")
-                print(f"  - Best coherence: {portal_paths[0].coherence_score:.3f}" if portal_paths else "  - No paths")
+                print(
+                    f"  - Best coherence: {portal_paths[0].coherence_score:.3f}"
+                    if portal_paths
+                    else "  - No paths"
+                )
 
                 self.logfire.info(
                     "Portal temporal generation complete",
                     timepoints=len(all_timepoints),
                     paths=len(portal_paths),
-                    is_portal_mode=True
+                    is_portal_mode=True,
                 )
 
                 self._shadow_evaluate_all_timepoints(all_timepoints, scene_result)
@@ -2025,11 +2077,13 @@ class FullE2EWorkflowRunner:
 
             # MODE DETECTION: Check if branching simulation
             if config.temporal.mode == TemporalMode.BRANCHING:
-                print(f"\n{'='*80}")
-                print(f"BRANCHING MODE DETECTED")
-                print(f"Running forward simulation with counterfactual branches")
-                print(f"Steps: {config.temporal.backward_steps}")  # BRANCHING uses backward_steps as step count
-                print(f"{'='*80}\n")
+                print(f"\n{'=' * 80}")
+                print("BRANCHING MODE DETECTED")
+                print("Running forward simulation with counterfactual branches")
+                print(
+                    f"Steps: {config.temporal.backward_steps}"
+                )  # BRANCHING uses backward_steps as step count
+                print(f"{'=' * 80}\n")
 
                 # Inject scenario context into temporal agent for branching anchoring
                 temporal_agent.scenario_description = config.scenario_description
@@ -2047,16 +2101,20 @@ class FullE2EWorkflowRunner:
                 scene_result["branching_paths"] = branching_paths
                 scene_result["is_branching_mode"] = True
 
-                print(f"✓ Branching simulation complete:")
+                print("✓ Branching simulation complete:")
                 print(f"  - Paths generated: {len(branching_paths)}")
                 print(f"  - Timepoints created: {len(all_timepoints)}")
-                print(f"  - Best coherence: {branching_paths[0].coherence_score:.3f}" if branching_paths else "  - No paths")
+                print(
+                    f"  - Best coherence: {branching_paths[0].coherence_score:.3f}"
+                    if branching_paths
+                    else "  - No paths"
+                )
 
                 self.logfire.info(
                     "Branching temporal generation complete",
                     timepoints=len(all_timepoints),
                     paths=len(branching_paths),
-                    is_branching_mode=True
+                    is_branching_mode=True,
                 )
 
                 self._shadow_evaluate_all_timepoints(all_timepoints, scene_result)
@@ -2064,11 +2122,11 @@ class FullE2EWorkflowRunner:
 
             # MODE DETECTION: Check if directorial simulation
             if config.temporal.mode == TemporalMode.DIRECTORIAL:
-                print(f"\n{'='*80}")
-                print(f"DIRECTORIAL MODE DETECTED")
-                print(f"Running narrative-driven simulation with dramatic arc")
+                print(f"\n{'=' * 80}")
+                print("DIRECTORIAL MODE DETECTED")
+                print("Running narrative-driven simulation with dramatic arc")
                 print(f"Steps: {config.temporal.backward_steps}")
-                print(f"{'='*80}\n")
+                print(f"{'=' * 80}\n")
 
                 # Run directorial simulation
                 directorial_paths = temporal_agent.run_directorial_simulation(config.temporal)
@@ -2082,7 +2140,7 @@ class FullE2EWorkflowRunner:
                 scene_result["directorial_paths"] = directorial_paths
                 scene_result["is_directorial_mode"] = True
 
-                print(f"✓ Directorial simulation complete:")
+                print("✓ Directorial simulation complete:")
                 print(f"  - Paths generated: {len(directorial_paths)}")
                 print(f"  - Timepoints created: {len(all_timepoints)}")
                 if directorial_paths:
@@ -2093,7 +2151,7 @@ class FullE2EWorkflowRunner:
                     "Directorial temporal generation complete",
                     timepoints=len(all_timepoints),
                     paths=len(directorial_paths),
-                    is_directorial_mode=True
+                    is_directorial_mode=True,
                 )
 
                 self._shadow_evaluate_all_timepoints(all_timepoints, scene_result)
@@ -2101,11 +2159,11 @@ class FullE2EWorkflowRunner:
 
             # MODE DETECTION: Check if cyclical simulation
             if config.temporal.mode == TemporalMode.CYCLICAL:
-                print(f"\n{'='*80}")
-                print(f"CYCLICAL MODE DETECTED")
-                print(f"Running cyclical simulation with prophecy tracking")
+                print(f"\n{'=' * 80}")
+                print("CYCLICAL MODE DETECTED")
+                print("Running cyclical simulation with prophecy tracking")
                 print(f"Cycle length: {getattr(config.temporal, 'cycle_length', 4)}")
-                print(f"{'='*80}\n")
+                print(f"{'=' * 80}\n")
 
                 # Run cyclical simulation
                 cyclical_paths = temporal_agent.run_cyclical_simulation(config.temporal)
@@ -2119,18 +2177,20 @@ class FullE2EWorkflowRunner:
                 scene_result["cyclical_paths"] = cyclical_paths
                 scene_result["is_cyclical_mode"] = True
 
-                print(f"✓ Cyclical simulation complete:")
+                print("✓ Cyclical simulation complete:")
                 print(f"  - Paths generated: {len(cyclical_paths)}")
                 print(f"  - Timepoints created: {len(all_timepoints)}")
                 if cyclical_paths:
                     print(f"  - Best coherence: {cyclical_paths[0].coherence_score:.3f}")
-                    print(f"  - Prophecy fulfillment: {cyclical_paths[0].prophecy_fulfillment_rate:.2f}")
+                    print(
+                        f"  - Prophecy fulfillment: {cyclical_paths[0].prophecy_fulfillment_rate:.2f}"
+                    )
 
                 self.logfire.info(
                     "Cyclical temporal generation complete",
                     timepoints=len(all_timepoints),
                     paths=len(cyclical_paths),
-                    is_cyclical_mode=True
+                    is_cyclical_mode=True,
                 )
 
                 self._shadow_evaluate_all_timepoints(all_timepoints, scene_result)
@@ -2150,19 +2210,20 @@ class FullE2EWorkflowRunner:
             # Phase 1: Initialize trajectory tracker early for inline dialog
             try:
                 from synth.trajectory_tracker import TrajectoryTracker
+
                 self._trajectory_tracker = TrajectoryTracker()
             except ImportError:
                 self._trajectory_tracker = None
 
             # January 2026: Extract directorial mode info for rich event descriptions
             is_directorial = config.temporal.mode == TemporalMode.DIRECTORIAL
-            narrative_arc = getattr(config.temporal, 'narrative_arc', None)
-            dramatic_tension = getattr(config.temporal, 'dramatic_tension', 0.7)
+            narrative_arc = getattr(config.temporal, "narrative_arc", None)
+            dramatic_tension = getattr(config.temporal, "dramatic_tension", 0.7)
             scenario_desc = config.scenario_description
-            narrative_beats = config.metadata.get('narrative_beats', []) if config.metadata else []
+            narrative_beats = config.metadata.get("narrative_beats", []) if config.metadata else []
 
             # Phase 1: Inline dialog state
-            prior_dialog_beats: List[str] = []
+            prior_dialog_beats: list[str] = []
             last_dialog_outcome = None
             scene_result["all_timepoints_so_far"] = all_timepoints
             inline_dialogs_created = 0
@@ -2170,7 +2231,7 @@ class FullE2EWorkflowRunner:
             # Generate remaining timepoints with inline dialog
             target_count = config.timepoints.count
             for i in range(1, target_count):
-                print(f"  Generating timepoint {i+1}/{target_count}...")
+                print(f"  Generating timepoint {i + 1}/{target_count}...")
 
                 try:
                     # January 2026: Generate rich event descriptions for DIRECTORIAL mode
@@ -2186,35 +2247,37 @@ class FullE2EWorkflowRunner:
                             narrative_beats=narrative_beats,
                             dramatic_tension=dramatic_tension,
                             previous_event=current_timepoint.event_description,
-                            entities=[e.entity_id for e in entities]
+                            entities=[e.entity_id for e in entities],
                         )
                         context["next_event"] = event_desc
 
                     # Inject quantitative state into context for LLM
-                    if hasattr(self, '_qse') and self._qse and self._qse.is_active:
+                    if hasattr(self, "_qse") and self._qse and self._qse.is_active:
                         context["resource_state"] = self._qse.get_state_summary()
 
                     # Phase 1: Inject dialog outcome from previous timepoint
                     if last_dialog_outcome:
                         context["prior_dialog_summary"] = last_dialog_outcome.summary
                         context["entity_states_post_dialog"] = {
-                            eid: delta for eid, delta in last_dialog_outcome.emotional_deltas.items()
+                            eid: delta
+                            for eid, delta in last_dialog_outcome.emotional_deltas.items()
                         }
 
                     next_timepoint = temporal_agent.generate_next_timepoint(
-                        current_timepoint,
-                        context=context
+                        current_timepoint, context=context
                     )
 
                     # Propagate quantitative state (deterministic, not LLM-generated)
-                    if hasattr(self, '_qse') and self._qse and self._qse.is_active:
+                    if hasattr(self, "_qse") and self._qse and self._qse.is_active:
                         entity_ids = next_timepoint.entities_present or []
                         qse_result = self._qse.propagate(
-                            timepoint_id=next_timepoint.timepoint_id,
-                            entity_ids=entity_ids
+                            timepoint_id=next_timepoint.timepoint_id, entity_ids=entity_ids
                         )
                         # Store resource state in timepoint metadata
-                        if not hasattr(next_timepoint, 'metadata') or next_timepoint.metadata is None:
+                        if (
+                            not hasattr(next_timepoint, "metadata")
+                            or next_timepoint.metadata is None
+                        ):
                             next_timepoint.metadata = {}
                         if isinstance(next_timepoint.metadata, dict):
                             next_timepoint.metadata["resource_state"] = qse_result.global_resources
@@ -2248,16 +2311,20 @@ class FullE2EWorkflowRunner:
                     if dialog:
                         inline_dialogs_created += 1
                         last_dialog_outcome = outcome
-                        print(f"    [Inline Dialog] Created dialog for {next_timepoint.timepoint_id}")
+                        print(
+                            f"    [Inline Dialog] Created dialog for {next_timepoint.timepoint_id}"
+                        )
 
                 except Exception as e:
-                    print(f"  Warning: Failed to generate timepoint {i+1}: {e}")
+                    print(f"  Warning: Failed to generate timepoint {i + 1}: {e}")
                     # Continue with what we have
                     break
 
             # Phase 1: Mark inline dialog as complete for FORWARD mode
             scene_result["dialog_inline_complete"] = True
-            print(f"✓ Generated {len(all_timepoints)} timepoints with {inline_dialogs_created} inline dialogs")
+            print(
+                f"✓ Generated {len(all_timepoints)} timepoints with {inline_dialogs_created} inline dialogs"
+            )
 
             self._shadow_evaluate_all_timepoints(all_timepoints, scene_result)
 
@@ -2276,10 +2343,10 @@ class FullE2EWorkflowRunner:
         total: int,
         scenario_desc: str,
         narrative_arc: str,
-        narrative_beats: List[str],
+        narrative_beats: list[str],
         dramatic_tension: float,
         previous_event: str,
-        entities: List[str]
+        entities: list[str],
     ) -> str:
         """
         Generate rich event descriptions for DIRECTORIAL mode using LLM.
@@ -2333,9 +2400,13 @@ class FullE2EWorkflowRunner:
         relevant_beat = None
         if narrative_beats:
             # Map beats to approximate positions
-            beat_positions = {beat: i / len(narrative_beats) for i, beat in enumerate(narrative_beats)}
+            beat_positions = {
+                beat: i / len(narrative_beats) for i, beat in enumerate(narrative_beats)
+            }
             # Find closest beat to current position
-            closest_beat = min(narrative_beats, key=lambda b: abs(beat_positions[b] - narrative_position))
+            closest_beat = min(
+                narrative_beats, key=lambda b: abs(beat_positions[b] - narrative_position)
+            )
             if abs(beat_positions[closest_beat] - narrative_position) < 0.15:
                 relevant_beat = closest_beat
 
@@ -2357,9 +2428,9 @@ Narrative position: {narrative_position:.1%} through story
 PREVIOUS EVENT:
 {previous_event[:200] if previous_event else "Story beginning"}
 
-{"CURRENT NARRATIVE BEAT: " + relevant_beat.replace('_', ' ') if relevant_beat else ""}
+{"CURRENT NARRATIVE BEAT: " + relevant_beat.replace("_", " ") if relevant_beat else ""}
 
-ENTITIES PRESENT: {', '.join(entities[:8])}
+ENTITIES PRESENT: {", ".join(entities[:8])}
 
 INSTRUCTIONS:
 1. Write a 2-3 sentence event description
@@ -2376,15 +2447,15 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                 model=llm.default_model,
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
+                    {"role": "user", "content": user_prompt},
                 ],
                 temperature=0.7 + (dramatic_tension * 0.2),  # Higher tension = more creative
-                max_tokens=300
+                max_tokens=300,
             )
 
             # Extract response content
             if isinstance(response, dict):
-                content = response.get('choices', [{}])[0].get('message', {}).get('content', '')
+                content = response.get("choices", [{}])[0].get("message", {}).get("content", "")
             else:
                 content = response.choices[0].message.content
 
@@ -2399,19 +2470,17 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
             "SETUP": f"The investigation begins as {entities[0] if entities else 'the protagonist'} surveys the scene, noting the unsettling atmosphere that pervades the area.",
             "RISING ACTION": f"Tensions mount as new evidence comes to light. {entities[0] if entities else 'The detective'} pieces together disturbing connections.",
             "CLIMAX APPROACH": f"The confrontation draws near. {entities[0] if entities else 'Our hero'} must act decisively as danger closes in.",
-            "CLIMAX/FALLING ACTION": f"The critical moment arrives. Actions have consequences as the truth is finally revealed.",
-            "RESOLUTION": f"In the aftermath, {entities[0] if entities else 'the survivors'} reflect on what transpired and what it means for the future."
+            "CLIMAX/FALLING ACTION": "The critical moment arrives. Actions have consequences as the truth is finally revealed.",
+            "RESOLUTION": f"In the aftermath, {entities[0] if entities else 'the survivors'} reflect on what transpired and what it means for the future.",
         }
 
-        return fallback_descriptions.get(phase, f"Timepoint {iteration}: The narrative continues with dramatic developments.")
+        return fallback_descriptions.get(
+            phase, f"Timepoint {iteration}: The narrative continues with dramatic developments."
+        )
 
     def _convert_portal_paths_to_timepoints(
-        self,
-        portal_paths: List,
-        initial_timepoint: Timepoint,
-        store,
-        run_id: str
-    ) -> List[Timepoint]:
+        self, portal_paths: list, initial_timepoint: Timepoint, store, run_id: str
+    ) -> list[Timepoint]:
         """
         Convert PortalPath objects to Timepoint objects for E2E pipeline.
 
@@ -2436,7 +2505,7 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
         # Take best path (first in list, already sorted by coherence)
         best_path = portal_paths[0]
 
-        print(f"\n  Converting best path to timepoints:")
+        print("\n  Converting best path to timepoints:")
         print(f"    Path ID: {best_path.path_id}")
         print(f"    Coherence: {best_path.coherence_score:.3f}")
         print(f"    States: {len(best_path.states)}")
@@ -2464,8 +2533,8 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                     "coherence_score": best_path.coherence_score,
                     "is_pivot_point": idx in best_path.pivot_points,
                     "world_state": state.world_state,
-                    "year": state.year
-                }
+                    "year": state.year,
+                },
             )
 
             # Save to database (temp DB for workflow)
@@ -2482,7 +2551,7 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
             else:
                 print(f"    ✓ Timepoint {idx}: Year {state.year}")
 
-        print(f"\n  Portal path metadata:")
+        print("\n  Portal path metadata:")
         print(f"    All paths available: {len(portal_paths)}")
         for i, path in enumerate(portal_paths[:3], 1):  # Show top 3
             print(f"      Path {i}: Coherence {path.coherence_score:.3f}")
@@ -2490,12 +2559,8 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
         return timepoints
 
     def _convert_branching_paths_to_timepoints(
-        self,
-        branching_paths: List,
-        initial_timepoint: Timepoint,
-        store,
-        run_id: str
-    ) -> List[Timepoint]:
+        self, branching_paths: list, initial_timepoint: Timepoint, store, run_id: str
+    ) -> list[Timepoint]:
         """
         Convert BranchingPath objects to Timepoint objects for E2E pipeline.
 
@@ -2521,7 +2586,7 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
         # Take best path (first in list, already sorted by coherence)
         best_path = branching_paths[0]
 
-        print(f"\n  Converting best branching path to timepoints:")
+        print("\n  Converting best branching path to timepoints:")
         print(f"    Path ID: {best_path.path_id}")
         print(f"    Coherence: {best_path.coherence_score:.3f}")
         print(f"    States: {len(best_path.states)}")
@@ -2532,11 +2597,13 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
 
         # January 2026: Get fallback entities from initial_timepoint (from scene orchestration)
         # This ensures we always have entities even if LLM inference fails
-        fallback_entity_ids = initial_timepoint.entities_present if initial_timepoint.entities_present else []
+        fallback_entity_ids = (
+            initial_timepoint.entities_present if initial_timepoint.entities_present else []
+        )
         if not fallback_entity_ids:
             # Secondary fallback: try to get from store if available
             try:
-                all_entities = store.list_entities() if hasattr(store, 'list_entities') else []
+                all_entities = store.list_entities() if hasattr(store, "list_entities") else []
                 fallback_entity_ids = [e.entity_id for e in all_entities[:10]]
             except Exception:
                 pass
@@ -2570,8 +2637,8 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                     "is_branch_point": idx in best_path.branch_points,
                     "world_state": state.world_state,
                     "year": state.year,
-                    "month": state.month
-                }
+                    "month": state.month,
+                },
             )
 
             # Save to database (temp DB for workflow)
@@ -2588,7 +2655,7 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
             else:
                 print(f"    ✓ Timepoint {idx}: {state.year}-{state.month:02d}")
 
-        print(f"\n  Branching path metadata:")
+        print("\n  Branching path metadata:")
         print(f"    All paths available: {len(branching_paths)}")
         for i, path in enumerate(branching_paths[:3], 1):  # Show top 3
             print(f"      Path {i}: Coherence {path.coherence_score:.3f}")
@@ -2596,12 +2663,8 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
         return timepoints
 
     def _convert_directorial_paths_to_timepoints(
-        self,
-        directorial_paths: List,
-        initial_timepoint: Timepoint,
-        store,
-        run_id: str
-    ) -> List[Timepoint]:
+        self, directorial_paths: list, initial_timepoint: Timepoint, store, run_id: str
+    ) -> list[Timepoint]:
         """
         Convert DirectorialPath objects to Timepoint objects for E2E pipeline.
 
@@ -2622,7 +2685,7 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
 
         best_path = directorial_paths[0]
 
-        print(f"\n  Converting best directorial path to timepoints:")
+        print("\n  Converting best directorial path to timepoints:")
         print(f"    Path ID: {best_path.path_id}")
         print(f"    Coherence: {best_path.coherence_score:.3f}")
         print(f"    States: {len(best_path.states)}")
@@ -2631,7 +2694,9 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
         timepoints = []
         previous_timepoint_id = None
 
-        fallback_entity_ids = initial_timepoint.entities_present if initial_timepoint.entities_present else []
+        fallback_entity_ids = (
+            initial_timepoint.entities_present if initial_timepoint.entities_present else []
+        )
 
         for idx, state in enumerate(best_path.states):
             tp_id = f"tp_{idx:03d}_{state.year}"
@@ -2652,17 +2717,19 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                     "path_position": idx,
                     "plausibility_score": state.plausibility_score,
                     "coherence_score": best_path.coherence_score,
-                    "act": state.act.value if hasattr(state.act, 'value') else str(state.act),
+                    "act": state.act.value if hasattr(state.act, "value") else str(state.act),
                     "tension_score": state.tension_score,
                     "pov_entity": state.pov_entity,
-                    "framing": state.framing.value if hasattr(state.framing, 'value') else str(state.framing),
+                    "framing": state.framing.value
+                    if hasattr(state.framing, "value")
+                    else str(state.framing),
                     "dramatic_irony": state.dramatic_irony,
                     "narrative_beat": state.narrative_beat,
                     "dramatic_importance": state.dramatic_importance,
                     "world_state": state.world_state,
                     "year": state.year,
-                    "month": state.month
-                }
+                    "month": state.month,
+                },
             )
 
             store.save_timepoint(timepoint)
@@ -2671,23 +2738,23 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
             timepoints.append(timepoint)
             previous_timepoint_id = tp_id
 
-            act_label = state.act.value if hasattr(state.act, 'value') else str(state.act)
-            print(f"    ✓ Timepoint {idx}: {state.year}-{state.month:02d} [{act_label.upper()}] tension={state.tension_score:.2f}")
+            act_label = state.act.value if hasattr(state.act, "value") else str(state.act)
+            print(
+                f"    ✓ Timepoint {idx}: {state.year}-{state.month:02d} [{act_label.upper()}] tension={state.tension_score:.2f}"
+            )
 
-        print(f"\n  Directorial path metadata:")
+        print("\n  Directorial path metadata:")
         print(f"    All paths available: {len(directorial_paths)}")
         for i, path in enumerate(directorial_paths[:3], 1):
-            print(f"      Path {i}: Coherence {path.coherence_score:.3f}, Arc {path.arc_completion_score:.3f}")
+            print(
+                f"      Path {i}: Coherence {path.coherence_score:.3f}, Arc {path.arc_completion_score:.3f}"
+            )
 
         return timepoints
 
     def _convert_cyclical_paths_to_timepoints(
-        self,
-        cyclical_paths: List,
-        initial_timepoint: Timepoint,
-        store,
-        run_id: str
-    ) -> List[Timepoint]:
+        self, cyclical_paths: list, initial_timepoint: Timepoint, store, run_id: str
+    ) -> list[Timepoint]:
         """
         Convert CyclicalPath objects to Timepoint objects for E2E pipeline.
 
@@ -2708,7 +2775,7 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
 
         best_path = cyclical_paths[0]
 
-        print(f"\n  Converting best cyclical path to timepoints:")
+        print("\n  Converting best cyclical path to timepoints:")
         print(f"    Path ID: {best_path.path_id}")
         print(f"    Coherence: {best_path.coherence_score:.3f}")
         print(f"    States: {len(best_path.states)}")
@@ -2718,7 +2785,9 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
         timepoints = []
         previous_timepoint_id = None
 
-        fallback_entity_ids = initial_timepoint.entities_present if initial_timepoint.entities_present else []
+        fallback_entity_ids = (
+            initial_timepoint.entities_present if initial_timepoint.entities_present else []
+        )
 
         for idx, state in enumerate(best_path.states):
             tp_id = f"tp_{idx:03d}_{state.year}"
@@ -2749,8 +2818,8 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                     "causal_loop_tag": state.causal_loop_tag,
                     "world_state": state.world_state,
                     "year": state.year,
-                    "month": state.month
-                }
+                    "month": state.month,
+                },
             )
 
             store.save_timepoint(timepoint)
@@ -2761,21 +2830,29 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
 
             is_boundary = idx in best_path.cycle_boundaries
             boundary_label = " [CYCLE BOUNDARY]" if is_boundary else ""
-            print(f"    ✓ Timepoint {idx}: {state.year}-{state.month:02d} C{state.cycle_index}P{state.position_in_cycle}{boundary_label}")
+            print(
+                f"    ✓ Timepoint {idx}: {state.year}-{state.month:02d} C{state.cycle_index}P{state.position_in_cycle}{boundary_label}"
+            )
 
-        print(f"\n  Cyclical path metadata:")
+        print("\n  Cyclical path metadata:")
         print(f"    All paths available: {len(cyclical_paths)}")
         for i, path in enumerate(cyclical_paths[:3], 1):
-            print(f"      Path {i}: Coherence {path.coherence_score:.3f}, Prophecy {path.prophecy_fulfillment_rate:.2f}")
+            print(
+                f"      Path {i}: Coherence {path.coherence_score:.3f}, Prophecy {path.prophecy_fulfillment_rate:.2f}"
+            )
 
         return timepoints
 
     def _train_entities(
-        self, scene_result: Dict, timepoints: List[Timepoint], andos_layers: List[List[Entity]], run_id: str
-    ) -> List[Entity]:
+        self,
+        scene_result: dict,
+        timepoints: list[Timepoint],
+        andos_layers: list[list[Entity]],
+        run_id: str,
+    ) -> list[Entity]:
         """Step 4: Train entities layer-by-layer using ANDOS ordering"""
         with self.logfire.span("step:entity_training"):
-            print(f"\nStep 4: Training entities layer-by-layer (ANDOS)...")
+            print("\nStep 4: Training entities layer-by-layer (ANDOS)...")
             print(f"  {len(andos_layers)} layers, {len(timepoints)} timepoints")
 
             llm = scene_result["llm_client"]
@@ -2789,7 +2866,9 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
             for layer_idx in range(len(andos_layers)):
                 layer_entities = andos_layers[layer_idx]
 
-                print(f"\n  🔷 ANDOS Layer {layer_idx}/{len(andos_layers)-1}: Training {len(layer_entities)} entities")
+                print(
+                    f"\n  🔷 ANDOS Layer {layer_idx}/{len(andos_layers) - 1}: Training {len(layer_entities)} entities"
+                )
                 layer_ids = [e.entity_id for e in layer_entities]
                 print(f"     Entities: {layer_ids}")
 
@@ -2804,16 +2883,27 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                     if entity.entity_metadata.get("needs_llm_population", False):
                         try:
                             from tensor_initialization import populate_tensor_llm_guided
+
                             print(f"     🔧 LLM-guided population for {entity.entity_id}...")
                             refined_tensor, maturity = populate_tensor_llm_guided(
                                 entity, first_timepoint, graph, llm
                             )
-                            import json, base64
-                            entity.tensor = json.dumps({
-                                "context_vector": base64.b64encode(refined_tensor.context_vector).decode('utf-8'),
-                                "biology_vector": base64.b64encode(refined_tensor.biology_vector).decode('utf-8'),
-                                "behavior_vector": base64.b64encode(refined_tensor.behavior_vector).decode('utf-8')
-                            })
+                            import base64
+                            import json
+
+                            entity.tensor = json.dumps(
+                                {
+                                    "context_vector": base64.b64encode(
+                                        refined_tensor.context_vector
+                                    ).decode("utf-8"),
+                                    "biology_vector": base64.b64encode(
+                                        refined_tensor.biology_vector
+                                    ).decode("utf-8"),
+                                    "behavior_vector": base64.b64encode(
+                                        refined_tensor.behavior_vector
+                                    ).decode("utf-8"),
+                                }
+                            )
                             entity.entity_metadata["needs_llm_population"] = False
                             entity.tensor_maturity = maturity  # Update maturity from LLM population
                             store.save_entity(entity)
@@ -2826,7 +2916,10 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                             print(f"       ✓ Populated (maturity: {maturity:.3f})")
 
                             # Log decoded personality traits from behavior_vector
-                            if entity.entity_metadata.get("personality_source") == "llm_population_decoded":
+                            if (
+                                entity.entity_metadata.get("personality_source")
+                                == "llm_population_decoded"
+                            ):
                                 decoded = entity.entity_metadata.get("personality_traits", [])
                                 print(f"       [DECODE] Personality traits: {decoded}")
 
@@ -2839,7 +2932,9 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                 # Batch parallel prospection (M15) for all entities in this layer
                 try:
                     import asyncio
+
                     from prospection_triggers import trigger_prospection_parallel
+
                     prospection_results = asyncio.run(
                         trigger_prospection_parallel(
                             layer_entities, first_timepoint, llm, store, config
@@ -2848,7 +2943,9 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                     # Save entities that were refined by prospection
                     for eid, ps in prospection_results.items():
                         if ps is not None:
-                            entity_obj = next((e for e in layer_entities if e.entity_id == eid), None)
+                            entity_obj = next(
+                                (e for e in layer_entities if e.entity_id == eid), None
+                            )
                             if entity_obj:
                                 store.save_entity(entity_obj)
                 except Exception as e:
@@ -2866,7 +2963,7 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                         "resolution": ResolutionLevel.SCENE,
                         "violations": [],
                         "results": {},
-                        "entity_populations": {}
+                        "entity_populations": {},
                     }
 
                     try:
@@ -2880,7 +2977,9 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
 
                         # Report violations if any
                         violations = result_state.get("violations", [])
-                        if violations and layer_idx == 0:  # Only show for first layer to reduce noise
+                        if (
+                            violations and layer_idx == 0
+                        ):  # Only show for first layer to reduce noise
                             print(f"     ⚠️  Found {len(violations)} validation violations")
 
                     except Exception as e:
@@ -2893,7 +2992,7 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                         run_id,
                         entity.entity_id,
                         entity.resolution_level,
-                        timepoints[0].timepoint_id if timepoints else "unknown"
+                        timepoints[0].timepoint_id if timepoints else "unknown",
                     )
 
                 print(f"     ✓ Layer {layer_idx} complete")
@@ -2908,23 +3007,24 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
 
             # Phase 2 Parallel Training: Optional concurrent tensor maturity training
             config = scene_result.get("config")
-            parallel_training_enabled = getattr(config, 'parallel_training', False) if config else False
+            parallel_training_enabled = (
+                getattr(config, "parallel_training", False) if config else False
+            )
 
             if parallel_training_enabled:
                 self._run_parallel_tensor_training(
-                    entities=all_entities,
-                    scene_result=scene_result,
-                    run_id=run_id
+                    entities=all_entities, scene_result=scene_result, run_id=run_id
                 )
 
             # PART 3 FIX: Post-training validation - ensure all human entities have physical_tensor
             from schemas import PhysicalTensor
+
             entities_fixed = 0
             for entity in all_entities:
                 if entity.entity_type == "human":
                     # Check if physical_tensor exists and is valid
                     physical_data = entity.entity_metadata.get("physical_tensor", {})
-                    if not physical_data or 'age' not in physical_data:
+                    if not physical_data or "age" not in physical_data:
                         # Recreate physical_tensor from defaults
                         physical = PhysicalTensor(
                             age=35.0,
@@ -2935,7 +3035,7 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                             mobility=1.0,
                             stamina=1.0,
                             sensory_acuity={"vision": 1.0, "hearing": 1.0},
-                            location=None
+                            location=None,
                         )
                         entity.entity_metadata["physical_tensor"] = physical.model_dump()
                         entities_fixed += 1
@@ -2944,22 +3044,21 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
             if entities_fixed > 0:
                 print(f"  ✓ Validated and fixed {entities_fixed} entities")
 
-            print(f"\n✓ Trained {len(all_entities)} unique entities across {len(andos_layers)} layers")
+            print(
+                f"\n✓ Trained {len(all_entities)} unique entities across {len(andos_layers)} layers"
+            )
 
             self.logfire.info(
                 "ANDOS layer-by-layer training complete",
                 entities=len(all_entities),
                 layers=len(andos_layers),
-                timepoints_processed=len(timepoints)
+                timepoints_processed=len(timepoints),
             )
 
             return all_entities
 
     def _run_parallel_tensor_training(
-        self,
-        entities: List[Entity],
-        scene_result: Dict,
-        run_id: str
+        self, entities: list[Entity], scene_result: dict, run_id: str
     ) -> None:
         """
         Phase 2 Parallel Training: Train all entity tensors concurrently.
@@ -2983,16 +3082,18 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                 return
 
             # Get training configuration (max_parallel_workers acts as ceiling; 0 = no ceiling)
-            target_maturity = getattr(config, 'target_tensor_maturity', 0.95)
-            global_cap = getattr(config, 'max_parallel_workers', 5)
-            subsystem_cap = getattr(config, 'max_training_workers', 4)
+            target_maturity = getattr(config, "target_tensor_maturity", 0.95)
+            global_cap = getattr(config, "max_parallel_workers", 5)
+            subsystem_cap = getattr(config, "max_training_workers", 4)
             max_workers = subsystem_cap if global_cap == 0 else min(global_cap, subsystem_cap)
 
             # Get entities that need training
             entities_to_train = [
-                e for e in entities
+                e
+                for e in entities
                 if e.entity_metadata.get("needs_training", True)
-                and hasattr(e, 'tensor') and e.tensor
+                and hasattr(e, "tensor")
+                and e.tensor
             ]
 
             if not entities_to_train:
@@ -3015,7 +3116,9 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
 
                 def on_progress(tensor_id: str, maturity: float, cycles: int):
                     if len(progress_updates) % 10 == 0:  # Log every 10 updates
-                        print(f"    Progress: {tensor_id} → maturity {maturity:.3f} ({cycles} cycles)")
+                        print(
+                            f"    Progress: {tensor_id} → maturity {maturity:.3f} ({cycles} cycles)"
+                        )
                     progress_updates.append((tensor_id, maturity, cycles))
 
                 # Run parallel training
@@ -3027,7 +3130,7 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                         run_id=run_id,
                         target_maturity=target_maturity,
                         max_workers=max_workers,
-                        progress_callback=on_progress
+                        progress_callback=on_progress,
                     )
                 )
 
@@ -3046,7 +3149,7 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                     entities_trained=successful,
                     entities_failed=failed,
                     target_maturity=target_maturity,
-                    max_workers=max_workers
+                    max_workers=max_workers,
                 )
 
             except Exception as e:
@@ -3054,7 +3157,7 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                 self.logfire.warn("Parallel tensor training failed", error=str(e))
 
     @staticmethod
-    def _extract_dialog_beats(dialog: 'Dialog') -> List[str]:
+    def _extract_dialog_beats(dialog: "Dialog") -> list[str]:
         """Extract 3-5 key beats from a dialog for temporal freshness enforcement."""
         try:
             turns = json.loads(dialog.turns) if isinstance(dialog.turns, str) else dialog.turns
@@ -3072,11 +3175,11 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
 
     def _synthesize_dialogs(
         self,
-        entities: List[Entity],
-        timepoints: List[Timepoint],
-        scene_result: Dict,
+        entities: list[Entity],
+        timepoints: list[Timepoint],
+        scene_result: dict,
         run_id: str,
-        config: Optional['SimulationConfig'] = None
+        config: Optional["SimulationConfig"] = None,
     ) -> None:
         """Step 4.5: Synthesize dialogs (M11) - entities already trained via ANDOS"""
         with self.logfire.span("step:dialog_synthesis"):
@@ -3091,16 +3194,18 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
 
             # Get animism_level from config if available
             animism_level = 0
-            if config and hasattr(config, 'entities') and hasattr(config.entities, 'animism_level'):
+            if config and hasattr(config, "entities") and hasattr(config.entities, "animism_level"):
                 animism_level = config.entities.animism_level
 
             # Beat accumulator for temporal freshness
-            prior_dialog_beats: List[str] = []
+            prior_dialog_beats: list[str] = []
 
             # Phase 3: Generate waveform resolution schedule if available
             waveform_schedule = self._waveform_resolution_schedule(entities, timepoints)
             if waveform_schedule:
-                print(f"  [Waveform] Resolution schedule covers {len(waveform_schedule)} (entity, timepoint) pairs")
+                print(
+                    f"  [Waveform] Resolution schedule covers {len(waveform_schedule)} (entity, timepoint) pairs"
+                )
 
             # Synthesize dialogs for each timepoint
             dialogs_created = 0
@@ -3111,35 +3216,45 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                     # for this timepoint, skip dialog synthesis entirely
                     if waveform_schedule:
                         from synth.fidelity_envelope import FidelityBand
+
                         entity_bands = [
-                            waveform_schedule.get((e.entity_id, timepoint_idx))
-                            for e in entities
+                            waveform_schedule.get((e.entity_id, timepoint_idx)) for e in entities
                         ]
                         all_tensor = all(
                             b == FidelityBand.TENSOR for b in entity_bands if b is not None
                         )
                         if all_tensor and any(b is not None for b in entity_bands):
                             self._waveform_metrics["skipped"] += 1
-                            print(f"  [Waveform] Skipping dialog for {timepoint.timepoint_id} (all entities in TENSOR band)")
+                            print(
+                                f"  [Waveform] Skipping dialog for {timepoint.timepoint_id} (all entities in TENSOR band)"
+                            )
                             # Still record trajectory snapshots with predicted values
                             if self._trajectory_tracker is not None:
                                 for entity in entities:
-                                    self._trajectory_tracker.record_snapshot(entity, timepoint, timepoint_idx)
+                                    self._trajectory_tracker.record_snapshot(
+                                        entity, timepoint, timepoint_idx
+                                    )
                             continue
                         self._waveform_metrics["called_llm"] += 1
 
                     # Per-entity waveform gating: exclude TENSOR and SCENE entities from dialog
                     if waveform_schedule:
                         from synth.fidelity_envelope import FidelityBand
+
                         eligible_entities = []
                         for entity in entities:
                             band = waveform_schedule.get((entity.entity_id, timepoint_idx))
-                            if band is None or band not in (FidelityBand.TENSOR, FidelityBand.SCENE):
+                            if band is None or band not in (
+                                FidelityBand.TENSOR,
+                                FidelityBand.SCENE,
+                            ):
                                 eligible_entities.append(entity)
                             else:
                                 # Still record trajectory snapshot for skipped entity
                                 if self._trajectory_tracker is not None:
-                                    self._trajectory_tracker.record_snapshot(entity, timepoint, timepoint_idx)
+                                    self._trajectory_tracker.record_snapshot(
+                                        entity, timepoint, timepoint_idx
+                                    )
                     else:
                         eligible_entities = entities
 
@@ -3147,36 +3262,52 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                         # Not enough entities above SCENE band for dialog
                         if self._trajectory_tracker is not None:
                             for entity in entities:
-                                self._trajectory_tracker.record_snapshot(entity, timepoint, timepoint_idx)
+                                self._trajectory_tracker.record_snapshot(
+                                    entity, timepoint, timepoint_idx
+                                )
                         continue
 
                     # Select dialog_participants from eligible_entities only
                     import random
+
                     num_participants = min(4, len(eligible_entities))
                     dialog_participants = random.sample(eligible_entities, num_participants)
 
-                    print(f"  Generating dialog for {timepoint.timepoint_id} with {num_participants} entities...")
+                    print(
+                        f"  Generating dialog for {timepoint.timepoint_id} with {num_participants} entities..."
+                    )
 
                     # Build timeline context (simplified) - convert timestamps to ISO strings for JSON serialization
-                    timeline = [{"event_description": tp.event_description, "timestamp": tp.timestamp.isoformat() if hasattr(tp.timestamp, 'isoformat') else str(tp.timestamp)} for tp in timepoints]
+                    timeline = [
+                        {
+                            "event_description": tp.event_description,
+                            "timestamp": tp.timestamp.isoformat()
+                            if hasattr(tp.timestamp, "isoformat")
+                            else str(tp.timestamp),
+                        }
+                        for tp in timepoints
+                    ]
 
                     # Synthesize dialog (this invokes M11)
                     # Entities should now have tensors from ANDOS layer-by-layer training
                     # Get QSE resource state if active
                     qse_state = None
-                    if hasattr(self, '_qse') and self._qse and self._qse.is_active:
+                    if hasattr(self, "_qse") and self._qse and self._qse.is_active:
                         qse_state = self._qse.get_state_summary()
 
                     # Build ADPRS envelopes for per-turn generation if waveform schedule available
                     per_turn_envelopes = None
                     if waveform_schedule:
                         from synth.fidelity_envelope import ADPRSEnvelope
+
                         per_turn_envelopes = {}
                         for dp in dialog_participants:
                             envelope_data = dp.entity_metadata.get("adprs_envelope")
                             if envelope_data and isinstance(envelope_data, dict):
                                 try:
-                                    per_turn_envelopes[dp.entity_id] = ADPRSEnvelope.from_metadata_dict(envelope_data)
+                                    per_turn_envelopes[dp.entity_id] = (
+                                        ADPRSEnvelope.from_metadata_dict(envelope_data)
+                                    )
                                 except Exception:
                                     pass
 
@@ -3190,10 +3321,10 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                         animism_level=animism_level,
                         prior_dialog_beats=prior_dialog_beats if prior_dialog_beats else None,
                         qse_state=qse_state,
-                        voice_mixer=getattr(self, '_voice_mixer', None),
+                        voice_mixer=getattr(self, "_voice_mixer", None),
                         # Per-turn dialog generation kwargs
-                        use_per_turn=getattr(self, '_use_per_turn_dialog', True),
-                        steering_model=getattr(self, '_steering_model', None),
+                        use_per_turn=getattr(self, "_use_per_turn_dialog", True),
+                        steering_model=getattr(self, "_steering_model", None),
                         adprs_envelopes=per_turn_envelopes if per_turn_envelopes else None,
                     )
 
@@ -3210,7 +3341,9 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                     # Phase 2 ADPRS: Record cognitive state snapshots after dialog backprop sync
                     if self._trajectory_tracker is not None:
                         for entity in dialog_participants:
-                            self._trajectory_tracker.record_snapshot(entity, timepoint, timepoint_idx)
+                            self._trajectory_tracker.record_snapshot(
+                                entity, timepoint, timepoint_idx
+                            )
 
                     print(f"  ✓ Created dialog with {len(dialog_participants)} participants")
 
@@ -3219,6 +3352,7 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                     # Print traceback for debugging datetime serialization issues
                     if "datetime" in str(e).lower() or "json" in str(e).lower():
                         import traceback
+
                         traceback.print_exc()
                     # Continue with other timepoints
 
@@ -3230,8 +3364,10 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                 called = self._waveform_metrics["called_llm"]
                 total = skipped + called
                 ratio = skipped / total if total > 0 else 0.0
-                print(f"  [Waveform] Sufficiency: skipped={skipped}, called_llm={called}, "
-                      f"ratio={ratio:.2%}")
+                print(
+                    f"  [Waveform] Sufficiency: skipped={skipped}, called_llm={called}, "
+                    f"ratio={ratio:.2%}"
+                )
 
             self.logfire.info(
                 "Dialog synthesis complete",
@@ -3242,11 +3378,7 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
             )
 
     def _execute_queries(
-        self,
-        entities: List[Entity],
-        timepoints: List[Timepoint],
-        scene_result: Dict,
-        run_id: str
+        self, entities: list[Entity], timepoints: list[Timepoint], scene_result: dict, run_id: str
     ) -> None:
         """Step 4.6: Execute queries to test lazy resolution (M5)"""
         with self.logfire.span("step:query_execution"):
@@ -3268,6 +3400,7 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
 
             # Sample entities for queries (up to 3)
             import random
+
             sample_entities = random.sample(entities, min(3, len(entities)))
 
             for entity in sample_entities:
@@ -3275,7 +3408,7 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                 query_types = [
                     f"What did {entity.entity_id.replace('_', ' ')} think about the events?",
                     f"What actions did {entity.entity_id.replace('_', ' ')} take?",
-                    f"How did {entity.entity_id.replace('_', ' ')} interact with others?"
+                    f"How did {entity.entity_id.replace('_', ' ')} interact with others?",
                 ]
 
                 for query_text in query_types[:2]:  # 2 queries per entity
@@ -3284,7 +3417,9 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                         response = query_interface.query(query_text)
 
                         # Log response summary
-                        response_preview = response[:100] + "..." if len(response) > 100 else response
+                        response_preview = (
+                            response[:100] + "..." if len(response) > 100 else response
+                        )
                         print(f"    ✓ Response: {response_preview}")
 
                         queries_executed += 1
@@ -3298,16 +3433,12 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
             self.logfire.info(
                 "Query execution complete",
                 queries_executed=queries_executed,
-                queries_failed=queries_failed
+                queries_failed=queries_failed,
             )
 
     def _format_training_data(
-        self,
-        entities: List[Entity],
-        timepoints: List[Timepoint],
-        scene_result: Dict,
-        run_id: str
-    ) -> List[Dict[str, str]]:
+        self, entities: list[Entity], timepoints: list[Timepoint], scene_result: dict, run_id: str
+    ) -> list[dict[str, str]]:
         """Step 5: Format training data"""
         with self.logfire.span("step:format_training_data"):
             print("\nStep 5: Formatting training data...")
@@ -3328,29 +3459,26 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
             formatted_result = {
                 "specification": scene_result["specification"],
                 "entities": entities,
-                "timepoints": timepoints
+                "timepoints": timepoints,
             }
 
             training_examples = formatter.format_batch([formatted_result])
 
             print(f"✓ Generated {len(training_examples)} training examples")
 
-            self.logfire.info(
-                "Training data formatted",
-                examples=len(training_examples)
-            )
+            self.logfire.info("Training data formatted", examples=len(training_examples))
 
             return training_examples
 
     def _generate_script_exports(
         self,
-        all_timepoints: List[Timepoint],
-        trained_entities: List[Entity],
-        scene_result: Dict,
+        all_timepoints: list[Timepoint],
+        trained_entities: list[Entity],
+        scene_result: dict,
         output_dir: Path,
         config: SimulationConfig,
-        timestamp: str
-    ) -> Dict[str, Path]:
+        timestamp: str,
+    ) -> dict[str, Path]:
         """
         Generate Fountain and PDF script exports.
 
@@ -3368,8 +3496,8 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
         print("\n  📝 Generating script exports...")
 
         try:
-            from reporting.script_generator import ScriptGenerator
             from reporting.export_formats import FountainExporter, PDFExporter
+            from reporting.script_generator import ScriptGenerator
 
             store = scene_result.get("store")
             if not store:
@@ -3387,16 +3515,18 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                 entities=trained_entities,
                 world_id=config.world_id,
                 title=f"{config.world_id} - {timestamp}",
-                temporal_mode=config.temporal.mode.value
+                temporal_mode=config.temporal.mode.value,
             )
 
             # Export Fountain script
             fountain_file = output_dir / f"screenplay_{timestamp}.fountain"
             fountain_exporter = FountainExporter()
             fountain_exporter.export(script_data, str(fountain_file))
-            print(f"    ✓ Fountain script: {fountain_file.name} ({fountain_file.stat().st_size} bytes)")
+            print(
+                f"    ✓ Fountain script: {fountain_file.name} ({fountain_file.stat().st_size} bytes)"
+            )
 
-            result_files = {'fountain': fountain_file}
+            result_files = {"fountain": fountain_file}
 
             # Export PDF script (with graceful degradation if reportlab not installed)
             try:
@@ -3407,9 +3537,9 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                 pdf_exporter = PDFExporter()
                 pdf_exporter.export(script_data, str(pdf_file))
                 print(f"    ✓ PDF script: {pdf_file.name} ({pdf_file.stat().st_size} bytes)")
-                result_files['pdf'] = pdf_file
+                result_files["pdf"] = pdf_file
             except ImportError:
-                print(f"    ⚠️  PDF export skipped: reportlab not installed (pip install reportlab)")
+                print("    ⚠️  PDF export skipped: reportlab not installed (pip install reportlab)")
             except Exception as pdf_err:
                 print(f"    ⚠️  PDF export failed: {pdf_err}")
 
@@ -3419,13 +3549,20 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
             print(f"    ⚠️  Script export failed: {e}")
             # Print full traceback for debugging
             import traceback
+
             traceback.print_exc()
             # Non-fatal - continue with upload
             return {}
 
     def _upload_to_oxen(
-        self, training_data: List[Dict], scene_result: Dict, all_timepoints: List[Timepoint], trained_entities: List[Entity], config: SimulationConfig, run_id: str
-    ) -> tuple[Optional[str], Optional[str]]:
+        self,
+        training_data: list[dict],
+        scene_result: dict,
+        all_timepoints: list[Timepoint],
+        trained_entities: list[Entity],
+        config: SimulationConfig,
+        run_id: str,
+    ) -> tuple[str | None, str | None]:
         """Step 6: Upload to Oxen"""
         with self.logfire.span("step:oxen_upload"):
             print("\nStep 6: Uploading to Oxen...")
@@ -3444,9 +3581,10 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
             output_file = output_dir / f"training_{timestamp}.jsonl"
 
             import json
-            with open(output_file, 'w') as f:
+
+            with open(output_file, "w") as f:
                 for example in training_data:
-                    f.write(json.dumps(example) + '\n')
+                    f.write(json.dumps(example) + "\n")
 
             print(f"  Saved locally: {output_file}")
 
@@ -3463,64 +3601,63 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                 oxen_client = OxenClient(
                     namespace=os.getenv("OXEN_NAMESPACE", "timepoint-ai"),
                     repo_name=repo_name,
-                    interactive_auth=False
+                    interactive_auth=False,
                 )
 
                 # Create repo if needed
                 if not oxen_client.repo_exists():
                     print(f"  Creating repository: {repo_name}...")
                     repo_info = oxen_client.create_repo(
-                        name=repo_name,
-                        description=f"Training data for {config.world_id}"
+                        name=repo_name, description=f"Training data for {config.world_id}"
                     )
-                    print(f"  ✓ Repository created")
+                    print("  ✓ Repository created")
 
                 # Upload training dataset
-                print(f"  Uploading training dataset...")
+                print("  Uploading training dataset...")
                 upload_result = oxen_client.upload_dataset(
                     file_path=str(output_file),
                     commit_message=f"Training data: {len(training_data)} examples from {run_id}",
                     dst_path=f"datasets/{timestamp}/{output_file.name}",
-                    create_repo_if_missing=True
+                    create_repo_if_missing=True,
                 )
 
-                print(f"  ✓ Training dataset uploaded")
+                print("  ✓ Training dataset uploaded")
                 print(f"  Repo: {upload_result.repo_url}")
                 print(f"  Dataset: {upload_result.dataset_url}")
 
                 # Upload Fountain script if generated
-                if 'fountain' in script_files and script_files['fountain']:
+                if "fountain" in script_files and script_files["fountain"]:
                     try:
-                        print(f"  Uploading Fountain script...")
+                        print("  Uploading Fountain script...")
                         fountain_result = oxen_client.upload_dataset(
-                            file_path=str(script_files['fountain']),
+                            file_path=str(script_files["fountain"]),
                             commit_message=f"Fountain screenplay for {run_id}",
                             dst_path=f"screenplays/{timestamp}/{script_files['fountain'].name}",
-                            create_repo_if_missing=False
+                            create_repo_if_missing=False,
                         )
-                        print(f"  ✓ Fountain script uploaded")
+                        print("  ✓ Fountain script uploaded")
                     except Exception as e:
                         print(f"  ⚠️  Fountain upload failed: {e}")
 
                 # Upload PDF script if generated
-                if 'pdf' in script_files and script_files['pdf']:
+                if "pdf" in script_files and script_files["pdf"]:
                     try:
-                        print(f"  Uploading PDF script...")
+                        print("  Uploading PDF script...")
                         pdf_result = oxen_client.upload_dataset(
-                            file_path=str(script_files['pdf']),
+                            file_path=str(script_files["pdf"]),
                             commit_message=f"PDF screenplay for {run_id}",
                             dst_path=f"screenplays/{timestamp}/{script_files['pdf'].name}",
-                            create_repo_if_missing=False
+                            create_repo_if_missing=False,
                         )
-                        print(f"  ✓ PDF script uploaded")
+                        print("  ✓ PDF script uploaded")
                     except Exception as e:
                         print(f"  ⚠️  PDF upload failed: {e}")
 
                 self.logfire.info(
                     "Oxen upload complete",
                     repo_url=upload_result.repo_url,
-                    fountain_uploaded='fountain' in script_files,
-                    pdf_uploaded='pdf' in script_files
+                    fountain_uploaded="fountain" in script_files,
+                    pdf_uploaded="pdf" in script_files,
                 )
 
                 return upload_result.repo_url, upload_result.dataset_url
@@ -3533,11 +3670,11 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
     def _complete_metadata(
         self,
         run_id: str,
-        scene_result: Dict,
-        timepoints: List[Timepoint],
-        training_data: List[Dict],
-        oxen_repo_url: Optional[str],
-        oxen_dataset_url: Optional[str]
+        scene_result: dict,
+        timepoints: list[Timepoint],
+        training_data: list[dict],
+        oxen_repo_url: str | None,
+        oxen_dataset_url: str | None,
     ) -> RunMetadata:
         """Step 7: Complete metadata tracking"""
         with self.logfire.span("step:complete_metadata"):
@@ -3548,7 +3685,7 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
 
             # FIX BUG #4: Get REAL cost/token tracking from LLM client
             llm = scene_result.get("llm_client")
-            if llm and hasattr(llm, 'service'):
+            if llm and hasattr(llm, "service"):
                 # Get statistics from centralized service
                 stats = llm.service.get_statistics()
                 actual_cost = stats.get("total_cost", 0.0)
@@ -3556,24 +3693,24 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                 actual_tokens = logger_stats.get("total_tokens", 0)
                 actual_calls = logger_stats.get("total_calls", 0)
 
-                print(f"  📊 Real metrics from LLM service:")
+                print("  📊 Real metrics from LLM service:")
                 print(f"     Cost: ${actual_cost:.4f} (not placeholder!)")
                 print(f"     Tokens: {actual_tokens:,}")
                 print(f"     Calls: {actual_calls}")
             elif llm:
                 # Fallback to legacy client stats if available
-                actual_cost = getattr(llm, 'cost', 0.0)
-                actual_tokens = getattr(llm, 'token_count', 0)
+                actual_cost = getattr(llm, "cost", 0.0)
+                actual_tokens = getattr(llm, "token_count", 0)
                 actual_calls = timepoints_count  # Rough estimate only for legacy
 
-                print(f"  ⚠️  Using legacy client stats (may be incomplete)")
+                print("  ⚠️  Using legacy client stats (may be incomplete)")
             else:
                 # Final fallback: use conservative estimates
-                actual_cost = (entities_count * timepoints_count * 0.01)
+                actual_cost = entities_count * timepoints_count * 0.01
                 actual_tokens = entities_count * timepoints_count * 1000
                 actual_calls = timepoints_count
 
-                print(f"  ⚠️  No LLM client found, using estimates")
+                print("  ⚠️  No LLM client found, using estimates")
 
             # M1+M17: Calculate fidelity metrics (Database v2)
             config = scene_result.get("config")
@@ -3584,37 +3721,48 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
 
             # Calculate fidelity distribution (count ResolutionLevel across entities)
             from collections import Counter
+
             from schemas import ResolutionLevel
+
             resolution_counts = Counter()
             for entity in scene_result["entities"]:
-                res_level = getattr(entity, 'resolution_level', ResolutionLevel.SCENE)
+                res_level = getattr(entity, "resolution_level", ResolutionLevel.SCENE)
                 resolution_counts[res_level.value] += 1
 
             fidelity_distribution = json.dumps(dict(resolution_counts))
             print(f"  📊 Fidelity distribution: {dict(resolution_counts)}")
 
             # Calculate token budget compliance
-            if config and hasattr(config.temporal, 'token_budget') and config.temporal.token_budget:
+            if config and hasattr(config.temporal, "token_budget") and config.temporal.token_budget:
                 token_budget = config.temporal.token_budget
                 token_budget_compliance = actual_tokens / token_budget if token_budget > 0 else None
-                print(f"  📊 Token budget compliance: {token_budget_compliance:.2f} ({actual_tokens:,} / {token_budget:,})")
+                print(
+                    f"  📊 Token budget compliance: {token_budget_compliance:.2f} ({actual_tokens:,} / {token_budget:,})"
+                )
 
             # Calculate fidelity efficiency score (quality per token)
             # Quality proxy: entities + timepoints (output richness)
             quality_score = entities_count + timepoints_count
             if actual_tokens > 0:
                 fidelity_efficiency_score = quality_score / actual_tokens
-                print(f"  📊 Fidelity efficiency: {fidelity_efficiency_score:.6f} (quality: {quality_score}, tokens: {actual_tokens:,})")
+                print(
+                    f"  📊 Fidelity efficiency: {fidelity_efficiency_score:.6f} (quality: {quality_score}, tokens: {actual_tokens:,})"
+                )
 
             # Capture fidelity strategy from TemporalAgent (if available)
             temporal_agent = scene_result.get("temporal_agent")
-            if temporal_agent and hasattr(temporal_agent, 'fidelity_strategy'):
+            if temporal_agent and hasattr(temporal_agent, "fidelity_strategy"):
                 import json as json_module
+
                 try:
                     strategy = temporal_agent.fidelity_strategy
                     if strategy:
-                        fidelity_strategy_json = json_module.dumps(strategy.model_dump() if hasattr(strategy, 'model_dump') else str(strategy))
-                        print(f"  📊 Fidelity strategy captured from TemporalAgent")
+                        fidelity_strategy_json = json_module.dumps(
+                            strategy.model_dump()
+                            if hasattr(strategy, "model_dump")
+                            else str(strategy)
+                        )
+                        print("  📊 Fidelity strategy captured from TemporalAgent")
                 except Exception as e:
                     print(f"  ⚠️  Failed to serialize fidelity strategy: {e}")
 
@@ -3633,7 +3781,7 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                 fidelity_distribution=fidelity_distribution,
                 actual_tokens_used=float(actual_tokens) if actual_tokens else None,
                 token_budget_compliance=token_budget_compliance,
-                fidelity_efficiency_score=fidelity_efficiency_score
+                fidelity_efficiency_score=fidelity_efficiency_score,
             )
 
             # ADPRS: Include shadow evaluation report in metadata
@@ -3648,22 +3796,19 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                     metadata.summary += f"\n{shadow_note}"
                 else:
                     metadata.summary = shadow_note
-                print(f"  📊 ADPRS shadow report attached to metadata")
+                print("  📊 ADPRS shadow report attached to metadata")
 
             # Phase 6: Record simulation completion to usage tracking
             if self._track_usage and self._usage_bridge:
                 try:
                     self._usage_bridge.record_simulation(
-                        run_id=run_id,
-                        success=True,
-                        cost_usd=actual_cost,
-                        tokens=actual_tokens
+                        run_id=run_id, success=True, cost_usd=actual_cost, tokens=actual_tokens
                     )
                     print(f"  📊 Usage recorded: ${actual_cost:.4f}, {actual_tokens:,} tokens")
                 except Exception as e:
                     print(f"  ⚠️  Failed to record usage: {e}")
 
-            print(f"✓ Metadata complete")
+            print("✓ Metadata complete")
             print(f"  - Run ID: {run_id}")
             print(f"  - Entities: {entities_count}")
             print(f"  - Timepoints: {timepoints_count}")
@@ -3679,16 +3824,13 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                 run_id=run_id,
                 cost=actual_cost,
                 tokens=actual_tokens,
-                calls=actual_calls
+                calls=actual_calls,
             )
 
             return metadata
 
     def _run_convergence_analysis(
-        self,
-        run_id: str,
-        template_id: str,
-        config: SimulationConfig
+        self, run_id: str, template_id: str, config: SimulationConfig
     ) -> None:
         """
         Step 10: Optional Convergence Analysis (post-run).
@@ -3705,13 +3847,14 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
             print("\nStep 10: Running convergence analysis...")
 
             try:
+                import uuid
+
                 from evaluation.convergence import (
-                    extract_causal_graph,
                     compute_convergence_from_graphs,
+                    extract_causal_graph,
                 )
                 from schemas import ConvergenceSet
                 from storage import GraphStore
-                import uuid
 
                 conv_config = config.convergence
                 run_count = conv_config.run_count if conv_config else 3
@@ -3719,8 +3862,9 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                 # Get recent runs for this template
                 all_runs = self.metadata_manager.get_all_runs()
                 template_runs = [
-                    r for r in all_runs
-                    if hasattr(r, 'template_id') and r.template_id == template_id
+                    r
+                    for r in all_runs
+                    if hasattr(r, "template_id") and r.template_id == template_id
                 ]
 
                 # Take most recent N runs (including current)
@@ -3739,15 +3883,15 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                         # Use extract_causal_graph() to get ACTUAL temporal/knowledge edges
                         # This reads from SHARED_DB_PATH where timepoints/events were persisted
                         graph = extract_causal_graph(
-                            run_id=run.run_id,
-                            db_path=SHARED_DB_PATH,
-                            template_id=template_id
+                            run_id=run.run_id, db_path=SHARED_DB_PATH, template_id=template_id
                         )
 
                         # Log graph statistics for debugging
-                        print(f"    Run {run.run_id}: {len(graph.temporal_edges)} temporal edges, "
-                              f"{len(graph.knowledge_edges)} knowledge edges, "
-                              f"{len(graph.timepoints)} timepoints")
+                        print(
+                            f"    Run {run.run_id}: {len(graph.temporal_edges)} temporal edges, "
+                            f"{len(graph.knowledge_edges)} knowledge edges, "
+                            f"{len(graph.timepoints)} timepoints"
+                        )
 
                         if graph.edge_count > 0:
                             graphs.append(graph)
@@ -3765,7 +3909,7 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                 result = compute_convergence_from_graphs(graphs)
 
                 # Display results
-                print(f"\n  📊 Convergence Results:")
+                print("\n  📊 Convergence Results:")
                 print(f"  ├─ Score: {result.convergence_score:.2%}")
                 print(f"  ├─ Grade: {result.robustness_grade}")
                 print(f"  ├─ Consensus Edges: {len(result.consensus_edges)}")
@@ -3784,10 +3928,12 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                     robustness_grade=result.robustness_grade,
                     consensus_edge_count=len(result.consensus_edges),
                     contested_edge_count=len(result.contested_edges),
-                    divergence_points=json.dumps([
-                        {"edge": dp.edge, "ratio": dp.agreement_ratio}
-                        for dp in result.divergence_points[:10]
-                    ])
+                    divergence_points=json.dumps(
+                        [
+                            {"edge": dp.edge, "ratio": dp.agreement_ratio}
+                            for dp in result.divergence_points[:10]
+                        ]
+                    ),
                 )
                 store.save_convergence_set(convergence_set)
 
@@ -3797,7 +3943,7 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
                     "Convergence analysis complete",
                     score=result.convergence_score,
                     grade=result.robustness_grade,
-                    set_id=convergence_set.set_id
+                    set_id=convergence_set.set_id,
                 )
 
             except Exception as e:

@@ -10,23 +10,23 @@ Tests the COMPLETE Timepoint-Pro pipeline:
 This is the ultimate integration test showing all sprints working together.
 """
 
-import pytest
 import os
-import tempfile
 import shutil
-from pathlib import Path
+import tempfile
+
+import pytest
 
 # Sprint 3: NL Interface
 from nl_interface import NLConfigGenerator
 
 # Orchestrator
 from orchestrator import simulate_event
-from storage import GraphStore
+from reporting.export_pipeline import ExportPipeline
 
 # Sprint 1 & 2: Query, Reporting & Export
 from reporting.query_engine import EnhancedQueryEngine
 from reporting.report_generator import ReportGenerator
-from reporting.export_pipeline import ExportPipeline
+from storage import GraphStore
 
 
 @pytest.mark.e2e
@@ -42,7 +42,7 @@ class TestCompleteE2EPipeline:
 
     def teardown_method(self):
         """Cleanup test environment"""
-        if hasattr(self, 'temp_dir') and os.path.exists(self.temp_dir):
+        if hasattr(self, "temp_dir") and os.path.exists(self.temp_dir):
             shutil.rmtree(self.temp_dir)
 
     @pytest.mark.llm
@@ -59,9 +59,9 @@ class TestCompleteE2EPipeline:
         This demonstrates the complete user workflow from natural language
         to exported data.
         """
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("COMPLETE PIPELINE TEST: All Sprints Integrated")
-        print("="*70)
+        print("=" * 70)
 
         # ================================================================
         # PHASE 1: Natural Language to Config (Sprint 3)
@@ -77,11 +77,11 @@ class TestCompleteE2EPipeline:
         # Generate config from NL
         generator = NLConfigGenerator()  # Mock mode
 
-        print(f"Input: \"{description}\"")
+        print(f'Input: "{description}"')
 
         config, confidence = generator.generate_config(description)
 
-        print(f"✅ Config generated")
+        print("✅ Config generated")
         print(f"   Scenario: {config['scenario'][:60]}...")
         print(f"   Entities: {len(config['entities'])}")
         print(f"   Timepoints: {config['timepoint_count']}")
@@ -100,24 +100,24 @@ class TestCompleteE2EPipeline:
         print("-" * 70)
 
         result = simulate_event(
-            config['scenario'],
+            config["scenario"],
             llm_client,
             self.storage,
             context={
-                "max_entities": len(config['entities']),
-                "max_timepoints": min(config['timepoint_count'], 3),
-                "temporal_mode": config.get('temporal_mode', 'forward')
+                "max_entities": len(config["entities"]),
+                "max_timepoints": min(config["timepoint_count"], 3),
+                "temporal_mode": config.get("temporal_mode", "forward"),
             },
-            save_to_db=True
+            save_to_db=True,
         )
 
-        print(f"✅ Simulation executed")
+        print("✅ Simulation executed")
         print(f"   Entities: {len(result['entities'])}")
         print(f"   Timepoints: {len(result['timepoints'])}")
         print(f"   Graph nodes: {result['graph'].number_of_nodes()}")
 
         # Store simulation ID for later queries
-        simulation_id = result['timepoints'][0].timepoint_id if result['timepoints'] else "sim_001"
+        simulation_id = result["timepoints"][0].timepoint_id if result["timepoints"] else "sim_001"
 
         # ================================================================
         # PHASE 3: Query Simulation Data (Sprint 1)
@@ -135,7 +135,7 @@ class TestCompleteE2EPipeline:
         print("\nQuery 1: Summarize relationships")
         relationships = query_engine.summarize_relationships(world_id)
 
-        print(f"✅ Relationship summary generated")
+        print("✅ Relationship summary generated")
         print(f"   World ID: {relationships.get('world_id')}")
         print(f"   Entity pairs: {len(relationships.get('entity_pairs', []))}")
 
@@ -143,7 +143,7 @@ class TestCompleteE2EPipeline:
         print("\nQuery 2: Knowledge flow graph")
         knowledge_flow = query_engine.knowledge_flow_graph(world_id)
 
-        print(f"✅ Knowledge flow graph generated")
+        print("✅ Knowledge flow graph generated")
         print(f"   Nodes: {len(knowledge_flow.get('nodes', []))}")
         print(f"   Edges: {len(knowledge_flow.get('edges', []))}")
 
@@ -151,7 +151,7 @@ class TestCompleteE2EPipeline:
         print("\nQuery 3: Timeline summary")
         timeline = query_engine.timeline_summary(world_id)
 
-        print(f"✅ Timeline summary generated")
+        print("✅ Timeline summary generated")
         print(f"   Events: {len(timeline.get('events', []))}")
         print(f"   Key moments: {len(timeline.get('key_moments', []))}")
 
@@ -161,7 +161,7 @@ class TestCompleteE2EPipeline:
         batch_queries = [
             "What happened in the simulation?",
             "Who were the main entities?",
-            "What was the outcome?"
+            "What was the outcome?",
         ]
 
         batch_results = query_engine.execute_batch(batch_queries, world_id=world_id)
@@ -170,7 +170,7 @@ class TestCompleteE2EPipeline:
 
         # Query 5: Get batch stats
         stats = query_engine.get_batch_stats()
-        print(f"\nQuery Stats:")
+        print("\nQuery Stats:")
         print(f"   Queries executed: {stats.get('queries_executed', 0)}")
         print(f"   Cache hits: {stats.get('cache_hits', 0)}")
         print(f"   Cache misses: {stats.get('cache_misses', 0)}")
@@ -187,10 +187,7 @@ class TestCompleteE2EPipeline:
         # Report 1: Markdown summary report
         print("\nReport 1: Generating Markdown summary report...")
 
-        md_report = report_generator.generate_summary_report(
-            world_id=world_id,
-            format="markdown"
-        )
+        md_report = report_generator.generate_summary_report(world_id=world_id, format="markdown")
 
         print(f"✅ Markdown report generated ({len(md_report)} chars)")
         print(f"   Preview: {md_report[:100]}...")
@@ -199,19 +196,17 @@ class TestCompleteE2EPipeline:
         print("\nReport 2: Generating JSON relationship report...")
 
         json_report = report_generator.generate_relationship_report(
-            world_id=world_id,
-            format="json"
+            world_id=world_id, format="json"
         )
 
-        print(f"✅ JSON report generated")
+        print("✅ JSON report generated")
         print(f"   Type: {type(json_report)}")
 
         # Report 3: CSV knowledge report
         print("\nReport 3: Generating knowledge flow report...")
 
         knowledge_report = report_generator.generate_knowledge_report(
-            world_id=world_id,
-            format="markdown"
+            world_id=world_id, format="markdown"
         )
 
         print(f"✅ Knowledge report generated ({len(knowledge_report)} chars)")
@@ -223,10 +218,10 @@ class TestCompleteE2EPipeline:
             "markdown_length": len(md_report),
             "json_length": len(json_report),
             "knowledge_length": len(knowledge_report),
-            "formats_generated": 3
+            "formats_generated": 3,
         }
 
-        print(f"✅ Report statistics")
+        print("✅ Report statistics")
         print(f"   Formats generated: {report_stats['formats_generated']}")
 
         # ================================================================
@@ -249,14 +244,14 @@ class TestCompleteE2EPipeline:
             world_id=world_id,
             report_type="summary",
             export_format="json",
-            output_path=os.path.join(export_dir, "summary")
+            output_path=os.path.join(export_dir, "summary"),
         )
 
-        json_path = json_result['output_path']
+        json_path = json_result["output_path"]
         assert os.path.exists(json_path), "JSON export file not created"
-        json_size = json_result['file_size_bytes']
+        json_size = json_result["file_size_bytes"]
 
-        print(f"✅ JSON export created")
+        print("✅ JSON export created")
         print(f"   Path: {json_path}")
         print(f"   Size: {json_size} bytes")
 
@@ -267,14 +262,14 @@ class TestCompleteE2EPipeline:
             world_id=world_id,
             report_type="relationships",
             export_format="markdown",
-            output_path=os.path.join(export_dir, "relationships")
+            output_path=os.path.join(export_dir, "relationships"),
         )
 
-        md_path = md_result['output_path']
+        md_path = md_result["output_path"]
         assert os.path.exists(md_path), "Markdown export file not created"
-        md_size = md_result['file_size_bytes']
+        md_size = md_result["file_size_bytes"]
 
-        print(f"✅ Markdown export created")
+        print("✅ Markdown export created")
         print(f"   Path: {md_path}")
         print(f"   Size: {md_size} bytes")
 
@@ -286,15 +281,15 @@ class TestCompleteE2EPipeline:
             report_type="knowledge",
             export_format="json",
             output_path=os.path.join(export_dir, "knowledge"),
-            compression="gzip"
+            compression="gzip",
         )
 
-        compressed_path = compressed_result['output_path']
+        compressed_path = compressed_result["output_path"]
         assert os.path.exists(compressed_path), "Compressed export not created"
-        compressed_size = compressed_result['file_size_bytes']
+        compressed_size = compressed_result["file_size_bytes"]
         compression_ratio = (1 - compressed_size / json_size) * 100 if json_size > 0 else 0
 
-        print(f"✅ Compressed export created")
+        print("✅ Compressed export created")
         print(f"   Path: {compressed_path}")
         print(f"   Size: {compressed_size} bytes")
         print(f"   Compression: {compression_ratio:.1f}% reduction")
@@ -310,14 +305,14 @@ class TestCompleteE2EPipeline:
             report_type="script",
             export_format="fountain",
             output_path=os.path.join(export_dir, "screenplay"),
-            title=f"Simulation: {simulation_id}"
+            title=f"Simulation: {simulation_id}",
         )
 
-        fountain_path = fountain_result['output_path']
+        fountain_path = fountain_result["output_path"]
         assert os.path.exists(fountain_path), "Fountain script export not created"
-        fountain_size = fountain_result['file_size_bytes']
+        fountain_size = fountain_result["file_size_bytes"]
 
-        print(f"✅ Fountain script export created")
+        print("✅ Fountain script export created")
         print(f"   Path: {fountain_path}")
         print(f"   Size: {fountain_size} bytes")
 
@@ -329,14 +324,14 @@ class TestCompleteE2EPipeline:
             report_type="script",
             export_format="storyboard",
             output_path=os.path.join(export_dir, "storyboard"),
-            title=f"Simulation: {simulation_id}"
+            title=f"Simulation: {simulation_id}",
         )
 
-        storyboard_path = storyboard_result['output_path']
+        storyboard_path = storyboard_result["output_path"]
         assert os.path.exists(storyboard_path), "Storyboard JSON export not created"
-        storyboard_size = storyboard_result['file_size_bytes']
+        storyboard_size = storyboard_result["file_size_bytes"]
 
-        print(f"✅ Storyboard JSON export created")
+        print("✅ Storyboard JSON export created")
         print(f"   Path: {storyboard_path}")
         print(f"   Size: {storyboard_size} bytes")
 
@@ -348,19 +343,19 @@ class TestCompleteE2EPipeline:
             report_type="script",
             export_format="pdf",
             output_path=os.path.join(export_dir, "screenplay"),
-            title=f"Simulation: {simulation_id}"
+            title=f"Simulation: {simulation_id}",
         )
 
-        pdf_path = pdf_result['output_path']
+        pdf_path = pdf_result["output_path"]
         assert os.path.exists(pdf_path), "PDF screenplay export not created"
-        pdf_size = pdf_result['file_size_bytes']
+        pdf_size = pdf_result["file_size_bytes"]
 
         # Verify it's a valid PDF
-        with open(pdf_path, 'rb') as f:
+        with open(pdf_path, "rb") as f:
             pdf_header = f.read(4)
-            assert pdf_header == b'%PDF', "PDF file is invalid"
+            assert pdf_header == b"%PDF", "PDF file is invalid"
 
-        print(f"✅ PDF screenplay export created")
+        print("✅ PDF screenplay export created")
         print(f"   Path: {pdf_path}")
         print(f"   Size: {pdf_size} bytes")
 
@@ -374,12 +369,12 @@ class TestCompleteE2EPipeline:
         checks = {
             "Sprint 3: Config generated": config is not None,
             "Sprint 3: Config validated": validation.is_valid,
-            "Orchestrator: Simulation executed": len(result['entities']) > 0,
+            "Orchestrator: Simulation executed": len(result["entities"]) > 0,
             "Sprint 1: Relationships queried": relationships is not None,
             "Sprint 1: Knowledge flow generated": knowledge_flow is not None,
             "Sprint 1: Timeline generated": timeline is not None,
             "Sprint 1: Batch queries executed": len(batch_results) > 0,
-            "Sprint 1: Query stats tracked": stats.get('queries_executed', 0) > 0,
+            "Sprint 1: Query stats tracked": stats.get("queries_executed", 0) > 0,
             "Sprint 2: Markdown report generated": len(md_report) > 0,
             "Sprint 2: JSON report generated": len(json_report) > 0,
             "Sprint 2: Knowledge report generated": len(knowledge_report) > 0,
@@ -403,28 +398,35 @@ class TestCompleteE2EPipeline:
         # ================================================================
         # FINAL SUMMARY
         # ================================================================
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("COMPLETE PIPELINE TEST: SUCCESS")
-        print("="*70)
+        print("=" * 70)
         print("\nPipeline Summary:")
         print(f"  1. Sprint 3 (NL Interface):     {len(config['entities'])} entities configured")
         print(f"  2. Orchestrator:                {len(result['entities'])} entities created")
-        print(f"  3. Sprint 1 (Query):            {stats.get('queries_executed', 0)} queries executed")
-        print(f"  4. Sprint 2 (Reports):          {report_stats['formats_generated']} report formats generated")
-        print(f"  5. Sprint 2 (Export):           6 export formats created (JSON, MD, compressed, Fountain, Storyboard, PDF)")
+        print(
+            f"  3. Sprint 1 (Query):            {stats.get('queries_executed', 0)} queries executed"
+        )
+        print(
+            f"  4. Sprint 2 (Reports):          {report_stats['formats_generated']} report formats generated"
+        )
+        print(
+            "  5. Sprint 2 (Export):           6 export formats created (JSON, MD, compressed, Fountain, Storyboard, PDF)"
+        )
         print("\nAll Sprints Verified:")
         print("  ✅ Sprint 1: Query Interface")
         print("  ✅ Sprint 2: Reporting & Export")
         print("  ✅ Sprint 3: Natural Language Interface")
         print("  ✅ Orchestrator: Simulation Engine")
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("TIMEPOINT-PRO COMPLETE INTEGRATION: SUCCESS")
-        print("="*70 + "\n")
+        print("=" * 70 + "\n")
 
 
 if __name__ == "__main__":
     """Run complete pipeline test"""
     import sys
+
     pytest_args = [__file__, "-v", "-s", "-m", "e2e"]
     exit_code = pytest.main(pytest_args)
     sys.exit(exit_code)

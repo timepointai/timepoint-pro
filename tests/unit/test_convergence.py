@@ -8,12 +8,13 @@ Tests the core convergence utilities:
 """
 
 import pytest
+
 from evaluation.convergence import (
-    normalize_timepoint_id,
-    graph_similarity,
     CausalGraph,
-    find_divergence_points,
     compute_convergence_from_graphs,
+    find_divergence_points,
+    graph_similarity,
+    normalize_timepoint_id,
 )
 
 
@@ -131,7 +132,7 @@ class TestGraphSimilarity:
         # Union: {("a", "b"), ("b", "c"), ("c", "d")} = 3 edges
         # Jaccard = 1/3
         similarity = graph_similarity(g1, g2)
-        assert abs(similarity - 1/3) < 0.01
+        assert abs(similarity - 1 / 3) < 0.01
 
     def test_both_empty_graphs(self):
         """Two empty graphs should have similarity of 1.0."""
@@ -182,7 +183,7 @@ class TestGraphSimilarity:
         # Intersection = {("tp1", "tp2", "temporal")} = 1
         # Union = 3 edges
         similarity = graph_similarity(g1, g2)
-        assert abs(similarity - 1/3) < 0.01
+        assert abs(similarity - 1 / 3) < 0.01
 
 
 class TestCausalGraph:
@@ -297,7 +298,7 @@ class TestComputeConvergenceFromGraphs:
         result = compute_convergence_from_graphs(graphs)
 
         # Jaccard = 1/3
-        assert abs(result.convergence_score - 1/3) < 0.01
+        assert abs(result.convergence_score - 1 / 3) < 0.01
         assert result.robustness_grade == "F"  # < 0.5
 
     def test_requires_at_least_two_graphs(self):

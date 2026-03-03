@@ -5,19 +5,19 @@ This adapter bridges the gap between the simple NL interface output schema
 and the complex production SimulationConfig required by e2e_runner.
 """
 
-from typing import Dict, Any, Optional, Tuple
 import hashlib
 from datetime import datetime
+from typing import Any
 
 from generation.config_schema import (
-    SimulationConfig,
-    EntityConfig,
     CompanyConfig,
-    TemporalConfig,
+    EntityConfig,
     OutputConfig,
-    VariationConfig,
-    TemporalMode,
     ResolutionLevel,
+    SimulationConfig,
+    TemporalConfig,
+    TemporalMode,
+    VariationConfig,
 )
 
 
@@ -65,11 +65,7 @@ class NLToProductionAdapter:
         """
         self.default_resolution = default_resolution
 
-    def convert(
-        self,
-        nl_config: Dict[str, Any],
-        confidence: float = 0.8
-    ) -> SimulationConfig:
+    def convert(self, nl_config: dict[str, Any], confidence: float = 0.8) -> SimulationConfig:
         """
         Convert NL interface output to production SimulationConfig.
 
@@ -110,7 +106,7 @@ class NLToProductionAdapter:
             metadata=metadata,
         )
 
-    def _validate_nl_config(self, nl_config: Dict[str, Any]) -> None:
+    def _validate_nl_config(self, nl_config: dict[str, Any]) -> None:
         """Validate that NL config has minimum required fields."""
         required = ["scenario", "entities", "timepoint_count", "temporal_mode"]
         missing = [f for f in required if f not in nl_config]
@@ -124,7 +120,7 @@ class NLToProductionAdapter:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         return f"nl_{scenario_hash}_{timestamp}"
 
-    def _build_entity_config(self, nl_config: Dict[str, Any]) -> EntityConfig:
+    def _build_entity_config(self, nl_config: dict[str, Any]) -> EntityConfig:
         """Convert NL entity list to EntityConfig."""
         entities = nl_config.get("entities", [])
         count = len(entities) if entities else 3
@@ -135,7 +131,7 @@ class NLToProductionAdapter:
         # Check for animism level
         animism_level = nl_config.get("animism_level", 0)
         if animism_level > 0:
-            types = ["human", "animal", "building"][:animism_level + 1]
+            types = ["human", "animal", "building"][: animism_level + 1]
 
         return EntityConfig(
             count=count,
@@ -144,7 +140,7 @@ class NLToProductionAdapter:
             animism_level=animism_level,
         )
 
-    def _build_timepoints_config(self, nl_config: Dict[str, Any]) -> CompanyConfig:
+    def _build_timepoints_config(self, nl_config: dict[str, Any]) -> CompanyConfig:
         """Convert NL timepoint_count to CompanyConfig."""
         count = nl_config.get("timepoint_count", 5)
 
@@ -164,7 +160,7 @@ class NLToProductionAdapter:
             after_count=0,
         )
 
-    def _build_temporal_config(self, nl_config: Dict[str, Any]) -> TemporalConfig:
+    def _build_temporal_config(self, nl_config: dict[str, Any]) -> TemporalConfig:
         """Convert NL temporal_mode to TemporalConfig."""
         mode_str = nl_config.get("temporal_mode", "forward").lower()
         mode = self.TEMPORAL_MODE_MAP.get(mode_str, TemporalMode.FORWARD)
@@ -183,7 +179,7 @@ class NLToProductionAdapter:
 
         return TemporalConfig(**config_kwargs)
 
-    def _build_output_config(self, nl_config: Dict[str, Any]) -> OutputConfig:
+    def _build_output_config(self, nl_config: dict[str, Any]) -> OutputConfig:
         """Convert NL focus/outputs to OutputConfig."""
         focus_areas = nl_config.get("focus", ["dialog"])
         output_types = nl_config.get("outputs", ["dialog"])
@@ -213,7 +209,7 @@ class NLToProductionAdapter:
 
         return OutputConfig(**config_kwargs)
 
-    def _build_variation_config(self, nl_config: Dict[str, Any]) -> VariationConfig:
+    def _build_variation_config(self, nl_config: dict[str, Any]) -> VariationConfig:
         """Convert NL variation settings to VariationConfig."""
         generation_mode = nl_config.get("generation_mode", "vertical")
         variation_count = nl_config.get("variation_count", 1)
@@ -227,11 +223,7 @@ class NLToProductionAdapter:
 
         return VariationConfig(enabled=False)
 
-    def _build_metadata(
-        self,
-        nl_config: Dict[str, Any],
-        confidence: float
-    ) -> Dict[str, Any]:
+    def _build_metadata(self, nl_config: dict[str, Any], confidence: float) -> dict[str, Any]:
         """Build metadata preserving NL generation info."""
         return {
             "source": "nl_interface",
@@ -244,8 +236,7 @@ class NLToProductionAdapter:
 
 
 def convert_nl_to_production(
-    nl_config: Dict[str, Any],
-    confidence: float = 0.8
+    nl_config: dict[str, Any], confidence: float = 0.8
 ) -> SimulationConfig:
     """
     Convenience function to convert NL config to production config.

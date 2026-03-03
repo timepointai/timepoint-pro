@@ -2,7 +2,6 @@
 Tests for Enhanced Query Engine (Sprint 2.1)
 """
 
-import pytest
 from reporting.query_engine import EnhancedQueryEngine, QueryResultCache
 
 
@@ -44,11 +43,7 @@ class TestEnhancedQueryEngine:
     def test_execute_batch_basic(self):
         """Test basic batch query execution"""
         engine = EnhancedQueryEngine()
-        queries = [
-            "What happened?",
-            "Who was involved?",
-            "What was the outcome?"
-        ]
+        queries = ["What happened?", "Who was involved?", "What was the outcome?"]
         results = engine.execute_batch(queries, world_id="test_world")
 
         assert len(results) == 3
@@ -113,10 +108,7 @@ class TestEnhancedQueryEngine:
     def test_entity_comparison(self):
         """Test entity comparison"""
         engine = EnhancedQueryEngine()
-        comparison = engine.entity_comparison(
-            "test_world",
-            entity_ids=["alice", "bob"]
-        )
+        comparison = engine.entity_comparison("test_world", entity_ids=["alice", "bob"])
 
         assert "world_id" in comparison
         assert "entity_ids" in comparison

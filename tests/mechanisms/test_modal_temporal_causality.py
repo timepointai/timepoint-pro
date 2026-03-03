@@ -2,13 +2,14 @@
 """
 test_modal_temporal_causality.py - Tests for Mechanism 17: Modal Temporal Causality
 """
+
+from typing import Any
+
 import pytest
-import numpy as np
-from typing import Dict, Any, Optional
 
 from schemas import TemporalMode, Timeline, Timepoint
-from workflows import TemporalAgent
 from validation import Validator
+from workflows import TemporalAgent
 
 
 class ModalTemporalCausalitySystem:
@@ -20,19 +21,21 @@ class ModalTemporalCausalitySystem:
         self.current_mode = TemporalMode.FORWARD
         self.agents = {}
 
-    def set_mode(self, mode: TemporalMode, config: Optional[Dict] = None):
+    def set_mode(self, mode: TemporalMode, config: dict | None = None):
         """Set the active temporal mode"""
         self.current_mode = mode
         if mode not in self.agents:
             self.agents[mode] = TemporalAgent(mode, config or {})
 
-    def influence_event(self, event: str, context: Dict) -> float:
+    def influence_event(self, event: str, context: dict) -> float:
         """Get event probability influenced by current temporal mode"""
         if self.current_mode in self.agents:
             return self.agents[self.current_mode].influence_event_probability(event, context)
         return context.get("base_probability", 0.5)
 
-    def validate_causality(self, entity, knowledge_item: str, timepoint: Timepoint) -> Dict[str, Any]:
+    def validate_causality(
+        self, entity, knowledge_item: str, timepoint: Timepoint
+    ) -> dict[str, Any]:
         """Validate temporal consistency based on current mode"""
         return Validator._validators["temporal_consistency"]["func"](
             entity, knowledge_item, timepoint, self.current_mode.value
@@ -49,8 +52,8 @@ class ModalTemporalCausalitySystem:
         Returns:
             New timepoint representing the modal branch
         """
-        from schemas import Timepoint, ResolutionLevel
-        from datetime import datetime
+
+        from schemas import Timepoint
 
         branch_id = f"{base_timepoint.timepoint_id}_modal_{mode.value}"
 
@@ -59,7 +62,7 @@ class ModalTemporalCausalitySystem:
             timestamp=base_timepoint.timestamp,
             event_description=f"Modal branch ({mode.value}): {base_timepoint.event_description}",
             entities_present=base_timepoint.entities_present.copy(),
-            resolution_level=base_timepoint.resolution_level
+            resolution_level=base_timepoint.resolution_level,
         )
 
         if self.store:
@@ -96,7 +99,10 @@ class TestTemporalAgent:
 
     def test_temporal_agent_initialization(self):
         """Test TemporalAgent initialization"""
-        config = {"goals": ["maintain_causality"], "directorial_config": {"narrative_arc": "rising_action"}}
+        config = {
+            "goals": ["maintain_causality"],
+            "directorial_config": {"narrative_arc": "rising_action"},
+        }
         agent = TemporalAgent(TemporalMode.DIRECTORIAL, config)
 
         assert agent.mode == TemporalMode.DIRECTORIAL
@@ -118,7 +124,7 @@ class TestTemporalAgent:
                 "narrative_arc": "rising_action",
                 "coincidence_boost_factor": 1.5,
                 "dramatic_tension": 0.8,
-                "foreshadowing_probability": 0.0  # Disable for deterministic test
+                "foreshadowing_probability": 0.0,  # Disable for deterministic test
             }
         }
         agent = TemporalAgent(TemporalMode.DIRECTORIAL, config)
@@ -134,12 +140,7 @@ class TestTemporalAgent:
 
     def test_influence_event_probability_cyclical_mode(self):
         """Test event probability influence in Cyclical mode"""
-        config = {
-            "cyclical_config": {
-                "cycle_length": 10,
-                "destiny_weight": 0.6
-            }
-        }
+        config = {"cyclical_config": {"cycle_length": 10, "destiny_weight": 0.6}}
         agent = TemporalAgent(TemporalMode.CYCLICAL, config)
 
         context = {"base_probability": 0.5, "cyclical_config": config["cyclical_config"]}
@@ -203,7 +204,7 @@ class TestTemporalModeValidation:
             timepoint_id="tp_test",
             timestamp="2025-01-01T00:00:00",
             event_description="test event",
-            entities_present=["test_entity"]
+            entities_present=["test_entity"],
         )
 
         result = Validator._validators["temporal_consistency"]["func"](
@@ -221,7 +222,7 @@ class TestTemporalModeValidation:
             timepoint_id="tp_test",
             timestamp="2025-01-01T00:00:00",
             event_description="test event",
-            entities_present=["test_entity"]
+            entities_present=["test_entity"],
         )
 
         # Prophecy knowledge
@@ -247,7 +248,7 @@ class TestTemporalModeValidation:
             timepoint_id="tp_test",
             timestamp="2025-01-01T00:00:00",
             event_description="test event",
-            entities_present=["test_entity"]
+            entities_present=["test_entity"],
         )
 
         # Dramatic event
@@ -273,7 +274,7 @@ class TestTemporalModeValidation:
             timepoint_id="tp_test",
             timestamp="2025-01-01T00:00:00",
             event_description="test event",
-            entities_present=["test_entity"]
+            entities_present=["test_entity"],
         )
 
         result = Validator._validators["temporal_consistency"]["func"](
@@ -300,7 +301,7 @@ class TestTimelineModalSupport:
             resolution="day",
             entities_present=["entity1"],
             events=["event1"],
-            temporal_mode=TemporalMode.DIRECTORIAL
+            temporal_mode=TemporalMode.DIRECTORIAL,
         )
 
         assert timeline.temporal_mode == TemporalMode.DIRECTORIAL
@@ -316,7 +317,7 @@ class TestTimelineModalSupport:
             timestamp=datetime.now(),
             resolution="day",
             entities_present=["entity1"],
-            events=["event1"]
+            events=["event1"],
             # temporal_mode not specified, should default to FORWARD
         )
 
@@ -335,7 +336,7 @@ class TestIntegrationScenarios:
             "directorial_config": {
                 "narrative_arc": "climax",
                 "coincidence_boost_factor": 2.0,
-                "dramatic_tension": 0.9
+                "dramatic_tension": 0.9,
             }
         }
         agent = TemporalAgent(TemporalMode.DIRECTORIAL, config)
@@ -343,11 +344,7 @@ class TestIntegrationScenarios:
         context = {"base_probability": 0.3, "directorial_config": config["directorial_config"]}
 
         # Events that advance climax
-        climax_events = [
-            "crisis reaches peak",
-            "turning point decision",
-            "peak crisis moment"
-        ]
+        climax_events = ["crisis reaches peak", "turning point decision", "peak crisis moment"]
 
         for event in climax_events:
             prob = agent.influence_event_probability(event, context)
@@ -355,12 +352,7 @@ class TestIntegrationScenarios:
 
     def test_prophecy_cycle_causality(self):
         """Test prophecy-driven causality in cyclical mode"""
-        config = {
-            "cyclical_config": {
-                "destiny_weight": 0.8,
-                "cycle_length": 7
-            }
-        }
+        config = {"cyclical_config": {"destiny_weight": 0.8, "cycle_length": 7}}
         agent = TemporalAgent(TemporalMode.CYCLICAL, config)
 
         context = {"base_probability": 0.4, "cyclical_config": config["cyclical_config"]}

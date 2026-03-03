@@ -2,18 +2,15 @@
 Tests for Phase 5: PORTAL Inline Dialog — portal step dialog, constraint
 extraction, and antecedent constraint injection.
 """
-import pytest
-from dataclasses import dataclass, field
+
 from datetime import datetime
-from typing import List, Dict, Any, Optional
-from unittest.mock import MagicMock, patch
 
-from schemas import Entity, PhysicalTensor, CognitiveTensor
-
+from schemas import CognitiveTensor, Entity, PhysicalTensor
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_entity(entity_id: str, age: float = 35.0) -> Entity:
     return Entity(
@@ -27,6 +24,7 @@ def _make_entity(entity_id: str, age: float = 35.0) -> Entity:
 # PortalState construction and tensor seeding logic
 # ---------------------------------------------------------------------------
 
+
 class TestPortalTensorSeeding:
     """Test the tensor seeding logic used in _run_portal_step_dialog."""
 
@@ -38,8 +36,12 @@ class TestPortalTensorSeeding:
         if not entity.entity_metadata.get("physical_tensor"):
             age = entity.entity_metadata.get("age", 35.0)
             entity.entity_metadata["physical_tensor"] = PhysicalTensor(
-                age=age, health_status=1.0, pain_level=0.0,
-                fever=36.5, mobility=1.0, stamina=1.0,
+                age=age,
+                health_status=1.0,
+                pain_level=0.0,
+                fever=36.5,
+                mobility=1.0,
+                stamina=1.0,
                 sensory_acuity={"vision": 1.0, "hearing": 1.0},
             ).model_dump()
 
@@ -50,8 +52,11 @@ class TestPortalTensorSeeding:
         entity = _make_entity("Webb")
         if not entity.entity_metadata.get("cognitive_tensor"):
             entity.entity_metadata["cognitive_tensor"] = CognitiveTensor(
-                knowledge_state=[], emotional_valence=0.0, emotional_arousal=0.2,
-                energy_budget=100.0, decision_confidence=0.8,
+                knowledge_state=[],
+                emotional_valence=0.0,
+                emotional_arousal=0.2,
+                energy_budget=100.0,
+                decision_confidence=0.8,
             ).model_dump()
 
         assert entity.cognitive_tensor is not None
@@ -60,8 +65,12 @@ class TestPortalTensorSeeding:
     def test_does_not_overwrite_existing_tensors(self):
         entity = _make_entity("Chen")
         entity.entity_metadata["physical_tensor"] = PhysicalTensor(
-            age=60.0, health_status=0.5, pain_level=0.3,
-            fever=37.5, mobility=0.6, stamina=0.4,
+            age=60.0,
+            health_status=0.5,
+            pain_level=0.3,
+            fever=37.5,
+            mobility=0.6,
+            stamina=0.4,
             sensory_acuity={"vision": 0.7},
         ).model_dump()
 
@@ -87,6 +96,7 @@ class TestPortalTensorSeeding:
 # ---------------------------------------------------------------------------
 # Dialog Constraints Structure
 # ---------------------------------------------------------------------------
+
 
 class TestDialogConstraintsStructure:
     """Test the dialog_constraints dict structure returned by _run_portal_step_dialog."""
@@ -143,6 +153,7 @@ class TestDialogConstraintsStructure:
 # Portal enable_inline_dialog config
 # ---------------------------------------------------------------------------
 
+
 class TestPortalInlineDialogConfig:
     """Test that the enable_inline_dialog configuration is properly handled."""
 
@@ -176,6 +187,7 @@ class TestPortalInlineDialogConfig:
 # Ephemeral Timepoint Creation
 # ---------------------------------------------------------------------------
 
+
 class TestEphemeralTimepointCreation:
     """Test the ephemeral Timepoint creation logic from _run_portal_step_dialog."""
 
@@ -205,7 +217,6 @@ class TestEphemeralTimepointCreation:
         assert "Webb" in ephemeral_tp.entities_present
 
     def test_handles_invalid_month_gracefully(self):
-        from schemas import Timepoint
 
         # If month is None or invalid, fallback to month=1
         month = None
