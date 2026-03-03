@@ -1,12 +1,11 @@
 """
 Tests for Phase 4: Dialog Archetypes - Rhetorical profile lookup and structure.
 """
-import pytest
+
 from workflows.dialog_archetypes import (
     ARCHETYPE_RHETORICAL_PROFILES,
     get_rhetorical_profile,
 )
-
 
 REQUIRED_PROFILE_KEYS = {
     "argument_style",
@@ -42,7 +41,12 @@ class TestArchetypeProfiles:
 
     def test_string_fields_are_nonempty(self):
         for archetype_id, profile in ARCHETYPE_RHETORICAL_PROFILES.items():
-            for key in ("argument_style", "disagreement_pattern", "deflection_style", "sentence_style"):
+            for key in (
+                "argument_style",
+                "disagreement_pattern",
+                "deflection_style",
+                "sentence_style",
+            ):
                 assert isinstance(profile[key], str) and len(profile[key]) > 5, (
                     f"{archetype_id}.{key} should be a non-empty descriptive string"
                 )
@@ -79,9 +83,13 @@ class TestGetRhetoricalProfile:
     def test_engineer_specific_content(self):
         profile = get_rhetorical_profile("engineer")
         assert "data" in profile["argument_style"].lower()
-        assert "emotional appeals" in [nd.lower() for nd in profile["never_does"]] or \
-               any("emotional" in nd.lower() for nd in profile["never_does"])
+        assert "emotional appeals" in [nd.lower() for nd in profile["never_does"]] or any(
+            "emotional" in nd.lower() for nd in profile["never_does"]
+        )
 
     def test_executive_director_specific_content(self):
         profile = get_rhetorical_profile("executive_director")
-        assert "budget" in profile["argument_style"].lower() or "schedule" in profile["argument_style"].lower()
+        assert (
+            "budget" in profile["argument_style"].lower()
+            or "schedule" in profile["argument_style"].lower()
+        )

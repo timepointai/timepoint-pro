@@ -11,25 +11,21 @@ Tests cover:
 """
 
 import pytest
-import tempfile
-import time
-from datetime import datetime, timedelta
-from pathlib import Path
 
-from access.permissions import (
-    TensorPermission,
-    PermissionEnforcer,
-    PermissionDenied,
-)
 from access.audit import (
     AccessAuditLog,
     AuditLogger,
 )
-
+from access.permissions import (
+    PermissionDenied,
+    PermissionEnforcer,
+    TensorPermission,
+)
 
 # ============================================================================
 # Fixtures
 # ============================================================================
+
 
 @pytest.fixture
 def tmp_db_path(tmp_path) -> str:
@@ -62,6 +58,7 @@ def sample_permission() -> TensorPermission:
 # ============================================================================
 # TensorPermission Tests
 # ============================================================================
+
 
 @pytest.mark.unit
 class TestTensorPermission:
@@ -118,6 +115,7 @@ class TestTensorPermission:
 # PermissionEnforcer Basic Tests
 # ============================================================================
 
+
 @pytest.mark.unit
 class TestPermissionEnforcerBasic:
     """Basic tests for PermissionEnforcer."""
@@ -168,6 +166,7 @@ class TestPermissionEnforcerBasic:
 # ============================================================================
 # Permission Check Tests
 # ============================================================================
+
 
 @pytest.mark.unit
 class TestPermissionChecks:
@@ -290,6 +289,7 @@ class TestPermissionChecks:
 # Enforce Tests
 # ============================================================================
 
+
 @pytest.mark.unit
 class TestEnforce:
     """Tests for enforce method."""
@@ -335,6 +335,7 @@ class TestEnforce:
 # ============================================================================
 # Access Management Tests
 # ============================================================================
+
 
 @pytest.mark.unit
 class TestAccessManagement:
@@ -429,6 +430,7 @@ class TestAccessManagement:
 # ============================================================================
 # User Group Tests
 # ============================================================================
+
 
 @pytest.mark.unit
 class TestUserGroups:
@@ -531,6 +533,7 @@ class TestUserGroups:
 # Access Recording Tests
 # ============================================================================
 
+
 @pytest.mark.unit
 class TestAccessRecording:
     """Tests for access recording."""
@@ -566,6 +569,7 @@ class TestAccessRecording:
 # List Queries Tests
 # ============================================================================
 
+
 @pytest.mark.unit
 class TestListQueries:
     """Tests for list query methods."""
@@ -573,25 +577,33 @@ class TestListQueries:
     def test_list_accessible_tensors(self, enforcer):
         """Should list all tensors accessible by user."""
         # Create tensors with different access
-        enforcer.set_permission(TensorPermission(
-            tensor_id="tensor-owned",
-            owner_id="user-001",
-        ))
-        enforcer.set_permission(TensorPermission(
-            tensor_id="tensor-shared",
-            owner_id="user-002",
-            access_level="shared",
-            shared_with=["user-001"],
-        ))
-        enforcer.set_permission(TensorPermission(
-            tensor_id="tensor-public",
-            owner_id="user-003",
-            access_level="public",
-        ))
-        enforcer.set_permission(TensorPermission(
-            tensor_id="tensor-private",
-            owner_id="user-004",
-        ))
+        enforcer.set_permission(
+            TensorPermission(
+                tensor_id="tensor-owned",
+                owner_id="user-001",
+            )
+        )
+        enforcer.set_permission(
+            TensorPermission(
+                tensor_id="tensor-shared",
+                owner_id="user-002",
+                access_level="shared",
+                shared_with=["user-001"],
+            )
+        )
+        enforcer.set_permission(
+            TensorPermission(
+                tensor_id="tensor-public",
+                owner_id="user-003",
+                access_level="public",
+            )
+        )
+        enforcer.set_permission(
+            TensorPermission(
+                tensor_id="tensor-private",
+                owner_id="user-004",
+            )
+        )
 
         accessible = enforcer.list_accessible_tensors("user-001")
 
@@ -602,18 +614,24 @@ class TestListQueries:
 
     def test_list_owned_tensors(self, enforcer):
         """Should list tensors owned by user."""
-        enforcer.set_permission(TensorPermission(
-            tensor_id="tensor-1",
-            owner_id="user-001",
-        ))
-        enforcer.set_permission(TensorPermission(
-            tensor_id="tensor-2",
-            owner_id="user-001",
-        ))
-        enforcer.set_permission(TensorPermission(
-            tensor_id="tensor-3",
-            owner_id="user-002",
-        ))
+        enforcer.set_permission(
+            TensorPermission(
+                tensor_id="tensor-1",
+                owner_id="user-001",
+            )
+        )
+        enforcer.set_permission(
+            TensorPermission(
+                tensor_id="tensor-2",
+                owner_id="user-001",
+            )
+        )
+        enforcer.set_permission(
+            TensorPermission(
+                tensor_id="tensor-3",
+                owner_id="user-002",
+            )
+        )
 
         owned = enforcer.list_owned_tensors("user-001")
 
@@ -624,22 +642,28 @@ class TestListQueries:
 
     def test_list_shared_tensors(self, enforcer):
         """Should list tensors shared with user (not owned)."""
-        enforcer.set_permission(TensorPermission(
-            tensor_id="tensor-owned",
-            owner_id="user-001",
-        ))
-        enforcer.set_permission(TensorPermission(
-            tensor_id="tensor-shared-1",
-            owner_id="user-002",
-            access_level="shared",
-            shared_with=["user-001"],
-        ))
-        enforcer.set_permission(TensorPermission(
-            tensor_id="tensor-shared-2",
-            owner_id="user-003",
-            access_level="shared",
-            shared_with=["user-001"],
-        ))
+        enforcer.set_permission(
+            TensorPermission(
+                tensor_id="tensor-owned",
+                owner_id="user-001",
+            )
+        )
+        enforcer.set_permission(
+            TensorPermission(
+                tensor_id="tensor-shared-1",
+                owner_id="user-002",
+                access_level="shared",
+                shared_with=["user-001"],
+            )
+        )
+        enforcer.set_permission(
+            TensorPermission(
+                tensor_id="tensor-shared-2",
+                owner_id="user-003",
+                access_level="shared",
+                shared_with=["user-001"],
+            )
+        )
 
         shared = enforcer.list_shared_tensors("user-001")
 
@@ -651,6 +675,7 @@ class TestListQueries:
 # ============================================================================
 # AuditLogger Tests
 # ============================================================================
+
 
 @pytest.mark.unit
 class TestAuditLogger:
@@ -750,6 +775,7 @@ class TestAuditLogger:
 # AuditLogger Analytics Tests
 # ============================================================================
 
+
 @pytest.mark.unit
 class TestAuditLoggerAnalytics:
     """Tests for AuditLogger analytics methods."""
@@ -809,6 +835,7 @@ class TestAuditLoggerAnalytics:
 # AuditLogger Cleanup Tests
 # ============================================================================
 
+
 @pytest.mark.unit
 class TestAuditLoggerCleanup:
     """Tests for AuditLogger cleanup methods."""
@@ -847,6 +874,7 @@ class TestAuditLoggerCleanup:
 # AccessAuditLog Tests
 # ============================================================================
 
+
 @pytest.mark.unit
 class TestAccessAuditLog:
     """Tests for AccessAuditLog data class."""
@@ -876,6 +904,7 @@ class TestAccessAuditLog:
 # ============================================================================
 # Integration Tests
 # ============================================================================
+
 
 @pytest.mark.integration
 class TestPermissionAuditIntegration:

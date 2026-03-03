@@ -9,31 +9,50 @@ Tracks:
 - Oxen upload URLs
 """
 
-from typing import Dict, List, Set, Optional, Any
-from pydantic import BaseModel, ConfigDict, Field
-from datetime import datetime, timedelta
-from pathlib import Path
 import json
 import sqlite3
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
+
 from schemas import ResolutionLevel, TemporalMode
 
 # List of all 17 mechanisms
 ALL_MECHANISMS = [
-    "M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "M9",
-    "M10", "M11", "M12", "M13", "M14", "M15", "M16", "M17"
+    "M1",
+    "M2",
+    "M3",
+    "M4",
+    "M5",
+    "M6",
+    "M7",
+    "M8",
+    "M9",
+    "M10",
+    "M11",
+    "M12",
+    "M13",
+    "M14",
+    "M15",
+    "M16",
+    "M17",
 ]
 
 
 class MechanismUsage(BaseModel):
     """Record of a mechanism being invoked"""
+
     mechanism: str  # M1, M2, etc.
     function_name: str
     timestamp: datetime
-    context: Dict[str, Any] = Field(default_factory=dict)
+    context: dict[str, Any] = Field(default_factory=dict)
 
 
 class ResolutionAssignment(BaseModel):
     """Record of resolution level assigned to an entity"""
+
     entity_id: str
     resolution: ResolutionLevel
     timepoint_id: str
@@ -42,19 +61,21 @@ class ResolutionAssignment(BaseModel):
 
 class ValidationRecord(BaseModel):
     """Record of a validation being executed"""
+
     validator_name: str
     passed: bool
     timestamp: datetime
-    message: Optional[str] = None
-    violations: List[str] = Field(default_factory=list)
+    message: str | None = None
+    violations: list[str] = Field(default_factory=list)
 
 
 class RunMetadata(BaseModel):
     """Complete metadata for a single E2E workflow run"""
+
     run_id: str
     template_id: str
     started_at: datetime
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None
 
     # Configuration
     causal_mode: TemporalMode
@@ -62,14 +83,14 @@ class RunMetadata(BaseModel):
     max_timepoints: int
 
     # Mechanism tracking
-    mechanisms_used: Set[str] = Field(default_factory=set)
-    mechanism_usage_log: List[MechanismUsage] = Field(default_factory=list)
+    mechanisms_used: set[str] = Field(default_factory=set)
+    mechanism_usage_log: list[MechanismUsage] = Field(default_factory=list)
 
     # Resolution diversity
-    resolution_assignments: List[ResolutionAssignment] = Field(default_factory=list)
+    resolution_assignments: list[ResolutionAssignment] = Field(default_factory=list)
 
     # Validations
-    validations: List[ValidationRecord] = Field(default_factory=list)
+    validations: list[ValidationRecord] = Field(default_factory=list)
 
     # Results
     entities_created: int = 0
@@ -82,66 +103,56 @@ class RunMetadata(BaseModel):
     tokens_used: int = 0
 
     # Duration
-    duration_seconds: Optional[float] = None
+    duration_seconds: float | None = None
 
     # Oxen upload
-    oxen_repo_url: Optional[str] = None
-    oxen_dataset_url: Optional[str] = None
+    oxen_repo_url: str | None = None
+    oxen_dataset_url: str | None = None
 
     # Status
     status: str = "running"  # running, completed, failed
-    error_message: Optional[str] = None
+    error_message: str | None = None
 
     # LLM-generated summary
-    summary: Optional[str] = None
-    summary_generated_at: Optional[datetime] = None
+    summary: str | None = None
+    summary_generated_at: datetime | None = None
 
     # Narrative exports
-    narrative_exports: Optional[Dict[str, str]] = Field(
-        default=None,
-        description="Paths to generated narrative files: {format: path}"
+    narrative_exports: dict[str, str] | None = Field(
+        default=None, description="Paths to generated narrative files: {format: path}"
     )
-    narrative_export_generated_at: Optional[datetime] = None
+    narrative_export_generated_at: datetime | None = None
 
     # M1+M17: Database v2 - Fidelity-Temporal Strategy Tracking
     schema_version: str = "2.0"  # Database version marker
-    fidelity_strategy_json: Optional[str] = Field(
-        default=None,
-        description="JSON-serialized FidelityTemporalStrategy from TemporalAgent"
+    fidelity_strategy_json: str | None = Field(
+        default=None, description="JSON-serialized FidelityTemporalStrategy from TemporalAgent"
     )
-    fidelity_distribution: Optional[str] = Field(
-        default=None,
-        description="JSON dict of {ResolutionLevel: count} for this run"
+    fidelity_distribution: str | None = Field(
+        default=None, description="JSON dict of {ResolutionLevel: count} for this run"
     )
-    actual_tokens_used: Optional[float] = Field(
-        default=None,
-        description="Actual token usage (may differ from budget)"
+    actual_tokens_used: float | None = Field(
+        default=None, description="Actual token usage (may differ from budget)"
     )
-    token_budget_compliance: Optional[float] = Field(
-        default=None,
-        description="actual_tokens / token_budget ratio"
+    token_budget_compliance: float | None = Field(
+        default=None, description="actual_tokens / token_budget ratio"
     )
-    fidelity_efficiency_score: Optional[float] = Field(
-        default=None,
-        description="Quality metric: output_quality / tokens_used"
+    fidelity_efficiency_score: float | None = Field(
+        default=None, description="Quality metric: output_quality / tokens_used"
     )
 
     # Phase 7: Tensor Resolution Metrics
-    tensor_resolution_stats: Optional[str] = Field(
-        default=None,
-        description="JSON dict with tensor resolution statistics"
+    tensor_resolution_stats: str | None = Field(
+        default=None, description="JSON dict with tensor resolution statistics"
     )
     entities_resolved_from_cache: int = Field(
-        default=0,
-        description="Number of entities resolved from existing tensors"
+        default=0, description="Number of entities resolved from existing tensors"
     )
     entities_new_baseline: int = Field(
-        default=0,
-        description="Number of entities requiring new baseline tensors"
+        default=0, description="Number of entities requiring new baseline tensors"
     )
-    tensor_cache_hit_rate: Optional[float] = Field(
-        default=None,
-        description="Percentage of entities resolved from cache (0.0-1.0)"
+    tensor_cache_hit_rate: float | None = Field(
+        default=None, description="Percentage of entities resolved from cache (0.0-1.0)"
     )
 
     model_config = ConfigDict(use_enum_values=True)
@@ -256,41 +267,43 @@ class MetadataManager:
         columns = {row[1] for row in cursor.fetchall()}  # row[1] is column name
 
         # Add summary column if missing
-        if 'summary' not in columns:
+        if "summary" not in columns:
             print("📝 Migrating database: Adding 'summary' column to runs table...")
             cursor.execute("ALTER TABLE runs ADD COLUMN summary TEXT")
             conn.commit()
             print("   ✓ Summary column added")
 
         # Add summary_generated_at column if missing
-        if 'summary_generated_at' not in columns:
+        if "summary_generated_at" not in columns:
             print("📝 Migrating database: Adding 'summary_generated_at' column to runs table...")
             cursor.execute("ALTER TABLE runs ADD COLUMN summary_generated_at TEXT")
             conn.commit()
             print("   ✓ Summary timestamp column added")
 
         # Add narrative_exports column if missing
-        if 'narrative_exports' not in columns:
+        if "narrative_exports" not in columns:
             print("📝 Migrating database: Adding 'narrative_exports' column to runs table...")
             cursor.execute("ALTER TABLE runs ADD COLUMN narrative_exports TEXT")
             conn.commit()
             print("   ✓ Narrative exports column added")
 
         # Add narrative_export_generated_at column if missing
-        if 'narrative_export_generated_at' not in columns:
-            print("📝 Migrating database: Adding 'narrative_export_generated_at' column to runs table...")
+        if "narrative_export_generated_at" not in columns:
+            print(
+                "📝 Migrating database: Adding 'narrative_export_generated_at' column to runs table..."
+            )
             cursor.execute("ALTER TABLE runs ADD COLUMN narrative_export_generated_at TEXT")
             conn.commit()
             print("   ✓ Narrative export timestamp column added")
 
         # M1+M17: Database v2 - Add fidelity-temporal strategy tracking columns
         v2_columns = {
-            'schema_version': "TEXT DEFAULT '2.0'",
-            'fidelity_strategy_json': "TEXT",
-            'fidelity_distribution': "TEXT",
-            'actual_tokens_used': "REAL",
-            'token_budget_compliance': "REAL",
-            'fidelity_efficiency_score': "REAL"
+            "schema_version": "TEXT DEFAULT '2.0'",
+            "fidelity_strategy_json": "TEXT",
+            "fidelity_distribution": "TEXT",
+            "actual_tokens_used": "REAL",
+            "token_budget_compliance": "REAL",
+            "fidelity_efficiency_score": "REAL",
         }
 
         for col_name, col_type in v2_columns.items():
@@ -302,15 +315,17 @@ class MetadataManager:
 
         # Phase 7: Tensor Resolution Metrics columns
         resolution_columns = {
-            'tensor_resolution_stats': "TEXT",
-            'entities_resolved_from_cache': "INTEGER DEFAULT 0",
-            'entities_new_baseline': "INTEGER DEFAULT 0",
-            'tensor_cache_hit_rate': "REAL"
+            "tensor_resolution_stats": "TEXT",
+            "entities_resolved_from_cache": "INTEGER DEFAULT 0",
+            "entities_new_baseline": "INTEGER DEFAULT 0",
+            "tensor_cache_hit_rate": "REAL",
         }
 
         for col_name, col_type in resolution_columns.items():
             if col_name not in columns:
-                print(f"📝 Migrating database: Adding '{col_name}' column (Phase 7 tensor resolution)...")
+                print(
+                    f"📝 Migrating database: Adding '{col_name}' column (Phase 7 tensor resolution)..."
+                )
                 cursor.execute(f"ALTER TABLE runs ADD COLUMN {col_name} {col_type}")  # nosec B608 - col_name/col_type from hardcoded dict
                 conn.commit()
                 print(f"   ✓ {col_name} column added")
@@ -321,7 +336,7 @@ class MetadataManager:
         template_id: str,
         causal_mode: TemporalMode,
         max_entities: int,
-        max_timepoints: int
+        max_timepoints: int,
     ) -> RunMetadata:
         """Start tracking a new run"""
         metadata = RunMetadata(
@@ -330,26 +345,29 @@ class MetadataManager:
             started_at=datetime.now(),
             causal_mode=causal_mode,
             max_entities=max_entities,
-            max_timepoints=max_timepoints
+            max_timepoints=max_timepoints,
         )
 
         # Save to database
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO runs (
                 run_id, template_id, started_at, causal_mode,
                 max_entities, max_timepoints
             ) VALUES (?, ?, ?, ?, ?, ?)
-        """, (
-            run_id,
-            template_id,
-            metadata.started_at.isoformat(),
-            causal_mode.value,
-            max_entities,
-            max_timepoints
-        ))
+        """,
+            (
+                run_id,
+                template_id,
+                metadata.started_at.isoformat(),
+                causal_mode.value,
+                max_entities,
+                max_timepoints,
+            ),
+        )
 
         conn.commit()
         conn.close()
@@ -357,67 +375,59 @@ class MetadataManager:
         return metadata
 
     def record_mechanism(
-        self,
-        run_id: str,
-        mechanism: str,
-        function_name: str,
-        context: Optional[Dict[str, Any]] = None
+        self, run_id: str, mechanism: str, function_name: str, context: dict[str, Any] | None = None
     ):
         """Record mechanism usage"""
         usage = MechanismUsage(
             mechanism=mechanism,
             function_name=function_name,
             timestamp=datetime.now(),
-            context=context or {}
+            context=context or {},
         )
 
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO mechanism_usage (
                 run_id, mechanism, function_name, timestamp, context
             ) VALUES (?, ?, ?, ?, ?)
-        """, (
-            run_id,
-            mechanism,
-            function_name,
-            usage.timestamp.isoformat(),
-            json.dumps(usage.context)
-        ))
+        """,
+            (
+                run_id,
+                mechanism,
+                function_name,
+                usage.timestamp.isoformat(),
+                json.dumps(usage.context),
+            ),
+        )
 
         conn.commit()
         conn.close()
 
     def record_resolution(
-        self,
-        run_id: str,
-        entity_id: str,
-        resolution: ResolutionLevel,
-        timepoint_id: str
+        self, run_id: str, entity_id: str, resolution: ResolutionLevel, timepoint_id: str
     ):
         """Record resolution assignment"""
         assignment = ResolutionAssignment(
             entity_id=entity_id,
             resolution=resolution,
             timepoint_id=timepoint_id,
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )
 
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO resolution_assignments (
                 run_id, entity_id, resolution, timepoint_id, timestamp
             ) VALUES (?, ?, ?, ?, ?)
-        """, (
-            run_id,
-            entity_id,
-            resolution.value,
-            timepoint_id,
-            assignment.timestamp.isoformat()
-        ))
+        """,
+            (run_id, entity_id, resolution.value, timepoint_id, assignment.timestamp.isoformat()),
+        )
 
         conn.commit()
         conn.close()
@@ -427,8 +437,8 @@ class MetadataManager:
         run_id: str,
         validator_name: str,
         passed: bool,
-        message: Optional[str] = None,
-        violations: Optional[List[str]] = None
+        message: str | None = None,
+        violations: list[str] | None = None,
     ):
         """Record validation execution"""
         record = ValidationRecord(
@@ -436,24 +446,27 @@ class MetadataManager:
             passed=passed,
             timestamp=datetime.now(),
             message=message,
-            violations=violations or []
+            violations=violations or [],
         )
 
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO validations (
                 run_id, validator_name, passed, timestamp, message, violations
             ) VALUES (?, ?, ?, ?, ?, ?)
-        """, (
-            run_id,
-            validator_name,
-            passed,
-            record.timestamp.isoformat(),
-            message,
-            json.dumps(violations or [])
-        ))
+        """,
+            (
+                run_id,
+                validator_name,
+                passed,
+                record.timestamp.isoformat(),
+                message,
+                json.dumps(violations or []),
+            ),
+        )
 
         conn.commit()
         conn.close()
@@ -467,20 +480,20 @@ class MetadataManager:
         cost_usd: float,
         llm_calls: int,
         tokens_used: int,
-        oxen_repo_url: Optional[str] = None,
-        oxen_dataset_url: Optional[str] = None,
-        error_message: Optional[str] = None,
+        oxen_repo_url: str | None = None,
+        oxen_dataset_url: str | None = None,
+        error_message: str | None = None,
         # M1+M17: Database v2 - Fidelity metrics
-        fidelity_strategy_json: Optional[str] = None,
-        fidelity_distribution: Optional[str] = None,
-        actual_tokens_used: Optional[float] = None,
-        token_budget_compliance: Optional[float] = None,
-        fidelity_efficiency_score: Optional[float] = None,
+        fidelity_strategy_json: str | None = None,
+        fidelity_distribution: str | None = None,
+        actual_tokens_used: float | None = None,
+        token_budget_compliance: float | None = None,
+        fidelity_efficiency_score: float | None = None,
         # Phase 7: Tensor Resolution Metrics
-        tensor_resolution_stats: Optional[str] = None,
+        tensor_resolution_stats: str | None = None,
         entities_resolved_from_cache: int = 0,
         entities_new_baseline: int = 0,
-        tensor_cache_hit_rate: Optional[float] = None
+        tensor_cache_hit_rate: float | None = None,
     ) -> RunMetadata:
         """Complete a run and finalize metadata"""
         conn = sqlite3.connect(self.db_path)
@@ -499,7 +512,8 @@ class MetadataManager:
         status = "failed" if error_message else "completed"
 
         # Update run
-        cursor.execute("""
+        cursor.execute(
+            """
             UPDATE runs SET
                 completed_at = ?,
                 entities_created = ?,
@@ -523,41 +537,39 @@ class MetadataManager:
                 entities_new_baseline = ?,
                 tensor_cache_hit_rate = ?
             WHERE run_id = ?
-        """, (
-            completed_at.isoformat(),
-            entities_created,
-            timepoints_created,
-            training_examples,
-            cost_usd,
-            llm_calls,
-            tokens_used,
-            duration,
-            oxen_repo_url,
-            oxen_dataset_url,
-            status,
-            error_message,
-            fidelity_strategy_json,
-            fidelity_distribution,
-            actual_tokens_used,
-            token_budget_compliance,
-            fidelity_efficiency_score,
-            tensor_resolution_stats,
-            entities_resolved_from_cache,
-            entities_new_baseline,
-            tensor_cache_hit_rate,
-            run_id
-        ))
+        """,
+            (
+                completed_at.isoformat(),
+                entities_created,
+                timepoints_created,
+                training_examples,
+                cost_usd,
+                llm_calls,
+                tokens_used,
+                duration,
+                oxen_repo_url,
+                oxen_dataset_url,
+                status,
+                error_message,
+                fidelity_strategy_json,
+                fidelity_distribution,
+                actual_tokens_used,
+                token_budget_compliance,
+                fidelity_efficiency_score,
+                tensor_resolution_stats,
+                entities_resolved_from_cache,
+                entities_new_baseline,
+                tensor_cache_hit_rate,
+                run_id,
+            ),
+        )
 
         conn.commit()
         conn.close()
 
         return self.get_run(run_id)
 
-    def update_summary(
-        self,
-        run_id: str,
-        summary: str
-    ):
+    def update_summary(self, run_id: str, summary: str):
         """
         Update run with LLM-generated summary.
 
@@ -568,25 +580,20 @@ class MetadataManager:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cursor.execute("""
+        cursor.execute(
+            """
             UPDATE runs SET
                 summary = ?,
                 summary_generated_at = ?
             WHERE run_id = ?
-        """, (
-            summary,
-            datetime.now().isoformat(),
-            run_id
-        ))
+        """,
+            (summary, datetime.now().isoformat(), run_id),
+        )
 
         conn.commit()
         conn.close()
 
-    def update_narrative_exports(
-        self,
-        run_id: str,
-        narrative_exports: Dict[str, str]
-    ):
+    def update_narrative_exports(self, run_id: str, narrative_exports: dict[str, str]):
         """
         Update run with narrative export file paths.
 
@@ -597,16 +604,15 @@ class MetadataManager:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cursor.execute("""
+        cursor.execute(
+            """
             UPDATE runs SET
                 narrative_exports = ?,
                 narrative_export_generated_at = ?
             WHERE run_id = ?
-        """, (
-            json.dumps(narrative_exports),
-            datetime.now().isoformat(),
-            run_id
-        ))
+        """,
+            (json.dumps(narrative_exports), datetime.now().isoformat(), run_id),
+        )
 
         conn.commit()
         conn.close()
@@ -627,7 +633,8 @@ class MetadataManager:
 
         if exists:
             # Update existing run
-            cursor.execute("""
+            cursor.execute(
+                """
                 UPDATE runs SET
                     template_id = ?,
                     started_at = ?,
@@ -660,42 +667,51 @@ class MetadataManager:
                     entities_new_baseline = ?,
                     tensor_cache_hit_rate = ?
                 WHERE run_id = ?
-            """, (
-                metadata.template_id,
-                metadata.started_at.isoformat(),
-                metadata.completed_at.isoformat() if metadata.completed_at else None,
-                metadata.causal_mode.value if hasattr(metadata.causal_mode, 'value') else str(metadata.causal_mode),
-                metadata.max_entities,
-                metadata.max_timepoints,
-                metadata.entities_created,
-                metadata.timepoints_created,
-                metadata.training_examples,
-                metadata.cost_usd,
-                metadata.llm_calls,
-                metadata.tokens_used,
-                metadata.duration_seconds,
-                metadata.oxen_repo_url,
-                metadata.oxen_dataset_url,
-                metadata.status,
-                metadata.error_message,
-                metadata.summary,
-                metadata.summary_generated_at.isoformat() if metadata.summary_generated_at else None,
-                json.dumps(metadata.narrative_exports) if metadata.narrative_exports else None,
-                metadata.narrative_export_generated_at.isoformat() if metadata.narrative_export_generated_at else None,
-                metadata.fidelity_strategy_json,
-                metadata.fidelity_distribution,
-                metadata.actual_tokens_used,
-                metadata.token_budget_compliance,
-                metadata.fidelity_efficiency_score,
-                metadata.tensor_resolution_stats,
-                metadata.entities_resolved_from_cache,
-                metadata.entities_new_baseline,
-                metadata.tensor_cache_hit_rate,
-                metadata.run_id
-            ))
+            """,
+                (
+                    metadata.template_id,
+                    metadata.started_at.isoformat(),
+                    metadata.completed_at.isoformat() if metadata.completed_at else None,
+                    metadata.causal_mode.value
+                    if hasattr(metadata.causal_mode, "value")
+                    else str(metadata.causal_mode),
+                    metadata.max_entities,
+                    metadata.max_timepoints,
+                    metadata.entities_created,
+                    metadata.timepoints_created,
+                    metadata.training_examples,
+                    metadata.cost_usd,
+                    metadata.llm_calls,
+                    metadata.tokens_used,
+                    metadata.duration_seconds,
+                    metadata.oxen_repo_url,
+                    metadata.oxen_dataset_url,
+                    metadata.status,
+                    metadata.error_message,
+                    metadata.summary,
+                    metadata.summary_generated_at.isoformat()
+                    if metadata.summary_generated_at
+                    else None,
+                    json.dumps(metadata.narrative_exports) if metadata.narrative_exports else None,
+                    metadata.narrative_export_generated_at.isoformat()
+                    if metadata.narrative_export_generated_at
+                    else None,
+                    metadata.fidelity_strategy_json,
+                    metadata.fidelity_distribution,
+                    metadata.actual_tokens_used,
+                    metadata.token_budget_compliance,
+                    metadata.fidelity_efficiency_score,
+                    metadata.tensor_resolution_stats,
+                    metadata.entities_resolved_from_cache,
+                    metadata.entities_new_baseline,
+                    metadata.tensor_cache_hit_rate,
+                    metadata.run_id,
+                ),
+            )
         else:
             # Insert new run
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO runs (
                     run_id, template_id, started_at, completed_at, causal_mode,
                     max_entities, max_timepoints, entities_created, timepoints_created,
@@ -707,39 +723,47 @@ class MetadataManager:
                     tensor_resolution_stats, entities_resolved_from_cache,
                     entities_new_baseline, tensor_cache_hit_rate
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                metadata.run_id,
-                metadata.template_id,
-                metadata.started_at.isoformat(),
-                metadata.completed_at.isoformat() if metadata.completed_at else None,
-                metadata.causal_mode.value if hasattr(metadata.causal_mode, 'value') else str(metadata.causal_mode),
-                metadata.max_entities,
-                metadata.max_timepoints,
-                metadata.entities_created,
-                metadata.timepoints_created,
-                metadata.training_examples,
-                metadata.cost_usd,
-                metadata.llm_calls,
-                metadata.tokens_used,
-                metadata.duration_seconds,
-                metadata.oxen_repo_url,
-                metadata.oxen_dataset_url,
-                metadata.status,
-                metadata.error_message,
-                metadata.summary,
-                metadata.summary_generated_at.isoformat() if metadata.summary_generated_at else None,
-                json.dumps(metadata.narrative_exports) if metadata.narrative_exports else None,
-                metadata.narrative_export_generated_at.isoformat() if metadata.narrative_export_generated_at else None,
-                metadata.fidelity_strategy_json,
-                metadata.fidelity_distribution,
-                metadata.actual_tokens_used,
-                metadata.token_budget_compliance,
-                metadata.fidelity_efficiency_score,
-                metadata.tensor_resolution_stats,
-                metadata.entities_resolved_from_cache,
-                metadata.entities_new_baseline,
-                metadata.tensor_cache_hit_rate
-            ))
+            """,
+                (
+                    metadata.run_id,
+                    metadata.template_id,
+                    metadata.started_at.isoformat(),
+                    metadata.completed_at.isoformat() if metadata.completed_at else None,
+                    metadata.causal_mode.value
+                    if hasattr(metadata.causal_mode, "value")
+                    else str(metadata.causal_mode),
+                    metadata.max_entities,
+                    metadata.max_timepoints,
+                    metadata.entities_created,
+                    metadata.timepoints_created,
+                    metadata.training_examples,
+                    metadata.cost_usd,
+                    metadata.llm_calls,
+                    metadata.tokens_used,
+                    metadata.duration_seconds,
+                    metadata.oxen_repo_url,
+                    metadata.oxen_dataset_url,
+                    metadata.status,
+                    metadata.error_message,
+                    metadata.summary,
+                    metadata.summary_generated_at.isoformat()
+                    if metadata.summary_generated_at
+                    else None,
+                    json.dumps(metadata.narrative_exports) if metadata.narrative_exports else None,
+                    metadata.narrative_export_generated_at.isoformat()
+                    if metadata.narrative_export_generated_at
+                    else None,
+                    metadata.fidelity_strategy_json,
+                    metadata.fidelity_distribution,
+                    metadata.actual_tokens_used,
+                    metadata.token_budget_compliance,
+                    metadata.fidelity_efficiency_score,
+                    metadata.tensor_resolution_stats,
+                    metadata.entities_resolved_from_cache,
+                    metadata.entities_new_baseline,
+                    metadata.tensor_cache_hit_rate,
+                ),
+            )
 
         conn.commit()
         conn.close()
@@ -751,7 +775,8 @@ class MetadataManager:
         cursor = conn.cursor()
 
         # Get run with explicit column names to avoid migration ordering issues
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT
                 run_id, template_id, started_at, completed_at, causal_mode,
                 max_entities, max_timepoints, entities_created, timepoints_created,
@@ -763,23 +788,28 @@ class MetadataManager:
                 tensor_resolution_stats, entities_resolved_from_cache,
                 entities_new_baseline, tensor_cache_hit_rate
             FROM runs WHERE run_id = ?
-        """, (run_id,))
+        """,
+            (run_id,),
+        )
         row = cursor.fetchone()
         if not row:
             conn.close()
             raise ValueError(f"Run {run_id} not found")
 
         # Get mechanisms used
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT DISTINCT mechanism FROM mechanism_usage WHERE run_id = ?
-        """, (run_id,))
+        """,
+            (run_id,),
+        )
         mechanisms_used = {r[0] for r in cursor.fetchall()}
 
         conn.close()
 
         # Parse narrative exports if present
         narrative_exports = None
-        narrative_exports_raw = row['narrative_exports']
+        narrative_exports_raw = row["narrative_exports"]
         if narrative_exports_raw:
             try:
                 narrative_exports = json.loads(narrative_exports_raw)
@@ -788,46 +818,54 @@ class MetadataManager:
 
         # Build metadata using column names (not indices) for robustness
         metadata = RunMetadata(
-            run_id=row['run_id'],
-            template_id=row['template_id'],
-            started_at=datetime.fromisoformat(row['started_at']),
-            completed_at=datetime.fromisoformat(row['completed_at']) if row['completed_at'] else None,
-            causal_mode=TemporalMode(row['causal_mode']),
-            max_entities=row['max_entities'],
-            max_timepoints=row['max_timepoints'],
-            entities_created=row['entities_created'],
-            timepoints_created=row['timepoints_created'],
-            training_examples=row['training_examples'],
-            cost_usd=row['cost_usd'],
-            llm_calls=row['llm_calls'],
-            tokens_used=row['tokens_used'],
-            duration_seconds=row['duration_seconds'],
-            oxen_repo_url=row['oxen_repo_url'],
-            oxen_dataset_url=row['oxen_dataset_url'],
-            status=row['status'],
-            error_message=row['error_message'],
-            summary=row['summary'],
-            summary_generated_at=datetime.fromisoformat(row['summary_generated_at']) if row['summary_generated_at'] else None,
+            run_id=row["run_id"],
+            template_id=row["template_id"],
+            started_at=datetime.fromisoformat(row["started_at"]),
+            completed_at=datetime.fromisoformat(row["completed_at"])
+            if row["completed_at"]
+            else None,
+            causal_mode=TemporalMode(row["causal_mode"]),
+            max_entities=row["max_entities"],
+            max_timepoints=row["max_timepoints"],
+            entities_created=row["entities_created"],
+            timepoints_created=row["timepoints_created"],
+            training_examples=row["training_examples"],
+            cost_usd=row["cost_usd"],
+            llm_calls=row["llm_calls"],
+            tokens_used=row["tokens_used"],
+            duration_seconds=row["duration_seconds"],
+            oxen_repo_url=row["oxen_repo_url"],
+            oxen_dataset_url=row["oxen_dataset_url"],
+            status=row["status"],
+            error_message=row["error_message"],
+            summary=row["summary"],
+            summary_generated_at=datetime.fromisoformat(row["summary_generated_at"])
+            if row["summary_generated_at"]
+            else None,
             narrative_exports=narrative_exports,
-            narrative_export_generated_at=datetime.fromisoformat(row['narrative_export_generated_at']) if row['narrative_export_generated_at'] else None,
+            narrative_export_generated_at=datetime.fromisoformat(
+                row["narrative_export_generated_at"]
+            )
+            if row["narrative_export_generated_at"]
+            else None,
             # M1+M17: Database v2 - Fidelity metrics
-            schema_version=row['schema_version'] if row['schema_version'] else "2.0",
-            fidelity_strategy_json=row['fidelity_strategy_json'],
-            fidelity_distribution=row['fidelity_distribution'],
-            actual_tokens_used=row['actual_tokens_used'],
-            token_budget_compliance=row['token_budget_compliance'],
-            fidelity_efficiency_score=row['fidelity_efficiency_score'],
+            schema_version=row["schema_version"] if row["schema_version"] else "2.0",
+            fidelity_strategy_json=row["fidelity_strategy_json"],
+            fidelity_distribution=row["fidelity_distribution"],
+            actual_tokens_used=row["actual_tokens_used"],
+            token_budget_compliance=row["token_budget_compliance"],
+            fidelity_efficiency_score=row["fidelity_efficiency_score"],
             # Phase 7: Tensor Resolution Metrics
-            tensor_resolution_stats=row['tensor_resolution_stats'],
-            entities_resolved_from_cache=row['entities_resolved_from_cache'] or 0,
-            entities_new_baseline=row['entities_new_baseline'] or 0,
-            tensor_cache_hit_rate=row['tensor_cache_hit_rate'],
-            mechanisms_used=mechanisms_used
+            tensor_resolution_stats=row["tensor_resolution_stats"],
+            entities_resolved_from_cache=row["entities_resolved_from_cache"] or 0,
+            entities_new_baseline=row["entities_new_baseline"] or 0,
+            tensor_cache_hit_rate=row["tensor_cache_hit_rate"],
+            mechanisms_used=mechanisms_used,
         )
 
         return metadata
 
-    def get_all_runs(self, template_id: Optional[str] = None) -> List[RunMetadata]:
+    def get_all_runs(self, template_id: str | None = None) -> list[RunMetadata]:
         """Get all runs, optionally filtered by template"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()

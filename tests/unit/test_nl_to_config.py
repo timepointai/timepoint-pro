@@ -3,12 +3,8 @@ Tests for NL to Config Translation (Sprint 3.1)
 """
 
 import pytest
-from nl_interface import (
-    NLConfigGenerator,
-    ConfigValidator,
-    SimulationConfig,
-    ValidationResult
-)
+
+from nl_interface import ConfigValidator, NLConfigGenerator, SimulationConfig, ValidationResult
 
 
 class TestConfigValidator:
@@ -20,14 +16,11 @@ class TestConfigValidator:
 
         config = {
             "scenario": "Test Scenario",
-            "entities": [
-                {"name": "Alice", "role": "CEO"},
-                {"name": "Bob", "role": "CFO"}
-            ],
+            "entities": [{"name": "Alice", "role": "CEO"}, {"name": "Bob", "role": "CFO"}],
             "timepoint_count": 5,
             "temporal_mode": "forward",
             "focus": ["dialog", "decision_making"],
-            "outputs": ["dialog", "decisions"]
+            "outputs": ["dialog", "decisions"],
         }
 
         result = validator.validate(config)
@@ -45,7 +38,7 @@ class TestConfigValidator:
             # Missing timepoint_count
             "temporal_mode": "forward",
             "focus": ["dialog"],
-            "outputs": ["dialog"]
+            "outputs": ["dialog"],
         }
 
         result = validator.validate(config)
@@ -62,7 +55,7 @@ class TestConfigValidator:
             "timepoint_count": 5,
             "temporal_mode": "invalid_mode",
             "focus": ["dialog"],
-            "outputs": ["dialog"]
+            "outputs": ["dialog"],
         }
 
         result = validator.validate(config)
@@ -78,13 +71,15 @@ class TestConfigValidator:
             "timepoint_count": 5,
             "temporal_mode": "forward",
             "focus": ["dialog"],
-            "outputs": ["dialog"]
+            "outputs": ["dialog"],
         }
 
         result = validator.validate(config)
         assert not result.is_valid
         # Pydantic validation catches this, check for error message
-        assert any("entities" in error.lower() or "maximum" in error.lower() for error in result.errors)
+        assert any(
+            "entities" in error.lower() or "maximum" in error.lower() for error in result.errors
+        )
 
     def test_too_many_timepoints(self):
         """Test validation catches excessive timepoints"""
@@ -96,13 +91,16 @@ class TestConfigValidator:
             "timepoint_count": 101,
             "temporal_mode": "forward",
             "focus": ["dialog"],
-            "outputs": ["dialog"]
+            "outputs": ["dialog"],
         }
 
         result = validator.validate(config)
         assert not result.is_valid
         # Pydantic validation catches this, check for error message
-        assert any("timepoint" in error.lower() or "less than or equal to 100" in error.lower() for error in result.errors)
+        assert any(
+            "timepoint" in error.lower() or "less than or equal to 100" in error.lower()
+            for error in result.errors
+        )
 
     def test_invalid_focus_area(self):
         """Test validation catches invalid focus areas"""
@@ -114,7 +112,7 @@ class TestConfigValidator:
             "timepoint_count": 5,
             "temporal_mode": "forward",
             "focus": ["invalid_focus"],
-            "outputs": ["dialog"]
+            "outputs": ["dialog"],
         }
 
         result = validator.validate(config)
@@ -130,7 +128,7 @@ class TestConfigValidator:
             "timepoint_count": 5,
             "temporal_mode": "forward",
             "focus": ["dialog"],
-            "outputs": ["invalid_output"]
+            "outputs": ["invalid_output"],
         }
 
         result = validator.validate(config)
@@ -146,7 +144,7 @@ class TestConfigValidator:
             "timepoint_count": 5,
             "temporal_mode": "forward",
             "focus": ["dialog"],
-            "outputs": ["dialog"]
+            "outputs": ["dialog"],
         }
 
         result = validator.validate(config)
@@ -164,7 +162,7 @@ class TestConfigValidator:
             "timepoint_count": 60,
             "temporal_mode": "forward",
             "focus": ["dialog"],
-            "outputs": ["dialog"]
+            "outputs": ["dialog"],
         }
 
         result = validator.validate(config)
@@ -181,7 +179,7 @@ class TestConfigValidator:
             "timepoint_count": 5,
             "temporal_mode": "forward",
             "focus": ["decision_making"],  # No dialog focus
-            "outputs": ["dialog"]  # But requesting dialog output
+            "outputs": ["dialog"],  # But requesting dialog output
         }
 
         result = validator.validate(config)
@@ -199,7 +197,7 @@ class TestConfigValidator:
             "start_time": "1789-04-30T10:00:00",
             "temporal_mode": "forward",
             "focus": ["dialog"],
-            "outputs": ["dialog"]
+            "outputs": ["dialog"],
         }
 
         result = validator.validate(config)
@@ -216,7 +214,7 @@ class TestConfigValidator:
             "start_time": "not-a-date",
             "temporal_mode": "forward",
             "focus": ["dialog"],
-            "outputs": ["dialog"]
+            "outputs": ["dialog"],
         }
 
         result = validator.validate(config)
@@ -234,7 +232,7 @@ class TestConfigValidator:
             "focus": ["dialog"],
             "outputs": ["dialog"],
             "generation_mode": "horizontal",
-            "variation_count": 50
+            "variation_count": 50,
         }
 
         result = validator.validate(config)
@@ -252,7 +250,7 @@ class TestConfigValidator:
             "focus": ["dialog"],
             "outputs": ["dialog"],
             "generation_mode": "horizontal",
-            "variation_count": 1001  # Exceeds max
+            "variation_count": 1001,  # Exceeds max
         }
 
         result = validator.validate(config)
@@ -277,9 +275,7 @@ class TestNLConfigGenerator:
         """Test mock config generation with simple description"""
         generator = NLConfigGenerator()  # Mock mode
 
-        config, confidence = generator.generate_config(
-            "Simulate a board meeting with 5 people"
-        )
+        config, confidence = generator.generate_config("Simulate a board meeting with 5 people")
 
         assert isinstance(config, dict)
         assert "scenario" in config
@@ -307,9 +303,7 @@ class TestNLConfigGenerator:
         """Test mock-generated configs are valid"""
         generator = NLConfigGenerator()
 
-        config, confidence = generator.generate_config(
-            "Board meeting with 5 executives"
-        )
+        config, confidence = generator.generate_config("Board meeting with 5 executives")
 
         # Validate config
         validation = generator.validate_config(config)
@@ -325,7 +319,7 @@ class TestNLConfigGenerator:
             "timepoint_count": 5,
             "temporal_mode": "forward",
             "focus": ["dialog"],
-            "outputs": ["dialog"]
+            "outputs": ["dialog"],
         }
 
         result = generator.validate_config(config)
@@ -379,7 +373,7 @@ class TestSimulationConfigSchema:
             timepoint_count=5,
             temporal_mode="forward",
             focus=["dialog"],
-            outputs=["dialog"]
+            outputs=["dialog"],
         )
 
         assert config.scenario == "Test Scenario"
@@ -395,7 +389,7 @@ class TestSimulationConfigSchema:
                 timepoint_count=5,
                 temporal_mode="forward",
                 focus=["dialog"],
-                outputs=["dialog"]
+                outputs=["dialog"],
             )
 
     def test_timepoint_count_bounds(self):
@@ -407,7 +401,7 @@ class TestSimulationConfigSchema:
                 timepoint_count=0,  # Too low
                 temporal_mode="forward",
                 focus=["dialog"],
-                outputs=["dialog"]
+                outputs=["dialog"],
             )
 
         with pytest.raises(ValueError):
@@ -417,7 +411,7 @@ class TestSimulationConfigSchema:
                 timepoint_count=101,  # Too high
                 temporal_mode="forward",
                 focus=["dialog"],
-                outputs=["dialog"]
+                outputs=["dialog"],
             )
 
     def test_temporal_mode_validation(self):
@@ -429,7 +423,7 @@ class TestSimulationConfigSchema:
                 timepoint_count=5,
                 temporal_mode="invalid",
                 focus=["dialog"],
-                outputs=["dialog"]
+                outputs=["dialog"],
             )
 
     def test_optional_fields(self):
@@ -443,7 +437,7 @@ class TestSimulationConfigSchema:
             outputs=["dialog"],
             start_time="2025-01-01T10:00:00",
             animism_level=2,
-            resolution_mode="progressive"
+            resolution_mode="progressive",
         )
 
         assert config.start_time == "2025-01-01T10:00:00"
@@ -460,5 +454,5 @@ class TestSimulationConfigSchema:
                 temporal_mode="forward",
                 focus=["dialog"],
                 outputs=["dialog"],
-                animism_level=4  # Too high
+                animism_level=4,  # Too high
             )

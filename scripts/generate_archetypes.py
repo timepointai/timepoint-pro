@@ -42,36 +42,30 @@ def main():
     parser = argparse.ArgumentParser(
         description="Generate archetype tensors through the real Timepoint pipeline",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=__doc__
+        epilog=__doc__,
     )
     parser.add_argument(
         "--category",
         type=str,
         choices=["corporate", "detective", "historical", "medical", "generic", "all"],
         default="all",
-        help="Category of archetypes to generate"
+        help="Category of archetypes to generate",
     )
     parser.add_argument(
         "--regenerate",
         action="store_true",
-        help="Regenerate even if archetypes already exist in database"
+        help="Regenerate even if archetypes already exist in database",
     )
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Show what would be generated without making LLM calls"
+        help="Show what would be generated without making LLM calls",
     )
     parser.add_argument(
-        "--verbose",
-        action="store_true",
-        default=True,
-        help="Show detailed progress"
+        "--verbose", action="store_true", default=True, help="Show detailed progress"
     )
     parser.add_argument(
-        "--db-path",
-        type=str,
-        default="character_engine.db",
-        help="Path to tensor database"
+        "--db-path", type=str, default="character_engine.db", help="Path to tensor database"
     )
 
     args = parser.parse_args()
@@ -81,11 +75,10 @@ def main():
         ALL_ARCHETYPES,
         CORPORATE_ARCHETYPES,
         DETECTIVE_ARCHETYPES,
+        GENERIC_ARCHETYPES,
         HISTORICAL_ARCHETYPES,
         MEDICAL_ARCHETYPES,
-        GENERIC_ARCHETYPES,
         seed_database_with_archetypes,
-        generate_all_archetype_tensors
     )
     from tensor_persistence import TensorDatabase
 
@@ -96,7 +89,7 @@ def main():
         "historical": HISTORICAL_ARCHETYPES,
         "medical": MEDICAL_ARCHETYPES,
         "generic": GENERIC_ARCHETYPES,
-        "all": ALL_ARCHETYPES
+        "all": ALL_ARCHETYPES,
     }
     archetypes = category_map[args.category]
 
@@ -128,6 +121,7 @@ def main():
     print("Initializing LLM client...")
     try:
         from llm_v2 import LLMClient
+
         llm_client = LLMClient()
         print(f"  Model: {llm_client.default_model}")
     except Exception as e:
@@ -148,11 +142,11 @@ def main():
             archetypes=archetypes,
             world_id="archetype_seeds",
             regenerate=args.regenerate,
-            verbose=args.verbose
+            verbose=args.verbose,
         )
 
         print("\n" + "=" * 60)
-        print(f"Generation complete!")
+        print("Generation complete!")
         print(f"  Archetypes seeded: {seeded}/{len(archetypes)}")
         print("=" * 60)
 
@@ -173,6 +167,7 @@ def main():
     except Exception as e:
         print(f"\nERROR: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
 

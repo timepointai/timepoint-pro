@@ -10,15 +10,15 @@ Phase 6: Public API - Usage Quotas
 import os
 import sqlite3
 import threading
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, Dict, List, Any
-from contextlib import contextmanager
-
+from typing import Any
 
 # ============================================================================
 # Data Models
 # ============================================================================
+
 
 @dataclass
 class UsageRecord:
@@ -44,12 +44,13 @@ class UsageEvent:
     user_id: str
     event_type: str  # "api_call", "simulation_start", "simulation_complete", "cost"
     timestamp: datetime
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 # ============================================================================
 # Usage Database
 # ============================================================================
+
 
 class UsageDatabase:
     """
@@ -59,7 +60,7 @@ class UsageDatabase:
     Survives server restarts unlike in-memory rate limiting.
     """
 
-    def __init__(self, db_path: Optional[str] = None):
+    def __init__(self, db_path: str | None = None):
         """
         Initialize the usage database.
 
@@ -67,20 +68,14 @@ class UsageDatabase:
             db_path: Path to SQLite database file.
                     Defaults to metadata/usage.db
         """
-        self.db_path = db_path or os.getenv(
-            "USAGE_DB_PATH",
-            "metadata/usage.db"
-        )
+        self.db_path = db_path or os.getenv("USAGE_DB_PATH", "metadata/usage.db")
         self._local = threading.local()
         self._init_schema()
 
     def _get_connection(self) -> sqlite3.Connection:
         """Get thread-local database connection."""
         if not hasattr(self._local, "conn") or self._local.conn is None:
-            self._local.conn = sqlite3.connect(
-                self.db_path,
-                check_same_thread=False
-            )
+            self._local.conn = sqlite3.connect(self.db_path, check_same_thread=False)
             self._local.conn.row_factory = sqlite3.Row
         return self._local.conn
 
@@ -170,11 +165,7 @@ class UsageDatabase:
     # Usage Record CRUD
     # ========================================================================
 
-    def get_usage(
-        self,
-        user_id: str,
-        period: Optional[str] = None
-    ) -> UsageRecord:
+    def get_usage(self, user_id: str, period: str | None = None) -> UsageRecord:
         """
         Get usage record for a user and period.
 
@@ -195,7 +186,7 @@ class UsageDatabase:
             SELECT * FROM usage_records
             WHERE user_id = ? AND period = ?
             """,
-            (user_id, period)
+            (user_id, period),
         ).fetchone()
 
         if row:
@@ -241,16 +232,13 @@ class UsageDatabase:
                     record.simulations_failed,
                     record.created_at.isoformat(),
                     record.updated_at.isoformat(),
-                )
+                ),
             )
 
         return record
 
     def increment_api_calls(
-        self,
-        user_id: str,
-        count: int = 1,
-        period: Optional[str] = None
+        self, user_id: str, count: int = 1, period: str | None = None
     ) -> UsageRecord:
         """
         Increment API call count.
@@ -276,7 +264,7 @@ class UsageDatabase:
                     updated_at = ?
                 WHERE user_id = ? AND period = ?
                 """,
-                (count, datetime.utcnow().isoformat(), user_id, period)
+                (count, datetime.utcnow().isoformat(), user_id, period),
             )
 
         return self.get_usage(user_id, period)
@@ -287,7 +275,7 @@ class UsageDatabase:
         started: int = 0,
         completed: int = 0,
         failed: int = 0,
-        period: Optional[str] = None
+        period: str | None = None,
     ) -> UsageRecord:
         """
         Increment simulation counts.
@@ -317,24 +305,13 @@ class UsageDatabase:
                     updated_at = ?
                 WHERE user_id = ? AND period = ?
                 """,
-                (
-                    started,
-                    completed,
-                    failed,
-                    datetime.utcnow().isoformat(),
-                    user_id,
-                    period
-                )
+                (started, completed, failed, datetime.utcnow().isoformat(), user_id, period),
             )
 
         return self.get_usage(user_id, period)
 
     def add_cost(
-        self,
-        user_id: str,
-        cost_usd: float,
-        tokens: int = 0,
-        period: Optional[str] = None
+        self, user_id: str, cost_usd: float, tokens: int = 0, period: str | None = None
     ) -> UsageRecord:
         """
         Add cost and token usage.
@@ -362,16 +339,12 @@ class UsageDatabase:
                     updated_at = ?
                 WHERE user_id = ? AND period = ?
                 """,
-                (cost_usd, tokens, datetime.utcnow().isoformat(), user_id, period)
+                (cost_usd, tokens, datetime.utcnow().isoformat(), user_id, period),
             )
 
         return self.get_usage(user_id, period)
 
-    def get_usage_history(
-        self,
-        user_id: str,
-        limit: int = 12
-    ) -> List[UsageRecord]:
+    def get_usage_history(self, user_id: str, limit: int = 12) -> list[UsageRecord]:
         """
         Get usage history for a user.
 
@@ -391,7 +364,7 @@ class UsageDatabase:
             ORDER BY period DESC
             LIMIT ?
             """,
-            (user_id, limit)
+            (user_id, limit),
         ).fetchall()
 
         return [
@@ -415,10 +388,7 @@ class UsageDatabase:
     # ========================================================================
 
     def log_event(
-        self,
-        user_id: str,
-        event_type: str,
-        details: Optional[Dict[str, Any]] = None
+        self, user_id: str, event_type: str, details: dict[str, Any] | None = None
     ) -> str:
         """
         Log a usage event.
@@ -449,17 +419,13 @@ class UsageDatabase:
                     user_id,
                     event_type,
                     timestamp.isoformat(),
-                    json.dumps(details) if details else None
-                )
+                    json.dumps(details) if details else None,
+                ),
             )
 
         return event_id
 
-    def get_recent_events(
-        self,
-        user_id: str,
-        limit: int = 100
-    ) -> List[Dict[str, Any]]:
+    def get_recent_events(self, user_id: str, limit: int = 100) -> list[dict[str, Any]]:
         """
         Get recent events for a user.
 
@@ -481,7 +447,7 @@ class UsageDatabase:
             ORDER BY timestamp DESC
             LIMIT ?
             """,
-            (user_id, limit)
+            (user_id, limit),
         ).fetchall()
 
         return [
@@ -499,7 +465,7 @@ class UsageDatabase:
     # Stats & Cleanup
     # ========================================================================
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get overall usage statistics."""
         conn = self._get_connection()
         period = self.current_period()
@@ -515,7 +481,7 @@ class UsageDatabase:
             FROM usage_records
             WHERE period = ?
             """,
-            (period,)
+            (period,),
         ).fetchone()
 
         return {
@@ -542,10 +508,7 @@ class UsageDatabase:
         cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
 
         with self._transaction() as conn:
-            cursor = conn.execute(
-                "DELETE FROM usage_events WHERE timestamp < ?",
-                (cutoff,)
-            )
+            cursor = conn.execute("DELETE FROM usage_events WHERE timestamp < ?", (cutoff,))
             return cursor.rowcount
 
     def close(self) -> None:
@@ -559,7 +522,7 @@ class UsageDatabase:
 # Global Instance
 # ============================================================================
 
-_usage_db: Optional[UsageDatabase] = None
+_usage_db: UsageDatabase | None = None
 
 
 def get_usage_database() -> UsageDatabase:

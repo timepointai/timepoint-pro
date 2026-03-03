@@ -5,51 +5,40 @@ Tests API endpoints, authentication, and models independently.
 """
 
 import pytest
-import tempfile
-import numpy as np
-from datetime import datetime
-from pathlib import Path
-from unittest.mock import patch, MagicMock
-
 from fastapi.testclient import TestClient
+
+from api.auth import (
+    API_KEY_HEADER,
+    clear_api_keys,
+    create_api_key,
+    generate_api_key,
+    hash_api_key,
+    revoke_api_key,
+    setup_test_api_keys,
+    verify_api_key,
+)
+from api.deps import (
+    create_test_dependencies,
+    override_db_path,
+    reset_dependencies,
+)
 
 # API imports
 from api.main import create_app
 from api.models import (
+    ComposeRequest,
+    SearchRequest,
     TensorCreate,
     TensorUpdate,
     TensorValues,
-    SearchRequest,
-    ComposeRequest,
-    HealthResponse,
-)
-from api.auth import (
-    create_api_key,
-    verify_api_key,
-    hash_api_key,
-    generate_api_key,
-    revoke_api_key,
-    clear_api_keys,
-    setup_test_api_keys,
-    API_KEY_HEADER,
-)
-from api.deps import (
-    override_db_path,
-    reset_dependencies,
-    create_test_dependencies,
 )
 
 # Core imports
-from tensor_persistence import TensorDatabase, TensorRecord
-from tensor_serialization import serialize_tensor, deserialize_tensor
-from access.permissions import PermissionEnforcer
-from access.audit import AuditLogger
-from schemas import TTMTensor
-
 
 # ============================================================================
 # Fixtures
 # ============================================================================
+
 
 @pytest.fixture(autouse=True)
 def reset_state():
@@ -122,6 +111,7 @@ def sample_tensor_data() -> dict:
 # Auth Tests
 # ============================================================================
 
+
 class TestAPIKeyAuth:
     """Tests for API key authentication."""
 
@@ -191,6 +181,7 @@ class TestAPIKeyAuth:
 # ============================================================================
 # Model Validation Tests
 # ============================================================================
+
 
 class TestModelValidation:
     """Tests for Pydantic model validation."""
@@ -285,6 +276,7 @@ class TestModelValidation:
 # Health Endpoint Tests
 # ============================================================================
 
+
 class TestHealthEndpoint:
     """Tests for health check endpoint."""
 
@@ -311,6 +303,7 @@ class TestHealthEndpoint:
 # ============================================================================
 # Tensor CRUD Tests
 # ============================================================================
+
 
 class TestTensorCRUD:
     """Tests for tensor CRUD operations."""
@@ -435,12 +428,11 @@ class TestTensorCRUD:
 # Permission Tests
 # ============================================================================
 
+
 class TestPermissions:
     """Tests for permission enforcement."""
 
-    def test_cannot_read_others_private_tensor(
-        self, client, sample_tensor_data, test_user_id
-    ):
+    def test_cannot_read_others_private_tensor(self, client, sample_tensor_data, test_user_id):
         """Cannot read another user's private tensor."""
         # Create tensor as alice
         alice_key = create_api_key("alice", "Alice Key")
@@ -548,6 +540,7 @@ class TestPermissions:
 # Fork Tests
 # ============================================================================
 
+
 class TestForkEndpoint:
     """Tests for tensor forking."""
 
@@ -624,6 +617,7 @@ class TestForkEndpoint:
 # Stats Tests
 # ============================================================================
 
+
 class TestStatsEndpoint:
     """Tests for statistics endpoint."""
 
@@ -650,6 +644,7 @@ class TestStatsEndpoint:
 # ============================================================================
 # Error Handling Tests
 # ============================================================================
+
 
 class TestErrorHandling:
     """Tests for error handling."""

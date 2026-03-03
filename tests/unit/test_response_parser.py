@@ -1,7 +1,8 @@
 """Tests for ResponseParser JSON extraction — especially bracket-depth matching."""
 
 import pytest
-from llm_service.response_parser import ResponseParser, ParseError
+
+from llm_service.response_parser import ParseError, ResponseParser
 
 
 @pytest.fixture
@@ -37,9 +38,9 @@ class TestExtractJson:
 
     def test_text_wrapping_json(self, parser):
         text = (
-            'Based on analysis:\n\n'
+            "Based on analysis:\n\n"
             '{"entity_id": "hamilton", "knowledge_state": ["fact1", "fact2"]}\n\n'
-            'Explanation of the above...'
+            "Explanation of the above..."
         )
         result = parser.extract_json(text)
         assert '"hamilton"' in result
@@ -82,22 +83,23 @@ class TestExtractByBracketMatching:
         which the old greedy regex failed to extract.
         """
         text = (
-            '{\n'
+            "{\n"
             '  "entity_id": "alexander_hamilton",\n'
             '  "knowledge_state": [\n'
             '    "Served as first Secretary of the Treasury from 1789 to 1795",\n'
             '    "Played a key role in shaping the financial system",\n'
             '    "Advocated for a strong central government"\n'
-            '  ],\n'
+            "  ],\n"
             '  "emotional_state": {\n'
             '    "valence": 0.3,\n'
             '    "arousal": 0.5\n'
-            '  }\n'
-            '}'
+            "  }\n"
+            "}"
         )
         result = parser._extract_by_bracket_matching(text)
         assert result is not None
         import json
+
         parsed = json.loads(result)
         assert parsed["entity_id"] == "alexander_hamilton"
         assert len(parsed["knowledge_state"]) == 3
@@ -115,12 +117,14 @@ class TestExtractByBracketMatching:
         text = '{"a": 1} then {"b": 2}'
         result = parser._extract_by_bracket_matching(text)
         import json
+
         assert json.loads(result) == {"a": 1}
 
     def test_array_extraction(self, parser):
         text = 'result: [1, 2, {"nested": true}]'
         result = parser._extract_by_bracket_matching(text)
         import json
+
         parsed = json.loads(result)
         assert len(parsed) == 3
 
@@ -130,4 +134,5 @@ class TestExtractByBracketMatching:
         result = parser._extract_by_bracket_matching(text)
         assert result is not None
         import json
+
         assert json.loads(result)["count"] == 3

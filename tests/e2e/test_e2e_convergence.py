@@ -9,21 +9,19 @@ Tests the complete convergence evaluation system:
 - Storage and retrieval of ConvergenceSet objects
 """
 
-import pytest
-import tempfile
-import shutil
 import os
-from datetime import datetime
-from typing import List
+import shutil
+import tempfile
+
+import pytest
 
 from evaluation.convergence import (
     CausalGraph,
-    CausalEdge,
-    DivergencePoint,
     ConvergenceResult,
-    graph_similarity,
-    find_divergence_points,
+    DivergencePoint,
     compute_convergence_from_graphs,
+    find_divergence_points,
+    graph_similarity,
 )
 from schemas import ConvergenceSet
 from storage import GraphStore
@@ -41,15 +39,15 @@ class TestConvergenceE2EPipeline:
 
     def teardown_method(self):
         """Cleanup test environment."""
-        if hasattr(self, 'temp_dir') and os.path.exists(self.temp_dir):
+        if hasattr(self, "temp_dir") and os.path.exists(self.temp_dir):
             shutil.rmtree(self.temp_dir)
 
     def _create_sample_graph(
         self,
         run_id: str,
         template_id: str = "test_template",
-        temporal_edges: List[tuple] = None,
-        knowledge_edges: List[tuple] = None,
+        temporal_edges: list[tuple] = None,
+        knowledge_edges: list[tuple] = None,
     ) -> CausalGraph:
         """Helper to create sample causal graphs for testing."""
         return CausalGraph(
@@ -77,7 +75,7 @@ class TestConvergenceE2EPipeline:
 
         result = compute_convergence_from_graphs([g1, g2, g3])
 
-        print(f"\nResults:")
+        print("\nResults:")
         print(f"  Convergence Score: {result.convergence_score:.1%}")
         print(f"  Robustness Grade: {result.robustness_grade}")
         print(f"  Consensus Edges: {len(result.consensus_edges)}")
@@ -102,7 +100,7 @@ class TestConvergenceE2EPipeline:
 
         result = compute_convergence_from_graphs([g1, g2])
 
-        print(f"\nResults:")
+        print("\nResults:")
         print(f"  Convergence Score: {result.convergence_score:.1%}")
         print(f"  Robustness Grade: {result.robustness_grade}")
         print(f"  Consensus Edges: {len(result.consensus_edges)}")
@@ -136,13 +134,15 @@ class TestConvergenceE2EPipeline:
 
         result = compute_convergence_from_graphs([g1, g2])
 
-        print(f"\nResults:")
+        print("\nResults:")
         print(f"  Convergence Score: {result.convergence_score:.1%}")
         print(f"  Robustness Grade: {result.robustness_grade}")
         print(f"  Divergence Points: {len(result.divergence_points)}")
 
         # Should be around 33% (1 shared / 3 total edges)
-        assert 0.2 < result.convergence_score < 0.5, f"Expected moderate convergence, got {result.convergence_score}"
+        assert 0.2 < result.convergence_score < 0.5, (
+            f"Expected moderate convergence, got {result.convergence_score}"
+        )
         assert result.robustness_grade in ["D", "F"], "Low convergence should get grade D or F"
         assert len(result.divergence_points) > 0, "Should have divergence points"
 
@@ -182,8 +182,9 @@ class TestConvergenceE2EPipeline:
             )
 
             actual_grade = result.robustness_grade
-            assert actual_grade == expected_grade, \
+            assert actual_grade == expected_grade, (
                 f"Score {score} should get grade {expected_grade}, got {actual_grade}"
+            )
             print(f"  Score {score:.0%} → Grade {actual_grade} ✓")
 
         print("\n✅ PASSED: All grading thresholds work correctly")
@@ -293,14 +294,14 @@ class TestConvergenceE2EPipeline:
         # Get aggregate stats
         stats = self.store.get_convergence_stats()
 
-        print(f"\nAggregate Stats:")
+        print("\nAggregate Stats:")
         print(f"  Total Sets: {stats.get('total_sets', 0)}")
         print(f"  Average Score: {stats.get('average_score', 0):.1%}")
         print(f"  Grade Distribution: {stats.get('grade_distribution', {})}")
         print(f"  Template Coverage: {stats.get('template_coverage', {})}")
 
-        assert stats.get('total_sets', 0) == 4, "Should have 4 convergence sets"
-        assert 0.7 < stats.get('average_score', 0) < 0.9, "Average score should be around 0.8"
+        assert stats.get("total_sets", 0) == 4, "Should have 4 convergence sets"
+        assert 0.7 < stats.get("average_score", 0) < 0.9, "Average score should be around 0.8"
 
         print("\n✅ PASSED: Convergence stats aggregation works")
 
@@ -315,9 +316,9 @@ class TestConvergenceE2EPipeline:
 
         result = compute_convergence_from_graphs([g1, g2])
 
-        print(f"\nResults for empty graphs:")
+        print("\nResults for empty graphs:")
         print(f"  Convergence Score: {result.convergence_score}")
-        print(f"  Both empty = identical = 1.0 convergence")
+        print("  Both empty = identical = 1.0 convergence")
 
         # Two empty graphs are identical (Jaccard of empty sets = 1.0)
         assert result.convergence_score == 1.0, "Empty graphs should be considered identical"
@@ -409,10 +410,10 @@ class TestConvergenceE2EPipeline:
         print(f"  Grade: {serialized['robustness_grade']}")
         print(f"  Divergence points: {len(serialized['divergence_points'])}")
 
-        assert serialized['convergence_score'] == 0.85
-        assert serialized['robustness_grade'] == "B"
-        assert serialized['run_count'] == 3
-        assert len(serialized['divergence_points']) == 1
+        assert serialized["convergence_score"] == 0.85
+        assert serialized["robustness_grade"] == "B"
+        assert serialized["run_count"] == 3
+        assert len(serialized["divergence_points"]) == 1
 
         print("\n✅ PASSED: ConvergenceResult serialization works")
 
@@ -454,7 +455,7 @@ def test_full_convergence_pipeline():
     # Compute convergence
     result = compute_convergence_from_graphs(graphs)
 
-    print(f"\nPipeline Results (5 runs):")
+    print("\nPipeline Results (5 runs):")
     print(f"  Convergence Score: {result.convergence_score:.1%}")
     print(f"  Robustness Grade: {result.robustness_grade}")
     print(f"  Min/Max Similarity: {result.min_similarity:.1%} / {result.max_similarity:.1%}")
@@ -479,6 +480,7 @@ def test_full_convergence_pipeline():
 
 if __name__ == "__main__":
     import sys
+
     pytest_args = [__file__, "-v", "-s", "-m", "e2e"]
     exit_code = pytest.main(pytest_args)
     sys.exit(exit_code)

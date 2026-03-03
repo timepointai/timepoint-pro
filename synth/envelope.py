@@ -5,7 +5,7 @@ Part of the SynthasAIzer control paradigm.
 See SYNTH.md for full specification.
 """
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 
 class EnvelopeConfig(BaseModel):
@@ -32,29 +32,24 @@ class EnvelopeConfig(BaseModel):
         # Get intensity at 50% through scenario
         intensity = envelope.intensity_at(0.5, total_timepoints=10)
     """
+
     attack: float = Field(
         default=0.1,
         ge=0.0,
         le=1.0,
-        description="How quickly entity reaches full presence (0.0=instant, 1.0=gradual)"
+        description="How quickly entity reaches full presence (0.0=instant, 1.0=gradual)",
     )
     decay: float = Field(
         default=0.2,
         ge=0.0,
         le=1.0,
-        description="Drop after initial peak (0.0=none, 1.0=drops to sustain immediately)"
+        description="Drop after initial peak (0.0=none, 1.0=drops to sustain immediately)",
     )
     sustain: float = Field(
-        default=0.8,
-        ge=0.0,
-        le=1.0,
-        description="Baseline presence level during middle timepoints"
+        default=0.8, ge=0.0, le=1.0, description="Baseline presence level during middle timepoints"
     )
     release: float = Field(
-        default=0.3,
-        ge=0.0,
-        le=1.0,
-        description="Fade out speed (0.0=abrupt, 1.0=gradual)"
+        default=0.3, ge=0.0, le=1.0, description="Fade out speed (0.0=abrupt, 1.0=gradual)"
     )
 
     def intensity_at(self, progress: float, total_timepoints: int = 1) -> float:

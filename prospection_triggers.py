@@ -15,15 +15,14 @@ Key architectural principle:
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, List, Optional, Any
-from schemas import Entity, Timepoint, ProspectiveState
+from typing import Any
+
+from schemas import Entity, ProspectiveState, Timepoint
 from storage import GraphStore
 
 
 def should_trigger_prospection(
-    entity: Entity,
-    timepoint: Timepoint,
-    config: Dict[str, Any]
+    entity: Entity, timepoint: Timepoint, config: dict[str, Any]
 ) -> bool:
     """
     Determine if prospection should be triggered for this entity.
@@ -45,10 +44,12 @@ def should_trigger_prospection(
     """
     # Check 1: Template-level configuration
     # Handle both dict and SimulationConfig object
-    if hasattr(config, 'metadata'):
+    if hasattr(config, "metadata"):
         # SimulationConfig object
         metadata = config.metadata if config.metadata else {}
-        prospection_config = metadata.get("prospection_config", {}) if isinstance(metadata, dict) else {}
+        prospection_config = (
+            metadata.get("prospection_config", {}) if isinstance(metadata, dict) else {}
+        )
     else:
         # Dict
         prospection_config = config.get("metadata", {}).get("prospection_config", {})
@@ -66,7 +67,9 @@ def should_trigger_prospection(
         return True
 
     # Check 2: Character-level prospection ability
-    prospection_ability = entity.entity_metadata.get("cognitive_traits", {}).get("prospection_ability", 0.0)
+    prospection_ability = entity.entity_metadata.get("cognitive_traits", {}).get(
+        "prospection_ability", 0.0
+    )
     if prospection_ability > 0.7:  # High prospection ability
         return True
 
@@ -78,7 +81,14 @@ def should_trigger_prospection(
 
     # Check 4: Event-level triggers
     event_description = timepoint.event_description.lower()
-    high_stakes_keywords = ["confrontation", "decision", "critical", "crisis", "planning", "strategy"]
+    high_stakes_keywords = [
+        "confrontation",
+        "decision",
+        "critical",
+        "crisis",
+        "planning",
+        "strategy",
+    ]
     if any(keyword in event_description for keyword in high_stakes_keywords):
         # Only trigger for entities with some planning capability
         if prospection_ability > 0.3:
@@ -119,10 +129,8 @@ def should_trigger_prospection(
 
 
 def get_prospection_params(
-    entity: Entity,
-    timepoint: Timepoint,
-    config: Dict[str, Any]
-) -> Dict[str, Any]:
+    entity: Entity, timepoint: Timepoint, config: dict[str, Any]
+) -> dict[str, Any]:
     """
     Get prospection parameters for this entity.
 
@@ -135,10 +143,12 @@ def get_prospection_params(
         - forecast_confidence: 0.0-1.0 confidence in predictions
     """
     # Handle both dict and SimulationConfig object
-    if hasattr(config, 'metadata'):
+    if hasattr(config, "metadata"):
         # SimulationConfig object
         metadata = config.metadata if config.metadata else {}
-        prospection_config = metadata.get("prospection_config", {}) if isinstance(metadata, dict) else {}
+        prospection_config = (
+            metadata.get("prospection_config", {}) if isinstance(metadata, dict) else {}
+        )
     else:
         # Dict
         prospection_config = config.get("metadata", {}).get("prospection_config", {})
@@ -149,12 +159,16 @@ def get_prospection_params(
     # Get prospection ability from config or entity traits
     prospection_ability = prospection_config.get("prospection_ability")
     if prospection_ability is None:
-        prospection_ability = entity.entity_metadata.get("cognitive_traits", {}).get("prospection_ability", 0.5)
+        prospection_ability = entity.entity_metadata.get("cognitive_traits", {}).get(
+            "prospection_ability", 0.5
+        )
 
     # Get theory of mind
     theory_of_mind = prospection_config.get("theory_of_mind")
     if theory_of_mind is None:
-        theory_of_mind = entity.entity_metadata.get("cognitive_traits", {}).get("theory_of_mind", 0.5)
+        theory_of_mind = entity.entity_metadata.get("cognitive_traits", {}).get(
+            "theory_of_mind", 0.5
+        )
 
     # Anxiety baseline from personality
     personality_traits = entity.entity_metadata.get("personality_traits", [])
@@ -173,17 +187,13 @@ def get_prospection_params(
         "prospection_ability": prospection_ability,
         "theory_of_mind": theory_of_mind,
         "anxiety_baseline": anxiety_baseline,
-        "forecast_confidence": forecast_confidence
+        "forecast_confidence": forecast_confidence,
     }
 
 
 def trigger_prospection_for_entity(
-    entity: Entity,
-    timepoint: Timepoint,
-    llm_client: Any,
-    store: GraphStore,
-    config: Dict[str, Any]
-) -> Optional[ProspectiveState]:
+    entity: Entity, timepoint: Timepoint, llm_client: Any, store: GraphStore, config: dict[str, Any]
+) -> ProspectiveState | None:
     """
     Trigger prospection for an entity (M15).
 
@@ -219,7 +229,7 @@ def trigger_prospection_for_entity(
             entity,
             timepoint,
             llm_client,
-            store
+            store,
             # Note: params (time_horizons, etc.) are not passed to generate_prospective_state
             # because they're handled internally by the prospection mechanism
         )
@@ -239,12 +249,8 @@ def trigger_prospection_for_entity(
 
 
 def query_driven_prospection(
-    entity_id: str,
-    query: str,
-    store: GraphStore,
-    llm_client: Any,
-    config: Dict[str, Any]
-) -> Optional[ProspectiveState]:
+    entity_id: str, query: str, store: GraphStore, llm_client: Any, config: dict[str, Any]
+) -> ProspectiveState | None:
     """
     Trigger prospection in response to user query.
 
@@ -280,15 +286,10 @@ def query_driven_prospection(
     entity.entity_metadata["needs_prospection"] = True
 
     # Trigger prospection
-    return trigger_prospection_for_entity(
-        entity, current_timepoint, llm_client, store, config
-    )
+    return trigger_prospection_for_entity(entity, current_timepoint, llm_client, store, config)
 
 
-def refine_tensor_from_prospection(
-    entity: Entity,
-    prospective_state: ProspectiveState
-) -> None:
+def refine_tensor_from_prospection(entity: Entity, prospective_state: ProspectiveState) -> None:
     """
     Optionally refine entity tensor using prospection data.
 
@@ -307,10 +308,11 @@ def refine_tensor_from_prospection(
     Returns:
         None (modifies entity tensor in place)
     """
-    import json
     import base64
-    import numpy as np
+    import json
+
     import msgspec
+    import numpy as np
 
     # Load current tensor
     if not entity.tensor:
@@ -323,7 +325,7 @@ def refine_tensor_from_prospection(
     # ProspectiveState.expectations is a string field, so we need to parse it or use a default
     # For now, just use the number of expectations if available, otherwise use 0
     expectations_count = 0
-    if hasattr(prospective_state, 'expectations') and prospective_state.expectations:
+    if hasattr(prospective_state, "expectations") and prospective_state.expectations:
         # If expectations is a list, count it; if string, estimate from length
         if isinstance(prospective_state.expectations, list):
             expectations_count = len(prospective_state.expectations)
@@ -344,24 +346,30 @@ def refine_tensor_from_prospection(
     context[4] = np.clip(context[4] + confidence_delta, 0.0, 1.5)
 
     # Update tensor
-    entity.tensor = json.dumps({
-        "context_vector": base64.b64encode(msgspec.msgpack.encode(context.tolist())).decode('utf-8'),
-        "biology_vector": tensor_dict["biology_vector"],
-        "behavior_vector": tensor_dict["behavior_vector"]
-    })
+    entity.tensor = json.dumps(
+        {
+            "context_vector": base64.b64encode(msgspec.msgpack.encode(context.tolist())).decode(
+                "utf-8"
+            ),
+            "biology_vector": tensor_dict["biology_vector"],
+            "behavior_vector": tensor_dict["behavior_vector"],
+        }
+    )
 
-    print(f"  ✨ Refined {entity.entity_id} tensor from prospection (anxiety: {prospective_state.anxiety_level:.2f})")
+    print(
+        f"  ✨ Refined {entity.entity_id} tensor from prospection (anxiety: {prospective_state.anxiety_level:.2f})"
+    )
 
 
 def trigger_post_dialog_proception(
     entity: Entity,
-    dialog: 'Dialog',
+    dialog: "Dialog",
     timepoint: Timepoint,
     llm: Any,
     store: GraphStore,
-    suppressed_impulses: Optional[List[Dict]] = None,
-    withheld_knowledge: Optional[List[Dict]] = None,
-) -> Optional[ProspectiveState]:
+    suppressed_impulses: list[dict] | None = None,
+    withheld_knowledge: list[dict] | None = None,
+) -> ProspectiveState | None:
     """
     Trigger post-dialog proception for an entity.
 
@@ -387,8 +395,8 @@ def trigger_post_dialog_proception(
 
     from workflows.prospection import (
         generate_episodic_memory,
-        update_rumination_topics,
         generate_knowledge_from_proception,
+        update_rumination_topics,
     )
 
     try:
@@ -401,6 +409,7 @@ def trigger_post_dialog_proception(
 
         if not prospective_state:
             import uuid
+
             prospective_state = ProspectiveState(
                 prospective_id=f"prospect_{entity.entity_id}_{timepoint.timepoint_id}_{uuid.uuid4().hex[:8]}",
                 entity_id=entity.entity_id,
@@ -465,11 +474,13 @@ def trigger_post_dialog_proception(
             # Format suppressed impulses
             for si in suppressed_impulses:
                 if isinstance(si, str):
-                    existing_suppressed.append({
-                        "impulse": si,
-                        "context": dialog.dialog_id,
-                        "suppressed_by": "steering",
-                    })
+                    existing_suppressed.append(
+                        {
+                            "impulse": si,
+                            "context": dialog.dialog_id,
+                            "suppressed_by": "steering",
+                        }
+                    )
                 elif isinstance(si, dict):
                     existing_suppressed.append(si)
             prospective_state.suppressed_impulses = json.dumps(existing_suppressed[-10:])
@@ -478,13 +489,15 @@ def trigger_post_dialog_proception(
         generate_knowledge_from_proception(entity, prospective_state, store)
 
         # Save updated state
-        prospective_state.last_updated = __import__('datetime').datetime.utcnow()
+        prospective_state.last_updated = __import__("datetime").datetime.utcnow()
         if store:
             store.save_prospective_state(prospective_state)
 
-        print(f"  [M15] Post-dialog proception for {entity.entity_id}: "
-              f"memories={len(episodic_memories)}, "
-              f"topics={len(updated_topics)}")
+        print(
+            f"  [M15] Post-dialog proception for {entity.entity_id}: "
+            f"memories={len(episodic_memories)}, "
+            f"topics={len(updated_topics)}"
+        )
 
         return prospective_state
 
@@ -494,13 +507,13 @@ def trigger_post_dialog_proception(
 
 
 async def trigger_prospection_parallel(
-    entities: List[Entity],
+    entities: list[Entity],
     timepoint: Timepoint,
     llm_client: Any,
     store: GraphStore,
-    config: Dict[str, Any],
-    max_concurrent: int = 4
-) -> Dict[str, Optional[ProspectiveState]]:
+    config: dict[str, Any],
+    max_concurrent: int = 4,
+) -> dict[str, ProspectiveState | None]:
     """
     Trigger prospection for multiple entities concurrently.
 
@@ -519,7 +532,7 @@ async def trigger_prospection_parallel(
         Dict mapping entity_id → ProspectiveState (or None if not triggered/failed)
     """
     semaphore = asyncio.Semaphore(max_concurrent)
-    results: Dict[str, Optional[ProspectiveState]] = {}
+    results: dict[str, ProspectiveState | None] = {}
 
     async def process_entity(entity: Entity) -> tuple:
         async with semaphore:
@@ -530,7 +543,7 @@ async def trigger_prospection_parallel(
                         executor,
                         lambda: trigger_prospection_for_entity(
                             entity, timepoint, llm_client, store, config
-                        )
+                        ),
                     )
                     if prospective_state:
                         # Refine tensor from prospection result

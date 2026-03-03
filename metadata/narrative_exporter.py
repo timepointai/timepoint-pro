@@ -14,76 +14,83 @@ Usage:
     pdf_path = exporter.export_pdf(data, output_path, depth="summary")
 """
 
-from typing import List, Dict, Optional, Any
-from pathlib import Path
-from datetime import datetime
-from pydantic import BaseModel, Field
 import json
+from datetime import datetime
+from pathlib import Path
+from typing import Any
 
+from pydantic import BaseModel, Field
 
 # ============================================================================
 # Data Models
 # ============================================================================
 
+
 class CharacterProfile(BaseModel):
     """Profile of a single entity/character"""
+
     entity_id: str
     entity_type: str
-    role: Optional[str] = None
-    age: Optional[float] = None
-    initial_knowledge: List[str] = []
-    personality_traits: Optional[List[float]] = None
+    role: str | None = None
+    age: float | None = None
+    initial_knowledge: list[str] = []
+    personality_traits: list[float] | None = None
     knowledge_count: int = 0
-    final_energy: Optional[float] = None
-    final_emotional_state: Optional[Dict[str, float]] = None
+    final_energy: float | None = None
+    final_emotional_state: dict[str, float] | None = None
 
 
 class TimelineEntry(BaseModel):
     """Single timepoint in narrative timeline"""
+
     timepoint_id: str
-    timestamp: Optional[str] = None
+    timestamp: str | None = None
     event_description: str
-    entities_present: List[str] = []
+    entities_present: list[str] = []
     dialog_turn_count: int = 0
     importance: float = 0.5
-    causal_parent: Optional[str] = None  # Parent timepoint for convergence analysis
+    causal_parent: str | None = None  # Parent timepoint for convergence analysis
 
 
 class DialogExcerpt(BaseModel):
     """Excerpt from a dialog conversation"""
+
     dialog_id: str
     timepoint_id: str
-    participants: List[str]
-    turns: List[Dict[str, Any]]  # Full turn data
-    duration_seconds: Optional[int] = None
+    participants: list[str]
+    turns: list[dict[str, Any]]  # Full turn data
+    duration_seconds: int | None = None
 
 
 class TrainingInsights(BaseModel):
     """Summary of training data generated"""
+
     total_examples: int = 0
-    energy_dynamics: Dict[str, Any] = Field(default_factory=dict)
-    emotional_dynamics: Dict[str, Any] = Field(default_factory=dict)
-    knowledge_transfer: Dict[str, Any] = Field(default_factory=dict)
-    sample_prompts: List[str] = Field(default_factory=list)
+    energy_dynamics: dict[str, Any] = Field(default_factory=dict)
+    emotional_dynamics: dict[str, Any] = Field(default_factory=dict)
+    knowledge_transfer: dict[str, Any] = Field(default_factory=dict)
+    sample_prompts: list[str] = Field(default_factory=list)
 
 
 class MechanismUsage(BaseModel):
     """Usage statistics for a mechanism"""
+
     mechanism_id: str
     mechanism_name: str
     usage_count: int = 0
-    description: Optional[str] = None
+    description: str | None = None
 
 
 class NarrativeData(BaseModel):
     """Complete narrative data for a simulation run"""
+
     # Metadata
     run_id: str
     template_id: str
     started_at: datetime
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None
     causal_mode: str
-    duration_seconds: Optional[float] = None
+    duration_seconds: float | None = None
     cost_usd: float = 0.0
     status: str
 
@@ -91,14 +98,14 @@ class NarrativeData(BaseModel):
     executive_summary: str
 
     # Content
-    characters: List[CharacterProfile] = []
-    timeline: List[TimelineEntry] = []
-    dialogs: List[DialogExcerpt] = []
+    characters: list[CharacterProfile] = []
+    timeline: list[TimelineEntry] = []
+    dialogs: list[DialogExcerpt] = []
     training_insights: TrainingInsights = Field(default_factory=TrainingInsights)
-    mechanisms: List[MechanismUsage] = []
+    mechanisms: list[MechanismUsage] = []
 
     # Atmospheric/environmental context
-    atmospheric_context: Dict[str, Any] = Field(default_factory=dict)
+    atmospheric_context: dict[str, Any] = Field(default_factory=dict)
 
     # Results
     entities_created: int = 0
@@ -110,20 +117,21 @@ class NarrativeData(BaseModel):
     # Validation results
     validations_passed: int = 0
     validations_failed: int = 0
-    validation_details: List[Dict[str, Any]] = []
+    validation_details: list[dict[str, Any]] = []
 
     # Assessment
-    strengths: List[str] = []
-    weaknesses: List[str] = []
+    strengths: list[str] = []
+    weaknesses: list[str] = []
 
     # Oxen upload
     oxen_uploaded: bool = False
-    oxen_repo_url: Optional[str] = None
+    oxen_repo_url: str | None = None
 
 
 # ============================================================================
 # Narrative Exporter
 # ============================================================================
+
 
 class NarrativeExporter:
     """Generates narrative summaries in multiple formats"""
@@ -135,11 +143,11 @@ class NarrativeExporter:
     def collect_run_data(
         self,
         run_metadata,
-        timepoints: List,
-        entities: List,
+        timepoints: list,
+        entities: list,
         store,
-        training_data: Optional[List[Dict]] = None,
-        config = None
+        training_data: list[dict] | None = None,
+        config=None,
     ) -> NarrativeData:
         """
         Collect all simulation artifacts into structured narrative data.
@@ -163,25 +171,27 @@ class NarrativeExporter:
             energy = None
             emotional_state = None
 
-            if hasattr(entity, 'entity_metadata') and entity.entity_metadata:
+            if hasattr(entity, "entity_metadata") and entity.entity_metadata:
                 meta = entity.entity_metadata
-                if 'cognitive_tensor' in meta:
-                    cog = meta['cognitive_tensor']
-                    knowledge = cog.get('knowledge_state', [])
-                    energy = cog.get('energy_budget')
+                if "cognitive_tensor" in meta:
+                    cog = meta["cognitive_tensor"]
+                    knowledge = cog.get("knowledge_state", [])
+                    energy = cog.get("energy_budget")
                     emotional_state = {
-                        'valence': cog.get('emotional_valence', 0.0),
-                        'arousal': cog.get('emotional_arousal', 0.0)
+                        "valence": cog.get("emotional_valence", 0.0),
+                        "arousal": cog.get("emotional_arousal", 0.0),
                     }
 
             profile = CharacterProfile(
-                entity_id=entity.entity_id if hasattr(entity, 'entity_id') else str(entity),
-                entity_type=entity.entity_type if hasattr(entity, 'entity_type') else "unknown",
-                age=entity.entity_metadata.get('physical_tensor', {}).get('age') if hasattr(entity, 'entity_metadata') else None,
+                entity_id=entity.entity_id if hasattr(entity, "entity_id") else str(entity),
+                entity_type=entity.entity_type if hasattr(entity, "entity_type") else "unknown",
+                age=entity.entity_metadata.get("physical_tensor", {}).get("age")
+                if hasattr(entity, "entity_metadata")
+                else None,
                 initial_knowledge=knowledge[:10] if knowledge else [],  # First 10 items
                 knowledge_count=len(knowledge) if knowledge else 0,
                 final_energy=energy,
-                final_emotional_state=emotional_state
+                final_emotional_state=emotional_state,
             )
             characters.append(profile)
 
@@ -189,12 +199,14 @@ class NarrativeExporter:
         timeline = []
         for tp in timepoints:
             entry = TimelineEntry(
-                timepoint_id=tp.timepoint_id if hasattr(tp, 'timepoint_id') else str(tp),
-                timestamp=str(tp.timestamp) if hasattr(tp, 'timestamp') else None,
-                event_description=tp.event_description if hasattr(tp, 'event_description') else "Event",
-                entities_present=tp.entities_present if hasattr(tp, 'entities_present') else [],
-                causal_parent=tp.causal_parent if hasattr(tp, 'causal_parent') else None,
-                importance=tp.dramatic_importance if hasattr(tp, 'dramatic_importance') else 0.5
+                timepoint_id=tp.timepoint_id if hasattr(tp, "timepoint_id") else str(tp),
+                timestamp=str(tp.timestamp) if hasattr(tp, "timestamp") else None,
+                event_description=tp.event_description
+                if hasattr(tp, "event_description")
+                else "Event",
+                entities_present=tp.entities_present if hasattr(tp, "entities_present") else [],
+                causal_parent=tp.causal_parent if hasattr(tp, "causal_parent") else None,
+                importance=tp.dramatic_importance if hasattr(tp, "dramatic_importance") else 0.5,
             )
             timeline.append(entry)
 
@@ -202,20 +214,32 @@ class NarrativeExporter:
         dialogs = []
         if store:
             try:
-                all_dialogs = store.load_all_dialogs() if hasattr(store, 'load_all_dialogs') else []
+                all_dialogs = store.load_all_dialogs() if hasattr(store, "load_all_dialogs") else []
                 for dialog in all_dialogs:
-                    if hasattr(dialog, 'dialog_id'):
+                    if hasattr(dialog, "dialog_id"):
                         # Deserialize JSON strings from DB storage
-                        raw_participants = dialog.participants if hasattr(dialog, 'participants') else []
-                        raw_turns = dialog.turns if hasattr(dialog, 'turns') else []
-                        participants = json.loads(raw_participants) if isinstance(raw_participants, str) else (raw_participants or [])
-                        turns = json.loads(raw_turns) if isinstance(raw_turns, str) else (raw_turns or [])
+                        raw_participants = (
+                            dialog.participants if hasattr(dialog, "participants") else []
+                        )
+                        raw_turns = dialog.turns if hasattr(dialog, "turns") else []
+                        participants = (
+                            json.loads(raw_participants)
+                            if isinstance(raw_participants, str)
+                            else (raw_participants or [])
+                        )
+                        turns = (
+                            json.loads(raw_turns)
+                            if isinstance(raw_turns, str)
+                            else (raw_turns or [])
+                        )
 
                         excerpt = DialogExcerpt(
                             dialog_id=dialog.dialog_id,
-                            timepoint_id=dialog.timepoint_id if hasattr(dialog, 'timepoint_id') else "unknown",
+                            timepoint_id=dialog.timepoint_id
+                            if hasattr(dialog, "timepoint_id")
+                            else "unknown",
                             participants=participants,
-                            turns=turns
+                            turns=turns,
                         )
                         dialogs.append(excerpt)
             except Exception as e:
@@ -235,35 +259,41 @@ class NarrativeExporter:
 
             # Extract sample prompts (first 3)
             training_insights.sample_prompts = [
-                ex.get('prompt', '')[:200] + "..." if len(ex.get('prompt', '')) > 200 else ex.get('prompt', '')
+                ex.get("prompt", "")[:200] + "..."
+                if len(ex.get("prompt", "")) > 200
+                else ex.get("prompt", "")
                 for ex in training_data[:3]
             ]
 
             # Analyze energy dynamics
             energy_changes = []
             for ex in training_data:
-                if 'completion' in ex:
+                if "completion" in ex:
                     try:
-                        comp = json.loads(ex['completion']) if isinstance(ex['completion'], str) else ex['completion']
-                        if 'energy_change' in comp:
-                            energy_changes.append(comp['energy_change'])
+                        comp = (
+                            json.loads(ex["completion"])
+                            if isinstance(ex["completion"], str)
+                            else ex["completion"]
+                        )
+                        if "energy_change" in comp:
+                            energy_changes.append(comp["energy_change"])
                     except:
                         pass
 
             if energy_changes:
                 training_insights.energy_dynamics = {
-                    'mean_change': sum(energy_changes) / len(energy_changes),
-                    'total_samples': len(energy_changes)
+                    "mean_change": sum(energy_changes) / len(energy_changes),
+                    "total_samples": len(energy_changes),
                 }
 
         # Build mechanism usage list
         mechanisms = []
-        if hasattr(run_metadata, 'mechanisms_used'):
+        if hasattr(run_metadata, "mechanisms_used"):
             for mech_id in sorted(run_metadata.mechanisms_used):
                 usage = MechanismUsage(
                     mechanism_id=mech_id,
                     mechanism_name=mech_id,  # Could enhance with full names
-                    usage_count=1
+                    usage_count=1,
                 )
                 mechanisms.append(usage)
 
@@ -276,17 +306,19 @@ class NarrativeExporter:
         val_passed = 0
         val_failed = 0
         val_details = []
-        if hasattr(run_metadata, 'validations'):
+        if hasattr(run_metadata, "validations"):
             for val in run_metadata.validations:
-                if hasattr(val, 'passed') and val.passed:
+                if hasattr(val, "passed") and val.passed:
                     val_passed += 1
                 else:
                     val_failed += 1
-                val_details.append({
-                    'rule': val.rule_name if hasattr(val, 'rule_name') else "unknown",
-                    'passed': val.passed if hasattr(val, 'passed') else False,
-                    'message': val.message if hasattr(val, 'message') else ""
-                })
+                val_details.append(
+                    {
+                        "rule": val.rule_name if hasattr(val, "rule_name") else "unknown",
+                        "passed": val.passed if hasattr(val, "passed") else False,
+                        "message": val.message if hasattr(val, "message") else "",
+                    }
+                )
 
         # Assess strengths and weaknesses
         strengths, weaknesses = self._assess_run(
@@ -299,7 +331,9 @@ class NarrativeExporter:
             template_id=run_metadata.template_id,
             started_at=run_metadata.started_at,
             completed_at=run_metadata.completed_at,
-            causal_mode=run_metadata.causal_mode.value if hasattr(run_metadata.causal_mode, 'value') else str(run_metadata.causal_mode),
+            causal_mode=run_metadata.causal_mode.value
+            if hasattr(run_metadata.causal_mode, "value")
+            else str(run_metadata.causal_mode),
             duration_seconds=run_metadata.duration_seconds,
             cost_usd=run_metadata.cost_usd,
             status=run_metadata.status,
@@ -319,17 +353,21 @@ class NarrativeExporter:
             validation_details=val_details,
             strengths=strengths,
             weaknesses=weaknesses,
-            oxen_uploaded=bool(run_metadata.oxen_dataset_url) if hasattr(run_metadata, 'oxen_dataset_url') else False,
-            oxen_repo_url=run_metadata.oxen_repo_url if hasattr(run_metadata, 'oxen_repo_url') else None
+            oxen_uploaded=bool(run_metadata.oxen_dataset_url)
+            if hasattr(run_metadata, "oxen_dataset_url")
+            else False,
+            oxen_repo_url=run_metadata.oxen_repo_url
+            if hasattr(run_metadata, "oxen_repo_url")
+            else None,
         )
 
     def _generate_template_summary(
         self,
         metadata,
-        characters: List[CharacterProfile],
-        timeline: List[TimelineEntry],
-        dialogs: List[DialogExcerpt],
-        training: TrainingInsights
+        characters: list[CharacterProfile],
+        timeline: list[TimelineEntry],
+        dialogs: list[DialogExcerpt],
+        training: TrainingInsights,
     ) -> str:
         """Generate template-based executive summary"""
         char_names = ", ".join([c.entity_id for c in characters[:3]])
@@ -343,7 +381,9 @@ class NarrativeExporter:
         dialog_info = ""
         if dialogs:
             total_turns = sum(len(d.turns) for d in dialogs)
-            dialog_info = f"featuring {len(dialogs)} conversations with {total_turns} dialogue exchanges"
+            dialog_info = (
+                f"featuring {len(dialogs)} conversations with {total_turns} dialogue exchanges"
+            )
 
         summary = (
             f"A {metadata.causal_mode.value if hasattr(metadata.causal_mode, 'value') else metadata.causal_mode} "
@@ -360,12 +400,12 @@ class NarrativeExporter:
     def _assess_run(
         self,
         metadata,
-        characters: List[CharacterProfile],
-        timeline: List[TimelineEntry],
-        dialogs: List[DialogExcerpt],
+        characters: list[CharacterProfile],
+        timeline: list[TimelineEntry],
+        dialogs: list[DialogExcerpt],
         val_passed: int,
-        val_failed: int
-    ) -> tuple[List[str], List[str]]:
+        val_failed: int,
+    ) -> tuple[list[str], list[str]]:
         """Assess run strengths and weaknesses"""
         strengths = []
         weaknesses = []
@@ -379,7 +419,9 @@ class NarrativeExporter:
         # Assess content richness
         if dialogs and len(dialogs) > 0:
             total_turns = sum(len(d.turns) for d in dialogs)
-            strengths.append(f"Rich dialogue generation ({len(dialogs)} conversations, {total_turns} turns)")
+            strengths.append(
+                f"Rich dialogue generation ({len(dialogs)} conversations, {total_turns} turns)"
+            )
         else:
             weaknesses.append("No dialogs generated")
 
@@ -392,9 +434,13 @@ class NarrativeExporter:
         if characters:
             avg_knowledge = sum(c.knowledge_count for c in characters) / len(characters)
             if avg_knowledge >= 3:
-                strengths.append(f"Strong character development (avg {avg_knowledge:.1f} knowledge items)")
+                strengths.append(
+                    f"Strong character development (avg {avg_knowledge:.1f} knowledge items)"
+                )
             elif avg_knowledge > 0:
-                weaknesses.append(f"Limited character development (avg {avg_knowledge:.1f} knowledge items)")
+                weaknesses.append(
+                    f"Limited character development (avg {avg_knowledge:.1f} knowledge items)"
+                )
 
         # Assess validations
         if val_passed > 0:
@@ -403,7 +449,9 @@ class NarrativeExporter:
             weaknesses.append(f"Failed {val_failed} validation checks")
 
         # Assess cost efficiency
-        cost_per_entity = metadata.cost_usd / metadata.entities_created if metadata.entities_created > 0 else 0
+        cost_per_entity = (
+            metadata.cost_usd / metadata.entities_created if metadata.entities_created > 0 else 0
+        )
         if cost_per_entity < 0.01:
             strengths.append(f"Cost-efficient generation (${cost_per_entity:.4f} per entity)")
 
@@ -421,15 +469,19 @@ class NarrativeExporter:
             Updated NarrativeData with enhanced summary
         """
         # Build detailed prompt from narrative data
-        timeline_text = "\n".join([
-            f"{i+1}. {tp.timestamp} - {tp.event_description}"
-            for i, tp in enumerate(narrative_data.timeline[:10])
-        ])
+        timeline_text = "\n".join(
+            [
+                f"{i + 1}. {tp.timestamp} - {tp.event_description}"
+                for i, tp in enumerate(narrative_data.timeline[:10])
+            ]
+        )
 
-        char_text = "\n".join([
-            f"- {c.entity_id} ({c.entity_type}): {c.knowledge_count} knowledge items"
-            for c in narrative_data.characters[:5]
-        ])
+        char_text = "\n".join(
+            [
+                f"- {c.entity_id} ({c.entity_type}): {c.knowledge_count} knowledge items"
+                for c in narrative_data.characters[:5]
+            ]
+        )
 
         prompt = f"""Write a compelling 3-4 sentence executive summary for this simulation run.
 
@@ -452,7 +504,7 @@ Focus on the narrative arc, character interactions, and key outcomes. Write like
                 model="anthropic/claude-3-5-haiku-20241022",
                 max_tokens=300,
                 temperature=0.7,
-                call_type="enhance_narrative_summary"
+                call_type="enhance_narrative_summary",
             )
 
             if response.success and response.content:
@@ -464,10 +516,7 @@ Focus on the narrative arc, character interactions, and key outcomes. Write like
         return narrative_data
 
     def export_markdown(
-        self,
-        narrative_data: NarrativeData,
-        output_path: Path,
-        depth: str = "summary"
+        self, narrative_data: NarrativeData, output_path: Path, depth: str = "summary"
     ) -> Path:
         """
         Export narrative as Markdown document.
@@ -486,7 +535,7 @@ Focus on the narrative arc, character interactions, and key outcomes. Write like
         content = self._build_markdown_content(narrative_data, depth)
 
         # Write to file
-        output_path.write_text(content, encoding='utf-8')
+        output_path.write_text(content, encoding="utf-8")
 
         return output_path
 
@@ -497,11 +546,15 @@ Focus on the narrative arc, character interactions, and key outcomes. Write like
         # Header
         lines.append(f"# NARRATIVE SUMMARY: {data.template_id}")
         lines.append("")
-        lines.append(f"**Run ID**: {data.run_id} | **Mode**: {data.causal_mode} | **Date**: {data.started_at.strftime('%Y-%m-%d %H:%M:%S')}")
+        lines.append(
+            f"**Run ID**: {data.run_id} | **Mode**: {data.causal_mode} | **Date**: {data.started_at.strftime('%Y-%m-%d %H:%M:%S')}"
+        )
         lines.append("")
 
         if data.duration_seconds:
-            lines.append(f"**Duration**: {data.duration_seconds:.1f}s | **Cost**: ${data.cost_usd:.3f} | **Status**: {data.status}")
+            lines.append(
+                f"**Duration**: {data.duration_seconds:.1f}s | **Cost**: ${data.cost_usd:.3f} | **Status**: {data.status}"
+            )
         lines.append("")
         lines.append("---")
         lines.append("")
@@ -529,7 +582,9 @@ Focus on the narrative arc, character interactions, and key outcomes. Write like
                 if char.final_energy:
                     lines.append(f"- **Final Energy**: {char.final_energy:.1f}")
                 if char.final_emotional_state:
-                    lines.append(f"- **Emotional State**: Valence {char.final_emotional_state['valence']:.2f}, Arousal {char.final_emotional_state['arousal']:.2f}")
+                    lines.append(
+                        f"- **Emotional State**: Valence {char.final_emotional_state['valence']:.2f}, Arousal {char.final_emotional_state['arousal']:.2f}"
+                    )
 
                 # Show initial knowledge for comprehensive
                 if depth == "comprehensive" and char.initial_knowledge:
@@ -566,9 +621,9 @@ Focus on the narrative arc, character interactions, and key outcomes. Write like
                 turns_to_show = dialog.turns[:turn_limit] if turn_limit else dialog.turns
 
                 for turn in turns_to_show:
-                    speaker = turn.get('speaker', 'Unknown')
-                    content = turn.get('content', '')
-                    emotional_tone = turn.get('emotional_tone', '')
+                    speaker = turn.get("speaker", "Unknown")
+                    content = turn.get("content", "")
+                    emotional_tone = turn.get("emotional_tone", "")
 
                     if emotional_tone:
                         lines.append(f"**{speaker}** ({emotional_tone}):")
@@ -590,7 +645,9 @@ Focus on the narrative arc, character interactions, and key outcomes. Write like
             if data.training_insights.energy_dynamics:
                 lines.append("")
                 lines.append("**Energy Dynamics**:")
-                lines.append(f"- Mean energy change: {data.training_insights.energy_dynamics.get('mean_change', 0):.2f}")
+                lines.append(
+                    f"- Mean energy change: {data.training_insights.energy_dynamics.get('mean_change', 0):.2f}"
+                )
 
             if depth == "comprehensive" and data.training_insights.sample_prompts:
                 lines.append("")
@@ -619,7 +676,7 @@ Focus on the narrative arc, character interactions, and key outcomes. Write like
                 lines.append("")
                 lines.append("**Details**:")
                 for val in data.validation_details:
-                    status = "✅" if val['passed'] else "❌"
+                    status = "✅" if val["passed"] else "❌"
                     lines.append(f"- {status} {val['rule']}: {val['message']}")
 
             lines.append("")
@@ -658,7 +715,7 @@ Focus on the narrative arc, character interactions, and key outcomes. Write like
         # Footer
         lines.append("---")
         lines.append("")
-        lines.append(f"*Generated by Timepoint-Pro Narrative Export System*")
+        lines.append("*Generated by Timepoint-Pro Narrative Export System*")
         lines.append("")
 
         return "\n".join(lines)
@@ -677,21 +734,18 @@ Focus on the narrative arc, character interactions, and key outcomes. Write like
         output_path = Path(output_path)
 
         # Convert to dict and add format version
-        data_dict = narrative_data.model_dump(mode='json')
-        data_dict['format_version'] = "1.0"
-        data_dict['generated_at'] = datetime.now().isoformat()
+        data_dict = narrative_data.model_dump(mode="json")
+        data_dict["format_version"] = "1.0"
+        data_dict["generated_at"] = datetime.now().isoformat()
 
         # Write to file with pretty formatting
-        with open(output_path, 'w', encoding='utf-8') as f:
+        with open(output_path, "w", encoding="utf-8") as f:
             json.dump(data_dict, f, indent=2, ensure_ascii=False, default=str)
 
         return output_path
 
     def export_pdf(
-        self,
-        narrative_data: NarrativeData,
-        output_path: Path,
-        depth: str = "summary"
+        self, narrative_data: NarrativeData, output_path: Path, depth: str = "summary"
     ) -> Path:
         """
         Export narrative as PDF document.
@@ -708,15 +762,14 @@ Focus on the narrative arc, character interactions, and key outcomes. Write like
             ImportError: If reportlab is not installed
         """
         try:
+            from reportlab.lib.enums import TA_CENTER, TA_LEFT
             from reportlab.lib.pagesizes import letter
-            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
             from reportlab.lib.units import inch
-            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
-            from reportlab.lib.enums import TA_LEFT, TA_CENTER
+            from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer
         except ImportError:
             raise ImportError(
-                "reportlab package required for PDF export. "
-                "Install with: pip install reportlab"
+                "reportlab package required for PDF export. Install with: pip install reportlab"
             )
 
         output_path = Path(output_path)
@@ -725,10 +778,10 @@ Focus on the narrative arc, character interactions, and key outcomes. Write like
         doc = SimpleDocTemplate(
             str(output_path),
             pagesize=letter,
-            rightMargin=0.75*inch,
-            leftMargin=0.75*inch,
-            topMargin=1*inch,
-            bottomMargin=0.75*inch
+            rightMargin=0.75 * inch,
+            leftMargin=0.75 * inch,
+            topMargin=1 * inch,
+            bottomMargin=0.75 * inch,
         )
 
         # Build story
@@ -737,25 +790,25 @@ Focus on the narrative arc, character interactions, and key outcomes. Write like
 
         # Custom styles
         title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
+            "CustomTitle",
+            parent=styles["Heading1"],
             fontSize=24,
-            textColor='#1a1a1a',
+            textColor="#1a1a1a",
             spaceAfter=12,
-            alignment=TA_CENTER
+            alignment=TA_CENTER,
         )
 
         heading_style = ParagraphStyle(
-            'CustomHeading',
-            parent=styles['Heading2'],
+            "CustomHeading",
+            parent=styles["Heading2"],
             fontSize=16,
-            textColor='#333333',
-            spaceAfter=10
+            textColor="#333333",
+            spaceAfter=10,
         )
 
         # Title
         story.append(Paragraph(f"NARRATIVE SUMMARY: {narrative_data.template_id}", title_style))
-        story.append(Spacer(1, 0.2*inch))
+        story.append(Spacer(1, 0.2 * inch))
 
         # Metadata
         meta_text = f"<b>Run ID:</b> {narrative_data.run_id}<br/>"
@@ -766,13 +819,13 @@ Focus on the narrative arc, character interactions, and key outcomes. Write like
             meta_text += f"<b>Cost:</b> ${narrative_data.cost_usd:.3f} | "
             meta_text += f"<b>Status:</b> {narrative_data.status}"
 
-        story.append(Paragraph(meta_text, styles['Normal']))
-        story.append(Spacer(1, 0.3*inch))
+        story.append(Paragraph(meta_text, styles["Normal"]))
+        story.append(Spacer(1, 0.3 * inch))
 
         # Executive Summary
         story.append(Paragraph("Executive Summary", heading_style))
-        story.append(Paragraph(narrative_data.executive_summary, styles['Normal']))
-        story.append(Spacer(1, 0.2*inch))
+        story.append(Paragraph(narrative_data.executive_summary, styles["Normal"]))
+        story.append(Spacer(1, 0.2 * inch))
 
         # Add more sections based on depth (similar to markdown)
         if depth != "minimal":
@@ -782,9 +835,9 @@ Focus on the narrative arc, character interactions, and key outcomes. Write like
                 for char in narrative_data.characters:
                     char_text = f"<b>{char.entity_id}</b> ({char.entity_type})<br/>"
                     char_text += f"Knowledge Items: {char.knowledge_count}"
-                    story.append(Paragraph(char_text, styles['Normal']))
-                    story.append(Spacer(1, 0.1*inch))
-                story.append(Spacer(1, 0.2*inch))
+                    story.append(Paragraph(char_text, styles["Normal"]))
+                    story.append(Spacer(1, 0.1 * inch))
+                story.append(Spacer(1, 0.2 * inch))
 
             # Timeline
             if narrative_data.timeline:
@@ -792,8 +845,8 @@ Focus on the narrative arc, character interactions, and key outcomes. Write like
                 for i, tp in enumerate(narrative_data.timeline, 1):
                     timestamp = tp.timestamp if tp.timestamp else "Time unknown"
                     tp_text = f"{i}. <b>{timestamp}</b> - {tp.event_description}"
-                    story.append(Paragraph(tp_text, styles['Normal']))
-                story.append(Spacer(1, 0.2*inch))
+                    story.append(Paragraph(tp_text, styles["Normal"]))
+                story.append(Spacer(1, 0.2 * inch))
 
         # Build PDF
         doc.build(story)

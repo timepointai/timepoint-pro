@@ -9,24 +9,23 @@ Provides RESTful access to:
 Phase 6: Public API (Minimal Implementation)
 """
 
-from .main import app, create_app
-from .models import (
-    TensorCreate,
-    TensorUpdate,
-    TensorResponse,
-    TensorListResponse,
-    SearchRequest,
-    SearchResponse,
-    SearchResultItem,
-    HealthResponse,
-    ErrorResponse,
-)
 from .auth import (
     APIKeyAuth,
     get_api_key,
     verify_api_key,
 )
-
+from .main import app, create_app
+from .models import (
+    ErrorResponse,
+    HealthResponse,
+    SearchRequest,
+    SearchResponse,
+    SearchResultItem,
+    TensorCreate,
+    TensorListResponse,
+    TensorResponse,
+    TensorUpdate,
+)
 
 __all__ = [
     # Application

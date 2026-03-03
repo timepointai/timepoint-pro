@@ -4,16 +4,18 @@ Response Parsing - Extract and validate structured outputs from LLM responses
 Handles JSON extraction, schema validation, and error recovery.
 """
 
-from typing import Type, TypeVar, Optional, Any, Dict
-from pydantic import BaseModel, ValidationError
 import json
 import re
+from typing import Any, TypeVar
 
-T = TypeVar('T', bound=BaseModel)
+from pydantic import BaseModel, ValidationError
+
+T = TypeVar("T", bound=BaseModel)
 
 
 class ParseError(Exception):
     """Exception raised when response parsing fails"""
+
     pass
 
 
@@ -60,8 +62,8 @@ class ResponseParser:
         """
         # Try to extract from markdown code block first
         code_block_patterns = [
-            r'```json\s*([\s\S]*?)\s*```',
-            r'```\s*([\s\S]*?)\s*```',
+            r"```json\s*([\s\S]*?)\s*```",
+            r"```\s*([\s\S]*?)\s*```",
         ]
 
         for pattern in code_block_patterns:
@@ -94,12 +96,7 @@ class ResponseParser:
             f"4. The requested generation was too large for the model"
         )
 
-    def parse_structured(
-        self,
-        text: str,
-        schema: Type[T],
-        allow_partial: bool = False
-    ) -> T:
+    def parse_structured(self, text: str, schema: type[T], allow_partial: bool = False) -> T:
         """
         Parse response into a Pydantic model instance.
 
@@ -117,7 +114,7 @@ class ResponseParser:
         # Extract JSON
         try:
             json_str = self.extract_json(text)
-        except ParseError as e:
+        except ParseError:
             if self.strict:
                 raise
             # Return null-filled instance
@@ -151,7 +148,7 @@ class ResponseParser:
                     raise ParseError(f"Schema validation failed: {e}")
                 return self._create_null_instance(schema)
 
-    def parse_json(self, text: str) -> Dict[str, Any]:
+    def parse_json(self, text: str) -> dict[str, Any]:
         """
         Parse response as plain JSON dict (no schema validation).
 
@@ -191,7 +188,7 @@ class ResponseParser:
             pass
 
         # Look for numbers in text
-        number_pattern = r'[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?'
+        number_pattern = r"[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?"
         matches = re.findall(number_pattern, text)
 
         if matches:
@@ -200,7 +197,7 @@ class ResponseParser:
 
         raise ParseError(f"No valid number found in: {text}")
 
-    def _extract_by_bracket_matching(self, text: str) -> Optional[str]:
+    def _extract_by_bracket_matching(self, text: str) -> str | None:
         """
         Extract JSON from text using bracket-depth matching.
 
@@ -256,7 +253,7 @@ class ResponseParser:
             elif char in "}]":
                 depth -= 1
                 if depth == 0:
-                    candidate = text[start:i + 1]
+                    candidate = text[start : i + 1]
                     if self._is_valid_json(candidate):
                         return candidate
 
@@ -270,7 +267,7 @@ class ResponseParser:
         except (json.JSONDecodeError, ValueError):
             return False
 
-    def _coerce_data(self, data: Dict[str, Any], schema: Type[BaseModel]) -> Dict[str, Any]:
+    def _coerce_data(self, data: dict[str, Any], schema: type[BaseModel]) -> dict[str, Any]:
         """
         Attempt to coerce data types to match schema.
 
@@ -311,7 +308,7 @@ class ResponseParser:
 
         return coerced
 
-    def _fill_missing_fields(self, data: Dict[str, Any], schema: Type[BaseModel]) -> Dict[str, Any]:
+    def _fill_missing_fields(self, data: dict[str, Any], schema: type[BaseModel]) -> dict[str, Any]:
         """
         Fill missing required fields with default values.
 
@@ -358,7 +355,7 @@ class ResponseParser:
         else:
             return None
 
-    def _create_null_instance(self, schema: Type[T]) -> T:
+    def _create_null_instance(self, schema: type[T]) -> T:
         """
         Create a null-filled instance of a schema.
 

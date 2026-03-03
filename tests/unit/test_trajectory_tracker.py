@@ -4,15 +4,16 @@ Unit tests for trajectory tracker — cognitive state snapshot accumulation.
 All pure data manipulation, no LLM/DB dependencies.
 """
 
-import pytest
 from types import SimpleNamespace
 
 from synth.trajectory_tracker import CognitiveSnapshot, TrajectoryTracker
 
-
 # --- Helpers ---
 
-def make_entity(entity_id: str, valence=0.0, arousal=0.0, energy=100.0, knowledge=None, maturity=0.5):
+
+def make_entity(
+    entity_id: str, valence=0.0, arousal=0.0, energy=100.0, knowledge=None, maturity=0.5
+):
     """Create a mock entity with cognitive tensor metadata."""
     return SimpleNamespace(
         entity_id=entity_id,
@@ -34,6 +35,7 @@ def make_timepoint(tp_id: str, timestamp=None):
 
 
 # --- CognitiveSnapshot.compute_activation ---
+
 
 class TestComputeActivation:
     def test_neutral_state(self):
@@ -74,6 +76,7 @@ class TestComputeActivation:
 
 
 # --- TrajectoryTracker: record and retrieve ---
+
 
 class TestTrajectoryTrackerRecord:
     def test_record_snapshot(self):
@@ -119,6 +122,7 @@ class TestTrajectoryTrackerRecord:
 
 # --- Sufficient data check ---
 
+
 class TestSufficientData:
     def test_insufficient(self):
         tracker = TrajectoryTracker()
@@ -140,6 +144,7 @@ class TestSufficientData:
 
 
 # --- Tau normalization ---
+
 
 class TestActivationSeries:
     def test_tau_normalized(self):
@@ -172,6 +177,7 @@ class TestActivationSeries:
 
 # --- Summary ---
 
+
 class TestSummary:
     def test_summary_structure(self):
         tracker = TrajectoryTracker()
@@ -192,6 +198,7 @@ class TestSummary:
 
 
 # --- get_all_entity_ids ---
+
 
 class TestGetAllEntityIds:
     def test_multiple_entities(self):

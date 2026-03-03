@@ -8,17 +8,17 @@ Tests the complete Sprint 2 reporting infrastructure:
 - Export Pipeline with compression
 """
 
-import pytest
-import json
 import gzip
+import json
 import sqlite3
 from pathlib import Path
+
+import pytest
+
 from reporting import (
     EnhancedQueryEngine,
-    ReportGenerator,
     ExportPipeline,
-    FormatterFactory,
-    ExportFormatFactory
+    ReportGenerator,
 )
 
 
@@ -40,7 +40,7 @@ class TestQueryEngineIntegration:
         queries = [
             "What happened at the meeting?",
             "Who was involved?",
-            "What happened at the meeting?"  # Duplicate for cache hit
+            "What happened at the meeting?",  # Duplicate for cache hit
         ]
 
         results = engine.execute_batch(queries, world_id="test_world")
@@ -107,9 +107,7 @@ class TestReportGenerationIntegration:
 
         # Entity comparison
         comparison = generator.generate_entity_comparison_report(
-            "test_world",
-            entity_ids=["alice", "bob"],
-            format="markdown"
+            "test_world", entity_ids=["alice", "bob"], format="markdown"
         )
         assert "# Entity Comparison: test_world" in comparison
         assert "## Personality Comparison" in comparison
@@ -123,18 +121,22 @@ class TestReportGenerationIntegration:
             ("summary", {}),
             ("relationships", {}),
             ("knowledge", {}),
-            ("entity_comparison", {"entity_ids": ["alice", "bob"]})
+            ("entity_comparison", {"entity_ids": ["alice", "bob"]}),
         ]
 
         for report_type, kwargs in report_types:
             if report_type == "summary":
                 report = generator.generate_summary_report("test_world", format="json", **kwargs)
             elif report_type == "relationships":
-                report = generator.generate_relationship_report("test_world", format="json", **kwargs)
+                report = generator.generate_relationship_report(
+                    "test_world", format="json", **kwargs
+                )
             elif report_type == "knowledge":
                 report = generator.generate_knowledge_report("test_world", format="json", **kwargs)
             elif report_type == "entity_comparison":
-                report = generator.generate_entity_comparison_report("test_world", format="json", **kwargs)
+                report = generator.generate_entity_comparison_report(
+                    "test_world", format="json", **kwargs
+                )
 
             # Validate JSON structure
             data = json.loads(report)
@@ -156,7 +158,7 @@ class TestExportPipelineIntegration:
             world_id="integration_test",
             report_type="summary",
             export_format="json",
-            output_path=str(temp_output_dir / "summary.json")
+            output_path=str(temp_output_dir / "summary.json"),
         )
 
         assert Path(result["output_path"]).exists()
@@ -176,7 +178,7 @@ class TestExportPipelineIntegration:
             world_id="batch_test",
             report_types=["summary", "relationships", "knowledge"],
             export_formats=["json", "markdown"],
-            output_dir=str(temp_output_dir)
+            output_dir=str(temp_output_dir),
         )
 
         # Should create 6 files (3 types × 2 formats)
@@ -198,9 +200,7 @@ class TestExportPipelineIntegration:
         pipeline = ExportPipeline(engine)
 
         package = pipeline.export_world_package(
-            world_id="package_test",
-            output_dir=str(temp_output_dir),
-            formats=["json", "markdown"]
+            world_id="package_test", output_dir=str(temp_output_dir), formats=["json", "markdown"]
         )
 
         # Verify package metadata
@@ -227,7 +227,7 @@ class TestExportPipelineIntegration:
             report_type="summary",
             export_format="json",
             output_path=str(temp_output_dir / "summary.json"),
-            compression="gzip"
+            compression="gzip",
         )
 
         assert result["compression"] == "gzip"
@@ -235,7 +235,7 @@ class TestExportPipelineIntegration:
         assert Path(result["output_path"]).exists()
 
         # Verify compressed content
-        with gzip.open(result["output_path"], 'rt', encoding='utf-8') as f:
+        with gzip.open(result["output_path"], "rt", encoding="utf-8") as f:
             data = json.load(f)
             assert data["title"] == "Simulation Summary: compressed_test"
 
@@ -256,7 +256,7 @@ class TestMultiFormatExport:
                 world_id="multiformat_test",
                 report_type="summary",
                 export_format=fmt,
-                output_path=str(temp_output_dir / f"summary.{fmt}")
+                output_path=str(temp_output_dir / f"summary.{fmt}"),
             )
             results.append(result)
 
@@ -271,7 +271,7 @@ class TestMultiFormatExport:
         data = [
             {"id": 1, "event": "Meeting started"},
             {"id": 2, "event": "Proposal made"},
-            {"id": 3, "event": "Vote taken"}
+            {"id": 3, "event": "Vote taken"},
         ]
 
         output_path = temp_output_dir / "events.jsonl"
@@ -280,7 +280,7 @@ class TestMultiFormatExport:
         assert output_path.exists()
 
         # Verify content
-        lines = output_path.read_text().strip().split('\n')
+        lines = output_path.read_text().strip().split("\n")
         assert len(lines) == 3
 
         for i, line in enumerate(lines):
@@ -295,12 +295,12 @@ class TestMultiFormatExport:
         data = {
             "entities": [
                 {"id": 1, "name": "Alice", "role": "CEO"},
-                {"id": 2, "name": "Bob", "role": "CFO"}
+                {"id": 2, "name": "Bob", "role": "CFO"},
             ],
             "events": [
                 {"id": 1, "type": "meeting", "description": "Board meeting"},
-                {"id": 2, "type": "decision", "description": "Approved budget"}
-            ]
+                {"id": 2, "type": "decision", "description": "Approved budget"},
+            ],
         }
 
         output_path = temp_output_dir / "simulation.db"
@@ -337,11 +337,7 @@ class TestEndToEndWorkflow:
         engine = EnhancedQueryEngine(enable_cache=True)
 
         # 2. Execute batch queries
-        queries = [
-            "What happened?",
-            "Who was involved?",
-            "What was the outcome?"
-        ]
+        queries = ["What happened?", "Who was involved?", "What was the outcome?"]
         query_results = engine.execute_batch(queries, world_id="workflow_test")
         assert len(query_results) == 3
 
@@ -356,7 +352,7 @@ class TestEndToEndWorkflow:
             world_id="workflow_test",
             report_type="summary",
             export_format="json",
-            output_path=str(temp_output_dir / "summary.json")
+            output_path=str(temp_output_dir / "summary.json"),
         )
 
         assert Path(export_result["output_path"]).exists()
@@ -379,7 +375,7 @@ class TestEndToEndWorkflow:
             world_id="cache_test",
             report_types=["summary", "relationships"],
             export_formats=["json"],
-            output_dir=str(temp_output_dir / "batch1")
+            output_dir=str(temp_output_dir / "batch1"),
         )
 
         # Second batch export (should benefit from cache)
@@ -387,7 +383,7 @@ class TestEndToEndWorkflow:
             world_id="cache_test",
             report_types=["summary", "relationships"],
             export_formats=["json"],
-            output_dir=str(temp_output_dir / "batch2")
+            output_dir=str(temp_output_dir / "batch2"),
         )
 
         # Verify both batches created files
@@ -412,7 +408,7 @@ class TestEndToEndWorkflow:
             world_id="mixed_test",
             output_dir=str(temp_output_dir),
             formats=["json", "markdown"],
-            compression="gzip"
+            compression="gzip",
         )
 
         # All files should be compressed
@@ -425,7 +421,7 @@ class TestEndToEndWorkflow:
         assert len(json_files) > 0
 
         # Verify we can read compressed content
-        with gzip.open(json_files[0]["output_path"], 'rt', encoding='utf-8') as f:
+        with gzip.open(json_files[0]["output_path"], "rt", encoding="utf-8") as f:
             data = json.load(f)
             assert data["metadata"]["world_id"] == "mixed_test"
 
@@ -443,7 +439,7 @@ class TestErrorHandlingIntegration:
                 world_id="error_test",
                 report_type="invalid_type",
                 export_format="json",
-                output_path=str(temp_output_dir / "output.json")
+                output_path=str(temp_output_dir / "output.json"),
             )
 
         assert "Unsupported report type" in str(exc_info.value)
@@ -459,7 +455,7 @@ class TestErrorHandlingIntegration:
                 world_id="error_test",
                 report_type="entity_comparison",
                 export_format="json",
-                output_path=str(temp_output_dir / "output.json")
+                output_path=str(temp_output_dir / "output.json"),
             )
 
         assert "entity_comparison report requires 'entity_ids'" in str(exc_info.value)

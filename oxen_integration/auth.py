@@ -1,16 +1,17 @@
 """
 Authentication management for Oxen.ai integration.
 """
+
 import getpass
-from typing import Optional, Tuple
-from .config import OxenConfig, ConfigManager
+
+from .config import ConfigManager, OxenConfig
 from .exceptions import AuthenticationError
 
 
 class AuthManager:
     """Manages Oxen.ai authentication."""
 
-    def __init__(self, config_manager: Optional[ConfigManager] = None):
+    def __init__(self, config_manager: ConfigManager | None = None):
         """
         Initialize auth manager.
 
@@ -19,7 +20,7 @@ class AuthManager:
         """
         self.config_manager = config_manager or ConfigManager()
 
-    def get_token(self, interactive: bool = True) -> Tuple[str, OxenConfig]:
+    def get_token(self, interactive: bool = True) -> tuple[str, OxenConfig]:
         """
         Get API token with interactive fallback.
 
@@ -86,7 +87,9 @@ class AuthManager:
         print()
         return token, config
 
-    def configure_oxen_sdk(self, token: str, user_name: Optional[str] = None, user_email: Optional[str] = None) -> None:
+    def configure_oxen_sdk(
+        self, token: str, user_name: str | None = None, user_email: str | None = None
+    ) -> None:
         """
         Configure Oxen SDK with authentication.
 
@@ -104,8 +107,7 @@ class AuthManager:
             # Set user info if provided
             if user_name or user_email:
                 user.config_user(
-                    user_name or "Timepoint User",
-                    user_email or "noreply@timepoint.ai"
+                    user_name or "Timepoint User", user_email or "noreply@timepoint.ai"
                 )
 
         except ImportError:

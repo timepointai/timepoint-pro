@@ -19,9 +19,8 @@ via the `quantitative_tracking` field in template JSON.
 """
 
 import logging
-import copy
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Any
 
 from metadata.tracking import track_mechanism
 
@@ -31,12 +30,13 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ResourceConstraint:
     """A constraint on a quantitative resource."""
-    min_value: Optional[float] = None
-    max_value: Optional[float] = None
-    critical_threshold: Optional[float] = None
-    trigger_event: Optional[str] = None  # Event description when threshold is hit
 
-    def check(self, value: float, resource_name: str) -> List[str]:
+    min_value: float | None = None
+    max_value: float | None = None
+    critical_threshold: float | None = None
+    trigger_event: str | None = None  # Event description when threshold is hit
+
+    def check(self, value: float, resource_name: str) -> list[str]:
         """Return list of violation messages, empty if OK."""
         violations = []
         if self.min_value is not None and value < self.min_value:
@@ -55,24 +55,26 @@ class ResourceConstraint:
 @dataclass
 class ResourceDefinition:
     """Definition of a trackable resource from template config."""
+
     name: str
     unit: str
     initial_value: float
     rate_per_step: float = 0.0  # Negative = consumption, positive = regeneration
     constraint: ResourceConstraint = field(default_factory=ResourceConstraint)
-    affects_entities: List[str] = field(default_factory=list)  # Empty = affects all
+    affects_entities: list[str] = field(default_factory=list)  # Empty = affects all
 
 
 @dataclass
 class EntityResourceState:
     """Quantitative state for a single entity at a single timepoint."""
+
     entity_id: str
     timepoint_id: str
-    resources: Dict[str, float] = field(default_factory=dict)
-    critical_alerts: List[str] = field(default_factory=list)
-    constraint_violations: List[str] = field(default_factory=list)
+    resources: dict[str, float] = field(default_factory=dict)
+    critical_alerts: list[str] = field(default_factory=list)
+    constraint_violations: list[str] = field(default_factory=list)
 
-    def to_context_dict(self) -> Dict[str, Any]:
+    def to_context_dict(self) -> dict[str, Any]:
         """Format for injection into LLM context."""
         result = {}
         for name, value in self.resources.items():
@@ -85,10 +87,11 @@ class EntityResourceState:
 @dataclass
 class PropagationResult:
     """Result of propagating state from one timepoint to the next."""
-    entity_states: Dict[str, EntityResourceState]
-    triggered_events: List[str]
-    constraint_violations: List[str]
-    global_resources: Dict[str, float]
+
+    entity_states: dict[str, EntityResourceState]
+    triggered_events: list[str]
+    constraint_violations: list[str]
+    global_resources: dict[str, float]
 
 
 class QuantitativeStateEngine:
@@ -109,14 +112,14 @@ class QuantitativeStateEngine:
     """
 
     def __init__(self):
-        self.resource_definitions: Dict[str, ResourceDefinition] = {}
-        self.global_state: Dict[str, float] = {}  # Shared resources (O2, hull)
-        self.entity_states: Dict[str, Dict[str, float]] = {}  # Per-entity resources
-        self.history: List[PropagationResult] = []
+        self.resource_definitions: dict[str, ResourceDefinition] = {}
+        self.global_state: dict[str, float] = {}  # Shared resources (O2, hull)
+        self.entity_states: dict[str, dict[str, float]] = {}  # Per-entity resources
+        self.history: list[PropagationResult] = []
         self._step_count: int = 0
         self._entity_count: int = 0
 
-    def load_from_template(self, template_config: Dict[str, Any]) -> None:
+    def load_from_template(self, template_config: dict[str, Any]) -> None:
         """
         Initialize resource definitions from template configuration.
 
@@ -135,14 +138,18 @@ class QuantitativeStateEngine:
 
         for resource_name, config in tracking.items():
             initial = _parse_numeric(config.get("initial", 0))
-            rate = _parse_rate(config.get("depletion_rate", config.get("consumption_rate", 0)),
-                              config.get("degradation_rate", 0))
+            rate = _parse_rate(
+                config.get("depletion_rate", config.get("consumption_rate", 0)),
+                config.get("degradation_rate", 0),
+            )
 
             constraint = ResourceConstraint(
-                min_value=config.get("min", 0.0 if "percentage" not in config.get("unit", "") else 0.0),
+                min_value=config.get(
+                    "min", 0.0 if "percentage" not in config.get("unit", "") else 0.0
+                ),
                 max_value=config.get("max", None),
                 critical_threshold=_parse_numeric(config.get("critical_threshold")),
-                trigger_event=config.get("trigger_event", f"{resource_name} critical")
+                trigger_event=config.get("trigger_event", f"{resource_name} critical"),
             )
 
             self.resource_definitions[resource_name] = ResourceDefinition(
@@ -151,16 +158,18 @@ class QuantitativeStateEngine:
                 initial_value=initial,
                 rate_per_step=rate,
                 constraint=constraint,
-                affects_entities=config.get("affects_entities", [])
+                affects_entities=config.get("affects_entities", []),
             )
 
             # Initialize global state
             self.global_state[resource_name] = initial
 
-        logger.info(f"[QSE] Loaded {len(self.resource_definitions)} resource definitions: "
-                    f"{list(self.resource_definitions.keys())}")
+        logger.info(
+            f"[QSE] Loaded {len(self.resource_definitions)} resource definitions: "
+            f"{list(self.resource_definitions.keys())}"
+        )
 
-    def initialize_entity(self, entity_id: str, entity_config: Optional[Dict] = None) -> None:
+    def initialize_entity(self, entity_id: str, entity_config: dict | None = None) -> None:
         """
         Initialize resource state for a single entity.
 
@@ -186,9 +195,9 @@ class QuantitativeStateEngine:
     def propagate(
         self,
         timepoint_id: str,
-        entity_ids: List[str],
-        events: Optional[List[Dict[str, Any]]] = None,
-        event_modifiers: Optional[Dict[str, float]] = None
+        entity_ids: list[str],
+        events: list[dict[str, Any]] | None = None,
+        event_modifiers: dict[str, float] | None = None,
     ) -> PropagationResult:
         """
         Propagate quantitative state from current step to next.
@@ -233,11 +242,17 @@ class QuantitativeStateEngine:
                 self.global_state[resource_name] = new_value
 
                 # Check for critical threshold
-                if defn.constraint.is_critical(new_value) and not defn.constraint.is_critical(old_value):
-                    event_desc = defn.constraint.trigger_event or f"{resource_name} reached critical level"
+                if defn.constraint.is_critical(new_value) and not defn.constraint.is_critical(
+                    old_value
+                ):
+                    event_desc = (
+                        defn.constraint.trigger_event or f"{resource_name} reached critical level"
+                    )
                     triggered_events.append(event_desc)
-                    logger.warning(f"[QSE] CRITICAL: {resource_name} = {new_value:.1f} "
-                                 f"(threshold: {defn.constraint.critical_threshold})")
+                    logger.warning(
+                        f"[QSE] CRITICAL: {resource_name} = {new_value:.1f} "
+                        f"(threshold: {defn.constraint.critical_threshold})"
+                    )
 
                 # Check constraint violations
                 violations = defn.constraint.check(new_value, resource_name)
@@ -263,20 +278,24 @@ class QuantitativeStateEngine:
                 timepoint_id=timepoint_id,
                 resources=entity_resources,
                 critical_alerts=alerts,
-                constraint_violations=[v for v in constraint_violations
-                                      if not self.resource_definitions.get(
-                                          v.split(" (")[0], ResourceDefinition("", "", 0)
-                                      ).affects_entities or
-                                      entity_id in self.resource_definitions.get(
-                                          v.split(" (")[0], ResourceDefinition("", "", 0)
-                                      ).affects_entities]
+                constraint_violations=[
+                    v
+                    for v in constraint_violations
+                    if not self.resource_definitions.get(
+                        v.split(" (")[0], ResourceDefinition("", "", 0)
+                    ).affects_entities
+                    or entity_id
+                    in self.resource_definitions.get(
+                        v.split(" (")[0], ResourceDefinition("", "", 0)
+                    ).affects_entities
+                ],
             )
 
         result = PropagationResult(
             entity_states=entity_results,
             triggered_events=triggered_events,
             constraint_violations=constraint_violations,
-            global_resources=dict(self.global_state)
+            global_resources=dict(self.global_state),
         )
         self.history.append(result)
 
@@ -285,7 +304,7 @@ class QuantitativeStateEngine:
 
         return result
 
-    def get_state_summary(self) -> Dict[str, Any]:
+    def get_state_summary(self) -> dict[str, Any]:
         """Get current global resource state as a summary dict."""
         summary = {}
         for name, value in self.global_state.items():
@@ -295,11 +314,11 @@ class QuantitativeStateEngine:
                     "value": round(value, 2),
                     "unit": defn.unit,
                     "critical": defn.constraint.is_critical(value),
-                    "rate_per_step": defn.rate_per_step
+                    "rate_per_step": defn.rate_per_step,
                 }
         return summary
 
-    def get_entity_context(self, entity_id: str) -> Dict[str, Any]:
+    def get_entity_context(self, entity_id: str) -> dict[str, Any]:
         """
         Get resource context for a specific entity, suitable for LLM prompt injection.
 
@@ -325,7 +344,7 @@ class QuantitativeStateEngine:
             context["_critical_alerts"] = alerts
         return context
 
-    def get_trajectory(self, resource_name: str) -> List[float]:
+    def get_trajectory(self, resource_name: str) -> list[float]:
         """Get the value of a resource at each step."""
         trajectory = []
         for result in self.history:
@@ -340,7 +359,7 @@ class QuantitativeStateEngine:
         return len(self.resource_definitions) > 0
 
 
-def _parse_numeric(value: Any) -> Optional[float]:
+def _parse_numeric(value: Any) -> float | None:
     """Parse a numeric value from template config, handling strings and None."""
     if value is None:
         return None

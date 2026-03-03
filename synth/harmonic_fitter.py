@@ -12,8 +12,7 @@ Part of Phase 2.5: Harmonic Extension from TTM-MMA plan.
 """
 
 import logging
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from dataclasses import dataclass
 
 import numpy as np
 from scipy.optimize import curve_fit, differential_evolution
@@ -25,14 +24,14 @@ logger = logging.getLogger(__name__)
 # c2 in [0.0, 1.0], A2 in [0.0, 1.0], c3 in [0.0, 1.0],
 # A3 in [0.0, 1.0], baseline in [0.0, 1.0]
 HARMONIC_PARAM_BOUNDS = [
-    (0.5, 8.0),   # P1
+    (0.5, 8.0),  # P1
     (0.01, 1.0),  # c1
-    (0.0, 1.0),   # A1
-    (0.0, 1.0),   # c2
-    (0.0, 1.0),   # A2
-    (0.0, 1.0),   # c3
-    (0.0, 1.0),   # A3
-    (0.0, 1.0),   # baseline
+    (0.0, 1.0),  # A1
+    (0.0, 1.0),  # c2
+    (0.0, 1.0),  # A2
+    (0.0, 1.0),  # c3
+    (0.0, 1.0),  # A3
+    (0.0, 1.0),  # baseline
 ]
 
 HARMONIC_PARAM_NAMES = ["P1", "c1", "A1", "c2", "A2", "c3", "A3", "baseline"]
@@ -129,15 +128,15 @@ class HarmonicFitResult:
     """Result of fitting harmonic ADPRS parameters to an entity's trajectory."""
 
     entity_id: str
-    params: Dict[str, float]
-    spectral_signature: List[float]  # [c1, c2, c3] harmonic amplitudes
+    params: dict[str, float]
+    spectral_signature: list[float]  # [c1, c2, c3] harmonic amplitudes
     residual: float  # MSE
     n_points: int
     method: str  # "differential_evolution" or "curve_fit"
     converged: bool
     harmonics: int  # K value used
-    prior_params: Optional[Dict[str, float]] = None
-    parameter_drift: Optional[Dict[str, float]] = None
+    prior_params: dict[str, float] | None = None
+    parameter_drift: dict[str, float] | None = None
 
 
 class HarmonicFitter:
@@ -174,7 +173,7 @@ class HarmonicFitter:
         activation: np.ndarray,
         entity_id: str,
         harmonics: int = 3,
-        prior_params: Optional[Dict[str, float]] = None,
+        prior_params: dict[str, float] | None = None,
     ) -> HarmonicFitResult:
         """
         Fit K=harmonics harmonic ADPRS parameters to a single entity's trajectory.
@@ -192,7 +191,11 @@ class HarmonicFitter:
         if effective_k < harmonics:
             logger.info(
                 "Reduced harmonics %d -> %d for %s (n_points=%d, min_per_harmonic=%d)",
-                harmonics, effective_k, entity_id, n_points, self.min_points_per_harmonic,
+                harmonics,
+                effective_k,
+                entity_id,
+                n_points,
+                self.min_points_per_harmonic,
             )
 
         if prior_params is not None:
@@ -234,10 +237,14 @@ class HarmonicFitter:
             residual = float(de_result.fun)
             converged = de_result.success
         except Exception as e:
-            logger.warning("Cold fit failed for %s (K=%d): %s — using defaults", entity_id, harmonics, e)
+            logger.warning(
+                "Cold fit failed for %s (K=%d): %s — using defaults", entity_id, harmonics, e
+            )
             fitted_params = {name: HARMONIC_DEFAULT_PARAMS[name] for name in param_names}
             residual = float(
-                np.mean((waveform_fn(tau, *[fitted_params[n] for n in param_names]) - activation) ** 2)
+                np.mean(
+                    (waveform_fn(tau, *[fitted_params[n] for n in param_names]) - activation) ** 2
+                )
             )
             converged = False
 
@@ -262,7 +269,7 @@ class HarmonicFitter:
         activation: np.ndarray,
         entity_id: str,
         harmonics: int,
-        prior_params: Dict[str, float],
+        prior_params: dict[str, float],
     ) -> HarmonicFitResult:
         """Local refinement via curve_fit starting from prior parameters."""
         waveform_fn, bounds, param_names = self._get_fit_config(harmonics)
@@ -286,7 +293,9 @@ class HarmonicFitter:
         except Exception as e:
             logger.warning(
                 "Warm fit failed for %s (K=%d): %s — falling back to cold fit",
-                entity_id, harmonics, e,
+                entity_id,
+                harmonics,
+                e,
             )
             return self._cold_fit(tau, activation, entity_id, harmonics)
 
@@ -306,9 +315,7 @@ class HarmonicFitter:
             prior_params=prior_params,
         )
 
-    def _get_fit_config(
-        self, harmonics: int
-    ) -> Tuple:
+    def _get_fit_config(self, harmonics: int) -> tuple:
         """
         Return (waveform_fn, bounds, param_names) for the given K.
 
@@ -318,28 +325,28 @@ class HarmonicFitter:
         """
         if harmonics == 1:
             bounds = [
-                (0.5, 8.0),   # P1
+                (0.5, 8.0),  # P1
                 (0.01, 1.0),  # c1
-                (0.0, 1.0),   # A1
-                (0.0, 1.0),   # baseline
+                (0.0, 1.0),  # A1
+                (0.0, 1.0),  # baseline
             ]
             param_names = ["P1", "c1", "A1", "baseline"]
             return _harmonic_waveform_k1, bounds, param_names
         elif harmonics == 2:
             bounds = [
-                (0.5, 8.0),   # P1
+                (0.5, 8.0),  # P1
                 (0.01, 1.0),  # c1
-                (0.0, 1.0),   # A1
-                (0.0, 1.0),   # c2
-                (0.0, 1.0),   # A2
-                (0.0, 1.0),   # baseline
+                (0.0, 1.0),  # A1
+                (0.0, 1.0),  # c2
+                (0.0, 1.0),  # A2
+                (0.0, 1.0),  # baseline
             ]
             param_names = ["P1", "c1", "A1", "c2", "A2", "baseline"]
             return _harmonic_waveform_k2, bounds, param_names
         else:
             return harmonic_adprs_waveform, HARMONIC_PARAM_BOUNDS, HARMONIC_PARAM_NAMES
 
-    def _expand_params(self, fitted_params: Dict[str, float], harmonics: int) -> Dict[str, float]:
+    def _expand_params(self, fitted_params: dict[str, float], harmonics: int) -> dict[str, float]:
         """
         Expand fitted params to full K=3 parameter set, padding missing harmonics with zeros.
         """
@@ -354,7 +361,7 @@ class HarmonicFitter:
         return full
 
     @staticmethod
-    def spectral_distance(sig_a: List[float], sig_b: List[float]) -> float:
+    def spectral_distance(sig_a: list[float], sig_b: list[float]) -> float:
         """
         Cosine distance between two spectral signatures.
 

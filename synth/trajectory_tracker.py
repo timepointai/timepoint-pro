@@ -7,9 +7,8 @@ dialog synthesis, accumulating snapshots for ADPRS waveform fitting.
 Part of Phase 2: Emergent Envelope Fitting from TTM Trajectories.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
 
 
 @dataclass
@@ -19,7 +18,7 @@ class CognitiveSnapshot:
     entity_id: str
     timepoint_id: str
     timepoint_index: int
-    timestamp: Optional[datetime]
+    timestamp: datetime | None
     emotional_valence: float
     emotional_arousal: float
     energy_budget: float
@@ -44,11 +43,9 @@ class TrajectoryTracker:
     """Accumulates cognitive snapshots per entity during the dialog loop."""
 
     def __init__(self):
-        self._snapshots: Dict[str, List[CognitiveSnapshot]] = {}
+        self._snapshots: dict[str, list[CognitiveSnapshot]] = {}
 
-    def record_snapshot(
-        self, entity, timepoint, timepoint_index: int
-    ) -> Optional[CognitiveSnapshot]:
+    def record_snapshot(self, entity, timepoint, timepoint_index: int) -> CognitiveSnapshot | None:
         """
         Record a snapshot of the entity's cognitive state after dialog backprop sync.
 
@@ -97,14 +94,12 @@ class TrajectoryTracker:
 
         return snapshot
 
-    def get_trajectory(self, entity_id: str) -> List[CognitiveSnapshot]:
+    def get_trajectory(self, entity_id: str) -> list[CognitiveSnapshot]:
         """Get all snapshots for an entity, ordered by timepoint_index."""
         snapshots = self._snapshots.get(entity_id, [])
         return sorted(snapshots, key=lambda s: s.timepoint_index)
 
-    def get_activation_series(
-        self, entity_id: str
-    ) -> Tuple[List[float], List[float]]:
+    def get_activation_series(self, entity_id: str) -> tuple[list[float], list[float]]:
         """
         Get normalized tau and activation values for fitting.
 
@@ -133,7 +128,7 @@ class TrajectoryTracker:
         """Check if enough snapshots exist for meaningful fitting."""
         return len(self._snapshots.get(entity_id, [])) >= min_points
 
-    def get_all_entity_ids(self) -> List[str]:
+    def get_all_entity_ids(self) -> list[str]:
         """Get all entity IDs that have recorded snapshots."""
         return list(self._snapshots.keys())
 
@@ -143,7 +138,5 @@ class TrajectoryTracker:
         return {
             "entities_tracked": len(self._snapshots),
             "total_snapshots": total,
-            "per_entity": {
-                eid: len(snaps) for eid, snaps in self._snapshots.items()
-            },
+            "per_entity": {eid: len(snaps) for eid, snaps in self._snapshots.items()},
         }

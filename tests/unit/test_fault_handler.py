@@ -4,14 +4,11 @@ Tests for Fault Handling (Sprint 1.4)
 Tests retry logic, exponential backoff, error classification, and graceful degradation.
 """
 
-import pytest
 import time
 
-from generation.fault_handler import (
-    FaultHandler,
-    ErrorSeverity,
-    ErrorInfo
-)
+import pytest
+
+from generation.fault_handler import ErrorSeverity, FaultHandler
 
 
 class TestErrorClassification:
@@ -100,10 +97,7 @@ class TestBackoffCalculation:
 
     def test_exponential_backoff(self):
         """Test exponential backoff progression"""
-        handler = FaultHandler(
-            initial_backoff=1.0,
-            backoff_multiplier=2.0
-        )
+        handler = FaultHandler(initial_backoff=1.0, backoff_multiplier=2.0)
 
         # Retry 0: 1.0 * 2^0 = 1.0
         assert handler.calculate_backoff(0) == 1.0
@@ -119,11 +113,7 @@ class TestBackoffCalculation:
 
     def test_max_backoff_cap(self):
         """Test max backoff cap"""
-        handler = FaultHandler(
-            initial_backoff=1.0,
-            backoff_multiplier=2.0,
-            max_backoff=5.0
-        )
+        handler = FaultHandler(initial_backoff=1.0, backoff_multiplier=2.0, max_backoff=5.0)
 
         # Should be capped at 5.0 even for high retry counts
         assert handler.calculate_backoff(10) == 5.0
@@ -151,7 +141,7 @@ class TestRetryLogic:
         """Test retry on retryable errors"""
         handler = FaultHandler(
             max_retries=3,
-            initial_backoff=0.01  # Small backoff for fast tests
+            initial_backoff=0.01,  # Small backoff for fast tests
         )
 
         call_count = [0]
@@ -169,9 +159,7 @@ class TestRetryLogic:
     def test_max_retries_exceeded(self):
         """Test max retries enforcement"""
         handler = FaultHandler(
-            max_retries=2,
-            initial_backoff=0.01,
-            enable_graceful_degradation=False
+            max_retries=2, initial_backoff=0.01, enable_graceful_degradation=False
         )
 
         def always_fails():
@@ -186,9 +174,7 @@ class TestRetryLogic:
     def test_graceful_degradation_on_max_retries(self):
         """Test graceful degradation when max retries exceeded"""
         handler = FaultHandler(
-            max_retries=2,
-            initial_backoff=0.01,
-            enable_graceful_degradation=True
+            max_retries=2, initial_backoff=0.01, enable_graceful_degradation=True
         )
 
         def always_fails():
@@ -199,10 +185,7 @@ class TestRetryLogic:
 
     def test_critical_error_stops_immediately(self):
         """Test critical errors stop retry immediately"""
-        handler = FaultHandler(
-            max_retries=5,
-            initial_backoff=0.01
-        )
+        handler = FaultHandler(max_retries=5, initial_backoff=0.01)
 
         def critical_error():
             raise Exception("Authentication failed")
@@ -228,10 +211,7 @@ class TestRetryLogic:
 
     def test_retry_decorator(self):
         """Test retry decorator"""
-        handler = FaultHandler(
-            max_retries=2,
-            initial_backoff=0.01
-        )
+        handler = FaultHandler(max_retries=2, initial_backoff=0.01)
 
         call_count = [0]
 
@@ -255,9 +235,7 @@ class TestRetryLogic:
 
         try:
             handler.with_retry(
-                failing_func,
-                error_context={"entity_id": "alice"},
-                fallback_value=None
+                failing_func, error_context={"entity_id": "alice"}, fallback_value=None
             )
         except:
             pass
@@ -283,9 +261,7 @@ class TestErrorSummary:
     def test_error_summary_with_errors(self):
         """Test error summary with multiple errors"""
         handler = FaultHandler(
-            max_retries=2,
-            initial_backoff=0.01,
-            enable_graceful_degradation=True
+            max_retries=2, initial_backoff=0.01, enable_graceful_degradation=True
         )
 
         def fails_with_retry():
@@ -301,10 +277,7 @@ class TestErrorSummary:
 
     def test_recent_errors_limit(self):
         """Test recent errors are limited to 10"""
-        handler = FaultHandler(
-            max_retries=0,
-            enable_graceful_degradation=True
-        )
+        handler = FaultHandler(max_retries=0, enable_graceful_degradation=True)
 
         def failing_func():
             raise Exception("Test error")
@@ -382,7 +355,7 @@ class TestBackoffTiming:
         handler = FaultHandler(
             max_retries=2,
             initial_backoff=0.05,  # 50ms
-            backoff_multiplier=2.0
+            backoff_multiplier=2.0,
         )
 
         call_count = [0]

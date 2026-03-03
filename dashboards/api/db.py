@@ -4,11 +4,11 @@ Database query functions for Timepoint Dashboard API
 Provides efficient querying with filtering, sorting, and pagination.
 """
 
-import sqlite3
 import json
-from pathlib import Path
-from typing import List, Dict, Optional, Any, Tuple
+import sqlite3
 from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any
 
 
 class TimepointDB:
@@ -27,21 +27,21 @@ class TimepointDB:
 
     def query_runs(
         self,
-        template: Optional[str] = None,
-        status: Optional[str] = None,
-        date_from: Optional[str] = None,
-        date_to: Optional[str] = None,
-        min_cost: Optional[float] = None,
-        max_cost: Optional[float] = None,
-        causal_mode: Optional[str] = None,
-        mechanisms: Optional[List[str]] = None,
-        min_entities: Optional[int] = None,
-        min_timepoints: Optional[int] = None,
+        template: str | None = None,
+        status: str | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
+        min_cost: float | None = None,
+        max_cost: float | None = None,
+        causal_mode: str | None = None,
+        mechanisms: list[str] | None = None,
+        min_entities: int | None = None,
+        min_timepoints: int | None = None,
         sort_by: str = "started_at",
         order: str = "DESC",
         page: int = 1,
-        limit: int = 50
-    ) -> Tuple[List[Dict], int]:
+        limit: int = 50,
+    ) -> tuple[list[dict], int]:
         """
         Query runs with filtering, sorting, and pagination.
 
@@ -95,9 +95,16 @@ class TimepointDB:
 
         # Validate sort_by and order against whitelist to prevent SQL injection
         allowed_sort_columns = {
-            "started_at", "completed_at", "template_id", "causal_mode",
-            "entities_created", "timepoints_created", "cost_usd",
-            "status", "duration_seconds", "run_id"
+            "started_at",
+            "completed_at",
+            "template_id",
+            "causal_mode",
+            "entities_created",
+            "timepoints_created",
+            "cost_usd",
+            "status",
+            "duration_seconds",
+            "run_id",
         }
         if sort_by not in allowed_sort_columns:
             sort_by = "started_at"
@@ -145,22 +152,25 @@ class TimepointDB:
             run_dict = dict(row)
 
             # Get mechanisms used
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT DISTINCT mechanism, COUNT(*) as count
                 FROM mechanism_usage
                 WHERE run_id = ?
                 GROUP BY mechanism
-            """, (run_dict['run_id'],))
+            """,
+                (run_dict["run_id"],),
+            )
 
             mechanisms_used = {m[0]: m[1] for m in cursor.fetchall()}
-            run_dict['mechanisms_used'] = mechanisms_used
+            run_dict["mechanisms_used"] = mechanisms_used
 
             results.append(run_dict)
 
         conn.close()
         return results, total_count
 
-    def get_run_details(self, run_id: str) -> Optional[Dict]:
+    def get_run_details(self, run_id: str) -> dict | None:
         """Get full details for a specific run."""
         conn = self.get_connection()
         cursor = conn.cursor()
@@ -175,47 +185,56 @@ class TimepointDB:
         run_dict = dict(row)
 
         # Parse JSON fields from schema 2.0
-        if 'fidelity_strategy_json' in run_dict and run_dict['fidelity_strategy_json']:
+        if "fidelity_strategy_json" in run_dict and run_dict["fidelity_strategy_json"]:
             try:
-                run_dict['fidelity_strategy_json'] = json.loads(run_dict['fidelity_strategy_json'])
+                run_dict["fidelity_strategy_json"] = json.loads(run_dict["fidelity_strategy_json"])
             except (json.JSONDecodeError, TypeError):
                 pass  # Keep as string if parsing fails
 
-        if 'fidelity_distribution' in run_dict and run_dict['fidelity_distribution']:
+        if "fidelity_distribution" in run_dict and run_dict["fidelity_distribution"]:
             try:
-                run_dict['fidelity_distribution'] = json.loads(run_dict['fidelity_distribution'])
+                run_dict["fidelity_distribution"] = json.loads(run_dict["fidelity_distribution"])
             except (json.JSONDecodeError, TypeError):
                 pass
 
         # Get mechanisms
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT mechanism, function_name, timestamp, context
             FROM mechanism_usage
             WHERE run_id = ?
             ORDER BY timestamp
-        """, (run_id,))
-        run_dict['mechanism_usage'] = [dict(m) for m in cursor.fetchall()]
+        """,
+            (run_id,),
+        )
+        run_dict["mechanism_usage"] = [dict(m) for m in cursor.fetchall()]
 
         # Get resolution assignments
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT entity_id, resolution, timepoint_id, timestamp
             FROM resolution_assignments
             WHERE run_id = ?
-        """, (run_id,))
-        run_dict['resolution_assignments'] = [dict(r) for r in cursor.fetchall()]
+        """,
+            (run_id,),
+        )
+        run_dict["resolution_assignments"] = [dict(r) for r in cursor.fetchall()]
 
         # Get validations
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT validator_name, passed, timestamp, message, violations
             FROM validations
             WHERE run_id = ?
-        """, (run_id,))
-        run_dict['validations'] = [dict(v) for v in cursor.fetchall()]
+        """,
+            (run_id,),
+        )
+        run_dict["validations"] = [dict(v) for v in cursor.fetchall()]
 
         conn.close()
         return run_dict
 
-    def get_templates(self) -> List[str]:
+    def get_templates(self) -> list[str]:
         """Get list of all unique templates."""
         conn = self.get_connection()
         cursor = conn.cursor()
@@ -226,7 +245,7 @@ class TimepointDB:
         conn.close()
         return templates
 
-    def get_mechanisms(self) -> Dict[str, int]:
+    def get_mechanisms(self) -> dict[str, int]:
         """Get all mechanisms with total usage counts."""
         conn = self.get_connection()
         cursor = conn.cursor()
@@ -242,7 +261,7 @@ class TimepointDB:
         conn.close()
         return mechanisms
 
-    def get_meta_analytics(self) -> Dict[str, Any]:
+    def get_meta_analytics(self) -> dict[str, Any]:
         """Get aggregate statistics across all runs."""
         conn = self.get_connection()
         cursor = conn.cursor()
@@ -263,10 +282,10 @@ class TimepointDB:
         metrics = dict(cursor.fetchone())
 
         # Success rate
-        if metrics['total_runs'] > 0:
-            metrics['success_rate'] = metrics['completed_runs'] / metrics['total_runs']
+        if metrics["total_runs"] > 0:
+            metrics["success_rate"] = metrics["completed_runs"] / metrics["total_runs"]
         else:
-            metrics['success_rate'] = 0.0
+            metrics["success_rate"] = 0.0
 
         # Template distribution
         cursor.execute("""
@@ -276,7 +295,7 @@ class TimepointDB:
             ORDER BY count DESC
             LIMIT 10
         """)
-        metrics['top_templates'] = [dict(row) for row in cursor.fetchall()]
+        metrics["top_templates"] = [dict(row) for row in cursor.fetchall()]
 
         # Cost over time (by day)
         cursor.execute("""
@@ -290,7 +309,7 @@ class TimepointDB:
             ORDER BY date DESC
             LIMIT 30
         """)
-        metrics['cost_over_time'] = [dict(row) for row in cursor.fetchall()]
+        metrics["cost_over_time"] = [dict(row) for row in cursor.fetchall()]
 
         # Mechanism usage heatmap data
         cursor.execute("""
@@ -305,7 +324,7 @@ class TimepointDB:
             ORDER BY co_occurrence DESC
             LIMIT 50
         """)
-        metrics['mechanism_co_occurrence'] = [dict(row) for row in cursor.fetchall()]
+        metrics["mechanism_co_occurrence"] = [dict(row) for row in cursor.fetchall()]
 
         # Causal mode distribution
         cursor.execute("""
@@ -313,12 +332,12 @@ class TimepointDB:
             FROM runs
             GROUP BY causal_mode
         """)
-        metrics['causal_mode_distribution'] = [dict(row) for row in cursor.fetchall()]
+        metrics["causal_mode_distribution"] = [dict(row) for row in cursor.fetchall()]
 
         conn.close()
         return metrics
 
-    def get_narrative(self, run_id: str) -> Optional[Dict]:
+    def get_narrative(self, run_id: str) -> dict | None:
         """Load or generate narrative JSON for a run.
 
         First tries to load from exported file, then falls back to generating
@@ -326,7 +345,7 @@ class TimepointDB:
         """
         try:
             # Try to load from exported file first
-            parts = run_id.split('_')
+            parts = run_id.split("_")
             if len(parts) >= 3:
                 timestamp = f"{parts[1]}_{parts[2]}"  # YYYYMMDD_HHMMSS
                 datasets_path = self.db_path.parent.parent / "datasets"
@@ -337,11 +356,11 @@ class TimepointDB:
 
                     narrative_path = template_dir / f"narrative_{timestamp}.json"
                     if narrative_path.exists():
-                        with open(narrative_path, 'r') as f:
+                        with open(narrative_path) as f:
                             narrative = json.load(f)
                             # Map 'timeline' to 'timepoints' for compatibility
-                            if 'timeline' in narrative and 'timepoints' not in narrative:
-                                narrative['timepoints'] = narrative['timeline']
+                            if "timeline" in narrative and "timepoints" not in narrative:
+                                narrative["timepoints"] = narrative["timeline"]
                             return narrative
 
             # Fall back to generating from database
@@ -351,7 +370,7 @@ class TimepointDB:
             print(f"Error loading/generating narrative for {run_id}: {e}")
             return None
 
-    def _generate_narrative_from_db(self, run_id: str) -> Optional[Dict]:
+    def _generate_narrative_from_db(self, run_id: str) -> dict | None:
         """Generate narrative structure from database data.
 
         Since the database doesn't store full timepoint timeline data, this generates
@@ -369,37 +388,48 @@ class TimepointDB:
             return None
 
         # Get resolution assignments
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT entity_id, resolution, timepoint_id, timestamp
             FROM resolution_assignments
             WHERE run_id = ?
             ORDER BY timestamp
-        """, (run_id,))
+        """,
+            (run_id,),
+        )
         assignments = cursor.fetchall()
 
         # Build entities map from resolution assignments
         entities_map = {}
         for assignment in assignments:
-            entity_id = assignment['entity_id']
+            entity_id = assignment["entity_id"]
             if entity_id not in entities_map:
                 entities_map[entity_id] = {
-                    'entity_id': entity_id,
-                    'resolution': assignment['resolution'],
-                    'timepoints': []
+                    "entity_id": entity_id,
+                    "resolution": assignment["resolution"],
+                    "timepoints": [],
                 }
 
         # Get all entities if we have none from assignments
         # (for runs that completed but didn't track resolution assignments)
         if not entities_map:
-            entities_map = {'entity_placeholder': {'entity_id': 'entity_placeholder', 'resolution': 'unknown', 'timepoints': []}}
+            entities_map = {
+                "entity_placeholder": {
+                    "entity_id": "entity_placeholder",
+                    "resolution": "unknown",
+                    "timepoints": [],
+                }
+            }
 
         entity_list = list(entities_map.keys())
 
         # Generate synthetic timepoints based on timepoints_created counter
         # Since DB doesn't store the full timeline, we create placeholder timepoints
-        timepoints_created = run['timepoints_created'] or 1
-        started_at = datetime.fromisoformat(run['started_at'])
-        completed_at = datetime.fromisoformat(run['completed_at']) if run['completed_at'] else started_at
+        timepoints_created = run["timepoints_created"] or 1
+        started_at = datetime.fromisoformat(run["started_at"])
+        completed_at = (
+            datetime.fromisoformat(run["completed_at"]) if run["completed_at"] else started_at
+        )
 
         # Calculate time interval between timepoints
         total_duration = (completed_at - started_at).total_seconds()
@@ -409,42 +439,44 @@ class TimepointDB:
         for i in range(timepoints_created):
             tp_timestamp = started_at + timedelta(seconds=interval_seconds * i)
 
-            timepoint_list.append({
-                'timepoint_id': f"tp_{i+1:03d}" if timepoints_created > 1 else (assignments[0]['timepoint_id'] if assignments else 'tp_001'),
-                'timestamp': tp_timestamp.isoformat(),
-                'event_description': f"Timepoint {i+1}/{timepoints_created}" if timepoints_created > 1 else f"Timepoint {assignments[0]['timepoint_id'] if assignments else 'tp_001'}",
-                'entities_present': entity_list,
-                'importance': 0.5,
-                'dialog_turn_count': 0
-            })
+            timepoint_list.append(
+                {
+                    "timepoint_id": f"tp_{i + 1:03d}"
+                    if timepoints_created > 1
+                    else (assignments[0]["timepoint_id"] if assignments else "tp_001"),
+                    "timestamp": tp_timestamp.isoformat(),
+                    "event_description": f"Timepoint {i + 1}/{timepoints_created}"
+                    if timepoints_created > 1
+                    else f"Timepoint {assignments[0]['timepoint_id'] if assignments else 'tp_001'}",
+                    "entities_present": entity_list,
+                    "importance": 0.5,
+                    "dialog_turn_count": 0,
+                }
+            )
 
         conn.close()
 
         # Build narrative structure
         narrative = {
-            'run_id': run_id,
-            'template_id': run['template_id'],
-            'causal_mode': run['causal_mode'],
-            'timepoints': timepoint_list,
-            'characters': [
-                {
-                    'entity_id': eid,
-                    'resolution': data['resolution'],
-                    'relationships': {}
-                }
+            "run_id": run_id,
+            "template_id": run["template_id"],
+            "causal_mode": run["causal_mode"],
+            "timepoints": timepoint_list,
+            "characters": [
+                {"entity_id": eid, "resolution": data["resolution"], "relationships": {}}
                 for eid, data in entities_map.items()
             ],
-            'executive_summary': f"Auto-generated summary: {run['template_id']} run with {len(entities_map)} entities across {timepoints_created} timepoints. Status: {run['status']}.",
-            'dialogs': [],
-            '_source': 'database'  # Flag to indicate this was generated, not exported
+            "executive_summary": f"Auto-generated summary: {run['template_id']} run with {len(entities_map)} entities across {timepoints_created} timepoints. Status: {run['status']}.",
+            "dialogs": [],
+            "_source": "database",  # Flag to indicate this was generated, not exported
         }
 
         return narrative
 
-    def get_screenplay(self, run_id: str) -> Optional[str]:
+    def get_screenplay(self, run_id: str) -> str | None:
         """Load Fountain screenplay for a run."""
         try:
-            parts = run_id.split('_')
+            parts = run_id.split("_")
             if len(parts) < 3:
                 return None
 
@@ -458,7 +490,7 @@ class TimepointDB:
 
                 screenplay_path = template_dir / f"screenplay_{timestamp}.fountain"
                 if screenplay_path.exists():
-                    with open(screenplay_path, 'r') as f:
+                    with open(screenplay_path) as f:
                         return f.read()
 
             return None

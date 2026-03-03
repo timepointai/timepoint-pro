@@ -8,22 +8,20 @@ Supports multiple export formats with compression:
 - SQLite - Embedded database export
 """
 
-from typing import Dict, Any, List, Optional, IO
-import json
+import bz2
 import csv
 import gzip
-import bz2
-import hashlib
-from pathlib import Path
-from abc import ABC, abstractmethod
-from io import StringIO
+import json
 import sqlite3
+from abc import ABC, abstractmethod
+from pathlib import Path
+from typing import IO, Any
 
 
 class ExportFormat(ABC):
     """Base class for export formats"""
 
-    def __init__(self, compression: Optional[str] = None):
+    def __init__(self, compression: str | None = None):
         """
         Args:
             compression: Compression format (None, 'gzip', 'bz2')
@@ -41,21 +39,21 @@ class ExportFormat(ABC):
         """
         pass
 
-    def _open_file(self, path: str, mode: str = 'w') -> IO:
+    def _open_file(self, path: str, mode: str = "w") -> IO:
         """Open file with optional compression"""
-        if self.compression == 'gzip':
-            return gzip.open(path, mode + 't', encoding='utf-8')
-        elif self.compression == 'bz2':
-            return bz2.open(path, mode + 't', encoding='utf-8')
+        if self.compression == "gzip":
+            return gzip.open(path, mode + "t", encoding="utf-8")
+        elif self.compression == "bz2":
+            return bz2.open(path, mode + "t", encoding="utf-8")
         else:
-            return open(path, mode, encoding='utf-8')
+            return open(path, mode, encoding="utf-8")
 
     def _add_compression_suffix(self, path: str) -> str:
         """Add compression suffix to path if applicable"""
-        if self.compression == 'gzip':
-            return path + '.gz'
-        elif self.compression == 'bz2':
-            return path + '.bz2'
+        if self.compression == "gzip":
+            return path + ".gz"
+        elif self.compression == "bz2":
+            return path + ".bz2"
         return path
 
 
@@ -69,7 +67,7 @@ class JSONLExporter(ExportFormat):
     - Append operations
     """
 
-    def export(self, data: List[Dict[str, Any]], output_path: str) -> None:
+    def export(self, data: list[dict[str, Any]], output_path: str) -> None:
         """
         Export list of dictionaries as JSONL.
 
@@ -79,10 +77,10 @@ class JSONLExporter(ExportFormat):
         """
         output_path = self._add_compression_suffix(output_path)
 
-        with self._open_file(output_path, 'w') as f:
+        with self._open_file(output_path, "w") as f:
             for item in data:
                 json_line = json.dumps(item, default=str)
-                f.write(json_line + '\n')
+                f.write(json_line + "\n")
 
     def export_stream(self, data_generator, output_path: str) -> None:
         """
@@ -94,16 +92,16 @@ class JSONLExporter(ExportFormat):
         """
         output_path = self._add_compression_suffix(output_path)
 
-        with self._open_file(output_path, 'w') as f:
+        with self._open_file(output_path, "w") as f:
             for item in data_generator:
                 json_line = json.dumps(item, default=str)
-                f.write(json_line + '\n')
+                f.write(json_line + "\n")
 
 
 class JSONExporter(ExportFormat):
     """Export data in standard JSON format"""
 
-    def __init__(self, compression: Optional[str] = None, indent: int = 2):
+    def __init__(self, compression: str | None = None, indent: int = 2):
         """
         Args:
             compression: Compression format (None, 'gzip', 'bz2')
@@ -122,14 +120,14 @@ class JSONExporter(ExportFormat):
         """
         output_path = self._add_compression_suffix(output_path)
 
-        with self._open_file(output_path, 'w') as f:
+        with self._open_file(output_path, "w") as f:
             json.dump(data, f, indent=self.indent, default=str)
 
 
 class CSVExporter(ExportFormat):
     """Export data in CSV format"""
 
-    def __init__(self, compression: Optional[str] = None, delimiter: str = ','):
+    def __init__(self, compression: str | None = None, delimiter: str = ","):
         """
         Args:
             compression: Compression format (None, 'gzip', 'bz2')
@@ -138,7 +136,7 @@ class CSVExporter(ExportFormat):
         super().__init__(compression)
         self.delimiter = delimiter
 
-    def export(self, data: List[Dict[str, Any]], output_path: str) -> None:
+    def export(self, data: list[dict[str, Any]], output_path: str) -> None:
         """
         Export list of dictionaries as CSV.
 
@@ -156,7 +154,7 @@ class CSVExporter(ExportFormat):
         # Get headers from first item
         headers = list(data[0].keys())
 
-        with self._open_file(output_path, 'w') as f:
+        with self._open_file(output_path, "w") as f:
             writer = csv.DictWriter(f, fieldnames=headers, delimiter=self.delimiter)
             writer.writeheader()
             for row in data:
@@ -182,10 +180,7 @@ class SQLiteExporter(ExportFormat):
         super().__init__(compression=None)
 
     def export(
-        self,
-        data: Dict[str, List[Dict[str, Any]]],
-        output_path: str,
-        overwrite: bool = False
+        self, data: dict[str, list[dict[str, Any]]], output_path: str, overwrite: bool = False
     ) -> None:
         """
         Export data to SQLite database.
@@ -243,8 +238,10 @@ class SQLiteExporter(ExportFormat):
                 cursor.execute(create_sql)
 
                 # Insert records
-                placeholders = ', '.join(['?' for _ in columns])
-                insert_sql = f"INSERT INTO {table_name} ({', '.join(columns)}) VALUES ({placeholders})"
+                placeholders = ", ".join(["?" for _ in columns])
+                insert_sql = (
+                    f"INSERT INTO {table_name} ({', '.join(columns)}) VALUES ({placeholders})"
+                )
 
                 for record in records:
                     values = []
@@ -287,7 +284,7 @@ class FountainExporter(ExportFormat):
         fountain_text = formatter.format(script_data)
 
         # Write to file
-        with self._open_file(output_path, 'w') as f:
+        with self._open_file(output_path, "w") as f:
             f.write(fountain_text)
 
 
@@ -299,7 +296,7 @@ class StoryboardJSONExporter(ExportFormat):
     suitable for programmatic access and visual storyboard tools.
     """
 
-    def __init__(self, compression: Optional[str] = None, indent: int = 2):
+    def __init__(self, compression: str | None = None, indent: int = 2):
         """
         Args:
             compression: Compression format (None, 'gzip', 'bz2')
@@ -325,7 +322,7 @@ class StoryboardJSONExporter(ExportFormat):
         storyboard_data = formatter.format(script_data)
 
         # Write to file
-        with self._open_file(output_path, 'w') as f:
+        with self._open_file(output_path, "w") as f:
             json.dump(storyboard_data, f, indent=self.indent, default=str)
 
 
@@ -339,7 +336,7 @@ class PDFExporter(ExportFormat):
     - Correct formatting for scene headings, action, character, dialog
     """
 
-    def __init__(self, compression: Optional[str] = None):
+    def __init__(self, compression: str | None = None):
         """
         Args:
             compression: Not applicable for PDF (binary format)
@@ -356,14 +353,11 @@ class PDFExporter(ExportFormat):
         """
         from reportlab.lib.pagesizes import letter
         from reportlab.lib.units import inch
-        from reportlab.pdfgen import canvas
-        from reportlab.lib.styles import ParagraphStyle
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
-        from reportlab.lib.enums import TA_LEFT, TA_CENTER
+        from reportlab.platypus import PageBreak, SimpleDocTemplate
 
         # Ensure .pdf extension
-        if not output_path.endswith('.pdf'):
-            output_path = output_path + '.pdf'
+        if not output_path.endswith(".pdf"):
+            output_path = output_path + ".pdf"
 
         # Create PDF document
         doc = SimpleDocTemplate(
@@ -372,7 +366,7 @@ class PDFExporter(ExportFormat):
             leftMargin=1.5 * inch,
             rightMargin=1.0 * inch,
             topMargin=1.0 * inch,
-            bottomMargin=1.0 * inch
+            bottomMargin=1.0 * inch,
         )
 
         # Build content
@@ -389,31 +383,23 @@ class PDFExporter(ExportFormat):
         # Build PDF
         doc.build(story)
 
-    def _build_title_page(self, script_data) -> List:
+    def _build_title_page(self, script_data) -> list:
         """Build title page elements"""
-        from reportlab.platypus import Paragraph, Spacer
-        from reportlab.lib.styles import ParagraphStyle
         from reportlab.lib.enums import TA_CENTER
+        from reportlab.lib.styles import ParagraphStyle
         from reportlab.lib.units import inch
+        from reportlab.platypus import Paragraph, Spacer
 
         elements = []
 
         # Title style
         title_style = ParagraphStyle(
-            'Title',
-            fontName='Courier-Bold',
-            fontSize=24,
-            alignment=TA_CENTER,
-            spaceAfter=12
+            "Title", fontName="Courier-Bold", fontSize=24, alignment=TA_CENTER, spaceAfter=12
         )
 
         # Subtitle style
         subtitle_style = ParagraphStyle(
-            'Subtitle',
-            fontName='Courier',
-            fontSize=12,
-            alignment=TA_CENTER,
-            spaceAfter=6
+            "Subtitle", fontName="Courier", fontSize=12, alignment=TA_CENTER, spaceAfter=6
         )
 
         # Add vertical space
@@ -427,7 +413,9 @@ class PDFExporter(ExportFormat):
         if script_data.world_id:
             elements.append(Paragraph(f"World ID: {script_data.world_id}", subtitle_style))
 
-        elements.append(Paragraph(f"Temporal Mode: {script_data.temporal_mode.title()}", subtitle_style))
+        elements.append(
+            Paragraph(f"Temporal Mode: {script_data.temporal_mode.title()}", subtitle_style)
+        )
         elements.append(Spacer(1, 0.25 * inch))
 
         # Generated timestamp
@@ -439,63 +427,59 @@ class PDFExporter(ExportFormat):
 
         return elements
 
-    def _build_scene(self, scene) -> List:
+    def _build_scene(self, scene) -> list:
         """Build scene elements"""
-        from reportlab.platypus import Paragraph, Spacer
-        from reportlab.lib.styles import ParagraphStyle
         from reportlab.lib.enums import TA_LEFT
+        from reportlab.lib.styles import ParagraphStyle
         from reportlab.lib.units import inch
+        from reportlab.platypus import Paragraph, Spacer
 
         elements = []
 
         # Scene heading style (ALL CAPS, bold)
         heading_style = ParagraphStyle(
-            'SceneHeading',
-            fontName='Courier-Bold',
+            "SceneHeading",
+            fontName="Courier-Bold",
             fontSize=12,
             alignment=TA_LEFT,
             spaceAfter=12,
-            spaceBefore=12
+            spaceBefore=12,
         )
 
         # Action style
         action_style = ParagraphStyle(
-            'Action',
-            fontName='Courier',
-            fontSize=12,
-            alignment=TA_LEFT,
-            spaceAfter=12
+            "Action", fontName="Courier", fontSize=12, alignment=TA_LEFT, spaceAfter=12
         )
 
         # Character style (ALL CAPS, indented)
         character_style = ParagraphStyle(
-            'Character',
-            fontName='Courier',
+            "Character",
+            fontName="Courier",
             fontSize=12,
             alignment=TA_LEFT,
             leftIndent=2.2 * inch,
-            spaceAfter=0
+            spaceAfter=0,
         )
 
         # Dialog style (indented)
         dialog_style = ParagraphStyle(
-            'Dialog',
-            fontName='Courier',
+            "Dialog",
+            fontName="Courier",
             fontSize=12,
             alignment=TA_LEFT,
             leftIndent=1.0 * inch,
             rightIndent=1.5 * inch,
-            spaceAfter=12
+            spaceAfter=12,
         )
 
         # Parenthetical style (indented more)
         paren_style = ParagraphStyle(
-            'Parenthetical',
-            fontName='Courier',
+            "Parenthetical",
+            fontName="Courier",
             fontSize=12,
             alignment=TA_LEFT,
             leftIndent=1.5 * inch,
-            spaceAfter=0
+            spaceAfter=0,
         )
 
         # Scene heading
@@ -577,7 +561,7 @@ class ExportFormatFactory:
         "fountain": FountainExporter,
         "storyboard": StoryboardJSONExporter,
         "pdf": PDFExporter,
-        "tdf": TDFExporter
+        "tdf": TDFExporter,
     }
 
     @classmethod
@@ -608,13 +592,12 @@ class ExportFormatFactory:
         format_lower = format.lower()
         if format_lower not in cls._formats:
             raise ValueError(
-                f"Unsupported format: {format}. "
-                f"Supported: {list(cls._formats.keys())}"
+                f"Unsupported format: {format}. Supported: {list(cls._formats.keys())}"
             )
 
         return cls._formats[format_lower](**kwargs)
 
     @classmethod
-    def get_supported_formats(cls) -> List[str]:
+    def get_supported_formats(cls) -> list[str]:
         """Get list of supported formats"""
         return list(cls._formats.keys())

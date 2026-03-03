@@ -5,20 +5,18 @@ Tests the core waveform math, band mapping, recurrence, serialization,
 and composite max-composition — all pure math, no LLM/DB dependencies.
 """
 
-import math
-import pytest
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 from synth.fidelity_envelope import (
-    ADPRSEnvelope,
     ADPRSComposite,
+    ADPRSEnvelope,
     FidelityBand,
-    phi_to_resolution_band,
     datetime_to_ms,
+    phi_to_resolution_band,
 )
 
-
 # --- Helpers ---
+
 
 def make_t0() -> datetime:
     """Standard t0 for tests."""
@@ -34,6 +32,7 @@ def envelope_at_tau(env: ADPRSEnvelope, tau: float) -> float:
 
 # --- datetime_to_ms ---
 
+
 class TestDatetimeToMs:
     def test_epoch(self):
         epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
@@ -46,6 +45,7 @@ class TestDatetimeToMs:
 
 
 # --- Band mapping ---
+
 
 class TestPhiToResolutionBand:
     def test_tensor_band(self):
@@ -81,17 +81,22 @@ class TestPhiToResolutionBand:
 
 # --- Waveform boundary values ---
 
+
 class TestWaveformBoundaries:
     def test_tau_zero_p_nonzero(self):
         """At tau=0, sin(0)=0, so oscillation is 0; phi collapses to (1-S)*baseline."""
-        env = ADPRSEnvelope(A=0.7, D=1000.0, P=2.0, R=0, S=0.8, t0="2025-01-01T00:00:00+00:00", baseline=0.1)
+        env = ADPRSEnvelope(
+            A=0.7, D=1000.0, P=2.0, R=0, S=0.8, t0="2025-01-01T00:00:00+00:00", baseline=0.1
+        )
         phi = envelope_at_tau(env, 0.0)
         # oscillation = |sin(0)| = 0, decay = 1.0, so phi = 0 * 1 * 0.8 + 0.2 * 0.1 = 0.02
         assert abs(phi - 0.02) < 1e-6
 
     def test_tau_quarter_single_period(self):
         """At tau=0.25 with P=1, sin(pi/2)=1 → full oscillation peak."""
-        env = ADPRSEnvelope(A=1.0, D=1000.0, P=1.0, R=0, S=1.0, t0="2025-01-01T00:00:00+00:00", baseline=0.0)
+        env = ADPRSEnvelope(
+            A=1.0, D=1000.0, P=1.0, R=0, S=1.0, t0="2025-01-01T00:00:00+00:00", baseline=0.0
+        )
         phi = envelope_at_tau(env, 0.25)
         # oscillation = |sin(0.25 * 2pi * 1)| = |sin(pi/2)| = 1
         # decay = (1 - 0.25)^(0) = 1  (A=1 → exponent=0)
@@ -100,7 +105,9 @@ class TestWaveformBoundaries:
 
     def test_tau_one_decay_collapses(self):
         """At tau=1.0, decay = 0 → oscillation term vanishes, phi = (1-S)*baseline."""
-        env = ADPRSEnvelope(A=0.5, D=1000.0, P=2.0, R=0, S=0.8, t0="2025-01-01T00:00:00+00:00", baseline=0.1)
+        env = ADPRSEnvelope(
+            A=0.5, D=1000.0, P=2.0, R=0, S=0.8, t0="2025-01-01T00:00:00+00:00", baseline=0.1
+        )
         # Exactly at tau=1.0 (elapsed == D), tau < 1.0 is False → decay=0
         # phi = osc * 0 * S + (1-S)*baseline = 0.2 * 0.1 = 0.02
         t0 = make_t0()
@@ -111,7 +118,9 @@ class TestWaveformBoundaries:
 
     def test_past_duration_returns_baseline(self):
         """Well past duration (single-shot), evaluate returns baseline directly."""
-        env = ADPRSEnvelope(A=0.5, D=1000.0, P=2.0, R=0, S=0.8, t0="2025-01-01T00:00:00+00:00", baseline=0.1)
+        env = ADPRSEnvelope(
+            A=0.5, D=1000.0, P=2.0, R=0, S=0.8, t0="2025-01-01T00:00:00+00:00", baseline=0.1
+        )
         t0 = make_t0()
         t = t0 + timedelta(milliseconds=2000.0)  # past duration
         phi = env.evaluate(t)
@@ -120,10 +129,13 @@ class TestWaveformBoundaries:
 
 # --- Decay rates ---
 
+
 class TestDecayRates:
     def test_a_zero_fast_decay(self):
         """A=0 means exponent = 3, so fast decay toward end."""
-        env = ADPRSEnvelope(A=0.0, D=1000.0, P=1.0, R=0, S=1.0, t0="2025-01-01T00:00:00+00:00", baseline=0.0)
+        env = ADPRSEnvelope(
+            A=0.0, D=1000.0, P=1.0, R=0, S=1.0, t0="2025-01-01T00:00:00+00:00", baseline=0.0
+        )
         # Evaluate at tau=0.5, at the peak of sin for P=1 → tau=0.25
         phi_early = envelope_at_tau(env, 0.25)
         phi_late = envelope_at_tau(env, 0.75)
@@ -132,7 +144,9 @@ class TestDecayRates:
 
     def test_a_one_no_decay(self):
         """A=1 means exponent = 0, so no decay (constant envelope modulated only by oscillation)."""
-        env = ADPRSEnvelope(A=1.0, D=1000.0, P=1.0, R=0, S=1.0, t0="2025-01-01T00:00:00+00:00", baseline=0.0)
+        env = ADPRSEnvelope(
+            A=1.0, D=1000.0, P=1.0, R=0, S=1.0, t0="2025-01-01T00:00:00+00:00", baseline=0.0
+        )
         # At sin peaks (tau=0.25 and tau=0.75), values should be equal since no decay
         phi_early = envelope_at_tau(env, 0.25)
         phi_late = envelope_at_tau(env, 0.75)
@@ -141,17 +155,22 @@ class TestDecayRates:
 
 # --- Spread collapse ---
 
+
 class TestSpread:
     def test_s_zero_collapses_to_baseline(self):
         """S=0 means the oscillation term vanishes, output = baseline."""
-        env = ADPRSEnvelope(A=0.7, D=1000.0, P=2.0, R=0, S=0.0, t0="2025-01-01T00:00:00+00:00", baseline=0.5)
+        env = ADPRSEnvelope(
+            A=0.7, D=1000.0, P=2.0, R=0, S=0.0, t0="2025-01-01T00:00:00+00:00", baseline=0.5
+        )
         for tau in [0.0, 0.25, 0.5, 0.75]:
             phi = envelope_at_tau(env, tau)
             assert abs(phi - 0.5) < 1e-6, f"At tau={tau}, expected 0.5, got {phi}"
 
     def test_s_one_full_range(self):
         """S=1 means full oscillation range with baseline contribution zeroed."""
-        env = ADPRSEnvelope(A=1.0, D=1000.0, P=1.0, R=0, S=1.0, t0="2025-01-01T00:00:00+00:00", baseline=0.5)
+        env = ADPRSEnvelope(
+            A=1.0, D=1000.0, P=1.0, R=0, S=1.0, t0="2025-01-01T00:00:00+00:00", baseline=0.5
+        )
         phi = envelope_at_tau(env, 0.25)
         # oscillation=1, decay=1, phi = 1*1*1 + 0*0.5 = 1.0
         assert abs(phi - 1.0) < 1e-6
@@ -159,10 +178,13 @@ class TestSpread:
 
 # --- Multi-period oscillation ---
 
+
 class TestMultiPeriod:
     def test_p_one_single_peak(self):
         """P=1: one full sine cycle in duration → peak at tau=0.25."""
-        env = ADPRSEnvelope(A=1.0, D=1000.0, P=1.0, R=0, S=1.0, t0="2025-01-01T00:00:00+00:00", baseline=0.0)
+        env = ADPRSEnvelope(
+            A=1.0, D=1000.0, P=1.0, R=0, S=1.0, t0="2025-01-01T00:00:00+00:00", baseline=0.0
+        )
         phi_peak = envelope_at_tau(env, 0.25)
         phi_trough = envelope_at_tau(env, 0.5)
         assert phi_peak > 0.9
@@ -170,7 +192,9 @@ class TestMultiPeriod:
 
     def test_p_four_multiple_peaks(self):
         """P=4: four full sine cycles → peaks at tau=0.0625, 0.1875, etc."""
-        env = ADPRSEnvelope(A=1.0, D=1000.0, P=4.0, R=0, S=1.0, t0="2025-01-01T00:00:00+00:00", baseline=0.0)
+        env = ADPRSEnvelope(
+            A=1.0, D=1000.0, P=4.0, R=0, S=1.0, t0="2025-01-01T00:00:00+00:00", baseline=0.0
+        )
         # First peak: tau = 0.25 / 4 = 0.0625
         phi_peak1 = envelope_at_tau(env, 0.0625)
         # Second peak: tau = 0.75 / 4 = 0.1875
@@ -181,10 +205,13 @@ class TestMultiPeriod:
 
 # --- Recurrence ---
 
+
 class TestRecurrence:
     def test_r_zero_single_shot(self):
         """R=0: no recurrence. After duration, stays at baseline."""
-        env = ADPRSEnvelope(A=0.7, D=1000.0, P=1.0, R=0, S=0.8, t0="2025-01-01T00:00:00+00:00", baseline=0.1)
+        env = ADPRSEnvelope(
+            A=0.7, D=1000.0, P=1.0, R=0, S=0.8, t0="2025-01-01T00:00:00+00:00", baseline=0.1
+        )
         t0 = make_t0()
         # Well past duration
         t_after = t0 + timedelta(milliseconds=5000.0)
@@ -192,7 +219,9 @@ class TestRecurrence:
 
     def test_r_greater_than_d_has_gaps(self):
         """R > D: active for D ms, then gap until next cycle."""
-        env = ADPRSEnvelope(A=1.0, D=100.0, P=1.0, R=200.0, S=1.0, t0="2025-01-01T00:00:00+00:00", baseline=0.0)
+        env = ADPRSEnvelope(
+            A=1.0, D=100.0, P=1.0, R=200.0, S=1.0, t0="2025-01-01T00:00:00+00:00", baseline=0.0
+        )
         t0 = make_t0()
         # In gap: 150ms into first cycle (100 < 150 < 200)
         t_gap = t0 + timedelta(milliseconds=150.0)
@@ -204,7 +233,9 @@ class TestRecurrence:
 
     def test_recurrence_cycle_alignment(self):
         """Recurrence should repeat the waveform identically each cycle."""
-        env = ADPRSEnvelope(A=1.0, D=100.0, P=1.0, R=100.0, S=1.0, t0="2025-01-01T00:00:00+00:00", baseline=0.0)
+        env = ADPRSEnvelope(
+            A=1.0, D=100.0, P=1.0, R=100.0, S=1.0, t0="2025-01-01T00:00:00+00:00", baseline=0.0
+        )
         t0 = make_t0()
         # Same tau position in first and second cycle
         t_first = t0 + timedelta(milliseconds=25.0)  # tau=0.25 in cycle 0
@@ -214,22 +245,28 @@ class TestRecurrence:
 
 # --- Before start and after duration ---
 
+
 class TestOutOfRange:
     def test_before_start(self):
         """Time before t0 returns baseline."""
-        env = ADPRSEnvelope(A=0.7, D=1000.0, P=1.0, R=0, S=0.8, t0="2025-06-01T00:00:00+00:00", baseline=0.2)
+        env = ADPRSEnvelope(
+            A=0.7, D=1000.0, P=1.0, R=0, S=0.8, t0="2025-06-01T00:00:00+00:00", baseline=0.2
+        )
         t_before = datetime(2025, 1, 1, tzinfo=timezone.utc)
         assert abs(env.evaluate(t_before) - 0.2) < 1e-6
 
     def test_after_duration_single_shot(self):
         """Time after duration (single-shot) returns baseline."""
-        env = ADPRSEnvelope(A=0.7, D=1000.0, P=1.0, R=0, S=0.8, t0="2025-01-01T00:00:00+00:00", baseline=0.3)
+        env = ADPRSEnvelope(
+            A=0.7, D=1000.0, P=1.0, R=0, S=0.8, t0="2025-01-01T00:00:00+00:00", baseline=0.3
+        )
         t0 = make_t0()
         t_after = t0 + timedelta(milliseconds=2000.0)
         assert abs(env.evaluate(t_after) - 0.3) < 1e-6
 
 
 # --- Output clamping ---
+
 
 class TestClamping:
     def test_output_always_in_zero_one(self):
@@ -248,11 +285,16 @@ class TestClamping:
 
 # --- Composite ---
 
+
 class TestComposite:
     def test_max_of_two(self):
         """Composite returns max of its envelopes."""
-        env_low = ADPRSEnvelope(A=1.0, D=1000.0, P=1.0, R=0, S=0.3, t0="2025-01-01T00:00:00+00:00", baseline=0.1)
-        env_high = ADPRSEnvelope(A=1.0, D=1000.0, P=1.0, R=0, S=1.0, t0="2025-01-01T00:00:00+00:00", baseline=0.0)
+        env_low = ADPRSEnvelope(
+            A=1.0, D=1000.0, P=1.0, R=0, S=0.3, t0="2025-01-01T00:00:00+00:00", baseline=0.1
+        )
+        env_high = ADPRSEnvelope(
+            A=1.0, D=1000.0, P=1.0, R=0, S=1.0, t0="2025-01-01T00:00:00+00:00", baseline=0.0
+        )
         comp = ADPRSComposite(envelopes=[env_low, env_high])
 
         t = make_t0() + timedelta(milliseconds=250.0)  # tau=0.25, sin peak
@@ -269,7 +311,9 @@ class TestComposite:
 
     def test_evaluate_band(self):
         """Composite band mapping works through evaluate."""
-        env = ADPRSEnvelope(A=1.0, D=1000.0, P=1.0, R=0, S=1.0, t0="2025-01-01T00:00:00+00:00", baseline=0.0)
+        env = ADPRSEnvelope(
+            A=1.0, D=1000.0, P=1.0, R=0, S=1.0, t0="2025-01-01T00:00:00+00:00", baseline=0.0
+        )
         comp = ADPRSComposite(envelopes=[env])
         t = make_t0() + timedelta(milliseconds=250.0)
         band = comp.evaluate_band(t)
@@ -278,10 +322,13 @@ class TestComposite:
 
 # --- Serialization roundtrip ---
 
+
 class TestSerialization:
     def test_envelope_roundtrip(self):
         """to_metadata_dict → from_metadata_dict preserves all parameters."""
-        orig = ADPRSEnvelope(A=0.3, D=5000.0, P=3.0, R=10000.0, S=0.6, t0="2025-06-15T12:00:00+00:00", baseline=0.2)
+        orig = ADPRSEnvelope(
+            A=0.3, D=5000.0, P=3.0, R=10000.0, S=0.6, t0="2025-06-15T12:00:00+00:00", baseline=0.2
+        )
         d = orig.to_metadata_dict()
         restored = ADPRSEnvelope.from_metadata_dict(d)
         assert restored.A == orig.A
@@ -294,8 +341,12 @@ class TestSerialization:
 
     def test_composite_roundtrip(self):
         """Composite serialization preserves all envelopes."""
-        env1 = ADPRSEnvelope(A=0.5, D=1000.0, P=1.0, R=0, S=0.8, t0="2025-01-01T00:00:00+00:00", baseline=0.1)
-        env2 = ADPRSEnvelope(A=0.9, D=2000.0, P=3.0, R=5000.0, S=0.5, t0="2025-06-01T00:00:00+00:00", baseline=0.3)
+        env1 = ADPRSEnvelope(
+            A=0.5, D=1000.0, P=1.0, R=0, S=0.8, t0="2025-01-01T00:00:00+00:00", baseline=0.1
+        )
+        env2 = ADPRSEnvelope(
+            A=0.9, D=2000.0, P=3.0, R=5000.0, S=0.5, t0="2025-06-01T00:00:00+00:00", baseline=0.3
+        )
         comp = ADPRSComposite(envelopes=[env1, env2])
         d = comp.to_metadata_dict()
         restored = ADPRSComposite.from_metadata_dict(d)
@@ -306,6 +357,7 @@ class TestSerialization:
     def test_metadata_dict_is_json_safe(self):
         """Metadata dict should contain only JSON-serializable types."""
         import json
+
         env = ADPRSEnvelope()
         d = env.to_metadata_dict()
         json.dumps(d)  # Should not raise

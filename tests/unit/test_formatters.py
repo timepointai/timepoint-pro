@@ -2,16 +2,13 @@
 Tests for Output Formatters (Sprint 2.2)
 """
 
-import pytest
-import json
 import csv
+import json
 from io import StringIO
-from reporting.formatters import (
-    MarkdownFormatter,
-    JSONFormatter,
-    CSVFormatter,
-    FormatterFactory
-)
+
+import pytest
+
+from reporting.formatters import CSVFormatter, FormatterFactory, JSONFormatter, MarkdownFormatter
 
 
 class TestMarkdownFormatter:
@@ -29,10 +26,7 @@ class TestMarkdownFormatter:
         formatter = MarkdownFormatter()
         data = {
             "title": "Test Report",
-            "metadata": {
-                "world_id": "test_world",
-                "generated_at": "2025-10-21"
-            }
+            "metadata": {"world_id": "test_world", "generated_at": "2025-10-21"},
         }
         result = formatter.format(data)
         assert "## Metadata" in result
@@ -42,10 +36,7 @@ class TestMarkdownFormatter:
     def test_format_summary(self):
         """Test summary section formatting"""
         formatter = MarkdownFormatter()
-        data = {
-            "title": "Test Report",
-            "summary": "This is a test summary."
-        }
+        data = {"title": "Test Report", "summary": "This is a test summary."}
         result = formatter.format(data)
         assert "## Summary" in result
         assert "This is a test summary." in result
@@ -56,15 +47,9 @@ class TestMarkdownFormatter:
         data = {
             "title": "Test Report",
             "sections": [
-                {
-                    "title": "Section 1",
-                    "content": "Content for section 1"
-                },
-                {
-                    "title": "Section 2",
-                    "items": ["Item 1", "Item 2", "Item 3"]
-                }
-            ]
+                {"title": "Section 1", "content": "Content for section 1"},
+                {"title": "Section 2", "items": ["Item 1", "Item 2", "Item 3"]},
+            ],
         }
         result = formatter.format(data)
         assert "## Section 1" in result
@@ -83,13 +68,9 @@ class TestMarkdownFormatter:
                 {
                     "title": "Test Table",
                     "headers": ["Name", "Age", "City"],
-                    "rows": [
-                        ["Alice", 30, "NYC"],
-                        ["Bob", 25, "LA"],
-                        ["Charlie", 35, "Chicago"]
-                    ]
+                    "rows": [["Alice", 30, "NYC"], ["Bob", 25, "LA"], ["Charlie", 35, "Chicago"]],
                 }
-            ]
+            ],
         }
         result = formatter.format(data)
         assert "### Test Table" in result
@@ -102,14 +83,7 @@ class TestMarkdownFormatter:
     def test_format_table_without_headers(self):
         """Test table formatting handles missing headers gracefully"""
         formatter = MarkdownFormatter()
-        data = {
-            "tables": [
-                {
-                    "title": "Incomplete Table",
-                    "rows": [["data1", "data2"]]
-                }
-            ]
-        }
+        data = {"tables": [{"title": "Incomplete Table", "rows": [["data1", "data2"]]}]}
         result = formatter.format(data)
         # Should not crash, but table won't be formatted
         assert "### Incomplete Table" in result
@@ -119,24 +93,16 @@ class TestMarkdownFormatter:
         formatter = MarkdownFormatter()
         data = {
             "title": "Complete Report",
-            "metadata": {
-                "world_id": "test_world",
-                "entity_count": 10
-            },
+            "metadata": {"world_id": "test_world", "entity_count": 10},
             "summary": "Full simulation summary",
-            "sections": [
-                {
-                    "title": "Key Events",
-                    "items": ["Event 1", "Event 2"]
-                }
-            ],
+            "sections": [{"title": "Key Events", "items": ["Event 1", "Event 2"]}],
             "tables": [
                 {
                     "title": "Entity Stats",
                     "headers": ["Entity", "Actions"],
-                    "rows": [["Alice", 5], ["Bob", 3]]
+                    "rows": [["Alice", 5], ["Bob", 3]],
                 }
-            ]
+            ],
         }
         result = formatter.format(data)
         assert "# Complete Report" in result
@@ -163,13 +129,7 @@ class TestJSONFormatter:
         formatter = JSONFormatter(indent=2)
         data = {
             "title": "Test Report",
-            "metadata": {
-                "world_id": "test_world",
-                "stats": {
-                    "entities": 10,
-                    "timepoints": 5
-                }
-            }
+            "metadata": {"world_id": "test_world", "stats": {"entities": 10, "timepoints": 5}},
         }
         result = formatter.format(data)
         parsed = json.loads(result)
@@ -180,10 +140,7 @@ class TestJSONFormatter:
         formatter = JSONFormatter()
         data = {
             "entities": ["alice", "bob", "charlie"],
-            "events": [
-                {"type": "action", "actor": "alice"},
-                {"type": "speech", "actor": "bob"}
-            ]
+            "events": [{"type": "action", "actor": "alice"}, {"type": "speech", "actor": "bob"}],
         }
         result = formatter.format(data)
         parsed = json.loads(result)
@@ -201,6 +158,7 @@ class TestJSONFormatter:
     def test_default_str_conversion(self):
         """Test default=str for non-serializable objects"""
         from datetime import datetime
+
         formatter = JSONFormatter()
         data = {"timestamp": datetime(2025, 10, 21, 12, 0, 0)}
         result = formatter.format(data)
@@ -218,10 +176,7 @@ class TestCSVFormatter:
         data = {
             "table": {
                 "headers": ["Name", "Age", "City"],
-                "rows": [
-                    ["Alice", 30, "NYC"],
-                    ["Bob", 25, "LA"]
-                ]
+                "rows": [["Alice", 30, "NYC"], ["Bob", 25, "LA"]],
             }
         }
         result = formatter.format(data)
@@ -234,11 +189,7 @@ class TestCSVFormatter:
     def test_format_dict_as_csv(self):
         """Test dictionary to CSV conversion"""
         formatter = CSVFormatter()
-        data = {
-            "world_id": "test_world",
-            "entity_count": 10,
-            "status": "complete"
-        }
+        data = {"world_id": "test_world", "entity_count": 10, "status": "complete"}
         result = formatter.format(data)
         reader = csv.reader(StringIO(result))
         rows = list(reader)
@@ -252,11 +203,7 @@ class TestCSVFormatter:
     def test_format_dict_with_nested_structures(self):
         """Test dictionary with nested structures"""
         formatter = CSVFormatter()
-        data = {
-            "simple": "value",
-            "nested": {"key": "value"},
-            "list": [1, 2, 3]
-        }
+        data = {"simple": "value", "nested": {"key": "value"}, "list": [1, 2, 3]}
         result = formatter.format(data)
         # Nested structures should be JSON-encoded
         assert "simple,value" in result or "simple\r\nvalue" in result.replace(",", "\r\n")
@@ -277,10 +224,7 @@ class TestCSVFormatter:
         data = {
             "table": {
                 "headers": ["Name", "Description"],
-                "rows": [
-                    ["Alice", "Has, comma"],
-                    ["Bob", 'Has "quotes"']
-                ]
+                "rows": [["Alice", "Has, comma"], ["Bob", 'Has "quotes"']],
             }
         }
         result = formatter.format(data)

@@ -4,55 +4,48 @@ Unit tests for Batch API.
 Tests batch submission, status tracking, and cancellation.
 """
 
-import pytest
-import tempfile
 import os
-from datetime import datetime
-from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
-# API imports
-from api.main import create_app
 from api.auth import (
-    create_api_key,
-    clear_api_keys,
     API_KEY_HEADER,
+    clear_api_keys,
+    create_api_key,
+)
+from api.batch_runner import (
+    clear_batches,
+    reset_batch_runner,
 )
 from api.deps import (
     override_db_path,
     reset_dependencies,
 )
-from api.batch_runner import (
-    clear_batches,
-    reset_batch_runner,
-    get_batch,
-    BatchJob,
+
+# API imports
+from api.main import create_app
+from api.middleware.rate_limit import (
+    clear_job_counts,
+    clear_user_tiers,
+    get_limiter,
+    set_user_tier,
+)
+from api.middleware.usage_quota import reset_quota_config
+from api.models_batch import (
+    BatchCreateRequest,
+    BatchPriority,
 )
 from api.simulation_runner import (
     clear_jobs,
     reset_simulation_runner,
 )
-from api.models_batch import (
-    BatchStatus,
-    BatchPriority,
-    BatchCreateRequest,
-)
-from api.middleware.rate_limit import (
-    set_user_tier,
-    clear_user_tiers,
-    clear_job_counts,
-    reset_limiter,
-    reset_rate_limit_config,
-    get_limiter,
-)
-from api.middleware.usage_quota import reset_quota_config
 from api.usage_storage import reset_usage_database
-
 
 # ============================================================================
 # Fixtures
 # ============================================================================
+
 
 @pytest.fixture(autouse=True)
 def reset_state():
@@ -167,6 +160,7 @@ def pro_auth_headers(pro_api_key) -> dict:
 # Batch Model Tests
 # ============================================================================
 
+
 class TestBatchModels:
     """Tests for batch Pydantic models."""
 
@@ -182,16 +176,13 @@ class TestBatchModels:
         """Batch must have at least 2 simulations."""
         with pytest.raises(ValueError):
             BatchCreateRequest(
-                simulations=[
-                    {"template_id": "test", "entity_count": 3, "timepoint_count": 3}
-                ]
+                simulations=[{"template_id": "test", "entity_count": 3, "timepoint_count": 3}]
             )
 
     def test_batch_create_max_simulations(self):
         """Batch cannot exceed 100 simulations."""
         simulations = [
-            {"template_id": "test", "entity_count": 3, "timepoint_count": 3}
-            for _ in range(101)
+            {"template_id": "test", "entity_count": 3, "timepoint_count": 3} for _ in range(101)
         ]
 
         with pytest.raises(ValueError):
@@ -215,6 +206,7 @@ class TestBatchModels:
 # ============================================================================
 # Batch Creation Tests
 # ============================================================================
+
 
 class TestBatchCreation:
     """Tests for batch creation endpoint."""
@@ -257,8 +249,7 @@ class TestBatchCreation:
         """Batch exceeding tier size limit should fail."""
         # Free tier limit is 5
         simulations = [
-            {"template_id": "test", "entity_count": 3, "timepoint_count": 3}
-            for _ in range(10)
+            {"template_id": "test", "entity_count": 3, "timepoint_count": 3} for _ in range(10)
         ]
 
         response = client.post(
@@ -279,8 +270,7 @@ class TestBatchCreation:
     def test_create_batch_pro_tier_larger(self, client, pro_auth_headers):
         """Pro tier can create larger batches."""
         simulations = [
-            {"template_id": "test", "entity_count": 3, "timepoint_count": 3}
-            for _ in range(20)
+            {"template_id": "test", "entity_count": 3, "timepoint_count": 3} for _ in range(20)
         ]
 
         response = client.post(
@@ -296,6 +286,7 @@ class TestBatchCreation:
 # ============================================================================
 # Batch Status Tests
 # ============================================================================
+
 
 class TestBatchStatus:
     """Tests for batch status endpoint."""
@@ -359,6 +350,7 @@ class TestBatchStatus:
 # Batch Jobs Tests
 # ============================================================================
 
+
 class TestBatchJobs:
     """Tests for batch job listing endpoint."""
 
@@ -389,6 +381,7 @@ class TestBatchJobs:
 # ============================================================================
 # Batch Cancellation Tests
 # ============================================================================
+
 
 class TestBatchCancellation:
     """Tests for batch cancellation endpoint."""
@@ -426,6 +419,7 @@ class TestBatchCancellation:
 # ============================================================================
 # Batch List Tests
 # ============================================================================
+
 
 class TestBatchList:
     """Tests for batch listing endpoint."""
@@ -480,6 +474,7 @@ class TestBatchList:
 # Batch Stats Tests
 # ============================================================================
 
+
 class TestBatchStats:
     """Tests for batch statistics endpoint."""
 
@@ -509,6 +504,7 @@ class TestBatchStats:
 # ============================================================================
 # Usage Endpoint Tests
 # ============================================================================
+
 
 class TestUsageEndpoint:
     """Tests for usage status endpoint."""
@@ -547,6 +543,7 @@ class TestUsageEndpoint:
 # Quota Enforcement Tests
 # ============================================================================
 
+
 class TestQuotaEnforcement:
     """Tests for quota enforcement in batch creation."""
 
@@ -574,8 +571,11 @@ class TestQuotaEnforcement:
         assert response.status_code == 429
         data = response.json()
         # Could be rate limit or simulation quota - both are valid 429 responses
-        assert data.get("error") in ("SimulationQuotaExceeded", "RateLimitExceeded") or \
-               "quota" in str(data).lower() or "limit" in str(data).lower()
+        assert (
+            data.get("error") in ("SimulationQuotaExceeded", "RateLimitExceeded")
+            or "quota" in str(data).lower()
+            or "limit" in str(data).lower()
+        )
 
 
 # ============================================================================

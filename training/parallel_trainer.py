@@ -14,16 +14,16 @@ Phase 2: Parallel Refinement Infrastructure
 
 import asyncio
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional
 from datetime import datetime
 
 import numpy as np
 
-from tensor_persistence import TensorDatabase, TensorRecord
-from tensor_serialization import serialize_tensor, deserialize_tensor
 from schemas import TTMTensor
-from training.job_queue import JobQueue, TrainingJob, JobStatus
+from tensor_persistence import TensorDatabase
+from tensor_serialization import deserialize_tensor, serialize_tensor
+from training.job_queue import JobQueue, TrainingJob
 
 
 @dataclass
@@ -39,11 +39,12 @@ class TrainingResult:
         error: Error message if training failed
         duration_seconds: How long training took
     """
+
     tensor_id: str
     success: bool
     final_maturity: float = 0.0
     cycles_completed: int = 0
-    error: Optional[str] = None
+    error: str | None = None
     duration_seconds: float = 0.0
 
 
@@ -73,7 +74,7 @@ class ParallelTensorTrainer:
         self,
         tensor_db: TensorDatabase,
         max_workers: int = 4,
-        progress_callback: Optional[Callable[[str, float, int], None]] = None
+        progress_callback: Callable[[str, float, int], None] | None = None,
     ):
         """
         Initialize parallel trainer.
@@ -87,15 +88,12 @@ class ParallelTensorTrainer:
         self.max_workers = max_workers
         self.progress_callback = progress_callback
         self._job_queue = JobQueue(tensor_db)
-        self._active_workers: Dict[str, asyncio.Task] = {}
-        self._results: Dict[str, TrainingResult] = {}
+        self._active_workers: dict[str, asyncio.Task] = {}
+        self._results: dict[str, TrainingResult] = {}
 
     async def train_batch(
-        self,
-        tensor_ids: List[str],
-        target_maturity: float = 0.95,
-        max_cycles: int = 1000
-    ) -> Dict[str, TrainingResult]:
+        self, tensor_ids: list[str], target_maturity: float = 0.95, max_cycles: int = 1000
+    ) -> dict[str, TrainingResult]:
         """
         Train a batch of tensors in parallel.
 
@@ -115,10 +113,7 @@ class ParallelTensorTrainer:
         # Create jobs for each tensor
         jobs = []
         for tensor_id in tensor_ids:
-            job = self._job_queue.create_job(
-                tensor_id=tensor_id,
-                target_maturity=target_maturity
-            )
+            job = self._job_queue.create_job(tensor_id=tensor_id, target_maturity=target_maturity)
             jobs.append(job)
 
         # Calculate number of workers to spawn
@@ -130,9 +125,7 @@ class ParallelTensorTrainer:
             worker_id = f"worker-{uuid.uuid4().hex[:8]}"
             task = asyncio.create_task(
                 self._worker_loop(
-                    worker_id=worker_id,
-                    target_maturity=target_maturity,
-                    max_cycles=max_cycles
+                    worker_id=worker_id, target_maturity=target_maturity, max_cycles=max_cycles
                 )
             )
             self._active_workers[worker_id] = task
@@ -149,19 +142,12 @@ class ParallelTensorTrainer:
             if tensor_id not in self._results:
                 # Check if tensor was found but had error
                 self._results[tensor_id] = TrainingResult(
-                    tensor_id=tensor_id,
-                    success=False,
-                    error="Training not completed"
+                    tensor_id=tensor_id, success=False, error="Training not completed"
                 )
 
         return self._results
 
-    async def _worker_loop(
-        self,
-        worker_id: str,
-        target_maturity: float,
-        max_cycles: int
-    ) -> None:
+    async def _worker_loop(self, worker_id: str, target_maturity: float, max_cycles: int) -> None:
         """
         Worker loop that acquires and processes jobs.
 
@@ -186,7 +172,7 @@ class ParallelTensorTrainer:
                     tensor_id=job.tensor_id,
                     target_maturity=target_maturity,
                     worker_id=worker_id,
-                    max_cycles=max_cycles
+                    max_cycles=max_cycles,
                 )
 
                 # Record result
@@ -195,8 +181,7 @@ class ParallelTensorTrainer:
                 # Update job status
                 if result.success:
                     self._job_queue.complete_job(
-                        job.job_id,
-                        cycles_completed=result.cycles_completed
+                        job.job_id, cycles_completed=result.cycles_completed
                     )
                 else:
                     self._job_queue.fail_job(job.job_id, result.error or "Unknown error")
@@ -204,18 +189,12 @@ class ParallelTensorTrainer:
             except Exception as e:
                 # Record failure
                 self._results[job.tensor_id] = TrainingResult(
-                    tensor_id=job.tensor_id,
-                    success=False,
-                    error=str(e)
+                    tensor_id=job.tensor_id, success=False, error=str(e)
                 )
                 self._job_queue.fail_job(job.job_id, str(e))
 
     async def _train_tensor(
-        self,
-        tensor_id: str,
-        target_maturity: float,
-        worker_id: str,
-        max_cycles: int = 1000
+        self, tensor_id: str, target_maturity: float, worker_id: str, max_cycles: int = 1000
     ) -> TrainingResult:
         """
         Train a single tensor to target maturity.
@@ -234,20 +213,14 @@ class ParallelTensorTrainer:
         # Load tensor record
         record = self.tensor_db.get_tensor(tensor_id)
         if record is None:
-            return TrainingResult(
-                tensor_id=tensor_id,
-                success=False,
-                error="Tensor not found"
-            )
+            return TrainingResult(tensor_id=tensor_id, success=False, error="Tensor not found")
 
         # Deserialize tensor
         try:
             tensor = deserialize_tensor(record.tensor_blob)
         except Exception as e:
             return TrainingResult(
-                tensor_id=tensor_id,
-                success=False,
-                error=f"Failed to deserialize tensor: {e}"
+                tensor_id=tensor_id, success=False, error=f"Failed to deserialize tensor: {e}"
             )
 
         # Training loop
@@ -286,7 +259,7 @@ class ParallelTensorTrainer:
             success=True,
             final_maturity=current_maturity,
             cycles_completed=cycles,
-            duration_seconds=duration
+            duration_seconds=duration,
         )
 
     async def _refinement_step(self, tensor: TTMTensor) -> TTMTensor:
@@ -321,7 +294,7 @@ class ParallelTensorTrainer:
 
         return TTMTensor.from_arrays(context, biology, behavior)
 
-    def get_active_jobs(self) -> List[TrainingJob]:
+    def get_active_jobs(self) -> list[TrainingJob]:
         """
         Get list of currently running training jobs.
 
@@ -343,11 +316,11 @@ class ParallelTensorTrainer:
 
 async def train_tensors_parallel(
     tensor_db: TensorDatabase,
-    tensor_ids: List[str],
+    tensor_ids: list[str],
     target_maturity: float = 0.95,
     max_workers: int = 4,
-    progress_callback: Optional[Callable[[str, float, int], None]] = None
-) -> Dict[str, TrainingResult]:
+    progress_callback: Callable[[str, float, int], None] | None = None,
+) -> dict[str, TrainingResult]:
     """
     Convenience function to train multiple tensors in parallel.
 
@@ -362,12 +335,7 @@ async def train_tensors_parallel(
         Dict mapping tensor_id to TrainingResult
     """
     trainer = ParallelTensorTrainer(
-        tensor_db=tensor_db,
-        max_workers=max_workers,
-        progress_callback=progress_callback
+        tensor_db=tensor_db, max_workers=max_workers, progress_callback=progress_callback
     )
 
-    return await trainer.train_batch(
-        tensor_ids=tensor_ids,
-        target_maturity=target_maturity
-    )
+    return await trainer.train_batch(tensor_ids=tensor_ids, target_maturity=target_maturity)

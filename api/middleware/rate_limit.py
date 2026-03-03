@@ -8,22 +8,21 @@ Phase 6: Public API - Rate Limiting
 """
 
 import os
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Optional, Callable, Dict
-from datetime import datetime
 
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from slowapi import Limiter
-from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
-from ..auth import get_api_key, APIKeyRecord
-
+from ..auth import get_api_key
 
 # ============================================================================
 # Configuration
 # ============================================================================
+
 
 @dataclass
 class RateLimitConfig:
@@ -33,19 +32,25 @@ class RateLimitConfig:
     free_rpm: int = field(default_factory=lambda: int(os.getenv("RATE_LIMIT_FREE_RPM", "10")))
     basic_rpm: int = field(default_factory=lambda: int(os.getenv("RATE_LIMIT_BASIC_RPM", "60")))
     pro_rpm: int = field(default_factory=lambda: int(os.getenv("RATE_LIMIT_PRO_RPM", "300")))
-    enterprise_rpm: int = field(default_factory=lambda: int(os.getenv("RATE_LIMIT_ENTERPRISE_RPM", "1000")))
+    enterprise_rpm: int = field(
+        default_factory=lambda: int(os.getenv("RATE_LIMIT_ENTERPRISE_RPM", "1000"))
+    )
 
     # Requests per hour (for expensive operations)
     free_rph: int = field(default_factory=lambda: int(os.getenv("RATE_LIMIT_FREE_RPH", "100")))
     basic_rph: int = field(default_factory=lambda: int(os.getenv("RATE_LIMIT_BASIC_RPH", "1000")))
     pro_rph: int = field(default_factory=lambda: int(os.getenv("RATE_LIMIT_PRO_RPH", "10000")))
-    enterprise_rph: int = field(default_factory=lambda: int(os.getenv("RATE_LIMIT_ENTERPRISE_RPH", "100000")))
+    enterprise_rph: int = field(
+        default_factory=lambda: int(os.getenv("RATE_LIMIT_ENTERPRISE_RPH", "100000"))
+    )
 
     # Burst limits (requests per second)
     free_rps: int = field(default_factory=lambda: int(os.getenv("RATE_LIMIT_FREE_RPS", "2")))
     basic_rps: int = field(default_factory=lambda: int(os.getenv("RATE_LIMIT_BASIC_RPS", "5")))
     pro_rps: int = field(default_factory=lambda: int(os.getenv("RATE_LIMIT_PRO_RPS", "20")))
-    enterprise_rps: int = field(default_factory=lambda: int(os.getenv("RATE_LIMIT_ENTERPRISE_RPS", "50")))
+    enterprise_rps: int = field(
+        default_factory=lambda: int(os.getenv("RATE_LIMIT_ENTERPRISE_RPS", "50"))
+    )
 
     # Simulation-specific limits (concurrent jobs)
     free_concurrent_jobs: int = 1
@@ -54,7 +59,9 @@ class RateLimitConfig:
     enterprise_concurrent_jobs: int = -1  # Unlimited
 
     # Enable/disable rate limiting
-    enabled: bool = field(default_factory=lambda: os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true")
+    enabled: bool = field(
+        default_factory=lambda: os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
+    )
 
     def get_rpm_for_tier(self, tier: str) -> int:
         """Get requests per minute for a tier."""
@@ -94,7 +101,7 @@ class RateLimitConfig:
 
 
 # Global config instance
-_config: Optional[RateLimitConfig] = None
+_config: RateLimitConfig | None = None
 
 
 def get_rate_limit_config() -> RateLimitConfig:
@@ -116,7 +123,7 @@ def reset_rate_limit_config() -> None:
 # ============================================================================
 
 # In-memory tier mapping (in production, this would be from database)
-_USER_TIERS: Dict[str, str] = {}
+_USER_TIERS: dict[str, str] = {}
 
 
 def get_user_tier(user_id: str) -> str:
@@ -153,6 +160,7 @@ def clear_user_tiers() -> None:
 # ============================================================================
 # Rate Limit Key Functions
 # ============================================================================
+
 
 def get_rate_limit_key(request: Request) -> str:
     """
@@ -211,7 +219,7 @@ def get_dynamic_rate_limit(request: Request) -> str:
 # ============================================================================
 
 # Global limiter instance
-_limiter: Optional[Limiter] = None
+_limiter: Limiter | None = None
 
 
 def get_limiter() -> Limiter:
@@ -243,6 +251,7 @@ def reset_limiter() -> None:
 # ============================================================================
 # Exception Handler
 # ============================================================================
+
 
 async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> Response:
     """
@@ -282,18 +291,21 @@ async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) 
                 "concurrent_jobs": config.get_concurrent_jobs_for_tier(tier),
             },
             "retry_after": getattr(exc, "retry_after", 60),
-            "upgrade_info": "Contact support to upgrade your rate limit tier." if tier == "free" else None,
+            "upgrade_info": "Contact support to upgrade your rate limit tier."
+            if tier == "free"
+            else None,
         },
         headers={
             "Retry-After": str(getattr(exc, "retry_after", 60)),
             "X-RateLimit-Tier": tier,
-        }
+        },
     )
 
 
 # ============================================================================
 # Decorators for Common Rate Limits
 # ============================================================================
+
 
 def limit_standard() -> Callable:
     """
@@ -373,7 +385,7 @@ def limit_burst() -> Callable:
 # ============================================================================
 
 # Track active jobs per user
-_ACTIVE_JOBS: Dict[str, int] = {}
+_ACTIVE_JOBS: dict[str, int] = {}
 
 
 def check_job_concurrency(user_id: str) -> bool:

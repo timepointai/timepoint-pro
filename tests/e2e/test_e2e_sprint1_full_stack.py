@@ -10,18 +10,17 @@ Tests the complete Sprint 1 stack:
 - Checkpoint management
 """
 
-import pytest
 import tempfile
-from pathlib import Path
+
+import pytest
 
 from generation import (
-    WorldManager,
-    SimulationConfig,
-    HorizontalGenerator,
-    VerticalGenerator,
-    ProgressTracker,
+    CheckpointManager,
     FaultHandler,
-    CheckpointManager
+    HorizontalGenerator,
+    ProgressTracker,
+    VerticalGenerator,
+    WorldManager,
 )
 from generation.templates.loader import TemplateLoader
 
@@ -57,9 +56,7 @@ class TestSprint1Integration:
 
         # Generate 5 variations (small number for fast test)
         variations = generator.generate_variations(
-            base_config=base_config,
-            count=5,
-            strategies=["vary_personalities"]
+            base_config=base_config, count=5, strategies=["vary_personalities"]
         )
 
         assert len(variations) == 5
@@ -79,10 +76,7 @@ class TestSprint1Integration:
 
         # Expand temporal depth
         expanded = generator.generate_temporal_depth(
-            base_config=base_config,
-            before_count=3,
-            after_count=2,
-            strategy="progressive_training"
+            base_config=base_config, before_count=3, after_count=2, strategy="progressive_training"
         )
 
         assert expanded.timepoints.before_count == 3
@@ -119,10 +113,7 @@ class TestSprint1Integration:
 
     def test_fault_handler_integration(self):
         """Test fault handler with retry logic"""
-        handler = FaultHandler(
-            max_retries=2,
-            initial_backoff=0.01
-        )
+        handler = FaultHandler(max_retries=2, initial_backoff=0.01)
 
         call_count = [0]
 
@@ -143,17 +134,14 @@ class TestSprint1Integration:
     def test_checkpoint_manager_integration(self):
         """Test checkpoint manager for long-running jobs"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            manager = CheckpointManager(
-                checkpoint_dir=tmpdir,
-                auto_save_interval=5
-            )
+            manager = CheckpointManager(checkpoint_dir=tmpdir, auto_save_interval=5)
 
             # Create checkpoint
             manager.create_checkpoint("job_integration", metadata={"test": True})
 
             # Simulate generation with checkpoints
             for i in range(15):
-                manager.update_progress("job_integration", items_completed=i+1)
+                manager.update_progress("job_integration", items_completed=i + 1)
                 if manager.should_save_checkpoint("job_integration"):
                     manager.save_checkpoint("job_integration", state={"step": i})
 
@@ -181,7 +169,7 @@ class TestSprint1Integration:
             variations = h_generator.generate_variations(
                 base_config=base_config,
                 count=3,  # Small number for fast test
-                strategies=["vary_personalities"]
+                strategies=["vary_personalities"],
             )
 
             assert len(variations) == 3
@@ -194,7 +182,7 @@ class TestSprint1Integration:
                 base_config=base_config_v,
                 before_count=2,
                 after_count=2,
-                strategy="progressive_training"
+                strategy="progressive_training",
             )
 
             assert expanded.timepoints.before_count == 2
@@ -214,13 +202,9 @@ class TestSprint1Integration:
             # Step 5: Checkpoint management
             checkpoint_manager = CheckpointManager(checkpoint_dir=tmpdir)
             checkpoint_manager.create_checkpoint(
-                "sprint1_job",
-                metadata={"variations": 3, "expanded": True}
+                "sprint1_job", metadata={"variations": 3, "expanded": True}
             )
-            checkpoint_manager.save_checkpoint(
-                "sprint1_job",
-                state={"completed": True}
-            )
+            checkpoint_manager.save_checkpoint("sprint1_job", state={"completed": True})
 
             loaded = checkpoint_manager.load_checkpoint("sprint1_job")
             assert loaded["metadata"]["variations"] == 3
@@ -249,9 +233,7 @@ class TestComponentInteraction:
         tracker.progress_callback = progress_callback
 
         variations = generator.generate_variations(
-            base_config=base_config,
-            count=5,
-            strategies=["vary_personalities"]
+            base_config=base_config, count=5, strategies=["vary_personalities"]
         )
 
         # Simulate progress updates
@@ -271,9 +253,7 @@ class TestComponentInteraction:
         def generate_with_retry():
             base_config = _loader.load_template("showcase/jefferson_dinner")
             return generator.generate_temporal_depth(
-                base_config=base_config,
-                before_count=2,
-                after_count=2
+                base_config=base_config, before_count=2, after_count=2
             )
 
         result = handler.with_retry(generate_with_retry)
@@ -283,16 +263,10 @@ class TestComponentInteraction:
     def test_generation_with_checkpointing(self):
         """Test generation workflow with checkpointing"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            checkpoint_manager = CheckpointManager(
-                checkpoint_dir=tmpdir,
-                auto_save_interval=2
-            )
+            checkpoint_manager = CheckpointManager(checkpoint_dir=tmpdir, auto_save_interval=2)
 
             # Start job
-            checkpoint_manager.create_checkpoint(
-                "gen_job",
-                metadata={"total": 6}
-            )
+            checkpoint_manager.create_checkpoint("gen_job", metadata={"total": 6})
 
             # Simulate generation with checkpoints
             generator = HorizontalGenerator()
@@ -301,17 +275,14 @@ class TestComponentInteraction:
             variations = []
             for i in range(6):
                 variation = generator.generate_variations(
-                    base_config=base_config,
-                    count=1,
-                    strategies=["vary_personalities"]
+                    base_config=base_config, count=1, strategies=["vary_personalities"]
                 )[0]
                 variations.append(variation)
 
-                checkpoint_manager.update_progress("gen_job", items_completed=i+1)
+                checkpoint_manager.update_progress("gen_job", items_completed=i + 1)
                 if checkpoint_manager.should_save_checkpoint("gen_job"):
                     checkpoint_manager.save_checkpoint(
-                        "gen_job",
-                        state={"variations": [v.world_id for v in variations]}
+                        "gen_job", state={"variations": [v.world_id for v in variations]}
                     )
 
             # Verify checkpoint
@@ -348,9 +319,7 @@ class TestSprint1Acceptance:
         base_config = _loader.load_template("showcase/board_meeting")
 
         variations = generator.generate_variations(
-            base_config=base_config,
-            count=10,
-            strategies=["vary_personalities", "vary_outcomes"]
+            base_config=base_config, count=10, strategies=["vary_personalities", "vary_outcomes"]
         )
 
         assert len(variations) >= 10
@@ -365,10 +334,7 @@ class TestSprint1Acceptance:
         base_config = _loader.load_template("showcase/jefferson_dinner")
 
         expanded = generator.generate_temporal_depth(
-            base_config=base_config,
-            before_count=5,
-            after_count=5,
-            strategy="progressive_training"
+            base_config=base_config, before_count=5, after_count=5, strategy="progressive_training"
         )
 
         assert expanded.timepoints.before_count == 5
@@ -410,8 +376,8 @@ class TestSprint1Acceptance:
 
             # Process first 5 items
             for i in range(5):
-                manager.update_progress("fault_test", items_completed=i+1)
-                manager.save_checkpoint("fault_test", state={"processed": i+1})
+                manager.update_progress("fault_test", items_completed=i + 1)
+                manager.save_checkpoint("fault_test", state={"processed": i + 1})
 
             # Simulate crash and restart
             checkpoint = manager.load_checkpoint("fault_test")
@@ -420,8 +386,8 @@ class TestSprint1Acceptance:
 
             # Continue from checkpoint
             for i in range(resume_from, 10):
-                manager.update_progress("fault_test", items_completed=i+1)
-                manager.save_checkpoint("fault_test", state={"processed": i+1})
+                manager.update_progress("fault_test", items_completed=i + 1)
+                manager.save_checkpoint("fault_test", state={"processed": i + 1})
 
             # Verify completion
             assert manager.get_checkpoint_metadata("fault_test")["items_completed"] == 10

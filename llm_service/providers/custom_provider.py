@@ -4,22 +4,22 @@ Custom OpenRouter Provider - Direct HTTP integration
 Wraps the existing OpenRouterClient for backward compatibility.
 """
 
-from typing import Type, Optional, Dict, Any
-from pydantic import BaseModel
-import time
-import json
-
-from llm_service.provider import LLMProvider, LLMResponse
-from llm_service.response_parser import ResponseParser
+import os
 
 # Import existing client from llm.py
 import sys
-import os
+import time
+
+from pydantic import BaseModel
+
+from llm_service.provider import LLMResponse
+from llm_service.response_parser import ResponseParser
+
 # Get the project root directory
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
-from llm import OpenRouterClient, ModelManager
+from llm import ModelManager, OpenRouterClient
 
 
 class CustomOpenRouterProvider:
@@ -34,7 +34,7 @@ class CustomOpenRouterProvider:
         self,
         api_key: str,
         base_url: str = "https://openrouter.ai/api/v1",
-        default_model: Optional[str] = None,
+        default_model: str | None = None,
         model_cache_ttl_hours: int = 24,
     ):
         """
@@ -68,8 +68,8 @@ class CustomOpenRouterProvider:
         top_p: float = 0.9,
         frequency_penalty: float = 0.0,
         presence_penalty: float = 0.0,
-        model: Optional[str] = None,
-        **kwargs
+        model: str | None = None,
+        **kwargs,
     ) -> LLMResponse:
         """Make a chat completion call"""
         selected_model = model or self.default_model
@@ -133,11 +133,11 @@ class CustomOpenRouterProvider:
         self,
         system: str,
         user: str,
-        schema: Type[BaseModel],
+        schema: type[BaseModel],
         temperature: float = 0.7,
         max_tokens: int = 1000,
-        model: Optional[str] = None,
-        **kwargs
+        model: str | None = None,
+        **kwargs,
     ) -> BaseModel:
         """Make a structured output call"""
         # Add schema instruction to prompt
@@ -154,7 +154,7 @@ class CustomOpenRouterProvider:
             temperature=temperature,
             max_tokens=max_tokens,
             model=model,
-            **kwargs
+            **kwargs,
         )
 
         if not response.success:
@@ -183,12 +183,12 @@ class CustomOpenRouterProvider:
         models = self.model_manager.get_llama_models()
         return [model["id"] for model in models]
 
-    def _estimate_cost(self, tokens_used: Dict[str, int], model: str) -> float:
+    def _estimate_cost(self, tokens_used: dict[str, int], model: str) -> float:
         """Estimate API cost in USD"""
         # Rough cost estimates per 1M tokens
         cost_per_million = {
             "70b": 0.60,  # ~$0.60 per 1M tokens
-            "8b": 0.10,   # ~$0.10 per 1M tokens
+            "8b": 0.10,  # ~$0.10 per 1M tokens
         }
 
         # Determine model size from ID

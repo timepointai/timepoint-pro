@@ -8,7 +8,6 @@ Phase 3: Retrieval System
 """
 
 import numpy as np
-from typing import List, Optional
 
 from schemas import TTMTensor
 
@@ -24,9 +23,7 @@ class TensorComposer:
     """
 
     def weighted_blend(
-        self,
-        tensors: List[np.ndarray],
-        weights: Optional[List[float]] = None
+        self, tensors: list[np.ndarray], weights: list[float] | None = None
     ) -> np.ndarray:
         """
         Blend tensors using weighted average.
@@ -60,7 +57,7 @@ class TensorComposer:
 
         return result
 
-    def max_pool(self, tensors: List[np.ndarray]) -> np.ndarray:
+    def max_pool(self, tensors: list[np.ndarray]) -> np.ndarray:
         """
         Pool tensors by taking maximum value per dimension.
 
@@ -79,7 +76,7 @@ class TensorComposer:
         stacked = np.stack([t.astype(np.float32) for t in tensors])
         return np.max(stacked, axis=0)
 
-    def hierarchical(self, tensors: List[np.ndarray]) -> np.ndarray:
+    def hierarchical(self, tensors: list[np.ndarray]) -> np.ndarray:
         """
         Compose tensors hierarchically.
 
@@ -111,9 +108,9 @@ class TensorComposer:
 
     def compose_tensors(
         self,
-        tensors: List[TTMTensor],
+        tensors: list[TTMTensor],
         method: str = "weighted_blend",
-        weights: Optional[List[float]] = None
+        weights: list[float] | None = None,
     ) -> TTMTensor:
         """
         Compose full TTMTensor objects.
@@ -171,11 +168,7 @@ class TensorComposer:
             behavior=behavior,
         )
 
-    def blend_with_scores(
-        self,
-        tensors: List[TTMTensor],
-        scores: List[float]
-    ) -> TTMTensor:
+    def blend_with_scores(self, tensors: list[TTMTensor], scores: list[float]) -> TTMTensor:
         """
         Blend tensors using their similarity scores as weights.
 

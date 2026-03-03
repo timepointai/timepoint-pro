@@ -8,10 +8,9 @@ Generates concise 3-5 sentence summaries of each E2E workflow run by:
 - Returning summary for storage in database
 """
 
-from typing import Dict, List, Optional, Any
-from datetime import datetime
-from pathlib import Path
 import json
+from typing import Any
+
 from llm_v2 import LLMClient
 from metadata.run_tracker import RunMetadata
 
@@ -19,7 +18,7 @@ from metadata.run_tracker import RunMetadata
 class RunSummarizer:
     """Generates LLM-powered summaries of simulation runs"""
 
-    def __init__(self, llm_client: Optional[LLMClient] = None):
+    def __init__(self, llm_client: LLMClient | None = None):
         """
         Initialize summarizer with LLM client.
 
@@ -31,10 +30,10 @@ class RunSummarizer:
     def generate_summary(
         self,
         run_metadata: RunMetadata,
-        training_data: Optional[List[Dict]] = None,
-        all_timepoints: Optional[List] = None,
-        entities: Optional[List] = None,
-        store = None
+        training_data: list[dict] | None = None,
+        all_timepoints: list | None = None,
+        entities: list | None = None,
+        store=None,
     ) -> str:
         """
         Generate narrative summary using LLM (like a plot synopsis).
@@ -61,6 +60,7 @@ class RunSummarizer:
 
         # Call LLM with retry logic (use Haiku for cost efficiency: ~$0.003 per narrative summary)
         import time
+
         max_retries = 3
         retry_delay = 2  # seconds
 
@@ -72,7 +72,7 @@ class RunSummarizer:
                     model="anthropic/claude-3-5-haiku-20241022",
                     max_tokens=800,  # Increased for narrative summaries
                     temperature=0.7,  # Higher temp for creative narrative
-                    call_type="generate_summary"
+                    call_type="generate_summary",
                 )
                 summary = response.content.strip() if response.success else None
                 if not summary:
@@ -82,12 +82,18 @@ class RunSummarizer:
             except Exception as e:
                 error_str = str(e).lower()
                 # Check if this is a rate limit error (429)
-                is_rate_limit = "429" in error_str or "rate limit" in error_str or "too many requests" in error_str
+                is_rate_limit = (
+                    "429" in error_str
+                    or "rate limit" in error_str
+                    or "too many requests" in error_str
+                )
 
                 if is_rate_limit and attempt < max_retries - 1:
                     # Exponential backoff for rate limits
-                    wait_time = retry_delay * (2 ** attempt)
-                    print(f"Rate limit hit, retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})...")
+                    wait_time = retry_delay * (2**attempt)
+                    print(
+                        f"Rate limit hit, retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})..."
+                    )
                     time.sleep(wait_time)
                     continue
                 else:
@@ -97,10 +103,8 @@ class RunSummarizer:
                     return summary
 
     def _collect_run_artifacts(
-        self,
-        metadata: RunMetadata,
-        training_data: Optional[List[Dict]]
-    ) -> Dict[str, Any]:
+        self, metadata: RunMetadata, training_data: list[dict] | None
+    ) -> dict[str, Any]:
         """
         Gather key information for summary.
 
@@ -112,47 +116,46 @@ class RunSummarizer:
             "run_id": metadata.run_id,
             "template_id": metadata.template_id,
             "status": metadata.status,
-
             # Configuration
-            "causal_mode": metadata.causal_mode.value if hasattr(metadata.causal_mode, 'value') else str(metadata.causal_mode),
+            "causal_mode": metadata.causal_mode.value
+            if hasattr(metadata.causal_mode, "value")
+            else str(metadata.causal_mode),
             "max_entities": metadata.max_entities,
             "max_timepoints": metadata.max_timepoints,
-
             # Results
             "entities_created": metadata.entities_created,
             "timepoints_created": metadata.timepoints_created,
             "training_examples": metadata.training_examples,
-
             # Mechanisms
             "mechanisms_used": sorted(list(metadata.mechanisms_used)),
             "mechanism_count": len(metadata.mechanisms_used),
-
             # Cost & performance
             "cost_usd": metadata.cost_usd,
             "duration_seconds": metadata.duration_seconds,
             "llm_calls": metadata.llm_calls,
             "tokens_used": metadata.tokens_used,
-
             # Validations (if available)
-            "validations_passed": sum(1 for v in metadata.validations if v.passed) if metadata.validations else 0,
-            "validations_failed": sum(1 for v in metadata.validations if not v.passed) if metadata.validations else 0,
-
+            "validations_passed": sum(1 for v in metadata.validations if v.passed)
+            if metadata.validations
+            else 0,
+            "validations_failed": sum(1 for v in metadata.validations if not v.passed)
+            if metadata.validations
+            else 0,
             # Resolution diversity (if available)
-            "resolution_diversity": len(set(r.resolution for r in metadata.resolution_assignments)) if metadata.resolution_assignments else 0,
-
+            "resolution_diversity": len(set(r.resolution for r in metadata.resolution_assignments))
+            if metadata.resolution_assignments
+            else 0,
             # Training data sample
             "training_data_sample": training_data[:3] if training_data else None,
-
             # Error info
             "error_message": metadata.error_message,
-
             # Oxen upload
-            "oxen_uploaded": bool(metadata.oxen_dataset_url)
+            "oxen_uploaded": bool(metadata.oxen_dataset_url),
         }
 
         return artifacts
 
-    def _format_summary_prompt(self, artifacts: Dict[str, Any]) -> str:
+    def _format_summary_prompt(self, artifacts: dict[str, Any]) -> str:
         """
         Build LLM prompt from run artifacts.
 
@@ -171,61 +174,65 @@ Keep it SHORT and INFORMATIVE. Use past tense. Focus on outcomes, not process.
 
 ## Run Information
 
-Template: {artifacts['template_id']}
-Status: {artifacts['status']}
-Causal Mode: {artifacts['causal_mode']}
+Template: {artifacts["template_id"]}
+Status: {artifacts["status"]}
+Causal Mode: {artifacts["causal_mode"]}
 
 ## Configuration
 
-Max Entities: {artifacts['max_entities']}
-Max Timepoints: {artifacts['max_timepoints']}
+Max Entities: {artifacts["max_entities"]}
+Max Timepoints: {artifacts["max_timepoints"]}
 
 ## Results
 
-Entities Created: {artifacts['entities_created']}
-Timepoints Created: {artifacts['timepoints_created']}
-Training Examples: {artifacts['training_examples']}
+Entities Created: {artifacts["entities_created"]}
+Timepoints Created: {artifacts["timepoints_created"]}
+Training Examples: {artifacts["training_examples"]}
 
-## Mechanisms Used ({artifacts['mechanism_count']})
+## Mechanisms Used ({artifacts["mechanism_count"]})
 
-{', '.join(artifacts['mechanisms_used']) if artifacts['mechanisms_used'] else 'None'}
+{", ".join(artifacts["mechanisms_used"]) if artifacts["mechanisms_used"] else "None"}
 
 ## Performance
 
-Cost: ${artifacts['cost_usd']:.2f}
-Duration: {artifacts['duration_seconds']:.1f}s
-LLM Calls: {artifacts['llm_calls']}
-Tokens: {artifacts['tokens_used']:,}
+Cost: ${artifacts["cost_usd"]:.2f}
+Duration: {artifacts["duration_seconds"]:.1f}s
+LLM Calls: {artifacts["llm_calls"]}
+Tokens: {artifacts["tokens_used"]:,}
 
 ## Validations
 
-Passed: {artifacts['validations_passed']}
-Failed: {artifacts['validations_failed']}
+Passed: {artifacts["validations_passed"]}
+Failed: {artifacts["validations_failed"]}
 
 ## Resolution Diversity
 
-{artifacts['resolution_diversity']} different resolution levels used
+{artifacts["resolution_diversity"]} different resolution levels used
 
 """
 
-        if artifacts['error_message']:
+        if artifacts["error_message"]:
             prompt += f"\n## Error\n\n{artifacts['error_message']}\n"
 
-        if artifacts['oxen_uploaded']:
+        if artifacts["oxen_uploaded"]:
             prompt += "\n## Data Upload\n\nTraining data uploaded to Oxen.ai\n"
 
-        if artifacts['training_data_sample']:
-            prompt += f"\n## Training Data Sample (first 3 examples)\n\n"
-            for i, example in enumerate(artifacts['training_data_sample'], 1):
+        if artifacts["training_data_sample"]:
+            prompt += "\n## Training Data Sample (first 3 examples)\n\n"
+            for i, example in enumerate(artifacts["training_data_sample"], 1):
                 prompt += f"Example {i}:\n"
-                prompt += f"  Input: {example.get('messages', [{}])[0].get('content', 'N/A')[:100]}...\n"
+                prompt += (
+                    f"  Input: {example.get('messages', [{}])[0].get('content', 'N/A')[:100]}...\n"
+                )
                 prompt += f"  Output: {example.get('messages', [{}])[-1].get('content', 'N/A')[:100]}...\n\n"
 
         prompt += "\n## Your Task\n\nGenerate a 3-5 sentence summary. Be concise and informative.\n\nSummary:"
 
         return prompt
 
-    def _format_narrative_prompt(self, artifacts: Dict[str, Any], all_timepoints: List, entities: List, store) -> str:
+    def _format_narrative_prompt(
+        self, artifacts: dict[str, Any], all_timepoints: list, entities: list, store
+    ) -> str:
         """
         Build NARRATIVE summary prompt (like a movie plot synopsis).
 
@@ -235,10 +242,14 @@ Failed: {artifacts['validations_failed']}
             Narrative-focused prompt string
         """
         # Extract narrative arc from timepoints
-        timeline = "\n".join([
-            f"{i+1}. {tp.timestamp if hasattr(tp, 'timestamp') else 'Time unknown'} - {tp.event_description if hasattr(tp, 'event_description') else str(tp)}"
-            for i, tp in enumerate(all_timepoints[:10])  # Limit to first 10 to avoid huge prompts
-        ])
+        timeline = "\n".join(
+            [
+                f"{i + 1}. {tp.timestamp if hasattr(tp, 'timestamp') else 'Time unknown'} - {tp.event_description if hasattr(tp, 'event_description') else str(tp)}"
+                for i, tp in enumerate(
+                    all_timepoints[:10]
+                )  # Limit to first 10 to avoid huge prompts
+            ]
+        )
 
         if len(all_timepoints) > 10:
             timeline += f"\n... ({len(all_timepoints) - 10} more timepoints)"
@@ -246,9 +257,15 @@ Failed: {artifacts['validations_failed']}
         # Character summaries
         characters = []
         for e in entities[:15]:  # Limit to 15 main characters
-            if hasattr(e, 'entity_id') and hasattr(e, 'entity_type'):
-                knowledge_count = len(e.knowledge_state) if hasattr(e, 'knowledge_state') and e.knowledge_state else 0
-                characters.append(f"- **{e.entity_id}**: {e.entity_type}, {knowledge_count} knowledge items")
+            if hasattr(e, "entity_id") and hasattr(e, "entity_type"):
+                knowledge_count = (
+                    len(e.knowledge_state)
+                    if hasattr(e, "knowledge_state") and e.knowledge_state
+                    else 0
+                )
+                characters.append(
+                    f"- **{e.entity_id}**: {e.entity_type}, {knowledge_count} knowledge items"
+                )
 
         characters_text = "\n".join(characters) if characters else "(No character data available)"
 
@@ -263,18 +280,18 @@ Failed: {artifacts['validations_failed']}
                 if dialogs and len(dialogs) > 0:
                     first_dialog = dialogs[0]
                     # Deserialize JSON string from DB storage
-                    turns_data = first_dialog.turns if hasattr(first_dialog, 'turns') else []
+                    turns_data = first_dialog.turns if hasattr(first_dialog, "turns") else []
                     if isinstance(turns_data, str):
                         turns_data = json.loads(turns_data)
                     if turns_data and len(turns_data) > 0:
                         excerpt_turns = []
                         for turn in turns_data[:3]:  # First 3 turns
                             if isinstance(turn, dict):
-                                speaker = turn.get('speaker', 'Unknown')
-                                content = turn.get('content', str(turn))
+                                speaker = turn.get("speaker", "Unknown")
+                                content = turn.get("content", str(turn))
                             else:
-                                speaker = turn.speaker if hasattr(turn, 'speaker') else 'Unknown'
-                                content = turn.content if hasattr(turn, 'content') else str(turn)
+                                speaker = turn.speaker if hasattr(turn, "speaker") else "Unknown"
+                                content = turn.content if hasattr(turn, "content") else str(turn)
                             excerpt_turns.append(f"{speaker}: {content[:100]}...")
                         dialog_excerpt = "\n".join(excerpt_turns)
             except Exception as e:
@@ -295,9 +312,9 @@ Write 3-4 paragraphs that capture the narrative arc like you're describing a fil
 
 ## Scenario
 
-**Title**: {artifacts['template_id']}
-**Mode**: {artifacts['causal_mode']} causality
-**Setting**: {all_timepoints[0].event_description if hasattr(all_timepoints[0], 'event_description') else 'Historical simulation'}
+**Title**: {artifacts["template_id"]}
+**Mode**: {artifacts["causal_mode"]} causality
+**Setting**: {all_timepoints[0].event_description if hasattr(all_timepoints[0], "event_description") else "Historical simulation"}
 
 ## Timeline of Events
 
@@ -330,14 +347,14 @@ Summary:"""
 
         return prompt
 
-    def _generate_fallback_summary(self, artifacts: Dict[str, Any]) -> str:
+    def _generate_fallback_summary(self, artifacts: dict[str, Any]) -> str:
         """
         Generate structured summary if LLM is unavailable.
 
         Returns:
             Template-based summary string
         """
-        status_verb = "completed" if artifacts['status'] == "completed" else "failed"
+        status_verb = "completed" if artifacts["status"] == "completed" else "failed"
 
         summary = (
             f"Simulation of {artifacts['template_id']} {status_verb} using {artifacts['causal_mode']} causality. "
@@ -352,11 +369,11 @@ Summary:"""
 
 def generate_run_summary(
     run_metadata: RunMetadata,
-    training_data: Optional[List[Dict]] = None,
-    llm_client: Optional[LLMClient] = None,
-    all_timepoints: Optional[List] = None,
-    entities: Optional[List] = None,
-    store = None
+    training_data: list[dict] | None = None,
+    llm_client: LLMClient | None = None,
+    all_timepoints: list | None = None,
+    entities: list | None = None,
+    store=None,
 ) -> str:
     """
     Convenience function to generate narrative summary for a run.

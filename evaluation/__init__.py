@@ -15,13 +15,13 @@ Convergence across independent runs indicates robust causal chains.
 from evaluation.convergence import (
     CausalGraph,
     ConvergenceResult,
-    extract_causal_graph,
-    graph_similarity,
     compute_convergence,
-    find_divergence_points,
-    extract_outcome_summary,
-    outcome_similarity,
     compute_outcome_convergence,
+    extract_causal_graph,
+    extract_outcome_summary,
+    find_divergence_points,
+    graph_similarity,
+    outcome_similarity,
 )
 
 __all__ = [

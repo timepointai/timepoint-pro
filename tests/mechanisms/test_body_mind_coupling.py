@@ -4,8 +4,9 @@ Test script for Phase 2.1: Body-Mind Coupling (Mechanism 8.1)
 Tests that physical state affects cognitive state.
 """
 
-from schemas import Entity, PhysicalTensor, CognitiveTensor, ResolutionLevel
+from schemas import CognitiveTensor, Entity, PhysicalTensor, ResolutionLevel
 from temporal_chain import apply_body_mind_coupling
+
 
 def test_pain_coupling():
     """Test that pain reduces cognitive energy budget"""
@@ -16,7 +17,7 @@ def test_pain_coupling():
         entity_id="washington",
         entity_type="person",
         resolution_level=ResolutionLevel.TENSOR_ONLY,
-        entity_metadata={}
+        entity_metadata={},
     )
 
     # Set baseline physical state (healthy)
@@ -24,7 +25,7 @@ def test_pain_coupling():
         age=57.0,
         health_status=1.0,
         pain_level=0.0,  # No pain initially
-        fever=36.5  # Normal temperature
+        fever=36.5,  # Normal temperature
     )
 
     # Set baseline cognitive state
@@ -34,10 +35,12 @@ def test_pain_coupling():
         patience_threshold=50.0,
         decision_confidence=0.8,
         risk_tolerance=0.5,
-        social_engagement=0.8
+        social_engagement=0.8,
     )
 
-    print(f"  📊 Baseline - Energy: {entity.cognitive_tensor.energy_budget}, Valence: {entity.cognitive_tensor.emotional_valence}")
+    print(
+        f"  📊 Baseline - Energy: {entity.cognitive_tensor.energy_budget}, Valence: {entity.cognitive_tensor.emotional_valence}"
+    )
 
     # Apply body-mind coupling (should have no effect since pain=0)
     entity = apply_body_mind_coupling(entity)
@@ -74,6 +77,7 @@ def test_pain_coupling():
     print("  ✅ Pain coupling test PASSED")
     return True
 
+
 def test_fever_coupling():
     """Test that fever affects cognitive decision confidence"""
     print("\n🌡️ Testing Body-Mind Coupling: Fever Effects")
@@ -83,7 +87,7 @@ def test_fever_coupling():
         entity_id="jefferson",
         entity_type="person",
         resolution_level=ResolutionLevel.TENSOR_ONLY,
-        entity_metadata={}
+        entity_metadata={},
     )
 
     # Set physical state with high fever
@@ -91,7 +95,7 @@ def test_fever_coupling():
         age=45.0,
         health_status=0.6,
         pain_level=0.0,
-        fever=39.5  # High fever (>38.5 threshold)
+        fever=39.5,  # High fever (>38.5 threshold)
     )
 
     # Set baseline cognitive state
@@ -101,23 +105,34 @@ def test_fever_coupling():
         patience_threshold=50.0,
         decision_confidence=0.8,
         risk_tolerance=0.5,
-        social_engagement=0.8
+        social_engagement=0.8,
     )
 
-    print(f"  📊 Baseline - Confidence: {entity.cognitive_tensor.decision_confidence}, Risk: {entity.cognitive_tensor.risk_tolerance}, Social: {entity.cognitive_tensor.social_engagement}")
+    print(
+        f"  📊 Baseline - Confidence: {entity.cognitive_tensor.decision_confidence}, Risk: {entity.cognitive_tensor.risk_tolerance}, Social: {entity.cognitive_tensor.social_engagement}"
+    )
 
     # Apply body-mind coupling
     entity = apply_body_mind_coupling(entity)
 
-    print(f"  📊 High Fever - Confidence: {entity.cognitive_tensor.decision_confidence}, Risk: {entity.cognitive_tensor.risk_tolerance}, Social: {entity.cognitive_tensor.social_engagement}")
+    print(
+        f"  📊 High Fever - Confidence: {entity.cognitive_tensor.decision_confidence}, Risk: {entity.cognitive_tensor.risk_tolerance}, Social: {entity.cognitive_tensor.social_engagement}"
+    )
 
     # Verify fever effects
-    assert entity.cognitive_tensor.decision_confidence < 0.8, f"Expected confidence < 0.8, got {entity.cognitive_tensor.decision_confidence}"
-    assert entity.cognitive_tensor.risk_tolerance > 0.5, f"Expected risk tolerance > 0.5, got {entity.cognitive_tensor.risk_tolerance}"
-    assert entity.cognitive_tensor.social_engagement < 0.8, f"Expected social engagement < 0.8, got {entity.cognitive_tensor.social_engagement}"
+    assert entity.cognitive_tensor.decision_confidence < 0.8, (
+        f"Expected confidence < 0.8, got {entity.cognitive_tensor.decision_confidence}"
+    )
+    assert entity.cognitive_tensor.risk_tolerance > 0.5, (
+        f"Expected risk tolerance > 0.5, got {entity.cognitive_tensor.risk_tolerance}"
+    )
+    assert entity.cognitive_tensor.social_engagement < 0.8, (
+        f"Expected social engagement < 0.8, got {entity.cognitive_tensor.social_engagement}"
+    )
 
     print("  ✅ Fever coupling test PASSED")
     return True
+
 
 if __name__ == "__main__":
     print("🧪 Running Body-Mind Coupling Tests (Phase 2.1)")

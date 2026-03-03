@@ -37,24 +37,29 @@ Example:
     emitter.emit(SynthEvent.RUN_START, "run_123", {"template": "board_meeting"})
 """
 
-from synth.envelope import EnvelopeConfig, DEFAULT_ENVELOPE
-from synth.voice import VoiceConfig, VoiceMixer, DEFAULT_VOICE
-from synth.fidelity_envelope import ADPRSEnvelope, ADPRSComposite, FidelityBand, phi_to_resolution_band
-from synth.shadow_evaluator import ShadowEvaluator, ShadowEvaluationReport
-from synth.trajectory_tracker import TrajectoryTracker, CognitiveSnapshot
 from synth.adprs_fitter import ADPRSFitter, FitResult, adprs_waveform
-from synth.harmonic_fitter import HarmonicFitter, HarmonicFitResult, harmonic_adprs_waveform
-from synth.waveform_scheduler import WaveformScheduler
+from synth.envelope import DEFAULT_ENVELOPE, EnvelopeConfig
 from synth.events import (
+    EventListener,
     SynthEvent,
     SynthEventData,
     SynthEventEmitter,
-    EventListener,
-    logging_listener,
     console_listener,
     get_emitter,
+    logging_listener,
     set_emitter,
 )
+from synth.fidelity_envelope import (
+    ADPRSComposite,
+    ADPRSEnvelope,
+    FidelityBand,
+    phi_to_resolution_band,
+)
+from synth.harmonic_fitter import HarmonicFitResult, HarmonicFitter, harmonic_adprs_waveform
+from synth.shadow_evaluator import ShadowEvaluationReport, ShadowEvaluator
+from synth.trajectory_tracker import CognitiveSnapshot, TrajectoryTracker
+from synth.voice import DEFAULT_VOICE, VoiceConfig, VoiceMixer
+from synth.waveform_scheduler import WaveformScheduler
 
 __all__ = [
     # Envelope

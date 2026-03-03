@@ -11,15 +11,15 @@ Provides:
 - Test file tracking and timestamp monitoring
 - SynthasAIzer paradigm fixtures (templates, patches, envelopes, voices)
 """
-import ast
+
 import os
 import re
 import tempfile
 import time
+from collections.abc import Generator
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Generator
-from dataclasses import dataclass
 
 import pytest
 from dotenv import load_dotenv
@@ -28,36 +28,38 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Import test tracker for file monitoring
-pytest_plugins = ['tests.pytest_test_tracker']
+pytest_plugins = ["tests.pytest_test_tracker"]
 
 
 # ============================================================================
 # Test Quality Validation (from test_validation_system.py)
 # ============================================================================
 
+
 @dataclass
 class TestQualityReport:
     """Quality report for test validation"""
+
     file_path: str
-    issues: List[str]
-    warnings: List[str]
+    issues: list[str]
+    warnings: list[str]
     quality_score: float
 
 
 def validate_test_quality(item: pytest.Item) -> TestQualityReport:
     """Validate test quality using AST analysis"""
     critical_patterns = [
-        (r'assert True\b', "Meaningless assertion 'assert True'"),
-        (r'assert False\b(?!\s*,)', "Always-failing assertion 'assert False'"),
-        (r'^\s*pass\s*$', "Empty test body with only 'pass'"),
-        (r'raise NotImplementedError', "Placeholder implementation"),
-        (r'time\.sleep\(\d+\)', "Unnecessary sleep() in test"),
+        (r"assert True\b", "Meaningless assertion 'assert True'"),
+        (r"assert False\b(?!\s*,)", "Always-failing assertion 'assert False'"),
+        (r"^\s*pass\s*$", "Empty test body with only 'pass'"),
+        (r"raise NotImplementedError", "Placeholder implementation"),
+        (r"time\.sleep\(\d+\)", "Unnecessary sleep() in test"),
     ]
     warning_patterns = [
-        (r'print\(', "Debug print() statement"),
-        (r'pdb\.set_trace', "Debug breakpoint left in code"),
-        (r'# TODO', "Incomplete implementation (TODO)"),
-        (r'except.*:\s*pass', "Bare except clause"),
+        (r"print\(", "Debug print() statement"),
+        (r"pdb\.set_trace", "Debug breakpoint left in code"),
+        (r"# TODO", "Incomplete implementation (TODO)"),
+        (r"except.*:\s*pass", "Bare except clause"),
     ]
 
     file_path = str(item.fspath)
@@ -66,7 +68,7 @@ def validate_test_quality(item: pytest.Item) -> TestQualityReport:
     quality_score = 1.0
 
     try:
-        with open(file_path, 'r') as f:
+        with open(file_path) as f:
             content = f.read()
 
         # Check for critical patterns
@@ -88,10 +90,7 @@ def validate_test_quality(item: pytest.Item) -> TestQualityReport:
         quality_score = 0.5
 
     return TestQualityReport(
-        file_path=file_path,
-        issues=issues,
-        warnings=warnings,
-        quality_score=quality_score
+        file_path=file_path, issues=issues, warnings=warnings, quality_score=quality_score
     )
 
 
@@ -113,19 +112,21 @@ def pytest_collection_modifyitems(config, items):
 
         if report.issues and strict_quality:
             if report.quality_score < quality_threshold:
-                item.add_marker(pytest.mark.skip(
-                    reason=f"Quality score {report.quality_score:.2f} below threshold {quality_threshold}: {report.issues[0]}"
-                ))
+                item.add_marker(
+                    pytest.mark.skip(
+                        reason=f"Quality score {report.quality_score:.2f} below threshold {quality_threshold}: {report.issues[0]}"
+                    )
+                )
 
         # Auto-mark slow tests (those with sleep, LLM calls, etc.)
-        if 'llm_client' in item.fixturenames or 'real_llm' in item.fixturenames:
-            if not item.get_closest_marker('slow'):
+        if "llm_client" in item.fixturenames or "real_llm" in item.fixturenames:
+            if not item.get_closest_marker("slow"):
                 item.add_marker(pytest.mark.slow)
-            if not item.get_closest_marker('llm'):
+            if not item.get_closest_marker("llm"):
                 item.add_marker(pytest.mark.llm)
 
         # Auto-mark integration tests (those using multiple fixtures)
-        if len(item.fixturenames) >= 3 and not item.get_closest_marker('integration'):
+        if len(item.fixturenames) >= 3 and not item.get_closest_marker("integration"):
             item.add_marker(pytest.mark.integration)
 
 
@@ -135,38 +136,37 @@ def pytest_addoption(parser):
         "--strict-quality",
         action="store_true",
         default=False,
-        help="Skip tests with quality score below threshold"
+        help="Skip tests with quality score below threshold",
     )
     parser.addoption(
         "--quality-threshold",
         action="store",
         default="0.7",
-        help="Minimum quality score (0.0-1.0) for tests to run"
+        help="Minimum quality score (0.0-1.0) for tests to run",
     )
     parser.addoption(
         "--skip-llm",
         action="store_true",
         default=False,
-        help="Skip tests that make real LLM API calls"
+        help="Skip tests that make real LLM API calls",
     )
     parser.addoption(
-        "--skip-slow",
-        action="store_true",
-        default=False,
-        help="Skip slow-running tests"
+        "--skip-slow", action="store_true", default=False, help="Skip slow-running tests"
     )
     parser.addoption(
         "--real-llm",
         action="store_true",
         default=False,
-        help="Enable real LLM API calls (requires OPENROUTER_API_KEY)"
+        help="Enable real LLM API calls (requires OPENROUTER_API_KEY)",
     )
 
 
 def pytest_configure(config):
     """Configure pytest with custom markers and settings"""
     # Register all markers
-    config.addinivalue_line("markers", "unit: Unit tests (fast, isolated, no external dependencies)")
+    config.addinivalue_line(
+        "markers", "unit: Unit tests (fast, isolated, no external dependencies)"
+    )
     config.addinivalue_line("markers", "integration: Integration tests (multiple components)")
     config.addinivalue_line("markers", "system: System-level tests (full stack)")
     config.addinivalue_line("markers", "e2e: End-to-end tests (complete workflows)")
@@ -179,7 +179,9 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "validation: Data validation and consistency")
     config.addinivalue_line("markers", "safety: Security and safety features")
     config.addinivalue_line("markers", "compliance: Regulatory and compliance")
-    config.addinivalue_line("markers", "validation_workflow: Critical validation workflow tests (requires real LLM)")
+    config.addinivalue_line(
+        "markers", "validation_workflow: Critical validation workflow tests (requires real LLM)"
+    )
 
     # Apply skip markers based on options
     if config.getoption("--skip-llm"):
@@ -193,10 +195,11 @@ def pytest_configure(config):
 # Shared Fixtures - Database and Storage
 # ============================================================================
 
+
 @pytest.fixture(scope="function")
 def temp_db_path() -> Generator[str, None, None]:
     """Provide a temporary database file path"""
-    with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as f:
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
         db_path = f.name
 
     yield db_path
@@ -225,7 +228,7 @@ def shared_graph_store():
     """Provide a session-scoped shared GraphStore for integration tests"""
     from storage import GraphStore
 
-    with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as f:
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
         db_path = f.name
 
     store = GraphStore(f"sqlite:///{db_path}")
@@ -243,16 +246,17 @@ def shared_graph_store():
 # Shared Fixtures - LLM Clients
 # ============================================================================
 
+
 @pytest.fixture(scope="session")
-def llm_api_key() -> Optional[str]:
+def llm_api_key() -> str | None:
     """Get LLM API key from environment"""
-    return os.getenv('OPENROUTER_API_KEY')
+    return os.getenv("OPENROUTER_API_KEY")
 
 
 @pytest.fixture(scope="session")
 def has_llm_api_key(llm_api_key) -> bool:
     """Check if LLM API key is available"""
-    return llm_api_key is not None and llm_api_key != 'test'
+    return llm_api_key is not None and llm_api_key != "test"
 
 
 @pytest.fixture(scope="function")
@@ -268,12 +272,11 @@ def llm_client(llm_api_key, request):
 
     # Check if test requires real LLM
     requires_real = (
-        request.config.getoption("--real-llm") or
-        request.node.get_closest_marker('llm') is not None
+        request.config.getoption("--real-llm") or request.node.get_closest_marker("llm") is not None
     )
 
     if requires_real:
-        if not llm_api_key or llm_api_key == 'test':
+        if not llm_api_key or llm_api_key == "test":
             pytest.skip("Real LLM test requires OPENROUTER_API_KEY")
 
         # Real LLM client
@@ -289,7 +292,7 @@ def llm_client(llm_api_key, request):
             print(f"\n💰 LLM test '{request.node.name}' took {execution_time:.2f}s")
     else:
         # Mock LLM client - use dummy key
-        client = LLMClient(api_key='test')
+        client = LLMClient(api_key="test")
         yield client
 
 
@@ -302,7 +305,7 @@ def real_llm_client(llm_api_key):
     """
     from llm_v2 import LLMClient
 
-    if not llm_api_key or llm_api_key == 'test':
+    if not llm_api_key or llm_api_key == "test":
         pytest.skip("OPENROUTER_API_KEY not set - skipping real LLM test")
 
     return LLMClient(api_key=llm_api_key)
@@ -312,17 +315,18 @@ def real_llm_client(llm_api_key):
 # Shared Fixtures - Common Test Data
 # ============================================================================
 
+
 @pytest.fixture(scope="session")
 def sample_timepoint():
     """Provide a sample timepoint for testing"""
-    from schemas import Timepoint, ResolutionLevel
+    from schemas import ResolutionLevel, Timepoint
 
     return Timepoint(
         timepoint_id="test_tp_001",
         timestamp=datetime(1789, 4, 30),
         event_description="Constitutional Convention",
         entities_present=["hamilton", "washington", "madison"],
-        resolution_level=ResolutionLevel.TENSOR_ONLY
+        resolution_level=ResolutionLevel.TENSOR_ONLY,
     )
 
 
@@ -336,7 +340,7 @@ def sample_entity():
         entity_type="human",
         timepoint="test_tp_001",
         resolution_level=ResolutionLevel.TENSOR_ONLY,
-        entity_metadata={"role": "test_subject"}
+        entity_metadata={"role": "test_subject"},
     )
 
 
@@ -351,7 +355,7 @@ def sample_entities():
             entity_type="human",
             timepoint="test_tp_001",
             resolution_level=ResolutionLevel.TENSOR_ONLY,
-            entity_metadata={"role": f"test_subject_{i}"}
+            entity_metadata={"role": f"test_subject_{i}"},
         )
         for i in range(1, 6)
     ]
@@ -360,6 +364,7 @@ def sample_entities():
 # ============================================================================
 # Shared Fixtures - Workflow and Service Components
 # ============================================================================
+
 
 @pytest.fixture(scope="function")
 def temporal_agent(graph_store, llm_client):
@@ -389,6 +394,7 @@ def validator():
 # Async Test Support
 # ============================================================================
 
+
 @pytest.fixture(scope="session")
 def event_loop():
     """Provide event loop for async tests"""
@@ -402,6 +408,7 @@ def event_loop():
 # ============================================================================
 # Test Output and Reporting
 # ============================================================================
+
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item, call):
@@ -423,7 +430,7 @@ def pytest_runtest_makereport(item, call):
         report.quality_warnings = quality_report.warnings
 
     # Track LLM test execution
-    if call.when == "call" and item.get_closest_marker('llm'):
+    if call.when == "call" and item.get_closest_marker("llm"):
         if report.passed:
             print(f"\n✅ LLM test passed: {item.name}")
         elif report.failed:
@@ -439,21 +446,23 @@ def print_test_summary(request):
     log_dir = Path("logs/llm_calls")
     if log_dir.exists():
         import glob
+
         log_files = glob.glob(str(log_dir / "*.jsonl"))
         if log_files:
-            print("\n" + "="*70)
+            print("\n" + "=" * 70)
             print("💰 LLM COST SUMMARY")
-            print("="*70)
+            print("=" * 70)
             print(f"Log files: {len(log_files)}")
             print(f"Location: {log_dir}")
             print("To calculate total cost:")
             print(f"  cat {log_dir}/*.jsonl | jq -s 'map(.cost_usd) | add'")
-            print("="*70)
+            print("=" * 70)
 
 
 # ============================================================================
 # Shared Fixtures - Tensor Persistence (Phase 1)
 # ============================================================================
+
 
 @pytest.fixture(scope="function")
 def tensor_db(tmp_path):
@@ -479,6 +488,7 @@ def sample_ttm_tensor():
     - behavior: 8 (personality traits)
     """
     import numpy as np
+
     from schemas import TTMTensor
 
     return TTMTensor.from_arrays(
@@ -517,7 +527,7 @@ def shared_tensor_db():
     """
     from tensor_persistence import TensorDatabase
 
-    with tempfile.NamedTemporaryFile(suffix='_tensors.db', delete=False) as f:
+    with tempfile.NamedTemporaryFile(suffix="_tensors.db", delete=False) as f:
         db_path = f.name
 
     db = TensorDatabase(db_path)
@@ -528,7 +538,7 @@ def shared_tensor_db():
         try:
             os.unlink(db_path)
             # Also clean up WAL files
-            for ext in ['-wal', '-shm']:
+            for ext in ["-wal", "-shm"]:
                 wal_path = db_path + ext
                 if os.path.exists(wal_path):
                     os.unlink(wal_path)
@@ -540,6 +550,7 @@ def shared_tensor_db():
 # SynthasAIzer Paradigm Fixtures (Templates, Patches, Envelopes, Voices)
 # ============================================================================
 
+
 @pytest.fixture(scope="session")
 def template_loader():
     """
@@ -549,6 +560,7 @@ def template_loader():
     Use this fixture to access templates via the SynthasAIzer patch system.
     """
     from generation.templates.loader import TemplateLoader
+
     return TemplateLoader()
 
 
@@ -564,6 +576,7 @@ def sample_envelope():
     - release: 0.3 (30% for graceful exit)
     """
     from synth import EnvelopeConfig
+
     return EnvelopeConfig(attack=0.2, decay=0.1, sustain=0.8, release=0.3)
 
 
@@ -578,6 +591,7 @@ def sample_voice():
     - gain: 1.0 (full presence level)
     """
     from synth import VoiceConfig
+
     return VoiceConfig(mute=False, solo=False, gain=1.0)
 
 
@@ -589,14 +603,14 @@ def sample_synth_entity(sample_envelope, sample_voice):
     Combines base entity with envelope lifecycle and voice mixing controls.
     """
     from schemas import Entity, ResolutionLevel
-    from synth import EntityEnvelopeState, apply_envelope_to_entity
+    from synth import EntityEnvelopeState
 
     entity = Entity(
         entity_id="synth_entity_001",
         entity_type="human",
         timepoint="test_tp_001",
         resolution_level=ResolutionLevel.TENSOR_ONLY,
-        entity_metadata={"role": "synth_test_subject"}
+        entity_metadata={"role": "synth_test_subject"},
     )
 
     # Apply envelope state
@@ -605,19 +619,19 @@ def sample_synth_entity(sample_envelope, sample_voice):
         config=sample_envelope,
         current_phase="sustain",
         phase_progress=0.5,
-        current_level=sample_envelope.sustain
+        current_level=sample_envelope.sustain,
     )
 
     return {
         "entity": entity,
         "envelope": sample_envelope,
         "voice": sample_voice,
-        "envelope_state": envelope_state
+        "envelope_state": envelope_state,
     }
 
 
 @pytest.fixture(scope="function")
-def patch_categories(template_loader) -> List[str]:
+def patch_categories(template_loader) -> list[str]:
     """
     Provide list of all available patch categories.
 
@@ -628,7 +642,7 @@ def patch_categories(template_loader) -> List[str]:
 
 
 @pytest.fixture(scope="function")
-def mechanism_templates(template_loader) -> List[str]:
+def mechanism_templates(template_loader) -> list[str]:
     """
     Provide list of mechanism template IDs (M1-M18 coverage).
 
@@ -638,7 +652,7 @@ def mechanism_templates(template_loader) -> List[str]:
 
 
 @pytest.fixture(scope="function")
-def showcase_templates(template_loader) -> List[str]:
+def showcase_templates(template_loader) -> list[str]:
     """
     Provide list of showcase template IDs.
 
@@ -658,8 +672,10 @@ def load_template(template_loader):
             config = load_template("showcase/founding_fathers")
             assert config.entities.count >= 3
     """
+
     def _load(template_id: str):
         return template_loader.load_template(template_id)
+
     return _load
 
 
@@ -673,8 +689,10 @@ def get_patch_metadata(template_loader):
             patch = get_patch_metadata("showcase/founding_fathers")
             assert "historical" in patch.tags
     """
+
     def _get(template_id: str):
         return template_loader.get_patch_metadata(template_id)
+
     return _get
 
 

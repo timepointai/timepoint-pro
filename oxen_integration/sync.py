@@ -7,18 +7,18 @@ and Oxen remote repository.
 Phase 4: Oxen Integration
 """
 
+import hashlib
+import json
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
-import hashlib
-import json
+from typing import Any
 
 from .parquet_schemas import (
-    write_templates_parquet,
-    write_instances_parquet,
-    read_templates_parquet,
     read_instances_parquet,
+    read_templates_parquet,
+    write_instances_parquet,
+    write_templates_parquet,
 )
 
 
@@ -29,14 +29,15 @@ class SyncState:
 
     Persisted to allow incremental syncs.
     """
-    last_sync_time: Optional[datetime] = None
-    last_local_version: Optional[str] = None
-    last_remote_version: Optional[str] = None
-    synced_tensor_ids: Set[str] = field(default_factory=set)
-    pending_uploads: Set[str] = field(default_factory=set)
-    pending_downloads: Set[str] = field(default_factory=set)
 
-    def to_dict(self) -> Dict:
+    last_sync_time: datetime | None = None
+    last_local_version: str | None = None
+    last_remote_version: str | None = None
+    synced_tensor_ids: set[str] = field(default_factory=set)
+    pending_uploads: set[str] = field(default_factory=set)
+    pending_downloads: set[str] = field(default_factory=set)
+
+    def to_dict(self) -> dict:
         """Convert to serializable dict."""
         return {
             "last_sync_time": self.last_sync_time.isoformat() if self.last_sync_time else None,
@@ -48,10 +49,12 @@ class SyncState:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict) -> "SyncState":
+    def from_dict(cls, data: dict) -> "SyncState":
         """Create from dict."""
         return cls(
-            last_sync_time=datetime.fromisoformat(data["last_sync_time"]) if data.get("last_sync_time") else None,
+            last_sync_time=datetime.fromisoformat(data["last_sync_time"])
+            if data.get("last_sync_time")
+            else None,
             last_local_version=data.get("last_local_version"),
             last_remote_version=data.get("last_remote_version"),
             synced_tensor_ids=set(data.get("synced_tensor_ids", [])),
@@ -80,7 +83,7 @@ class TensorSyncManager:
         self,
         tensor_db: Any,  # TensorDatabase
         version_controller: Any,  # TensorVersionController
-        state_file: Optional[str] = None
+        state_file: str | None = None,
     ):
         """
         Initialize sync manager.
@@ -103,7 +106,7 @@ class TensorSyncManager:
         """Load sync state from file."""
         if self.state_file.exists():
             try:
-                with open(self.state_file, "r") as f:
+                with open(self.state_file) as f:
                     data = json.load(f)
                 return SyncState.from_dict(data)
             except Exception:
@@ -131,7 +134,7 @@ class TensorSyncManager:
     # Change Detection
     # ========================================================================
 
-    def detect_local_changes(self) -> List[Any]:
+    def detect_local_changes(self) -> list[Any]:
         """
         Detect tensors that have changed locally since last sync.
 
@@ -157,7 +160,7 @@ class TensorSyncManager:
 
         return changed
 
-    def detect_pending_sync(self, min_maturity: float = 0.0) -> Dict[str, List[Any]]:
+    def detect_pending_sync(self, min_maturity: float = 0.0) -> dict[str, list[Any]]:
         """
         Detect all tensors needing sync, categorized by type.
 
@@ -193,10 +196,10 @@ class TensorSyncManager:
 
     def push_changes(
         self,
-        records: Optional[List[Any]] = None,
-        commit_message: Optional[str] = None,
-        min_maturity: float = 0.0
-    ) -> Dict[str, Any]:
+        records: list[Any] | None = None,
+        commit_message: str | None = None,
+        min_maturity: float = 0.0,
+    ) -> dict[str, Any]:
         """
         Push local changes to Oxen.
 
@@ -217,8 +220,7 @@ class TensorSyncManager:
 
         # Use version controller to sync
         result = self.version_controller.sync_local_to_remote(
-            tensor_db=self.tensor_db,
-            min_maturity=min_maturity
+            tensor_db=self.tensor_db, min_maturity=min_maturity
         )
 
         # Update state
@@ -238,16 +240,14 @@ class TensorSyncManager:
             "errors": result.errors,
         }
 
-    def pull_changes(self) -> Dict[str, Any]:
+    def pull_changes(self) -> dict[str, Any]:
         """
         Pull remote changes to local.
 
         Returns:
             Dict with pull results
         """
-        result = self.version_controller.fetch_remote_updates(
-            tensor_db=self.tensor_db
-        )
+        result = self.version_controller.fetch_remote_updates(tensor_db=self.tensor_db)
 
         # Update state
         if result.fetched_count > 0:
@@ -271,7 +271,7 @@ class TensorSyncManager:
             "new_instances": result.new_instances,
         }
 
-    def sync_bidirectional(self, min_maturity: float = 0.0) -> Dict[str, Any]:
+    def sync_bidirectional(self, min_maturity: float = 0.0) -> dict[str, Any]:
         """
         Perform bidirectional sync (pull then push).
 
@@ -302,8 +302,8 @@ class TensorSyncManager:
         output_dir: str,
         include_templates: bool = True,
         include_instances: bool = True,
-        min_maturity: float = 0.0
-    ) -> Dict[str, str]:
+        min_maturity: float = 0.0,
+    ) -> dict[str, str]:
         """
         Export tensors to Parquet files for offline use.
 
@@ -342,10 +342,10 @@ class TensorSyncManager:
 
     def import_from_parquet(
         self,
-        templates_path: Optional[str] = None,
-        instances_path: Optional[str] = None,
-        overwrite: bool = False
-    ) -> Dict[str, int]:
+        templates_path: str | None = None,
+        instances_path: str | None = None,
+        overwrite: bool = False,
+    ) -> dict[str, int]:
         """
         Import tensors from Parquet files.
 
@@ -386,7 +386,7 @@ class TensorSyncManager:
     # Status and Diagnostics
     # ========================================================================
 
-    def get_sync_status(self) -> Dict[str, Any]:
+    def get_sync_status(self) -> dict[str, Any]:
         """
         Get current sync status.
 
@@ -396,7 +396,9 @@ class TensorSyncManager:
         pending = self.detect_pending_sync()
 
         return {
-            "last_sync": self.state.last_sync_time.isoformat() if self.state.last_sync_time else None,
+            "last_sync": self.state.last_sync_time.isoformat()
+            if self.state.last_sync_time
+            else None,
             "last_local_version": self.state.last_local_version,
             "last_remote_version": self.state.last_remote_version,
             "synced_count": len(self.state.synced_tensor_ids),
@@ -410,7 +412,7 @@ class TensorSyncManager:
         self.state = SyncState()
         self._save_state()
 
-    def mark_as_synced(self, tensor_ids: List[str]) -> None:
+    def mark_as_synced(self, tensor_ids: list[str]) -> None:
         """
         Manually mark tensors as synced.
 

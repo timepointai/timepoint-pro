@@ -7,21 +7,19 @@ Tests for the Moog-inspired control paradigm:
 - Event emission for monitoring
 """
 
-import pytest
-import time
 from unittest.mock import MagicMock
 
+import pytest
+
 from synth import (
-    EnvelopeConfig,
     DEFAULT_ENVELOPE,
-    VoiceConfig,
-    VoiceMixer,
     DEFAULT_VOICE,
+    EnvelopeConfig,
     SynthEvent,
     SynthEventData,
     SynthEventEmitter,
-    logging_listener,
-    console_listener,
+    VoiceConfig,
+    VoiceMixer,
     get_emitter,
     set_emitter,
 )
@@ -271,7 +269,7 @@ class TestSynthEventData:
             event_type=SynthEvent.RUN_START,
             timestamp=1234567890.0,
             run_id="run_123",
-            data={"template": "board_meeting"}
+            data={"template": "board_meeting"},
         )
         assert event.event_type == SynthEvent.RUN_START
         assert event.run_id == "run_123"
@@ -283,7 +281,7 @@ class TestSynthEventData:
             event_type=SynthEvent.RUN_START,
             timestamp=1234567890.0,
             run_id="run_123",
-            data={"key": "value"}
+            data={"key": "value"},
         )
         d = event.to_dict()
         assert d["event"] == "run_start"
@@ -296,7 +294,7 @@ class TestSynthEventData:
             "event": "run_complete",
             "timestamp": 1234567890.0,
             "run_id": "run_456",
-            "data": {"success": True}
+            "data": {"success": True},
         }
         event = SynthEventData.from_dict(d)
         assert event.event_type == SynthEvent.RUN_COMPLETE
@@ -442,6 +440,7 @@ class TestConfigSchemaIntegration:
     def test_entity_config_default_envelope(self):
         """EntityConfig should have optional envelope with default."""
         from generation.config_schema import EntityConfig
+
         config = EntityConfig(count=5)
         assert config.envelope is None
         envelope = config.get_envelope()
@@ -451,16 +450,15 @@ class TestConfigSchemaIntegration:
     def test_entity_config_custom_envelope(self):
         """EntityConfig should accept custom envelope."""
         from generation.config_schema import EntityConfig
-        config = EntityConfig(
-            count=5,
-            envelope=EnvelopeConfig(attack=0.5, sustain=0.9)
-        )
+
+        config = EntityConfig(count=5, envelope=EnvelopeConfig(attack=0.5, sustain=0.9))
         assert config.envelope.attack == 0.5
         assert config.envelope.sustain == 0.9
 
     def test_entity_config_default_voice(self):
         """EntityConfig should have optional default_voice with default."""
         from generation.config_schema import EntityConfig
+
         config = EntityConfig(count=5)
         assert config.default_voice is None
         voice = config.get_default_voice()
@@ -470,15 +468,14 @@ class TestConfigSchemaIntegration:
     def test_entity_config_custom_voice(self):
         """EntityConfig should accept custom default_voice."""
         from generation.config_schema import EntityConfig
-        config = EntityConfig(
-            count=5,
-            default_voice=VoiceConfig(gain=0.5)
-        )
+
+        config = EntityConfig(count=5, default_voice=VoiceConfig(gain=0.5))
         assert config.default_voice.gain == 0.5
 
     def test_backward_compatibility(self):
         """Existing configs without synth fields should still work."""
         from generation.config_schema import EntityConfig
+
         # Old-style config without synth fields
         config = EntityConfig(count=3, types=["human"])
         # Should not raise, should have defaults

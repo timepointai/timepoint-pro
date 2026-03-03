@@ -25,18 +25,18 @@ Robustness Improvements (Phase 11.1 - JSON Extraction Fix):
 - Full unit test coverage (test_json_extraction.py)
 """
 
-import numpy as np
-from typing import List, Dict, Any, Optional, Tuple
-import json
 import base64
-import msgspec
+import json
 import time
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
-from schemas import TTMTensor, Entity, Timepoint, ResolutionLevel
+import msgspec
+import numpy as np
+
 from metadata.tracking import track_mechanism
-
+from schemas import Entity, Timepoint, TTMTensor
 
 # ============================================================================
 # Global: Account-Level Rate Limit Detection
@@ -50,10 +50,10 @@ _cooldown_seconds = 300  # 5 minutes
 def _log_llm_call(
     prompt: str,
     response: Any,
-    error: Optional[Exception],
+    error: Exception | None,
     attempt: int,
     max_retries: int,
-    success: bool
+    success: bool,
 ) -> None:
     """Log LLM call details to JSONL file for debugging."""
     log_dir = Path("logs")
@@ -80,7 +80,9 @@ def _log_llm_call(
             content = response["choices"][0].get("message", {}).get("content", "")
             log_entry["response_content_length"] = len(content) if content else 0
             log_entry["response_empty"] = not content or content.strip() == ""
-            log_entry["response_preview"] = (content[:100] + "...") if content and len(content) > 100 else content
+            log_entry["response_preview"] = (
+                (content[:100] + "...") if content and len(content) > 100 else content
+            )
 
     # Write to log file
     with open(log_file, "a") as f:
@@ -103,7 +105,7 @@ def _print_llm_call_statistics() -> None:
     error_types = {}
 
     try:
-        with open(log_file, "r") as f:
+        with open(log_file) as f:
             for line in f:
                 entry = json.loads(line.strip())
                 total_attempts += 1
@@ -116,13 +118,21 @@ def _print_llm_call_statistics() -> None:
                     error_types[error_type] = error_types.get(error_type, 0) + 1
 
         # Print summary
-        print(f"\n    📊 LLM Call Statistics (today):")
+        print("\n    📊 LLM Call Statistics (today):")
         print(f"       Total attempts: {total_attempts}")
-        print(f"       ✅ Successes: {successes} ({successes/total_attempts*100:.1f}%)" if total_attempts > 0 else "       ✅ Successes: 0")
-        print(f"       ❌ Failures: {failures} ({failures/total_attempts*100:.1f}%)" if total_attempts > 0 else "       ❌ Failures: 0")
+        print(
+            f"       ✅ Successes: {successes} ({successes / total_attempts * 100:.1f}%)"
+            if total_attempts > 0
+            else "       ✅ Successes: 0"
+        )
+        print(
+            f"       ❌ Failures: {failures} ({failures / total_attempts * 100:.1f}%)"
+            if total_attempts > 0
+            else "       ❌ Failures: 0"
+        )
 
         if error_types:
-            print(f"       Error types:")
+            print("       Error types:")
             for error_type, count in sorted(error_types.items(), key=lambda x: -x[1]):
                 print(f"         - {error_type}: {count}")
 
@@ -217,7 +227,7 @@ def _extract_json_from_response(content: str) -> str:
 
             # Found matching closing bracket
             if depth == 0:
-                return content[start:i+1]
+                return content[start : i + 1]
 
     # If we get here, brackets weren't balanced
     raise ValueError(f"Unbalanced brackets: found opening {opening} but no matching {closing}")
@@ -227,7 +237,10 @@ def _extract_json_from_response(content: str) -> str:
 # Helper: LLM Retry Logic
 # ============================================================================
 
-def _call_llm_with_retry(llm_client: Any, prompt: str, max_retries: int = 3, initial_delay: float = 5.0) -> Dict[str, Any]:
+
+def _call_llm_with_retry(
+    llm_client: Any, prompt: str, max_retries: int = 3, initial_delay: float = 5.0
+) -> dict[str, Any]:
     """
     Call LLM with exponential backoff retry logic and comprehensive logging.
 
@@ -255,7 +268,7 @@ def _call_llm_with_retry(llm_client: Any, prompt: str, max_retries: int = 3, ini
                 model=llm_client.default_model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.3,
-                max_tokens=500
+                max_tokens=500,
             )
 
             # OpenRouterClient returns dict from response.json() - use dict syntax
@@ -264,12 +277,21 @@ def _call_llm_with_retry(llm_client: Any, prompt: str, max_retries: int = 3, ini
             # Handle empty responses
             if not content or content.strip() == "":
                 # Log empty response
-                _log_llm_call(prompt, response_obj, ValueError("Empty response from LLM"), attempt + 1, max_retries, False)
+                _log_llm_call(
+                    prompt,
+                    response_obj,
+                    ValueError("Empty response from LLM"),
+                    attempt + 1,
+                    max_retries,
+                    False,
+                )
 
                 # Track consecutive failures for account-level rate limiting
                 _consecutive_empty_responses += 1
                 if _consecutive_empty_responses >= _max_consecutive_failures:
-                    print(f"\n🚫 Account-level rate limit detected ({_consecutive_empty_responses} consecutive failures)")
+                    print(
+                        f"\n🚫 Account-level rate limit detected ({_consecutive_empty_responses} consecutive failures)"
+                    )
                     print(f"⏳ Entering {_cooldown_seconds}s cooldown to let API recover...")
                     time.sleep(_cooldown_seconds)
                     _consecutive_empty_responses = 0  # Reset after cooldown
@@ -284,7 +306,9 @@ def _call_llm_with_retry(llm_client: Any, prompt: str, max_retries: int = 3, ini
                 _log_llm_call(prompt, response_obj, e, attempt + 1, max_retries, False)
                 _consecutive_empty_responses += 1
                 if _consecutive_empty_responses >= _max_consecutive_failures:
-                    print(f"\n🚫 Account-level rate limit detected ({_consecutive_empty_responses} consecutive failures)")
+                    print(
+                        f"\n🚫 Account-level rate limit detected ({_consecutive_empty_responses} consecutive failures)"
+                    )
                     print(f"⏳ Entering {_cooldown_seconds}s cooldown to let API recover...")
                     time.sleep(_cooldown_seconds)
                     _consecutive_empty_responses = 0
@@ -307,7 +331,9 @@ def _call_llm_with_retry(llm_client: Any, prompt: str, max_retries: int = 3, ini
             # Track consecutive failures for account-level rate limiting (JSONDecodeError likely means malformed response)
             _consecutive_empty_responses += 1
             if _consecutive_empty_responses >= _max_consecutive_failures:
-                print(f"\n🚫 Account-level rate limit detected ({_consecutive_empty_responses} consecutive failures)")
+                print(
+                    f"\n🚫 Account-level rate limit detected ({_consecutive_empty_responses} consecutive failures)"
+                )
                 print(f"⏳ Entering {_cooldown_seconds}s cooldown to let API recover...")
                 time.sleep(_cooldown_seconds)
                 _consecutive_empty_responses = 0  # Reset after cooldown
@@ -320,7 +346,10 @@ def _call_llm_with_retry(llm_client: Any, prompt: str, max_retries: int = 3, ini
             else:
                 # Final attempt failed
                 print(f"    ❌ All {max_retries} LLM attempts failed: {e}")
-                log_file = Path("logs") / f"llm_tensor_population_{datetime.now().strftime('%Y-%m-%d')}.jsonl"
+                log_file = (
+                    Path("logs")
+                    / f"llm_tensor_population_{datetime.now().strftime('%Y-%m-%d')}.jsonl"
+                )
                 print(f"    📄 Full logs: {log_file}")
                 raise last_error
 
@@ -332,10 +361,10 @@ def _call_llm_with_retry(llm_client: Any, prompt: str, max_retries: int = 3, ini
 # Behavior Vector Decoder: Maps 8-dim behavior_vector → trait strings
 # ============================================================================
 
+
 def decode_behavior_vector_to_traits(
-    behavior: np.ndarray,
-    entity_metadata: Optional[Dict[str, Any]] = None
-) -> List[str]:
+    behavior: np.ndarray, entity_metadata: dict[str, Any] | None = None
+) -> list[str]:
     """
     Decode an 8-dim behavior_vector into personality trait strings compatible
     with _derive_speaking_style() in dialog_synthesis.py.
@@ -431,7 +460,7 @@ def decode_behavior_vector_to_traits(
     return traits
 
 
-def decode_biology_vector_to_physical(biology: np.ndarray) -> Dict[str, float]:
+def decode_biology_vector_to_physical(biology: np.ndarray) -> dict[str, float]:
     """
     Decode a 4-dim biology_vector back to physical_tensor metadata fields.
 
@@ -455,6 +484,7 @@ def decode_biology_vector_to_physical(biology: np.ndarray) -> Dict[str, float]:
 # ============================================================================
 # Phase 1: Baseline Tensor Initialization (Instant, No LLM)
 # ============================================================================
+
 
 @track_mechanism("M6", "ttm_baseline_init")
 def create_baseline_tensor(entity: Entity) -> TTMTensor:
@@ -502,9 +532,9 @@ def create_baseline_tensor(entity: Entity) -> TTMTensor:
         # Default physical state for humans
         if entity.entity_type == "human":
             biology[0] = 0.35  # Default age ~35 years
-            biology[1] = 0.8   # Good health baseline
-            biology[2] = 1.0   # No pain baseline
-            biology[3] = 0.8   # Good stamina baseline
+            biology[1] = 0.8  # Good health baseline
+            biology[2] = 1.0  # No pain baseline
+            biology[3] = 0.8  # Good stamina baseline
         else:
             # Non-human entities get neutral physical state
             biology = np.array([0.5, 0.5, 0.5, 0.5])
@@ -534,14 +564,15 @@ def create_baseline_tensor(entity: Entity) -> TTMTensor:
 # Phase 2: LLM-Guided Tensor Population (2-3 Refinement Loops)
 # ============================================================================
 
+
 @track_mechanism("M6", "ttm_llm_population")
 def populate_tensor_llm_guided(
     entity: Entity,
     timepoint: Timepoint,
     graph: Any,  # NetworkX graph
     llm_client: Any,  # LLMClient
-    max_loops: int = 3
-) -> Tuple[TTMTensor, float]:
+    max_loops: int = 3,
+) -> tuple[TTMTensor, float]:
     """
     Populate tensor values through LLM-guided refinement loops.
 
@@ -610,12 +641,8 @@ def populate_tensor_llm_guided(
 
 
 def _population_loop_metadata(
-    entity: Entity,
-    context: np.ndarray,
-    biology: np.ndarray,
-    behavior: np.ndarray,
-    llm_client: Any
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    entity: Entity, context: np.ndarray, biology: np.ndarray, behavior: np.ndarray, llm_client: Any
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Loop 1: Populate tensor from entity metadata using LLM analysis.
 
@@ -661,7 +688,10 @@ Expected format:
             adj = np.array(adjustments["biology_adjustments"][:4])
             biology = np.clip(biology * adj, 0.0, 2.0)
 
-        if "behavior_adjustments" in adjustments and adjustments["behavior_adjustments"] is not None:
+        if (
+            "behavior_adjustments" in adjustments
+            and adjustments["behavior_adjustments"] is not None
+        ):
             adj = np.array(adjustments["behavior_adjustments"][:8])
             behavior = np.clip(behavior * adj, 0.0, 2.0)
 
@@ -717,7 +747,9 @@ Expected format:
 
         if speech_examples and isinstance(speech_examples, list):
             entity.entity_metadata["speech_examples"] = speech_examples[:3]
-            print(f"    [VOICE] Generated {len(speech_examples[:3])} speech_examples for {entity.entity_id}")
+            print(
+                f"    [VOICE] Generated {len(speech_examples[:3])} speech_examples for {entity.entity_id}"
+            )
 
     except Exception as e:
         print(f"  ⚠️  Voice metadata generation failed for {entity.entity_id}: {e}")
@@ -730,8 +762,8 @@ def _population_loop_graph(
     biology: np.ndarray,
     behavior: np.ndarray,
     graph: Any,
-    llm_client: Any
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    llm_client: Any,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Loop 2: Refine tensor from graph structure and relationships.
 
@@ -743,11 +775,13 @@ def _population_loop_graph(
 
     # Get graph metrics
     try:
-        import networkx as nx
         import warnings
+
+        import networkx as nx
+
         # Suppress RuntimeWarning for small graphs
         with warnings.catch_warnings():
-            warnings.filterwarnings('ignore', category=RuntimeWarning)
+            warnings.filterwarnings("ignore", category=RuntimeWarning)
             centrality = nx.eigenvector_centrality(graph).get(entity.entity_id, 0.0)
         neighbors = list(graph.neighbors(entity.entity_id))
         degree = graph.degree(entity.entity_id)
@@ -784,7 +818,10 @@ Expected format:
             ref = np.array(refinements["context_refinements"][:8])
             context = np.clip(context + ref * 0.1, 0.0, 2.0)  # Small additive adjustment
 
-        if "behavior_refinements" in refinements and refinements["behavior_refinements"] is not None:
+        if (
+            "behavior_refinements" in refinements
+            and refinements["behavior_refinements"] is not None
+        ):
             ref = np.array(refinements["behavior_refinements"][:8])
             behavior = np.clip(behavior + ref * 0.1, 0.0, 2.0)
 
@@ -800,8 +837,8 @@ def _population_loop_validation(
     biology: np.ndarray,
     behavior: np.ndarray,
     timepoint: Timepoint,
-    llm_client: Any
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    llm_client: Any,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Loop 3: Validation and consistency check.
 
@@ -844,7 +881,11 @@ Expected format:
                 context = np.where(context == 0, np.array(fixes["context"]), context)
             if "biology" in fixes and fixes["biology"] is not None and len(fixes["biology"]) == 4:
                 biology = np.where(biology == 0, np.array(fixes["biology"]), biology)
-            if "behavior" in fixes and fixes["behavior"] is not None and len(fixes["behavior"]) == 8:
+            if (
+                "behavior" in fixes
+                and fixes["behavior"] is not None
+                and len(fixes["behavior"]) == 8
+            ):
                 behavior = np.where(behavior == 0, np.array(fixes["behavior"]), behavior)
 
         except Exception as e:
@@ -861,10 +902,9 @@ Expected format:
 # Phase 3: Tensor Maturity Index (Quality Gate)
 # ============================================================================
 
+
 def compute_tensor_maturity(
-    tensor: TTMTensor,
-    entity: Entity,
-    training_complete: bool = False
+    tensor: TTMTensor, entity: Entity, training_complete: bool = False
 ) -> float:
     """
     Compute tensor maturity index (0.0-1.0).
@@ -927,17 +967,17 @@ def compute_tensor_maturity(
 
     # Weighted sum
     maturity = (
-        0.25 * coverage +
-        0.20 * variance +
-        0.25 * coherence +
-        0.15 * training_score +
-        0.15 * validation_score
+        0.25 * coverage
+        + 0.20 * variance
+        + 0.25 * coherence
+        + 0.15 * training_score
+        + 0.15 * validation_score
     )
 
     return maturity
 
 
-def validate_tensor_maturity(entity: Entity, threshold: float = 0.95) -> Tuple[bool, str]:
+def validate_tensor_maturity(entity: Entity, threshold: float = 0.95) -> tuple[bool, str]:
     """
     Validate that entity tensor meets maturity threshold.
 
@@ -960,7 +1000,9 @@ def validate_tensor_maturity(entity: Entity, threshold: float = 0.95) -> Tuple[b
         tensor_dict = json.loads(tensor_json)
         context = np.array(msgspec.msgpack.decode(base64.b64decode(tensor_dict["context_vector"])))
         biology = np.array(msgspec.msgpack.decode(base64.b64decode(tensor_dict["biology_vector"])))
-        behavior = np.array(msgspec.msgpack.decode(base64.b64decode(tensor_dict["behavior_vector"])))
+        behavior = np.array(
+            msgspec.msgpack.decode(base64.b64decode(tensor_dict["behavior_vector"]))
+        )
 
         # Check for zeros
         if np.any(context == 0) or np.any(biology == 0) or np.any(behavior == 0):
@@ -984,13 +1026,14 @@ def validate_tensor_maturity(entity: Entity, threshold: float = 0.95) -> Tuple[b
 # Phase 4: Parallel Training to Maturity (Placeholder for LangGraph)
 # ============================================================================
 
+
 def train_tensor_to_maturity(
     entity: Entity,
     timepoint: Timepoint,
     store: Any,  # GraphStore
     llm_client: Any,  # LLMClient
     max_training_cycles: int = 10,
-    target_maturity: float = 0.95
+    target_maturity: float = 0.95,
 ) -> bool:
     """
     Train tensor through simulated interactions until maturity threshold.
@@ -1025,7 +1068,9 @@ def train_tensor_to_maturity(
         tensor_dict = json.loads(tensor_json)
         context = np.array(msgspec.msgpack.decode(base64.b64decode(tensor_dict["context_vector"])))
         biology = np.array(msgspec.msgpack.decode(base64.b64decode(tensor_dict["biology_vector"])))
-        behavior = np.array(msgspec.msgpack.decode(base64.b64decode(tensor_dict["behavior_vector"])))
+        behavior = np.array(
+            msgspec.msgpack.decode(base64.b64decode(tensor_dict["behavior_vector"]))
+        )
 
         # Simulate training update (placeholder - would be LangGraph dialog simulation)
         # For now, just add small random noise to push maturity higher
@@ -1040,15 +1085,25 @@ def train_tensor_to_maturity(
 
         # Update tensor
         trained_tensor = TTMTensor.from_arrays(context, biology, behavior)
-        entity.tensor = json.dumps({
-            "context_vector": base64.b64encode(msgspec.msgpack.encode(context.tolist())).decode('utf-8'),
-            "biology_vector": base64.b64encode(msgspec.msgpack.encode(biology.tolist())).decode('utf-8'),
-            "behavior_vector": base64.b64encode(msgspec.msgpack.encode(behavior.tolist())).decode('utf-8')
-        })
+        entity.tensor = json.dumps(
+            {
+                "context_vector": base64.b64encode(msgspec.msgpack.encode(context.tolist())).decode(
+                    "utf-8"
+                ),
+                "biology_vector": base64.b64encode(msgspec.msgpack.encode(biology.tolist())).decode(
+                    "utf-8"
+                ),
+                "behavior_vector": base64.b64encode(
+                    msgspec.msgpack.encode(behavior.tolist())
+                ).decode("utf-8"),
+            }
+        )
         entity.tensor_training_cycles += 1
 
         # Recompute maturity
-        maturity = compute_tensor_maturity(trained_tensor, entity, training_complete=(cycle == max_training_cycles - 1))
+        maturity = compute_tensor_maturity(
+            trained_tensor, entity, training_complete=(cycle == max_training_cycles - 1)
+        )
         entity.tensor_maturity = maturity
 
         # Decode trained behavior_vector → personality_traits
@@ -1077,13 +1132,16 @@ def train_tensor_to_maturity(
             print(f"  ✅ Training complete: {entity.entity_id} reached maturity {maturity:.3f}")
             return True
 
-    print(f"  ⚠️  Training incomplete: {entity.entity_id} maturity {entity.tensor_maturity:.3f} < {target_maturity}")
+    print(
+        f"  ⚠️  Training incomplete: {entity.entity_id} maturity {entity.tensor_maturity:.3f} < {target_maturity}"
+    )
     return False
 
 
 # ============================================================================
 # Helper: Create Fallback Tensor (Last Resort)
 # ============================================================================
+
 
 def create_fallback_tensor() -> TTMTensor:
     """

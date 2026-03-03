@@ -8,12 +8,12 @@ Tests the integration between:
 - e2e_workflows/e2e_runner.py (usage tracking)
 """
 
-import pytest
 import os
 import sys
-import json
-from unittest.mock import Mock, patch, MagicMock
 from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -25,6 +25,7 @@ class TestUsageBridge:
     def test_usage_bridge_import(self):
         """Test that UsageBridge can be imported."""
         from api.usage_bridge import UsageBridge, get_usage_bridge, reset_usage_bridge
+
         assert UsageBridge is not None
         assert get_usage_bridge is not None
         assert reset_usage_bridge is not None
@@ -32,6 +33,7 @@ class TestUsageBridge:
     def test_usage_bridge_initialization(self):
         """Test UsageBridge initializes with defaults."""
         from api.usage_bridge import UsageBridge, reset_usage_bridge
+
         reset_usage_bridge()  # Clear any existing bridge
 
         bridge = UsageBridge()
@@ -75,16 +77,12 @@ class TestUsageBridge:
 
         bridge = UsageBridge(enabled=False)
         # Should not raise
-        bridge.record_simulation(
-            run_id="test-run-1",
-            success=True,
-            cost_usd=1.50,
-            tokens=1500
-        )
+        bridge.record_simulation(run_id="test-run-1", success=True, cost_usd=1.50, tokens=1500)
 
     def test_global_bridge_singleton(self):
         """Test that get_usage_bridge returns same instance."""
         from api.usage_bridge import get_usage_bridge, reset_usage_bridge
+
         reset_usage_bridge()
 
         bridge1 = get_usage_bridge()
@@ -95,22 +93,18 @@ class TestUsageBridge:
         """Test convenience functions work."""
         from api.usage_bridge import (
             check_cli_quota,
-            record_cli_simulation,
             print_cli_usage,
-            reset_usage_bridge
+            record_cli_simulation,
+            reset_usage_bridge,
         )
+
         reset_usage_bridge()
 
         # These should not raise
         result = check_cli_quota(simulation_count=1)
         assert isinstance(result, bool)
 
-        record_cli_simulation(
-            run_id="test-run-2",
-            success=True,
-            cost_usd=0.05,
-            tokens=500
-        )
+        record_cli_simulation(run_id="test-run-2", success=True, cost_usd=0.05, tokens=500)
 
         # print_cli_usage should not raise
         print_cli_usage()
@@ -122,16 +116,14 @@ class TestTimePointClient:
     def test_client_import(self):
         """Test that TimePointClient can be imported."""
         from api.client import TimePointClient
+
         assert TimePointClient is not None
 
     def test_client_initialization(self):
         """Test client initializes with base_url and api_key."""
         from api.client import TimePointClient
 
-        client = TimePointClient(
-            base_url="http://localhost:8080",
-            api_key="test-key"
-        )
+        client = TimePointClient(base_url="http://localhost:8080", api_key="test-key")
         assert client.base_url == "http://localhost:8080"
         assert "X-API-Key" in client.session.headers
 
@@ -139,17 +131,18 @@ class TestTimePointClient:
         """Test client can read from environment variables."""
         from api.client import TimePointClient
 
-        with patch.dict(os.environ, {
-            "TIMEPOINT_API_URL": "http://test:8000",
-            "TIMEPOINT_API_KEY": "env-test-key"
-        }):
+        with patch.dict(
+            os.environ,
+            {"TIMEPOINT_API_URL": "http://test:8000", "TIMEPOINT_API_KEY": "env-test-key"},
+        ):
             client = TimePointClient()
             assert client.base_url == "http://test:8000"
 
     def test_batch_response_dataclass(self):
         """Test BatchResponse dataclass."""
-        from api.client import BatchResponse, BatchProgress, BatchCost
         from datetime import datetime
+
+        from api.client import BatchCost, BatchProgress, BatchResponse
 
         # BatchResponse requires nested dataclasses
         progress = BatchProgress(
@@ -159,14 +152,14 @@ class TestTimePointClient:
             completed_jobs=2,
             failed_jobs=0,
             cancelled_jobs=0,
-            progress_percent=100.0
+            progress_percent=100.0,
         )
         cost = BatchCost(
             estimated_cost_usd=5.0,
             actual_cost_usd=4.50,
             budget_cap_usd=10.0,
             budget_remaining_usd=5.50,
-            tokens_used=5000
+            tokens_used=5000,
         )
 
         resp = BatchResponse(
@@ -181,7 +174,7 @@ class TestTimePointClient:
             cost=cost,
             job_ids=["job-1", "job-2"],
             error_message=None,
-            owner_id="test-user"
+            owner_id="test-user",
         )
         assert resp.batch_id == "batch-123"
         assert len(resp.job_ids) == 2
@@ -208,7 +201,7 @@ class TestTimePointClient:
             simulations_remaining=95,
             cost_remaining_usd=47.50,
             is_quota_exceeded=False,
-            quota_exceeded_reason=None
+            quota_exceeded_reason=None,
         )
         assert status.user_id == "test-user"
         assert status.is_quota_exceeded is False
@@ -220,12 +213,13 @@ class TestE2ERunnerUsageTracking:
 
     def test_e2e_runner_import(self):
         """Test that e2e_runner can be imported with usage tracking."""
-        from e2e_workflows.e2e_runner import FullE2EWorkflowRunner, USAGE_TRACKING_AVAILABLE
+        from e2e_workflows.e2e_runner import USAGE_TRACKING_AVAILABLE, FullE2EWorkflowRunner
+
         assert FullE2EWorkflowRunner is not None
         # USAGE_TRACKING_AVAILABLE depends on api.usage_bridge being available
         assert isinstance(USAGE_TRACKING_AVAILABLE, bool)
 
-    @patch('e2e_workflows.e2e_runner.UsageBridge')
+    @patch("e2e_workflows.e2e_runner.UsageBridge")
     def test_e2e_runner_with_usage_tracking(self, mock_bridge_class):
         """Test that E2E runner initializes with usage tracking."""
         from e2e_workflows.e2e_runner import FullE2EWorkflowRunner
@@ -242,14 +236,14 @@ class TestE2ERunnerUsageTracking:
             generate_summary=False,
             track_usage=True,
             user_id="test-user",
-            user_tier="pro"
+            user_tier="pro",
         )
 
         # Check that usage tracking is configured
         if runner._track_usage:
             mock_bridge_class.assert_called_once_with(user_id="test-user", tier="pro")
 
-    @patch('e2e_workflows.e2e_runner.UsageBridge')
+    @patch("e2e_workflows.e2e_runner.UsageBridge")
     def test_e2e_runner_without_usage_tracking(self, mock_bridge_class):
         """Test that E2E runner can run without usage tracking."""
         from e2e_workflows.e2e_runner import FullE2EWorkflowRunner
@@ -260,7 +254,7 @@ class TestE2ERunnerUsageTracking:
         runner = FullE2EWorkflowRunner(
             metadata_manager=mock_metadata,
             generate_summary=False,
-            track_usage=False  # Explicitly disabled
+            track_usage=False,  # Explicitly disabled
         )
 
         assert runner._track_usage is False
@@ -307,7 +301,7 @@ class TestRunShAPIFlags:
             ["bash", "run.sh", "run", "--help"],
             capture_output=True,
             text=True,
-            cwd=str(Path(__file__).parent.parent.parent)
+            cwd=str(Path(__file__).parent.parent.parent),
         )
 
         help_text = result.stdout + result.stderr
@@ -328,7 +322,7 @@ class TestRunShAPIFlags:
             ["bash", "-n", "run.sh"],
             capture_output=True,
             text=True,
-            cwd=str(Path(__file__).parent.parent.parent)
+            cwd=str(Path(__file__).parent.parent.parent),
         )
 
         assert result.returncode == 0, f"run.sh syntax error: {result.stderr}"
@@ -358,12 +352,7 @@ class TestIntegrationScenarios:
         bridge.record_simulation_start(run_id)
 
         # 3. Record completion
-        bridge.record_simulation(
-            run_id=run_id,
-            success=True,
-            cost_usd=0.05,
-            tokens=1000
-        )
+        bridge.record_simulation(run_id=run_id, success=True, cost_usd=0.05, tokens=1000)
 
         # 4. Get usage (may be None if DB not configured)
         usage = bridge.get_usage()
@@ -372,17 +361,15 @@ class TestIntegrationScenarios:
     @pytest.mark.integration
     def test_client_sdk_error_handling(self):
         """Test that client SDK handles errors gracefully."""
-        from api.client import TimePointClient, TimePointAPIError
+        from api.client import TimePointClient
 
         # Client with non-existent server
-        client = TimePointClient(
-            base_url="http://localhost:9999",
-            api_key="test-key",
-            timeout=1
-        )
+        client = TimePointClient(base_url="http://localhost:9999", api_key="test-key", timeout=1)
 
         # Should raise appropriate error
-        with pytest.raises(Exception):  # Could be TimePointAPIError or requests.exceptions.ConnectionError
+        with pytest.raises(
+            Exception
+        ):  # Could be TimePointAPIError or requests.exceptions.ConnectionError
             client.get_usage()
 
 

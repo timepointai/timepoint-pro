@@ -5,11 +5,12 @@ Part of the SynthasAIzer control paradigm.
 See SYNTH.md for full specification.
 """
 
-from enum import Enum
-from dataclasses import dataclass, field
-from typing import Callable, List, Dict, Any, Optional
-import time
 import logging
+import time
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,7 @@ class SynthEvent(Enum):
     These events are emitted at key workflow points to enable
     visualization and monitoring tools.
     """
+
     # Lifecycle events
     RUN_START = "run_start"
     RUN_COMPLETE = "run_complete"
@@ -56,10 +58,11 @@ class SynthEventData:
 
     Contains all information about a single event occurrence.
     """
+
     event_type: SynthEvent
     timestamp: float
     run_id: str
-    data: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         """Convert to dictionary for serialization."""
@@ -67,7 +70,7 @@ class SynthEventData:
             "event": self.event_type.value,
             "timestamp": self.timestamp,
             "run_id": self.run_id,
-            "data": self.data
+            "data": self.data,
         }
 
     @classmethod
@@ -77,7 +80,7 @@ class SynthEventData:
             event_type=SynthEvent(d["event"]),
             timestamp=d["timestamp"],
             run_id=d["run_id"],
-            data=d.get("data", {})
+            data=d.get("data", {}),
         )
 
 
@@ -113,8 +116,8 @@ class SynthEventEmitter:
             enabled: Whether to actually emit events (default False for backward compat)
         """
         self.enabled = enabled
-        self.listeners: List[EventListener] = []
-        self._event_history: List[SynthEventData] = []
+        self.listeners: list[EventListener] = []
+        self._event_history: list[SynthEventData] = []
         self._max_history = 1000  # Prevent unbounded growth
 
     def add_listener(self, listener: EventListener):
@@ -127,7 +130,7 @@ class SynthEventEmitter:
         if listener in self.listeners:
             self.listeners.remove(listener)
 
-    def emit(self, event_type: SynthEvent, run_id: str, data: Optional[Dict[str, Any]] = None):
+    def emit(self, event_type: SynthEvent, run_id: str, data: dict[str, Any] | None = None):
         """
         Emit an event to all listeners.
 
@@ -143,16 +146,13 @@ class SynthEventEmitter:
             return
 
         event = SynthEventData(
-            event_type=event_type,
-            timestamp=time.time(),
-            run_id=run_id,
-            data=data or {}
+            event_type=event_type, timestamp=time.time(), run_id=run_id, data=data or {}
         )
 
         # Store in history (with limit)
         self._event_history.append(event)
         if len(self._event_history) > self._max_history:
-            self._event_history = self._event_history[-self._max_history:]
+            self._event_history = self._event_history[-self._max_history :]
 
         # Notify listeners
         for listener in self.listeners:
@@ -162,7 +162,7 @@ class SynthEventEmitter:
                 # Don't let listener errors break the workflow
                 logger.warning(f"Event listener error: {e}")
 
-    def get_history(self, event_type: Optional[SynthEvent] = None) -> List[SynthEventData]:
+    def get_history(self, event_type: SynthEvent | None = None) -> list[SynthEventData]:
         """
         Get event history, optionally filtered by type.
 
@@ -212,7 +212,7 @@ def console_listener(event: SynthEventData):
 
 
 # Global emitter instance (disabled by default)
-_global_emitter: Optional[SynthEventEmitter] = None
+_global_emitter: SynthEventEmitter | None = None
 
 
 def get_emitter() -> SynthEventEmitter:

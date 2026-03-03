@@ -23,14 +23,14 @@ Knowledge Extraction (M19):
     - Assigns confidence and causal relevance scores
 """
 
-from typing import List, Dict, Optional, Any
-from dataclasses import dataclass, field
-from datetime import datetime
 import json
 import logging
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any, Optional
 
-from schemas import Entity, Dialog, ExposureEvent
 from metadata.tracking import track_mechanism
+from schemas import Dialog, Entity, ExposureEvent
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +38,7 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 # Dialog Co-Generation Data Classes (Phase 1 + Phase 2)
 # ============================================================================
+
 
 @dataclass
 class DialogOutcomeContext:
@@ -47,15 +48,16 @@ class DialogOutcomeContext:
     Created after each inline dialog, passed to generate_next_timepoint()
     so that dialog at timepoint N influences timepoint N+1.
     """
+
     dialog_id: str = ""
     timepoint_id: str = ""
-    topics_raised: List[str] = field(default_factory=list)
-    persuasion_outcomes: Dict[str, bool] = field(default_factory=dict)
-    emotional_deltas: Dict[str, Dict[str, float]] = field(default_factory=dict)
-    relationship_shifts: Dict[str, float] = field(default_factory=dict)
+    topics_raised: list[str] = field(default_factory=list)
+    persuasion_outcomes: dict[str, bool] = field(default_factory=dict)
+    emotional_deltas: dict[str, dict[str, float]] = field(default_factory=dict)
+    relationship_shifts: dict[str, float] = field(default_factory=dict)
     summary: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "dialog_id": self.dialog_id,
             "timepoint_id": self.timepoint_id,
@@ -69,8 +71,8 @@ class DialogOutcomeContext:
 
 def _extract_dialog_outcome(
     dialog: Dialog,
-    entities: List[Entity],
-    timepoint: 'Timepoint',
+    entities: list[Entity],
+    timepoint: "Timepoint",
 ) -> DialogOutcomeContext:
     """
     Extract a DialogOutcomeContext from a completed dialog.
@@ -107,11 +109,17 @@ def _extract_dialog_outcome(
     # Extract relationship shifts from dialog context
     relationship_shifts = {}
     try:
-        context = json.loads(dialog.context_used) if isinstance(dialog.context_used, str) else (dialog.context_used or {})
+        context = (
+            json.loads(dialog.context_used)
+            if isinstance(dialog.context_used, str)
+            else (dialog.context_used or {})
+        )
         if isinstance(context, dict):
             impacts = context.get("relationship_impacts", {})
             if isinstance(impacts, dict):
-                relationship_shifts = {k: float(v) for k, v in impacts.items() if isinstance(v, (int, float))}
+                relationship_shifts = {
+                    k: float(v) for k, v in impacts.items() if isinstance(v, (int, float))
+                }
     except (json.JSONDecodeError, TypeError, ValueError):
         pass
 
@@ -138,25 +146,88 @@ def _extract_dialog_outcome(
 
 # Tactic vocabulary for classifying dialog moves
 TACTIC_VOCABULARY = [
-    "data_argument", "emotional_appeal", "authority_claim", "humor_deflection",
-    "silence_withdrawal", "procedural_challenge", "alliance_appeal", "threat_escalation",
+    "data_argument",
+    "emotional_appeal",
+    "authority_claim",
+    "humor_deflection",
+    "silence_withdrawal",
+    "procedural_challenge",
+    "alliance_appeal",
+    "threat_escalation",
 ]
 
 # Outcome vocabulary for tracking what happened
 OUTCOME_VOCABULARY = [
-    "accepted", "dismissed", "deferred", "ignored", "partially_acknowledged",
+    "accepted",
+    "dismissed",
+    "deferred",
+    "ignored",
+    "partially_acknowledged",
 ]
 
 # Keywords mapping for tactic classification
 _TACTIC_KEYWORDS = {
-    "data_argument": ["data", "number", "percent", "measurement", "reading", "test", "evidence", "shows", "indicates", "according to"],
-    "emotional_appeal": ["feel", "worried", "concerned", "scared", "lives at stake", "people", "families", "care about"],
-    "authority_claim": ["my authority", "i'm responsible", "as the", "my role", "chain of command", "protocol", "regulation"],
+    "data_argument": [
+        "data",
+        "number",
+        "percent",
+        "measurement",
+        "reading",
+        "test",
+        "evidence",
+        "shows",
+        "indicates",
+        "according to",
+    ],
+    "emotional_appeal": [
+        "feel",
+        "worried",
+        "concerned",
+        "scared",
+        "lives at stake",
+        "people",
+        "families",
+        "care about",
+    ],
+    "authority_claim": [
+        "my authority",
+        "i'm responsible",
+        "as the",
+        "my role",
+        "chain of command",
+        "protocol",
+        "regulation",
+    ],
     "humor_deflection": ["joke", "laugh", "funny", "ha", "lighten", "humor", "kidding"],
     "silence_withdrawal": [],  # Detected by absence, not keywords
-    "procedural_challenge": ["procedure", "process", "formal", "review", "committee", "schedule", "agenda", "motion"],
-    "alliance_appeal": ["agree with", "support", "together", "join", "side with", "back me", "ally"],
-    "threat_escalation": ["escalate", "report", "consequences", "warning", "unless", "force", "compel"],
+    "procedural_challenge": [
+        "procedure",
+        "process",
+        "formal",
+        "review",
+        "committee",
+        "schedule",
+        "agenda",
+        "motion",
+    ],
+    "alliance_appeal": [
+        "agree with",
+        "support",
+        "together",
+        "join",
+        "side with",
+        "back me",
+        "ally",
+    ],
+    "threat_escalation": [
+        "escalate",
+        "report",
+        "consequences",
+        "warning",
+        "unless",
+        "force",
+        "compel",
+    ],
 }
 
 
@@ -177,7 +248,7 @@ def _classify_tactic(content: str) -> str:
 
 def _classify_outcome(
     turn_content: str,
-    next_turns: List[Dict[str, Any]],
+    next_turns: list[dict[str, Any]],
     target_entity: str,
 ) -> str:
     """Classify the outcome of a dialog tactic based on subsequent turns."""
@@ -188,9 +259,13 @@ def _classify_outcome(
     for next_turn in next_turns[:3]:
         if next_turn.get("speaker") == target_entity:
             response = next_turn.get("content", "").lower()
-            if any(w in response for w in ["agree", "right", "good point", "yes", "fair", "accepted"]):
+            if any(
+                w in response for w in ["agree", "right", "good point", "yes", "fair", "accepted"]
+            ):
                 return "accepted"
-            if any(w in response for w in ["no", "wrong", "disagree", "reject", "absurd", "nonsense"]):
+            if any(
+                w in response for w in ["no", "wrong", "disagree", "reject", "absurd", "nonsense"]
+            ):
                 return "dismissed"
             if any(w in response for w in ["later", "table", "revisit", "not now", "another time"]):
                 return "deferred"
@@ -204,8 +279,8 @@ def _classify_outcome(
 
 def _update_character_arc(
     entity: Entity,
-    dialog_turns: List[Dict[str, Any]],
-    other_entities: List[Entity],
+    dialog_turns: list[dict[str, Any]],
+    other_entities: list[Entity],
     timepoint_id: str,
 ) -> None:
     """
@@ -214,12 +289,15 @@ def _update_character_arc(
     Records tactics used, outcomes, trust shifts, and promotes
     suppressed impulses to unspoken accumulation.
     """
-    arc = entity.entity_metadata.get("character_arc", {
-        "dialog_attempts": [],
-        "trust_ledger": {},
-        "alliance_history": [],
-        "unspoken_accumulation": [],
-    })
+    arc = entity.entity_metadata.get(
+        "character_arc",
+        {
+            "dialog_attempts": [],
+            "trust_ledger": {},
+            "alliance_history": [],
+            "unspoken_accumulation": [],
+        },
+    )
 
     other_ids = [e.entity_id for e in other_entities if e.entity_id != entity.entity_id]
 
@@ -247,16 +325,18 @@ def _update_character_arc(
             target = other_ids[0]
 
         # Classify outcome based on subsequent turns
-        subsequent = dialog_turns[turn_idx + 1:turn_idx + 4]
+        subsequent = dialog_turns[turn_idx + 1 : turn_idx + 4]
         outcome = _classify_outcome(content, subsequent, target) if target else "deferred"
 
-        arc["dialog_attempts"].append({
-            "timepoint_id": timepoint_id,
-            "tactic_used": tactic,
-            "target_entity": target,
-            "outcome": outcome,
-            "argument_summary": content[:100],
-        })
+        arc["dialog_attempts"].append(
+            {
+                "timepoint_id": timepoint_id,
+                "tactic_used": tactic,
+                "target_entity": target,
+                "outcome": outcome,
+                "argument_summary": content[:100],
+            }
+        )
 
         # Update trust ledger from outcome
         if target:
@@ -285,16 +365,20 @@ def _update_character_arc(
             # Check if already in unspoken accumulation
             existing = [u for u in arc["unspoken_accumulation"] if u.get("content") == impulse_text]
             if not existing:
-                arc["unspoken_accumulation"].append({
-                    "content": impulse_text,
-                    "urgency": 0.3,
-                    "first_formed": timepoint_id,
-                })
+                arc["unspoken_accumulation"].append(
+                    {
+                        "content": impulse_text,
+                        "urgency": 0.3,
+                        "first_formed": timepoint_id,
+                    }
+                )
     except (json.JSONDecodeError, TypeError, AttributeError):
         pass
 
     # Grow urgency for existing unspoken items that weren't expressed
-    spoken_content = " ".join(t.get("content", "") for t in dialog_turns if t.get("speaker") == entity.entity_id).lower()
+    spoken_content = " ".join(
+        t.get("content", "") for t in dialog_turns if t.get("speaker") == entity.entity_id
+    ).lower()
     for item in arc["unspoken_accumulation"]:
         content_lower = item.get("content", "").lower()
         # If the core of the unspoken item wasn't expressed, urgency grows
@@ -350,7 +434,9 @@ def _get_character_arc_for_context(entity: Entity) -> str:
 
 
 @track_mechanism("M8", "embodied_states_pain")
-def couple_pain_to_cognition(physical: 'PhysicalTensor', cognitive: 'CognitiveTensor') -> 'CognitiveTensor':
+def couple_pain_to_cognition(
+    physical: "PhysicalTensor", cognitive: "CognitiveTensor"
+) -> "CognitiveTensor":
     """Apply pain effects to cognitive state (body-mind coupling)"""
     pain_factor = physical.pain_level
 
@@ -358,9 +444,9 @@ def couple_pain_to_cognition(physical: 'PhysicalTensor', cognitive: 'CognitiveTe
     coupled = cognitive.copy()
 
     # Pain reduces energy budget and patience
-    coupled.energy_budget *= (1.0 - pain_factor * 0.5)
+    coupled.energy_budget *= 1.0 - pain_factor * 0.5
     coupled.patience_threshold -= pain_factor * 0.4
-    coupled.decision_confidence *= (1.0 - pain_factor * 0.2)
+    coupled.decision_confidence *= 1.0 - pain_factor * 0.2
 
     # Pain affects emotional state
     coupled.emotional_valence -= pain_factor * 0.3
@@ -368,7 +454,9 @@ def couple_pain_to_cognition(physical: 'PhysicalTensor', cognitive: 'CognitiveTe
     return coupled
 
 
-def couple_illness_to_cognition(physical: 'PhysicalTensor', cognitive: 'CognitiveTensor') -> 'CognitiveTensor':
+def couple_illness_to_cognition(
+    physical: "PhysicalTensor", cognitive: "CognitiveTensor"
+) -> "CognitiveTensor":
     """Apply illness effects to cognitive state (body-mind coupling)"""
     # Create a copy of the cognitive tensor to avoid modifying the original
     coupled = cognitive.copy()
@@ -382,18 +470,20 @@ def couple_illness_to_cognition(physical: 'PhysicalTensor', cognitive: 'Cognitiv
     return coupled
 
 
-def compute_age_constraints(age: float) -> Dict[str, float]:
+def compute_age_constraints(age: float) -> dict[str, float]:
     """Compute age-dependent capability degradation"""
     return {
         "stamina": max(0.3, 1.0 - (age - 25) * 0.01),
         "vision": max(0.4, 1.0 - (age - 20) * 0.015),
         "hearing": max(0.5, 1.0 - (age - 30) * 0.01),
         "recovery_rate": 1.0 / (1.0 + (age - 30) * 0.05),
-        "cognitive_speed": max(0.5, 1.0 - (age - 30) * 0.008)
+        "cognitive_speed": max(0.5, 1.0 - (age - 30) * 0.008),
     }
 
 
-def get_recent_exposure_events(entity: Entity, n: int = 5, store: Optional['GraphStore'] = None) -> List[Dict]:
+def get_recent_exposure_events(
+    entity: Entity, n: int = 5, store: Optional["GraphStore"] = None
+) -> list[dict]:
     """Get recent exposure events for an entity"""
     if not store:
         return []
@@ -404,13 +494,13 @@ def get_recent_exposure_events(entity: Entity, n: int = 5, store: Optional['Grap
             "information": exp.information,
             "source": exp.source,
             "timestamp": exp.timestamp,
-            "event_type": exp.event_type
+            "event_type": exp.event_type,
         }
         for exp in exposure_events
     ]
 
 
-def compute_relationship_metrics(entity_a: Entity, entity_b: Entity) -> Dict:
+def compute_relationship_metrics(entity_a: Entity, entity_b: Entity) -> dict:
     """Compute relationship metrics between two entities"""
     # Get knowledge states
     knowledge_a = set(entity_a.entity_metadata.get("knowledge_state", []))
@@ -424,20 +514,17 @@ def compute_relationship_metrics(entity_a: Entity, entity_b: Entity) -> Dict:
         "shared_knowledge": shared_knowledge,
         "alignment": shared_knowledge / max(1, total_unique),  # Simple alignment metric
         "interaction_count": 0,  # Would need to track from dialog history
-        "trust": 0.5  # Default neutral trust
+        "trust": 0.5,  # Default neutral trust
     }
 
 
-def get_timepoint_position(timeline: List[Dict], timepoint: 'Timepoint') -> str:
+def get_timepoint_position(timeline: list[dict], timepoint: "Timepoint") -> str:
     """Get position description in timeline"""
     # Simple implementation - could be enhanced
     return f"timepoint_{len(timeline)}"
 
 
-def _analyze_dialog_emotional_impact(
-    turns: List[Dict],
-    speaker_id: str
-) -> Dict[str, float]:
+def _analyze_dialog_emotional_impact(turns: list[dict], speaker_id: str) -> dict[str, float]:
     """
     Analyze dialog turns to compute emotional impact on a speaker.
 
@@ -455,23 +542,66 @@ def _analyze_dialog_emotional_impact(
     arousal_delta = 0.0
 
     # Count turns by and to this speaker
-    speaker_turns = [t for t in turns if t.get('speaker') == speaker_id]
+    speaker_turns = [t for t in turns if t.get("speaker") == speaker_id]
 
     if not speaker_turns:
         return {"valence_delta": 0.0, "arousal_delta": 0.0}
 
     # Analyze content sentiment using keyword patterns
-    positive_keywords = ["agree", "support", "excellent", "great", "thank", "appreciate",
-                         "exciting", "opportunity", "succeed", "optimistic", "confident"]
-    negative_keywords = ["disagree", "concern", "risk", "problem", "fail", "worried",
-                         "challenge", "difficult", "unfortunately", "frustrat", "disappoint"]
-    high_arousal_keywords = ["urgent", "immediately", "critical", "must", "now", "excited",
-                            "amazing", "terrible", "disaster", "breakthrough", "!"]
-    low_arousal_keywords = ["calm", "steady", "gradual", "perhaps", "maybe", "consider",
-                           "eventually", "sometime", "possibly", "reflect"]
+    positive_keywords = [
+        "agree",
+        "support",
+        "excellent",
+        "great",
+        "thank",
+        "appreciate",
+        "exciting",
+        "opportunity",
+        "succeed",
+        "optimistic",
+        "confident",
+    ]
+    negative_keywords = [
+        "disagree",
+        "concern",
+        "risk",
+        "problem",
+        "fail",
+        "worried",
+        "challenge",
+        "difficult",
+        "unfortunately",
+        "frustrat",
+        "disappoint",
+    ]
+    high_arousal_keywords = [
+        "urgent",
+        "immediately",
+        "critical",
+        "must",
+        "now",
+        "excited",
+        "amazing",
+        "terrible",
+        "disaster",
+        "breakthrough",
+        "!",
+    ]
+    low_arousal_keywords = [
+        "calm",
+        "steady",
+        "gradual",
+        "perhaps",
+        "maybe",
+        "consider",
+        "eventually",
+        "sometime",
+        "possibly",
+        "reflect",
+    ]
 
     for turn in speaker_turns:
-        content_lower = turn.get('content', '').lower()
+        content_lower = turn.get("content", "").lower()
 
         # Valence impact
         for kw in positive_keywords:
@@ -497,17 +627,14 @@ def _analyze_dialog_emotional_impact(
     valence_delta = max(-0.3, min(0.3, valence_delta))
     arousal_delta = max(-0.25, min(0.25, arousal_delta))
 
-    return {
-        "valence_delta": valence_delta,
-        "arousal_delta": arousal_delta
-    }
+    return {"valence_delta": valence_delta, "arousal_delta": arousal_delta}
 
 
 def _persist_emotional_state_updates(
-    entities: List[Entity],
-    dialog_turns: List[Dict],
-    coupled_cognitives: Dict[str, 'CognitiveTensor'],
-    store: Optional['GraphStore'] = None
+    entities: list[Entity],
+    dialog_turns: list[dict],
+    coupled_cognitives: dict[str, "CognitiveTensor"],
+    store: Optional["GraphStore"] = None,
 ) -> int:
     """
     Persist emotional state updates to entities after dialog synthesis.
@@ -546,9 +673,8 @@ def _persist_emotional_state_updates(
         # models natural stress recovery between interactions.
         arousal_baseline = 0.3
         arousal_decay_rate = 0.15  # 15% relaxation per dialog round
-        decayed_arousal = (
-            arousal_baseline
-            + (coupled.emotional_arousal - arousal_baseline) * (1 - arousal_decay_rate)
+        decayed_arousal = arousal_baseline + (coupled.emotional_arousal - arousal_baseline) * (
+            1 - arousal_decay_rate
         )
 
         # Compute new emotional values
@@ -568,14 +694,16 @@ def _persist_emotional_state_updates(
         entity.entity_metadata["cognitive_tensor"]["emotional_arousal"] = new_arousal
 
         # Also update energy budget (conversations drain energy)
-        energy_drain = len([t for t in dialog_turns if t.get('speaker') == entity_id]) * 0.02
+        energy_drain = len([t for t in dialog_turns if t.get("speaker") == entity_id]) * 0.02
         current_energy = coupled.energy_budget
         new_energy = max(0.0, current_energy - energy_drain)
         entity.entity_metadata["cognitive_tensor"]["energy_budget"] = new_energy
 
         updates_made += 1
-        logger.debug(f"[M11] Updated emotional state for {entity_id}: "
-                     f"valence={new_valence:.3f}, arousal={new_arousal:.3f}")
+        logger.debug(
+            f"[M11] Updated emotional state for {entity_id}: "
+            f"valence={new_valence:.3f}, arousal={new_arousal:.3f}"
+        )
 
     if updates_made > 0:
         logger.info(f"[M11] Persisted emotional state updates for {updates_made} entities")
@@ -583,7 +711,7 @@ def _persist_emotional_state_updates(
     return updates_made
 
 
-def _sync_ttm_to_cognitive(entity: Entity) -> Optional['CognitiveTensor']:
+def _sync_ttm_to_cognitive(entity: Entity) -> Optional["CognitiveTensor"]:
     """
     Sync TTMTensor context values → CognitiveTensor (pretraining equivalent).
 
@@ -605,10 +733,12 @@ def _sync_ttm_to_cognitive(entity: Entity) -> Optional['CognitiveTensor']:
     Returns:
         Updated CognitiveTensor if sync occurred, None otherwise
     """
-    import json
     import base64
+    import json
+
     import msgspec
     import numpy as np
+
     from schemas import CognitiveTensor
 
     # Check if entity has a trained tensor
@@ -624,20 +754,29 @@ def _sync_ttm_to_cognitive(entity: Entity) -> Optional['CognitiveTensor']:
         # Decode behavior_vector → personality_traits (last-chance fallback)
         # Only if entity still has no decoded traits at dialog time
         existing_source = entity.entity_metadata.get("personality_source", "")
-        if existing_source not in ("template_entity_roster", "llm_population_decoded", "tensor_decoded"):
-            behavior = np.array(msgspec.msgpack.decode(base64.b64decode(tensor_dict["behavior_vector"])))
+        if existing_source not in (
+            "template_entity_roster",
+            "llm_population_decoded",
+            "tensor_decoded",
+        ):
+            behavior = np.array(
+                msgspec.msgpack.decode(base64.b64decode(tensor_dict["behavior_vector"]))
+            )
             from tensor_initialization import decode_behavior_vector_to_traits
+
             decoded_traits = decode_behavior_vector_to_traits(behavior, entity.entity_metadata)
             if decoded_traits:
                 entity.entity_metadata["personality_traits"] = decoded_traits
                 entity.entity_metadata["personality_source"] = "sync_decoded"
-                logger.info(f"[SYNC] Decoded behavior_vector → traits for {entity.entity_id}: {decoded_traits}")
+                logger.info(
+                    f"[SYNC] Decoded behavior_vector → traits for {entity.entity_id}: {decoded_traits}"
+                )
 
         # Extract values from context_vector
         # [0]=knowledge, [1]=valence, [2]=arousal, [3]=energy, [4]=confidence, [5]=patience, [6]=risk, [7]=social
         ttm_valence = context[1]  # 0-1 scale
         ttm_arousal = context[2]  # 0-1 scale
-        ttm_energy = context[3]   # 0-1 scale
+        ttm_energy = context[3]  # 0-1 scale
         ttm_confidence = context[4]  # 0-1 scale
         ttm_patience = context[5]  # 0-1 scale
         ttm_risk = context[6]  # 0-1 scale
@@ -663,7 +802,9 @@ def _sync_ttm_to_cognitive(entity: Entity) -> Optional['CognitiveTensor']:
         # If already has non-default values, this entity has been updated at runtime
         # In that case, don't overwrite with TTM baseline
         if abs(existing_valence) > 0.01 or abs(existing_arousal) > 0.01:
-            logger.debug(f"[SYNC] {entity.entity_id}: Skipping TTM→Cog sync (already has runtime values)")
+            logger.debug(
+                f"[SYNC] {entity.entity_id}: Skipping TTM→Cog sync (already has runtime values)"
+            )
             return CognitiveTensor(**existing_cog) if existing_cog else None
 
         # Update cognitive tensor with TTM values
@@ -675,14 +816,16 @@ def _sync_ttm_to_cognitive(entity: Entity) -> Optional['CognitiveTensor']:
             "decision_confidence": cog_confidence,
             "patience_threshold": cog_patience,
             "risk_tolerance": cog_risk,
-            "social_engagement": cog_social
+            "social_engagement": cog_social,
         }
 
         # Write back to entity metadata
         entity.entity_metadata["cognitive_tensor"] = updated_cog
 
-        logger.info(f"[SYNC] TTM→Cog for {entity.entity_id}: "
-                   f"valence={cog_valence:.3f}, arousal={cog_arousal:.3f}, energy={cog_energy:.1f}")
+        logger.info(
+            f"[SYNC] TTM→Cog for {entity.entity_id}: "
+            f"valence={cog_valence:.3f}, arousal={cog_arousal:.3f}, energy={cog_energy:.1f}"
+        )
 
         return CognitiveTensor(**updated_cog)
 
@@ -692,9 +835,7 @@ def _sync_ttm_to_cognitive(entity: Entity) -> Optional['CognitiveTensor']:
 
 
 def _sync_cognitive_to_ttm(
-    entity: Entity,
-    cognitive: 'CognitiveTensor',
-    store: Optional['GraphStore'] = None
+    entity: Entity, cognitive: "CognitiveTensor", store: Optional["GraphStore"] = None
 ) -> bool:
     """
     Sync CognitiveTensor values → TTMTensor context (backprop equivalent).
@@ -718,8 +859,9 @@ def _sync_cognitive_to_ttm(
     Returns:
         True if sync successful, False otherwise
     """
-    import json
     import base64
+    import json
+
     import msgspec
     import numpy as np
 
@@ -763,9 +905,11 @@ def _sync_cognitive_to_ttm(
 
         # Re-encode tensor
         updated_tensor = {
-            "context_vector": base64.b64encode(msgspec.msgpack.encode(context.tolist())).decode('utf-8'),
+            "context_vector": base64.b64encode(msgspec.msgpack.encode(context.tolist())).decode(
+                "utf-8"
+            ),
             "biology_vector": tensor_dict["biology_vector"],  # Preserve unchanged
-            "behavior_vector": tensor_dict["behavior_vector"]  # Preserve unchanged
+            "behavior_vector": tensor_dict["behavior_vector"],  # Preserve unchanged
         }
 
         # Write back to entity
@@ -775,8 +919,10 @@ def _sync_cognitive_to_ttm(
         if store:
             store.save_entity(entity)
 
-        logger.info(f"[SYNC] Cog→TTM for {entity.entity_id}: "
-                   f"valence={ttm_valence:.3f}, arousal={ttm_arousal:.3f}, energy={ttm_energy:.3f}")
+        logger.info(
+            f"[SYNC] Cog→TTM for {entity.entity_id}: "
+            f"valence={ttm_valence:.3f}, arousal={ttm_arousal:.3f}, energy={ttm_energy:.3f}"
+        )
 
         return True
 
@@ -785,7 +931,7 @@ def _sync_cognitive_to_ttm(
         return False
 
 
-def _derive_speaking_style(personality_traits: List[str], archetype_id: str = "") -> Dict[str, str]:
+def _derive_speaking_style(personality_traits: list[str], archetype_id: str = "") -> dict[str, str]:
     """
     Derive speaking style characteristics from personality traits.
 
@@ -812,11 +958,18 @@ def _derive_speaking_style(personality_traits: List[str], archetype_id: str = ""
         "formality": "neutral",
         "tone": "neutral",
         "vocabulary": "general",
-        "speech_pattern": "direct"
+        "speech_pattern": "direct",
     }
 
     # Verbosity mapping
-    verbose_traits = ["intellectual", "philosophical", "verbose", "analytical", "academic", "professorial"]
+    verbose_traits = [
+        "intellectual",
+        "philosophical",
+        "verbose",
+        "analytical",
+        "academic",
+        "professorial",
+    ]
     terse_traits = ["reserved", "stoic", "practical", "military", "laconic", "quiet"]
     if any(t in traits_lower for t in verbose_traits):
         style["verbosity"] = "verbose"
@@ -844,7 +997,13 @@ def _derive_speaking_style(personality_traits: List[str], archetype_id: str = ""
 
     # Vocabulary mapping
     tech_traits = ["technical", "engineer", "scientific", "analytical", "data-driven"]
-    philosophical_traits = ["philosophical", "intellectual", "academic", "scholarly", "contemplative"]
+    philosophical_traits = [
+        "philosophical",
+        "intellectual",
+        "academic",
+        "scholarly",
+        "contemplative",
+    ]
     business_traits = ["business", "executive", "strategic", "pragmatic", "results-oriented"]
     if any(t in traits_lower for t in tech_traits):
         style["vocabulary"] = "technical"
@@ -879,7 +1038,7 @@ def _derive_speaking_style(personality_traits: List[str], archetype_id: str = ""
     return style
 
 
-def _infer_personality_from_role(role: str) -> List[str]:
+def _infer_personality_from_role(role: str) -> list[str]:
     """
     Infer personality traits from a role description when explicit traits are absent.
 
@@ -942,7 +1101,7 @@ def _infer_personality_from_role(role: str) -> List[str]:
     return ["determined", "principled"]
 
 
-def _generate_voice_examples(speaking_style: Dict[str, str], character_id: str) -> List[str]:
+def _generate_voice_examples(speaking_style: dict[str, str], character_id: str) -> list[str]:
     """
     Generate 2-3 few-shot example lines showing how a character with this
     specific speaking style combination should sound.
@@ -1032,14 +1191,19 @@ def _generate_voice_examples(speaking_style: Dict[str, str], character_id: str) 
         ],
     }
 
-    examples = list(base_examples.get(
-        (verbosity, tone),
-        base_examples.get((verbosity, "neutral"), [
-            "We should discuss this further.",
-            "What are the next steps?",
-            "Let me think about that.",
-        ])
-    ))
+    examples = list(
+        base_examples.get(
+            (verbosity, tone),
+            base_examples.get(
+                (verbosity, "neutral"),
+                [
+                    "We should discuss this further.",
+                    "What are the next steps?",
+                    "Let me think about that.",
+                ],
+            ),
+        )
+    )
 
     # --- Modulate by formality ---
     if formality == "formal" and verbosity != "terse":
@@ -1075,10 +1239,18 @@ def _generate_voice_examples(speaking_style: Dict[str, str], character_id: str) 
 def _formalize_example(text: str) -> str:
     """Apply light formalization to an example line."""
     replacements = [
-        ("we're", "we are"), ("I've", "I have"), ("don't", "do not"),
-        ("can't", "cannot"), ("won't", "will not"), ("Let's", "Let us"),
-        ("let's", "let us"), ("I'm", "I am"), ("it's", "it is"),
-        ("isn't", "is not"), ("wasn't", "was not"), ("shouldn't", "should not"),
+        ("we're", "we are"),
+        ("I've", "I have"),
+        ("don't", "do not"),
+        ("can't", "cannot"),
+        ("won't", "will not"),
+        ("Let's", "Let us"),
+        ("let's", "let us"),
+        ("I'm", "I am"),
+        ("it's", "it is"),
+        ("isn't", "is not"),
+        ("wasn't", "was not"),
+        ("shouldn't", "should not"),
         ("wouldn't", "would not"),
     ]
     for old, new in replacements:
@@ -1089,9 +1261,12 @@ def _formalize_example(text: str) -> str:
 def _casualize_example(text: str) -> str:
     """Apply light casualization to an example line."""
     replacements = [
-        ("I believe", "I think"), ("We should", "We gotta"),
-        ("Let us", "Let's"), ("do not", "don't"),
-        ("cannot", "can't"), ("will not", "won't"),
+        ("I believe", "I think"),
+        ("We should", "We gotta"),
+        ("Let us", "Let's"),
+        ("do not", "don't"),
+        ("cannot", "can't"),
+        ("will not", "won't"),
     ]
     for old, new in replacements:
         text = text.replace(old, new)
@@ -1102,7 +1277,7 @@ def _casualize_example(text: str) -> str:
     return text
 
 
-def extract_knowledge_references(content: str) -> List[str]:
+def extract_knowledge_references(content: str) -> list[str]:
     """
     DEPRECATED: Naive capitalization-based extraction.
 
@@ -1127,10 +1302,16 @@ def extract_knowledge_references(content: str) -> List[str]:
     return []  # Return empty - extraction now handled by M19 agent
 
 
-def create_exposure_event(entity_id: str, information: str, source: str, event_type: str,
-                         timestamp: datetime, confidence: float = 0.9,
-                         store: Optional['GraphStore'] = None,
-                         timepoint_id: Optional[str] = None):
+def create_exposure_event(
+    entity_id: str,
+    information: str,
+    source: str,
+    event_type: str,
+    timestamp: datetime,
+    confidence: float = 0.9,
+    store: Optional["GraphStore"] = None,
+    timepoint_id: str | None = None,
+):
     """
     Create an exposure event for information transfer.
 
@@ -1155,18 +1336,18 @@ def create_exposure_event(entity_id: str, information: str, source: str, event_t
         source=source,
         timestamp=timestamp,
         confidence=confidence,
-        timepoint_id=timepoint_id
+        timepoint_id=timepoint_id,
     )
     store.save_exposure_event(exposure)
-    logger.info(f"[M3] Created exposure event: {source} -> {entity_id} (info: {information[:50] if len(information) > 50 else information})")
+    logger.info(
+        f"[M3] Created exposure event: {source} -> {entity_id} (info: {information[:50] if len(information) > 50 else information})"
+    )
 
 
 @track_mechanism("M3", "exposure_event_integration")
 def _build_knowledge_from_exposures(
-    entity: Entity,
-    store: Optional['GraphStore'] = None,
-    limit: int = 20
-) -> List[Dict]:
+    entity: Entity, store: Optional["GraphStore"] = None, limit: int = 20
+) -> list[dict]:
     """
     Build knowledge context from exposure events (M3) for dialog synthesis (M11).
 
@@ -1189,14 +1370,18 @@ def _build_knowledge_from_exposures(
     if store:
         exposure_events = store.get_exposure_events(entity.entity_id, limit=limit)
         for exp in exposure_events:
-            knowledge_items.append({
-                "content": exp.information,
-                "source": exp.source or "direct_experience",
-                "confidence": exp.confidence,
-                "event_type": exp.event_type,
-                "timestamp": exp.timestamp.isoformat() if hasattr(exp.timestamp, 'isoformat') else str(exp.timestamp),
-                "from_exposure": True
-            })
+            knowledge_items.append(
+                {
+                    "content": exp.information,
+                    "source": exp.source or "direct_experience",
+                    "confidence": exp.confidence,
+                    "event_type": exp.event_type,
+                    "timestamp": exp.timestamp.isoformat()
+                    if hasattr(exp.timestamp, "isoformat")
+                    else str(exp.timestamp),
+                    "from_exposure": True,
+                }
+            )
 
     # Get static knowledge from entity metadata (fallback/supplemental)
     static_knowledge = entity.entity_metadata.get("knowledge_state", [])
@@ -1205,41 +1390,45 @@ def _build_knowledge_from_exposures(
         if isinstance(item, str):
             # Simple string knowledge item
             if not any(k.get("content") == item for k in knowledge_items):
-                knowledge_items.append({
-                    "content": item,
-                    "source": "background_knowledge",
-                    "confidence": 0.8,  # Default confidence for static knowledge
-                    "event_type": "prior",
-                    "from_exposure": False
-                })
+                knowledge_items.append(
+                    {
+                        "content": item,
+                        "source": "background_knowledge",
+                        "confidence": 0.8,  # Default confidence for static knowledge
+                        "event_type": "prior",
+                        "from_exposure": False,
+                    }
+                )
         elif isinstance(item, dict):
             # Already structured knowledge item
             content = item.get("content", str(item))
             if not any(k.get("content") == content for k in knowledge_items):
-                knowledge_items.append({
-                    "content": content,
-                    "source": item.get("source", "background_knowledge"),
-                    "confidence": item.get("confidence", 0.8),
-                    "event_type": item.get("event_type", "prior"),
-                    "from_exposure": False
-                })
+                knowledge_items.append(
+                    {
+                        "content": content,
+                        "source": item.get("source", "background_knowledge"),
+                        "confidence": item.get("confidence", 0.8),
+                        "event_type": item.get("event_type", "prior"),
+                        "from_exposure": False,
+                    }
+                )
 
     # Sort by confidence (highest first), then by recency (exposure events first)
     knowledge_items.sort(
-        key=lambda k: (k.get("confidence", 0.5), k.get("from_exposure", False)),
-        reverse=True
+        key=lambda k: (k.get("confidence", 0.5), k.get("from_exposure", False)), reverse=True
     )
 
     return knowledge_items[:limit]
 
 
-def _apply_circadian_energy_adjustment(base_energy: float, hour: int,
-                                       store: Optional['GraphStore'] = None) -> float:
+def _apply_circadian_energy_adjustment(
+    base_energy: float, hour: int, store: Optional["GraphStore"] = None
+) -> float:
     """Apply M14 circadian energy adjustment if configuration is available"""
     # Try to get circadian config from store context
     circadian_config = {}
-    if store and hasattr(store, 'context'):
-        circadian_config = store.context.get('circadian_config', {})
+    if store and hasattr(store, "context"):
+        circadian_config = store.context.get("circadian_config", {})
 
     # If no config, return base energy unchanged
     if not circadian_config:
@@ -1250,19 +1439,13 @@ def _apply_circadian_energy_adjustment(base_energy: float, hour: int,
 
     # Apply circadian adjustment to base energy (treat as "conversation" activity cost)
     adjusted_energy = compute_energy_cost_with_circadian(
-        activity="conversation",
-        hour=hour,
-        base_cost=base_energy,
-        circadian_config=circadian_config
+        activity="conversation", hour=hour, base_cost=base_energy, circadian_config=circadian_config
     )
 
     return adjusted_energy
 
 
-def _filter_dialog_participants(
-    entities: List[Entity],
-    animism_level: int = 0
-) -> tuple:
+def _filter_dialog_participants(entities: list[Entity], animism_level: int = 0) -> tuple:
     """
     Filter entities for dialog participation based on animism_level.
 
@@ -1284,11 +1467,19 @@ def _filter_dialog_participants(
         Tuple of (included_entities, excluded_entity_ids)
     """
     ANIMISM_THRESHOLDS = {
-        "human": 0, "person": 0, "character": 0,
-        "animal": 1, "creature": 1,
-        "building": 2, "object": 2, "environment": 2,
-        "location": 2, "vehicle": 2,
-        "abstract": 3, "concept": 3, "force": 3,
+        "human": 0,
+        "person": 0,
+        "character": 0,
+        "animal": 1,
+        "creature": 1,
+        "building": 2,
+        "object": 2,
+        "environment": 2,
+        "location": 2,
+        "vehicle": 2,
+        "abstract": 3,
+        "concept": 3,
+        "force": 3,
     }
 
     SPEAKING_MODES = {
@@ -1320,18 +1511,20 @@ def _filter_dialog_participants(
             included.append(entity)
         else:
             excluded_ids.append(entity.entity_id)
-            logger.info(f"Excluding {entity.entity_id} ({etype}) from dialog: "
-                       f"animism_level={animism_level} < threshold={threshold}")
+            logger.info(
+                f"Excluding {entity.entity_id} ({etype}) from dialog: "
+                f"animism_level={animism_level} < threshold={threshold}"
+            )
 
     return included, excluded_ids
 
 
 def _derive_dialog_params_from_persona(
-    speaking_style: Dict[str, str],
-    emotional_state: Dict[str, float],
+    speaking_style: dict[str, str],
+    emotional_state: dict[str, float],
     energy: float,
-    entity_type: str = "human"
-) -> Dict[str, str]:
+    entity_type: str = "human",
+) -> dict[str, str]:
     """
     Map emotion x personality → dialog behavior parameters.
 
@@ -1379,7 +1572,7 @@ def _derive_dialog_params_from_persona(
     return params
 
 
-def _compute_dialog_structure(participants_context: List[Dict]) -> Dict[str, any]:
+def _compute_dialog_structure(participants_context: list[dict]) -> dict[str, any]:
     """
     Compute dynamic dialog structure parameters based on participant state.
 
@@ -1433,9 +1626,9 @@ def _compute_dialog_structure(participants_context: List[Dict]) -> Dict[str, any
 
 
 def _compute_temporal_mood(
-    timepoint: 'Timepoint',
-    timeline: List[Dict],
-    participant_anxiety: Optional[Dict[str, float]] = None
+    timepoint: "Timepoint",
+    timeline: list[dict],
+    participant_anxiety: dict[str, float] | None = None,
 ) -> str:
     """
     Map timeline position to emotional register for dialog tone.
@@ -1460,42 +1653,64 @@ def _compute_temporal_mood(
                 break
 
     # Disaster keywords
-    disaster_words = ["failure", "explosion", "breach", "collapse", "death",
-                      "emergency", "critical", "catastroph", "disaster", "crisis"]
+    disaster_words = [
+        "failure",
+        "explosion",
+        "breach",
+        "collapse",
+        "death",
+        "emergency",
+        "critical",
+        "catastroph",
+        "disaster",
+        "crisis",
+    ]
     is_disaster = any(w in event_desc for w in disaster_words)
 
     if is_disaster:
-        mood = ("CRISIS. This is NOT a calm meeting. Characters shout, blame, panic. "
-                "Short urgent sentences. People talk over each other. "
-                "Someone may refuse to speak. Raw emotion overrides professionalism.")
+        mood = (
+            "CRISIS. This is NOT a calm meeting. Characters shout, blame, panic. "
+            "Short urgent sentences. People talk over each other. "
+            "Someone may refuse to speak. Raw emotion overrides professionalism."
+        )
     elif position < 0.25:
-        mood = ("EARLY STAGE. Professional optimism with seeds of doubt. "
-                "Characters are polite but small fractures are visible. "
-                "One character may voice a concern that others dismiss.")
+        mood = (
+            "EARLY STAGE. Professional optimism with seeds of doubt. "
+            "Characters are polite but small fractures are visible. "
+            "One character may voice a concern that others dismiss."
+        )
     elif position < 0.6:
-        mood = ("TENSION BUILDING. 'I told you so' energy. Trust fraying between characters. "
-                "References to earlier decisions that now look wrong. "
-                "Politeness is strained. Someone is holding back anger.")
+        mood = (
+            "TENSION BUILDING. 'I told you so' energy. Trust fraying between characters. "
+            "References to earlier decisions that now look wrong. "
+            "Politeness is strained. Someone is holding back anger."
+        )
     else:
-        mood = ("LATE STAGE. Heavy. Characters reference earlier decisions with regret or defensiveness. "
-                "Relationships are damaged. Some characters are resigned, others are digging in. "
-                "The weight of consequences is felt in every exchange.")
+        mood = (
+            "LATE STAGE. Heavy. Characters reference earlier decisions with regret or defensiveness. "
+            "Relationships are damaged. Some characters are resigned, others are digging in. "
+            "The weight of consequences is felt in every exchange."
+        )
 
     # Apply anxiety modifier from prospection data
     if participant_anxiety:
         anxiety_values = list(participant_anxiety.values())
         avg_anxiety = sum(anxiety_values) / len(anxiety_values) if anxiety_values else 0.0
         if avg_anxiety > 0.7:
-            mood += (" CRISIS-LEVEL ANXIETY. Characters are visibly stressed — voices crack, "
-                     "hands shake, decisions feel desperate. Fear of failure pervades every exchange.")
+            mood += (
+                " CRISIS-LEVEL ANXIETY. Characters are visibly stressed — voices crack, "
+                "hands shake, decisions feel desperate. Fear of failure pervades every exchange."
+            )
         elif avg_anxiety > 0.4:
-            mood += (" UNDERLYING TENSION. Characters carry unspoken worries. "
-                     "Pauses are loaded. Someone deflects when pressed about the future.")
+            mood += (
+                " UNDERLYING TENSION. Characters carry unspoken worries. "
+                "Pauses are loaded. Someone deflects when pressed about the future."
+            )
 
     return mood
 
 
-def _check_voice_distinctiveness(turns: List[Dict]) -> float:
+def _check_voice_distinctiveness(turns: list[dict]) -> float:
     """
     Multi-dimensional voice distinctiveness metric across 4 axes (equal weight):
     1. Hedging opener ratio (banned opener detection)
@@ -1513,11 +1728,21 @@ def _check_voice_distinctiveness(turns: List[Dict]) -> float:
         return 1.0
 
     HEDGING_PATTERNS = [
-        "i understand", "that's a valid point", "i see your point",
-        "i agree,", "i agree.", "you raise a good", "i appreciate your",
-        "that's a fair", "i hear what you", "you make a good",
-        "with all due respect", "i understand your concerns",
-        "that's a great point", "you're right, but", "i take your point",
+        "i understand",
+        "that's a valid point",
+        "i see your point",
+        "i agree,",
+        "i agree.",
+        "you raise a good",
+        "i appreciate your",
+        "that's a fair",
+        "i hear what you",
+        "you make a good",
+        "with all due respect",
+        "i understand your concerns",
+        "that's a great point",
+        "you're right, but",
+        "i take your point",
     ]
 
     total_turns = len(turns)
@@ -1582,7 +1807,7 @@ def _check_voice_distinctiveness(turns: List[Dict]) -> float:
         # Check for round-robin: if all speakers have equal turns, score is low
         mean_count = sum(counts) / len(counts)
         variance = sum((c - mean_count) ** 2 for c in counts) / len(counts)
-        cv = (variance ** 0.5) / mean_count if mean_count > 0 else 0
+        cv = (variance**0.5) / mean_count if mean_count > 0 else 0
         # CV > 0.3 = good variation, CV = 0 = perfect round-robin
         distribution_score = min(1.0, cv / 0.3)
     else:
@@ -1607,7 +1832,7 @@ def _check_voice_distinctiveness(turns: List[Dict]) -> float:
     return distinctiveness
 
 
-def _evaluate_dialog_quality(turns: List[Dict]) -> Dict:
+def _evaluate_dialog_quality(turns: list[dict]) -> dict:
     """
     Post-generation quality evaluation for rejection sampling.
 
@@ -1629,17 +1854,33 @@ def _evaluate_dialog_quality(turns: List[Dict]) -> Dict:
         return {"score": 1.0, "passed": True, "failures": [], "repair_notes": ""}
 
     BANNED_OPENERS = [
-        "i agree,", "i agree.", "that's a valid point", "i understand your concerns",
-        "i see your point", "you raise a good point", "that's a great point",
-        "i appreciate your", "that's a fair", "i hear what you",
-        "you make a good", "with all due respect", "you're right, but",
+        "i agree,",
+        "i agree.",
+        "that's a valid point",
+        "i understand your concerns",
+        "i see your point",
+        "you raise a good point",
+        "that's a great point",
+        "i appreciate your",
+        "that's a fair",
+        "i hear what you",
+        "you make a good",
+        "with all due respect",
+        "you're right, but",
         "i take your point",
     ]
 
     CONSENSUS_PHRASES = [
-        "i agree", "you're right", "that's true", "absolutely",
-        "exactly", "good point", "fair enough", "i concur",
-        "makes sense", "i think so too",
+        "i agree",
+        "you're right",
+        "that's true",
+        "absolutely",
+        "exactly",
+        "good point",
+        "fair enough",
+        "i concur",
+        "makes sense",
+        "i think so too",
     ]
 
     failures = []
@@ -1687,7 +1928,7 @@ def _evaluate_dialog_quality(turns: List[Dict]) -> Dict:
         mean_len = sum(turn_lengths) / len(turn_lengths)
         if mean_len > 0:
             variance = sum((l - mean_len) ** 2 for l in turn_lengths) / len(turn_lengths)
-            cv = (variance ** 0.5) / mean_len
+            cv = (variance**0.5) / mean_len
             if cv > 0.3:
                 checks_passed += 1
             else:
@@ -1733,15 +1974,25 @@ def _evaluate_dialog_quality(turns: List[Dict]) -> Dict:
     if failures:
         repair_parts = []
         if any("banned_openers" in f for f in failures):
-            repair_parts.append("REMOVE all hedging openers like 'I agree', 'That's a valid point'. Characters must respond with substance, not acknowledgment.")
+            repair_parts.append(
+                "REMOVE all hedging openers like 'I agree', 'That's a valid point'. Characters must respond with substance, not acknowledgment."
+            )
         if "round_robin_pattern" in failures:
-            repair_parts.append("BREAK the round-robin speaker order. Some characters speak multiple times in a row. Others stay silent for several turns.")
+            repair_parts.append(
+                "BREAK the round-robin speaker order. Some characters speak multiple times in a row. Others stay silent for several turns."
+            )
         if any("low_turn_length_cv" in f for f in failures):
-            repair_parts.append("VARY turn lengths dramatically. Mix 5-word interruptions with 40-word monologues.")
+            repair_parts.append(
+                "VARY turn lengths dramatically. Mix 5-word interruptions with 40-word monologues."
+            )
         if any("high_consensus" in f for f in failures):
-            repair_parts.append("REDUCE agreement. Characters must push back, disagree, or ignore each other's points instead of constantly agreeing.")
+            repair_parts.append(
+                "REDUCE agreement. Characters must push back, disagree, or ignore each other's points instead of constantly agreeing."
+            )
         if any("low_length_spread" in f for f in failures):
-            repair_parts.append("DIFFERENTIATE speaking lengths between characters. The terse character uses 8-word sentences. The verbose character uses 25-word sentences.")
+            repair_parts.append(
+                "DIFFERENTIATE speaking lengths between characters. The terse character uses 8-word sentences. The verbose character uses 25-word sentences."
+            )
         repair_notes = "\n".join(repair_parts)
 
     passed = score >= 0.6 or len(failures) < 2
@@ -1755,9 +2006,9 @@ def _evaluate_dialog_quality(turns: List[Dict]) -> Dict:
 
 
 def _evaluate_dialog_subtext_quality(
-    turns: List[Dict],
-    entities: List['Entity'],
-) -> Dict:
+    turns: list[dict],
+    entities: list["Entity"],
+) -> dict:
     """
     Phase 4 quality check: subtext and archetype adherence.
 
@@ -1773,7 +2024,9 @@ def _evaluate_dialog_subtext_quality(
 
         # Also check proception state for withheld knowledge
         try:
-            wk_raw = entity.entity_metadata.get("proception_state", {}).get("withheld_knowledge", "[]")
+            wk_raw = entity.entity_metadata.get("proception_state", {}).get(
+                "withheld_knowledge", "[]"
+            )
             if isinstance(wk_raw, str):
                 withheld = json.loads(wk_raw)
             else:
@@ -1796,6 +2049,7 @@ def _evaluate_dialog_subtext_quality(
     # Check 2: Archetype never_does adherence
     try:
         from workflows.dialog_archetypes import ARCHETYPE_RHETORICAL_PROFILES
+
         for entity in entities:
             archetype_id = entity.entity_metadata.get("archetype_id", "")
             profile = ARCHETYPE_RHETORICAL_PROFILES.get(archetype_id, {})
@@ -1818,23 +2072,23 @@ def _evaluate_dialog_subtext_quality(
 
 @track_mechanism("M11", "dialog_synthesis")
 def synthesize_dialog(
-    entities: List[Entity],
-    timepoint: 'Timepoint',
-    timeline: List[Dict],
-    llm: 'LLMClient',
-    store: Optional['GraphStore'] = None,
-    run_id: Optional[str] = None,
+    entities: list[Entity],
+    timepoint: "Timepoint",
+    timeline: list[dict],
+    llm: "LLMClient",
+    store: Optional["GraphStore"] = None,
+    run_id: str | None = None,
     animism_level: int = 0,
-    prior_dialog_beats: Optional[List[str]] = None,
-    qse_state: Optional[Dict] = None,
-    voice_mixer: Optional['VoiceMixer'] = None,
+    prior_dialog_beats: list[str] | None = None,
+    qse_state: dict | None = None,
+    voice_mixer: Optional["VoiceMixer"] = None,
     # NEW: Per-turn dialog generation kwargs (all optional, backward-compatible)
     use_per_turn: bool = True,
-    steering_model: Optional[str] = None,
-    character_model: Optional[str] = None,
-    quality_gate_model: Optional[str] = None,
+    steering_model: str | None = None,
+    character_model: str | None = None,
+    quality_gate_model: str | None = None,
     run_quality_per_turn: bool = False,
-    adprs_envelopes: Optional[Dict[str, 'ADPRSEnvelope']] = None,
+    adprs_envelopes: dict[str, "ADPRSEnvelope"] | None = None,
 ) -> Dialog:
     """Generate conversation with full physical/emotional/temporal context.
 
@@ -1851,15 +2105,15 @@ def synthesize_dialog(
     sanitized_timeline = []
     for item in timeline:
         # Convert Pydantic/SQLModel objects to dicts
-        if hasattr(item, 'model_dump'):
+        if hasattr(item, "model_dump"):
             item = item.model_dump()
-        elif hasattr(item, 'dict'):
+        elif hasattr(item, "dict"):
             item = item.dict()
         elif not isinstance(item, dict):
             item = {"event_description": str(item)}
         sanitized_item = {}
         for key, value in item.items():
-            if hasattr(value, 'isoformat'):  # datetime object
+            if hasattr(value, "isoformat"):  # datetime object
                 sanitized_item[key] = value.isoformat()
             else:
                 sanitized_item[key] = value
@@ -1869,7 +2123,9 @@ def synthesize_dialog(
     # Filter entities by animism_level (exclude non-human types below threshold)
     entities, excluded_ids = _filter_dialog_participants(entities, animism_level)
     if excluded_ids:
-        print(f"    [M11] Excluded {len(excluded_ids)} entities from dialog (animism_level={animism_level}): {', '.join(excluded_ids)}")
+        print(
+            f"    [M11] Excluded {len(excluded_ids)} entities from dialog (animism_level={animism_level}): {', '.join(excluded_ids)}"
+        )
 
     # Apply VoiceMixer filtering (mute/solo)
     if voice_mixer:
@@ -1878,7 +2134,9 @@ def synthesize_dialog(
         mixer_excluded = [eid for eid in all_ids if eid not in active_ids]
         if mixer_excluded:
             entities = [e for e in entities if e.entity_id in active_ids]
-            print(f"    [M11] VoiceMixer excluded {len(mixer_excluded)} entities: {', '.join(mixer_excluded)}")
+            print(
+                f"    [M11] VoiceMixer excluded {len(mixer_excluded)} entities: {', '.join(mixer_excluded)}"
+            )
 
     # Build comprehensive context for each participant
     participants_context = []
@@ -1888,9 +2146,11 @@ def synthesize_dialog(
         # This ensures trained tensor values are used, not default 0.0 values
         synced_cognitive = _sync_ttm_to_cognitive(entity)
         if synced_cognitive:
-            print(f"    [SYNC] TTM→Cog for {entity.entity_id}: "
-                  f"valence={synced_cognitive.emotional_valence:.3f}, "
-                  f"arousal={synced_cognitive.emotional_arousal:.3f}")
+            print(
+                f"    [SYNC] TTM→Cog for {entity.entity_id}: "
+                f"valence={synced_cognitive.emotional_valence:.3f}, "
+                f"arousal={synced_cognitive.emotional_arousal:.3f}"
+            )
 
         # Get current state from metadata (more defensive than property access)
         physical_data = entity.entity_metadata.get("physical_tensor", {})
@@ -1899,9 +2159,10 @@ def synthesize_dialog(
         # Try to construct tensors from metadata
         physical = None
         cognitive = None
-        if physical_data and 'age' in physical_data:
+        if physical_data and "age" in physical_data:
             try:
                 from schemas import PhysicalTensor
+
                 physical = PhysicalTensor(**physical_data)
             except Exception as e:
                 print(f"  ⚠️  Failed to construct physical tensor for {entity.entity_id}: {e}")
@@ -1909,6 +2170,7 @@ def synthesize_dialog(
         if cognitive_data:
             try:
                 from schemas import CognitiveTensor
+
                 cognitive = CognitiveTensor(**cognitive_data)
             except Exception as e:
                 print(f"  ⚠️  Failed to construct cognitive tensor for {entity.entity_id}: {e}")
@@ -1916,8 +2178,10 @@ def synthesize_dialog(
         # If entity doesn't have tensor attributes, skip it with warning
         if physical is None or cognitive is None:
             # Check if entity has TTM tensor (prospection-only entities)
-            if hasattr(entity, 'tensor') and entity.tensor:
-                print(f"  ⚠️  Skipping {entity.entity_id} in dialog synthesis - has TTM tensor but not trained (no physical/cognitive tensors)")
+            if hasattr(entity, "tensor") and entity.tensor:
+                print(
+                    f"  ⚠️  Skipping {entity.entity_id} in dialog synthesis - has TTM tensor but not trained (no physical/cognitive tensors)"
+                )
             else:
                 print(f"  ⚠️  Skipping {entity.entity_id} in dialog synthesis - missing tensor data")
             continue
@@ -1933,7 +2197,8 @@ def synthesize_dialog(
         recent_experiences = get_recent_exposure_events(entity, n=5, store=store)
         relationship_states = {
             other.entity_id: compute_relationship_metrics(entity, other)
-            for other in entities if other.entity_id != entity.entity_id
+            for other in entities
+            if other.entity_id != entity.entity_id
         }
 
         # Build knowledge from exposure events (M3 → M11 connection)
@@ -1974,84 +2239,80 @@ def synthesize_dialog(
                         "forecast_confidence": ps.forecast_confidence,
                         "contingency_plans": contingency_plans,
                     }
-                    logger.info(f"[M15→M11] Loaded prospection for {entity.entity_id}: "
-                               f"anxiety={ps.anxiety_level:.2f}, expectations={len(expectations)}")
+                    logger.info(
+                        f"[M15→M11] Loaded prospection for {entity.entity_id}: "
+                        f"anxiety={ps.anxiety_level:.2f}, expectations={len(expectations)}"
+                    )
             except Exception as e:
                 logger.warning(f"[M15→M11] Failed to load prospection for {entity.entity_id}: {e}")
 
         participant_ctx = {
             "id": entity.entity_id,
-
             # Knowledge & Beliefs - now includes exposure events from M3
             "knowledge": knowledge_from_exposures,
             "beliefs": coupled_cognitive.decision_confidence,  # Using confidence as belief proxy
-
             # Personality & Goals (three-tier: explicit -> role inference -> default)
             "personality_traits": (
                 entity.entity_metadata.get("personality_traits")
                 or _infer_personality_from_role(entity.entity_metadata.get("role", ""))
             ),
             "current_goals": entity.entity_metadata.get("current_goals", ["serve_country"]),
-
             # Voice differentiation data (from template roster or LLM-generated)
             "voice_guide": entity.entity_metadata.get("voice_guide"),
             "speech_examples": entity.entity_metadata.get("speech_examples"),
             "voice_gain": voice_mixer.get_entity_weight(entity.entity_id) if voice_mixer else 1.0,
-
             # Speaking Style (derived from personality for voice differentiation)
             "speaking_style": _derive_speaking_style(
                 entity.entity_metadata.get("personality_traits")
                 or _infer_personality_from_role(entity.entity_metadata.get("role", "")),
-                entity.entity_metadata.get("archetype_id", "")
+                entity.entity_metadata.get("archetype_id", ""),
             ),
-
             # Dialog speaking mode for non-human entities
             "dialog_speaking_mode": entity.entity_metadata.get("_dialog_speaking_mode"),
-
             # Physical State (affects engagement)
             "age": physical.age,
             "health": physical.health_status,
-            "pain": {
-                "level": physical.pain_level,
-                "location": physical.pain_location
-            } if physical.pain_level > 0.1 else None,
+            "pain": {"level": physical.pain_level, "location": physical.pain_location}
+            if physical.pain_level > 0.1
+            else None,
             "stamina": physical.stamina,
             "physical_constraints": compute_age_constraints(physical.age),
-
             # Cognitive/Emotional State (affects tone)
             "emotional_state": {
                 "valence": coupled_cognitive.emotional_valence,
-                "arousal": coupled_cognitive.emotional_arousal
+                "arousal": coupled_cognitive.emotional_arousal,
             },
             "energy_remaining": _apply_circadian_energy_adjustment(
                 base_energy=coupled_cognitive.energy_budget,
                 hour=timepoint.timestamp.hour,
-                store=store
+                store=store,
             ),
             "decision_confidence": coupled_cognitive.decision_confidence,
             "patience_level": coupled_cognitive.patience_threshold,
-
             # Temporal Context
             "recent_experiences": [
-                {"event": exp["information"], "source": exp["source"], "when": str(exp["timestamp"])}
+                {
+                    "event": exp["information"],
+                    "source": exp["source"],
+                    "when": str(exp["timestamp"]),
+                }
                 for exp in recent_experiences
             ],
             "timepoint_context": {
                 "event": timepoint.event_description,
                 "timestamp": timepoint.timestamp.isoformat(),  # Phase 7.5: Convert datetime to JSON-serializable string
-                "position_in_chain": get_timepoint_position(timeline, timepoint)
+                "position_in_chain": get_timepoint_position(timeline, timepoint),
             },
-
             # Relationship State
             "relationships": {
                 other_id: {
                     "shared_knowledge": rel["shared_knowledge"],
                     "belief_alignment": rel["alignment"],
                     "past_interactions": rel["interaction_count"],
-                    "trust_level": rel.get("trust", 0.5)
+                    "trust_level": rel.get("trust", 0.5),
                 }
                 for other_id, rel in relationship_states.items()
-            }
+            },
         }
 
         # Add prospection context if available (M15 → M11)
@@ -2063,14 +2324,16 @@ def synthesize_dialog(
             speaking_style=participant_ctx["speaking_style"],
             emotional_state=participant_ctx["emotional_state"],
             energy=participant_ctx["energy_remaining"],
-            entity_type=entity.entity_type or "human"
+            entity_type=entity.entity_type or "human",
         )
 
         participants_context.append(participant_ctx)
 
     # Check if we have enough participants after filtering
     if len(participants_context) < 2:
-        print(f"  ⚠️  Not enough valid participants for dialog ({len(participants_context)}/2 minimum)")
+        print(
+            f"  ⚠️  Not enough valid participants for dialog ({len(participants_context)}/2 minimum)"
+        )
         # Return a minimal dialog object
         return Dialog(
             dialog_id=f"dialog_{timepoint.timepoint_id}_skipped",
@@ -2079,7 +2342,7 @@ def synthesize_dialog(
             turns=json.dumps([]),
             context_used=json.dumps({"skipped": True, "reason": "insufficient_participants"}),
             duration_seconds=0,
-            information_transfer_count=0
+            information_transfer_count=0,
         )
 
     # =====================================================================
@@ -2089,7 +2352,7 @@ def synthesize_dialog(
         print(f"    [M11] Using per-turn dialog generation for {len(entities)} entities")
 
         from synth.params2persona import compute_persona_params
-        from workflows.dialog_context import build_fourth_wall_context, FourthWallContext
+        from workflows.dialog_context import build_fourth_wall_context
         from workflows.dialog_steering import run_dialog_graph
 
         # Build FourthWallContext and PersonaParams for each entity
@@ -2107,9 +2370,10 @@ def synthesize_dialog(
             # Get physical tensor
             physical_data = entity.entity_metadata.get("physical_tensor", {})
             physical = None
-            if physical_data and 'age' in physical_data:
+            if physical_data and "age" in physical_data:
                 try:
                     from schemas import PhysicalTensor
+
                     physical = PhysicalTensor(**physical_data)
                 except Exception:
                     continue
@@ -2152,7 +2416,9 @@ def synthesize_dialog(
                 turn_position=0,
                 max_turns=max_turns_val,
                 adprs_envelope=entity_envelope,
-                evaluation_time=timepoint.timestamp if hasattr(timepoint.timestamp, 'tzinfo') else None,
+                evaluation_time=timepoint.timestamp
+                if hasattr(timepoint.timestamp, "tzinfo")
+                else None,
             )
             ctx.persona_params = params
 
@@ -2180,6 +2446,7 @@ def synthesize_dialog(
         info_asymmetry = {}
         try:
             from workflows.dialog_context import _compute_information_asymmetry
+
             info_asymmetry = _compute_information_asymmetry(fourth_wall_contexts)
         except (ImportError, Exception):
             pass
@@ -2193,12 +2460,14 @@ def synthesize_dialog(
 
         initial_state: DialogState = {
             "turns": [],
-            "active_speakers": [e.entity_id for e in entities if e.entity_id in fourth_wall_contexts],
+            "active_speakers": [
+                e.entity_id for e in entities if e.entity_id in fourth_wall_contexts
+            ],
             "fourth_wall_contexts": fourth_wall_contexts,
             "persona_params": persona_params,
             "current_speaker": None,
             "narrative_goals": narrative_goals[:6],
-            "narrative_progress": {g: False for g in narrative_goals[:6]},
+            "narrative_progress": dict.fromkeys(narrative_goals[:6], False),
             "mood_register": "neutral",
             "proception_states": proception_states_dict,
             "suppressed_impulses": {},
@@ -2238,8 +2507,10 @@ def synthesize_dialog(
 
         # Run quality check on per-turn output
         quality = _evaluate_dialog_quality(turns_data)
-        print(f"    [M11] Dialog quality check: score={quality['score']:.2f}, "
-              f"passed={quality['passed']}, failures={quality.get('failures', [])}")
+        print(
+            f"    [M11] Dialog quality check: score={quality['score']:.2f}, "
+            f"passed={quality['passed']}, failures={quality.get('failures', [])}"
+        )
 
         # Check voice distinctiveness
         if turns_data:
@@ -2255,12 +2526,14 @@ def synthesize_dialog(
             timepoint_id=timepoint.timepoint_id,
             participants=json.dumps([e.entity_id for e in entities]),
             turns=json.dumps(turns_data),
-            context_used=json.dumps({
-                "per_turn_generation": True,
-                "physical_states_applied": True,
-                "emotional_states_applied": True,
-                "body_mind_coupling_applied": True,
-            }),
+            context_used=json.dumps(
+                {
+                    "per_turn_generation": True,
+                    "physical_states_applied": True,
+                    "emotional_states_applied": True,
+                    "body_mind_coupling_applied": True,
+                }
+            ),
             duration_seconds=len(turns_data) * 10,
             information_transfer_count=len(turns_data),
             run_id=run_id,
@@ -2276,7 +2549,12 @@ def synthesize_dialog(
                     timepoint=timepoint,
                     llm=llm,
                     store=store,
-                    suppressed_impulses=[{"impulse": s, "context": dialog_obj.dialog_id, "suppressed_by": "steering"} for s in suppressed] if suppressed else None,
+                    suppressed_impulses=[
+                        {"impulse": s, "context": dialog_obj.dialog_id, "suppressed_by": "steering"}
+                        for s in suppressed
+                    ]
+                    if suppressed
+                    else None,
                     withheld_knowledge=withheld if withheld else None,
                 )
 
@@ -2285,8 +2563,8 @@ def synthesize_dialog(
         if store and turns_data:
             try:
                 from workflows.knowledge_extraction import (
-                    extract_knowledge_from_dialog,
                     create_exposure_events_from_knowledge,
+                    extract_knowledge_from_dialog,
                 )
 
                 extraction_result = extract_knowledge_from_dialog(
@@ -2320,6 +2598,7 @@ def synthesize_dialog(
 
             # STATE SYNC: CognitiveTensor → TTMTensor
             from schemas import CognitiveTensor
+
             sync_count = 0
             for entity in entities:
                 updated_cog_data = entity.entity_metadata.get("cognitive_tensor", {})
@@ -2341,10 +2620,10 @@ def synthesize_dialog(
 
     # Build scene context
     scene_context = {
-        "location": getattr(timepoint, 'location', 'unspecified'),
+        "location": getattr(timepoint, "location", "unspecified"),
         "time_of_day": timepoint.timestamp.strftime("%I:%M %p"),
         "formality_level": "formal",  # Could be inferred from event description
-        "social_constraints": ["historical_accuracy", "period_language"]
+        "social_constraints": ["historical_accuracy", "period_language"],
     }
 
     # Construct rich prompt (with JSON serialization error handling)
@@ -2379,7 +2658,7 @@ def synthesize_dialog(
         else:
             examples = _generate_voice_examples(style, char_id)
 
-        style_summary = f'{style.get("verbosity", "moderate")} / {style.get("formality", "neutral")} / {style.get("tone", "neutral")} / {style.get("vocabulary", "general")} / {style.get("speech_pattern", "direct")}'
+        style_summary = f"{style.get('verbosity', 'moderate')} / {style.get('formality', 'neutral')} / {style.get('tone', 'neutral')} / {style.get('vocabulary', 'general')} / {style.get('speech_pattern', 'direct')}"
         example_lines = "\n".join(f'      "{ex}"' for ex in examples)
 
         # Build voice constraint block from voice_guide if available
@@ -2414,23 +2693,29 @@ def synthesize_dialog(
         if prosp and "anxiety_level" in prosp:
             participant_anxiety[ctx["id"]] = prosp["anxiety_level"]
 
-    temporal_mood = _compute_temporal_mood(timepoint, timeline, participant_anxiety=participant_anxiety or None)
+    temporal_mood = _compute_temporal_mood(
+        timepoint, timeline, participant_anxiety=participant_anxiety or None
+    )
     min_turns, max_turns = dialog_structure["turn_count_range"]
 
     # Build structure instructions
     structure_instructions = f"Generate {min_turns}-{max_turns} dialog turns."
     if dialog_structure["silent_allowed"]:
-        structure_instructions += " Not every character must speak in every exchange — some may observe silently."
+        structure_instructions += (
+            " Not every character must speak in every exchange — some may observe silently."
+        )
     if dialog_structure["high_conflict"]:
         structure_instructions += " This is a HIGH CONFLICT scene. Characters interrupt, talk over each other, and leave things unresolved."
     if dialog_structure["ending_mode"] == "unresolved_tension":
         structure_instructions += " END the dialog with unresolved tension — no neat wrap-up, no 'let's reconvene' closure."
     elif dialog_structure["ending_mode"] == "interrupted":
-        structure_instructions += " END the dialog abruptly — an interruption, alarm, or someone walking out."
+        structure_instructions += (
+            " END the dialog abruptly — an interruption, alarm, or someone walking out."
+        )
 
     # Build QSE resource state block if available
     qse_block = ""
-    if hasattr(synthesize_dialog, '_qse_state') and synthesize_dialog._qse_state:
+    if hasattr(synthesize_dialog, "_qse_state") and synthesize_dialog._qse_state:
         qse_lines = []
         for resource_name, resource_data in synthesize_dialog._qse_state.items():
             value = resource_data.get("value", "?")
@@ -2439,7 +2724,10 @@ def synthesize_dialog(
             marker = " *** CRITICAL ***" if critical else ""
             qse_lines.append(f"   - {resource_name}: {value} {unit}{marker}")
         if qse_lines:
-            qse_block = "\n\nRESOURCE STATE (QUANTITATIVE — characters MUST cite these exact numbers):\n" + "\n".join(qse_lines)
+            qse_block = (
+                "\n\nRESOURCE STATE (QUANTITATIVE — characters MUST cite these exact numbers):\n"
+                + "\n".join(qse_lines)
+            )
 
     # Build CHARACTER EXPECTATIONS block from prospection data (M15 → M11)
     prospection_block = ""
@@ -2562,8 +2850,7 @@ You MUST introduce NEW developments beyond these. Repeating these beats is a fai
 
     # Add non-human entity voice rules if any non-human participants
     non_human_participants = [
-        ctx for ctx in participants_context
-        if ctx.get("dialog_speaking_mode")
+        ctx for ctx in participants_context if ctx.get("dialog_speaking_mode")
     ]
     if non_human_participants:
         voice_rules = []
@@ -2582,58 +2869,61 @@ Format non-human "speech" as narrated action or environmental description, NOT q
     # Generate dialog with structured output
     # January 2026: Increased from 2000 to 6000 tokens to prevent dialog truncation
     # 8-12 turn dialogs need ~4000-5000 tokens; 2000 was causing JSON parsing failures
-    dialog_data = llm.generate_dialog(
-        prompt=prompt,
-        max_tokens=6000
-    )
+    dialog_data = llm.generate_dialog(prompt=prompt, max_tokens=6000)
 
     # Rejection sampling: evaluate quality and retry once if needed
     initial_turns = []
     for turn in dialog_data.turns:
-        turn_dict = turn.dict() if hasattr(turn, 'dict') else turn.model_dump()
+        turn_dict = turn.dict() if hasattr(turn, "dict") else turn.model_dump()
         initial_turns.append(turn_dict)
 
     quality = _evaluate_dialog_quality(initial_turns)
     if not quality["passed"]:
-        print(f"    [M11] Dialog quality check FAILED (score={quality['score']:.2f}, "
-              f"failures={quality['failures']}). Retrying with repair notes...")
-        repair_prompt = prompt + f"""
+        print(
+            f"    [M11] Dialog quality check FAILED (score={quality['score']:.2f}, "
+            f"failures={quality['failures']}). Retrying with repair notes..."
+        )
+        repair_prompt = (
+            prompt
+            + f"""
 
 REPAIR INSTRUCTIONS (previous generation failed quality checks):
-{quality['repair_notes']}
+{quality["repair_notes"]}
 
 These fixes are MANDATORY. The previous generation was rejected for violating these rules.
 """
-        dialog_data = llm.generate_dialog(
-            prompt=repair_prompt,
-            max_tokens=6000
         )
+        dialog_data = llm.generate_dialog(prompt=repair_prompt, max_tokens=6000)
         # Re-evaluate after retry (log only, don't retry again)
         retry_turns = []
         for turn in dialog_data.turns:
-            turn_dict = turn.dict() if hasattr(turn, 'dict') else turn.model_dump()
+            turn_dict = turn.dict() if hasattr(turn, "dict") else turn.model_dump()
             retry_turns.append(turn_dict)
         retry_quality = _evaluate_dialog_quality(retry_turns)
-        print(f"    [M11] Retry quality: score={retry_quality['score']:.2f}, "
-              f"failures={retry_quality['failures']}")
+        print(
+            f"    [M11] Retry quality: score={retry_quality['score']:.2f}, "
+            f"failures={retry_quality['failures']}"
+        )
     else:
         print(f"    [M11] Dialog quality check passed (score={quality['score']:.2f})")
 
     # Create ExposureEvents using M19 Knowledge Extraction Agent (LLM-based)
     exposure_events_created = 0
     if store:
-        print(f"    [M11→M19] Extracting knowledge from {len(dialog_data.turns)} dialog turns using LLM agent")
+        print(
+            f"    [M11→M19] Extracting knowledge from {len(dialog_data.turns)} dialog turns using LLM agent"
+        )
 
         # Import M19 knowledge extraction
         from workflows.knowledge_extraction import (
+            create_exposure_events_from_knowledge,
             extract_knowledge_from_dialog,
-            create_exposure_events_from_knowledge
         )
 
         # Prepare dialog turns as dicts for extraction
         turns_for_extraction = []
         for turn in dialog_data.turns:
-            turn_dict = turn.dict() if hasattr(turn, 'dict') else turn.model_dump()
+            turn_dict = turn.dict() if hasattr(turn, "dict") else turn.model_dump()
             turns_for_extraction.append(turn_dict)
 
         # Run LLM-based knowledge extraction (M19)
@@ -2643,33 +2933,35 @@ These fixes are MANDATORY. The previous generation was rejected for violating th
             timepoint=timepoint,
             llm=llm,
             store=store,
-            dialog_id=f"dialog_{timepoint.timepoint_id}"
+            dialog_id=f"dialog_{timepoint.timepoint_id}",
         )
 
         # Create exposure events from extracted knowledge (M19→M3)
         exposure_events_created = create_exposure_events_from_knowledge(
-            extraction_result=extraction_result,
-            timepoint=timepoint,
-            store=store
+            extraction_result=extraction_result, timepoint=timepoint, store=store
         )
 
         # Log extraction summary
         if extraction_result.items:
-            print(f"    [M19→M3] Extracted {len(extraction_result.items)} knowledge items ({extraction_result.items_per_turn:.2f}/turn)")
+            print(
+                f"    [M19→M3] Extracted {len(extraction_result.items)} knowledge items ({extraction_result.items_per_turn:.2f}/turn)"
+            )
             for item in extraction_result.items[:3]:  # Show first 3
                 print(f"      - [{item.category}] {item.content[:60]}...")
         else:
-            print(f"    [M19] No meaningful knowledge extracted (normal for casual dialog)")
+            print("    [M19] No meaningful knowledge extracted (normal for casual dialog)")
 
-        print(f"    [M19→M3] Created {exposure_events_created} exposure events from knowledge extraction")
+        print(
+            f"    [M19→M3] Created {exposure_events_created} exposure events from knowledge extraction"
+        )
 
     # Convert dialog turns to JSON-serializable format (handle datetime objects)
     turns_data = []
     for turn in dialog_data.turns:
-        turn_dict = turn.dict() if hasattr(turn, 'dict') else turn.model_dump()
+        turn_dict = turn.dict() if hasattr(turn, "dict") else turn.model_dump()
         # Convert any datetime objects to ISO strings
-        if 'timestamp' in turn_dict and hasattr(turn_dict['timestamp'], 'isoformat'):
-            turn_dict['timestamp'] = turn_dict['timestamp'].isoformat()
+        if "timestamp" in turn_dict and hasattr(turn_dict["timestamp"], "isoformat"):
+            turn_dict["timestamp"] = turn_dict["timestamp"].isoformat()
         turns_data.append(turn_dict)
 
     # Check voice distinctiveness and log warning if characters sound too similar
@@ -2682,14 +2974,17 @@ These fixes are MANDATORY. The previous generation was rejected for violating th
             entities=entities,
             dialog_turns=turns_data,
             coupled_cognitives=coupled_cognitives,
-            store=store
+            store=store,
         )
         if emotional_updates > 0:
-            print(f"    [M11] Updated emotional state for {emotional_updates} entities after dialog")
+            print(
+                f"    [M11] Updated emotional state for {emotional_updates} entities after dialog"
+            )
 
         # STATE SYNC: Copy CognitiveTensor → TTMTensor after dialog
         # Emotional/cognitive changes from dialog persist to the entity's tensor representation
         from schemas import CognitiveTensor
+
         sync_count = 0
         for entity in entities:
             # Get the updated cognitive state from entity metadata
@@ -2710,13 +3005,15 @@ These fixes are MANDATORY. The previous generation was rejected for violating th
         timepoint_id=timepoint.timepoint_id,
         participants=json.dumps([e.entity_id for e in entities]),
         turns=json.dumps(turns_data),  # Use sanitized turns
-        context_used=json.dumps({
-            "physical_states_applied": True,
-            "emotional_states_applied": True,
-            "body_mind_coupling_applied": True,
-            "relationship_context_applied": True
-        }),
+        context_used=json.dumps(
+            {
+                "physical_states_applied": True,
+                "emotional_states_applied": True,
+                "body_mind_coupling_applied": True,
+                "relationship_context_applied": True,
+            }
+        ),
         duration_seconds=dialog_data.total_duration,
         information_transfer_count=len(dialog_data.information_exchanged),
-        run_id=run_id  # January 2026: Link to simulation run for convergence analysis
+        run_id=run_id,  # January 2026: Link to simulation run for convergence analysis
     )

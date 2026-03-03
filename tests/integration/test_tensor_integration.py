@@ -12,40 +12,34 @@ the pipeline (entity tensor initialization, training, retrieval).
 Phase 4: Oxen Integration - validates with real pipeline data.
 """
 
-import asyncio
+import uuid
+
 import numpy as np
 import pytest
-import tempfile
-import uuid
-from pathlib import Path
-from typing import List, Dict, Tuple
 
-# Phase 1 imports
-from tensor_persistence import TensorDatabase, TensorRecord
-from tensor_serialization import serialize_tensor, deserialize_tensor
-
-# Phase 2 imports
-from training.job_queue import JobQueue, JobStatus
-from training.parallel_trainer import ParallelTensorTrainer, TrainingResult
+from retrieval.embedding_index import EmbeddingIndex
 
 # Phase 3 imports
-from retrieval.tensor_rag import TensorRAG, SearchResult
-from retrieval.embedding_index import EmbeddingIndex
-from retrieval.composition import TensorComposer
+from retrieval.tensor_rag import TensorRAG
 
 # Core imports
 from schemas import TTMTensor
 
+# Phase 1 imports
+from tensor_persistence import TensorDatabase, TensorRecord
+from tensor_serialization import deserialize_tensor, serialize_tensor
+
+# Phase 2 imports
+from training.parallel_trainer import ParallelTensorTrainer
 
 # ============================================================================
 # Realistic Tensor Data Generators
 # ============================================================================
 
+
 def create_character_tensor(
-    archetype: str,
-    profession: str = None,
-    epoch: str = "modern"
-) -> Tuple[TTMTensor, Dict]:
+    archetype: str, profession: str = None, epoch: str = "modern"
+) -> tuple[TTMTensor, dict]:
     """
     Create a realistic character tensor simulating pipeline output.
 
@@ -83,7 +77,7 @@ def create_character_tensor(
             "context": [0.7, 0.4, 0.6, 0.2, 0.6, 0.7, 0.3, 0.9],  # Social authority
             "biology": [0.5, 0.75, 0.95, 0.6],  # Comfortable lifestyle
             "behavior": [0.8, 0.5, 0.4, 0.6, 0.95, 0.7, 0.4, 0.3],  # Formal, commanding
-        }
+        },
     }
 
     # Epoch modifiers
@@ -99,7 +93,7 @@ def create_character_tensor(
         "renaissance": {
             "context": [0.05, 0.0, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0],  # More knowledge-focused
             "behavior": [0.0, 0.0, 0.0, 0.05, 0.1, 0.0, 0.0, 0.0],  # More patient
-        }
+        },
     }
 
     # Get base profile
@@ -108,12 +102,12 @@ def create_character_tensor(
 
     # Apply epoch modifiers
     context = np.array(profile["context"], dtype=np.float32)
-    context += np.array(epoch_mod.get("context", [0]*8), dtype=np.float32)
+    context += np.array(epoch_mod.get("context", [0] * 8), dtype=np.float32)
 
     biology = np.array(profile["biology"], dtype=np.float32)
 
     behavior = np.array(profile["behavior"], dtype=np.float32)
-    behavior += np.array(epoch_mod.get("behavior", [0]*8), dtype=np.float32)
+    behavior += np.array(epoch_mod.get("behavior", [0] * 8), dtype=np.float32)
 
     # Add small noise for realism
     context += np.random.normal(0, 0.02, 8).astype(np.float32)
@@ -131,13 +125,14 @@ def create_character_tensor(
         "archetype": archetype,
         "profession": profession or archetype,
         "epoch": epoch,
-        "description": f"{epoch.capitalize()} {archetype}" + (f" ({profession})" if profession else ""),
+        "description": f"{epoch.capitalize()} {archetype}"
+        + (f" ({profession})" if profession else ""),
     }
 
     return tensor, metadata
 
 
-def create_scenario_tensors(scenario_type: str) -> List[Tuple[TTMTensor, Dict]]:
+def create_scenario_tensors(scenario_type: str) -> list[tuple[TTMTensor, dict]]:
     """
     Create a set of tensors for a typical scenario.
 
@@ -176,6 +171,7 @@ def create_scenario_tensors(scenario_type: str) -> List[Tuple[TTMTensor, Dict]]:
 # Fixtures
 # ============================================================================
 
+
 @pytest.fixture
 def tensor_db(tmp_path) -> TensorDatabase:
     """Create a temporary TensorDatabase."""
@@ -184,13 +180,13 @@ def tensor_db(tmp_path) -> TensorDatabase:
 
 
 @pytest.fixture
-def detective_scenario() -> List[Tuple[TTMTensor, Dict]]:
+def detective_scenario() -> list[tuple[TTMTensor, dict]]:
     """Create detective scenario tensors."""
     return create_scenario_tensors("detective_story")
 
 
 @pytest.fixture
-def business_scenario() -> List[Tuple[TTMTensor, Dict]]:
+def business_scenario() -> list[tuple[TTMTensor, dict]]:
     """Create business meeting tensors."""
     return create_scenario_tensors("business_meeting")
 
@@ -198,6 +194,7 @@ def business_scenario() -> List[Tuple[TTMTensor, Dict]]:
 # ============================================================================
 # Phase 1 Integration Tests: Persistence with Realistic Data
 # ============================================================================
+
 
 @pytest.mark.integration
 class TestPhase1RealData:
@@ -269,6 +266,7 @@ class TestPhase1RealData:
 # Phase 2 Integration Tests: Training with Realistic Data
 # ============================================================================
 
+
 @pytest.mark.integration
 @pytest.mark.asyncio
 class TestPhase2RealData:
@@ -296,7 +294,7 @@ class TestPhase2RealData:
         trainer = ParallelTensorTrainer(tensor_db=tensor_db, max_workers=2)
         results = await trainer.train_batch(
             tensor_ids=tensor_ids,
-            target_maturity=0.6  # Moderate target for test speed
+            target_maturity=0.6,  # Moderate target for test speed
         )
 
         # Verify all trained
@@ -350,6 +348,7 @@ class TestPhase2RealData:
 # Phase 3 Integration Tests: RAG with Realistic Data
 # ============================================================================
 
+
 @pytest.mark.integration
 class TestPhase3RealData:
     """Test Phase 3 TensorRAG with realistic tensor data."""
@@ -388,22 +387,19 @@ class TestPhase3RealData:
     def test_semantic_search_finds_relevant(self, populated_rag):
         """Semantic search should find relevant tensors."""
         # Search for detective-related
-        results = populated_rag.search(
-            "Victorian detective investigating a crime",
-            n_results=3
-        )
+        results = populated_rag.search("Victorian detective investigating a crime", n_results=3)
 
         assert len(results) > 0
         # Should prioritize detective scenario
         top_result = results[0]
-        assert "detective" in top_result.tensor_id.lower() or "victorian" in top_result.tensor_record.description.lower()
+        assert (
+            "detective" in top_result.tensor_id.lower()
+            or "victorian" in top_result.tensor_record.description.lower()
+        )
 
     def test_semantic_search_business_context(self, populated_rag):
         """Search finds business-relevant tensors for business queries."""
-        results = populated_rag.search(
-            "corporate executive in boardroom meeting",
-            n_results=3
-        )
+        results = populated_rag.search("corporate executive in boardroom meeting", n_results=3)
 
         assert len(results) > 0
         # Should find business scenario tensors
@@ -437,7 +433,9 @@ class TestPhase3RealData:
         for i in range(8):
             min_val = min(ctx1[i], ctx2[i]) - 0.1
             max_val = max(ctx1[i], ctx2[i]) + 0.1
-            assert min_val <= ctx[i] <= max_val, f"Dim {i}: {ctx[i]} not between {min_val} and {max_val}"
+            assert min_val <= ctx[i] <= max_val, (
+                f"Dim {i}: {ctx[i]} not between {min_val} and {max_val}"
+            )
 
     def test_resolve_for_entity(self, populated_rag):
         """Test entity resolution with scenario context."""
@@ -446,7 +444,7 @@ class TestPhase3RealData:
             entity_description="A sharp-minded private investigator",
             scenario_context="Victorian London mystery",
             min_maturity=0.8,
-            allow_composition=True
+            allow_composition=True,
         )
 
         ctx, bio, beh = tensor.to_arrays()
@@ -459,7 +457,7 @@ class TestPhase3RealData:
         results = populated_rag.search(
             "character",
             n_results=10,
-            categories=["epoch/victorian"]  # Only Victorian
+            categories=["epoch/victorian"],  # Only Victorian
         )
 
         # All results should be Victorian
@@ -471,6 +469,7 @@ class TestPhase3RealData:
 # ============================================================================
 # Full Pipeline Integration Tests
 # ============================================================================
+
 
 @pytest.mark.integration
 @pytest.mark.asyncio
@@ -501,10 +500,7 @@ class TestFullPipelineIntegration:
 
         # 3. Train tensors (Phase 2)
         trainer = ParallelTensorTrainer(tensor_db=tensor_db, max_workers=2)
-        train_results = await trainer.train_batch(
-            tensor_ids=tensor_ids,
-            target_maturity=0.8
-        )
+        train_results = await trainer.train_batch(tensor_ids=tensor_ids, target_maturity=0.8)
 
         assert all(r.success for r in train_results.values())
 
@@ -513,9 +509,7 @@ class TestFullPipelineIntegration:
 
         # Search for detective
         search_results = rag.search(
-            "Victorian detective investigator",
-            n_results=2,
-            min_maturity=0.7
+            "Victorian detective investigator", n_results=2, min_maturity=0.7
         )
 
         assert len(search_results) > 0
@@ -563,6 +557,7 @@ class TestFullPipelineIntegration:
 # ============================================================================
 # EmbeddingIndex Standalone Tests
 # ============================================================================
+
 
 @pytest.mark.integration
 class TestEmbeddingIndexRealistic:

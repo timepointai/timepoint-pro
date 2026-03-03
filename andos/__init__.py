@@ -11,16 +11,8 @@ Modules:
     - layer_computer: Core ANDOS algorithm for computing training layers
 """
 
-from .layer_computer import (
-    compute_andos_layers,
-    validate_andos_layers,
-    build_interaction_graph
-)
+from .layer_computer import build_interaction_graph, compute_andos_layers, validate_andos_layers
 
-__all__ = [
-    'compute_andos_layers',
-    'validate_andos_layers',
-    'build_interaction_graph'
-]
+__all__ = ["compute_andos_layers", "validate_andos_layers", "build_interaction_graph"]
 
-__version__ = '0.1.0'
+__version__ = "0.1.0"

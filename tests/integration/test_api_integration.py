@@ -5,38 +5,35 @@ Tests complete workflows through the API with realistic tensor data.
 Uses the same character tensor generators as Phase 5 integration tests.
 """
 
-import pytest
-import numpy as np
 import uuid
-from typing import Tuple, Dict, List
 
+import numpy as np
+import pytest
 from fastapi.testclient import TestClient
 
-# API imports
-from api.main import create_app
 from api.auth import (
-    create_api_key,
-    clear_api_keys,
     API_KEY_HEADER,
+    clear_api_keys,
+    create_api_key,
 )
 from api.deps import (
     override_db_path,
     reset_dependencies,
 )
 
-# Core imports
-from schemas import TTMTensor
+# API imports
+from api.main import create_app
 
+# Core imports
 
 # ============================================================================
 # Realistic Tensor Data Generators
 # ============================================================================
 
+
 def create_character_tensor(
-    archetype: str,
-    profession: str = None,
-    epoch: str = "modern"
-) -> Tuple[Dict, Dict]:
+    archetype: str, profession: str = None, epoch: str = "modern"
+) -> tuple[dict, dict]:
     """
     Create realistic character tensor data for API requests.
 
@@ -67,23 +64,20 @@ def create_character_tensor(
             "context": [0.7, 0.4, 0.6, 0.2, 0.6, 0.7, 0.3, 0.9],
             "biology": [0.5, 0.75, 0.95, 0.6],
             "behavior": [0.8, 0.5, 0.4, 0.6, 0.95, 0.7, 0.4, 0.3],
-        }
+        },
     }
 
     profile = archetype_profiles.get(archetype, archetype_profiles["hero"])
 
     # Add small noise and clamp
     context = np.clip(
-        np.array(profile["context"]) + np.random.normal(0, 0.02, 8),
-        0.01, 0.99
+        np.array(profile["context"]) + np.random.normal(0, 0.02, 8), 0.01, 0.99
     ).tolist()
     biology = np.clip(
-        np.array(profile["biology"]) + np.random.normal(0, 0.01, 4),
-        0.01, 0.99
+        np.array(profile["biology"]) + np.random.normal(0, 0.01, 4), 0.01, 0.99
     ).tolist()
     behavior = np.clip(
-        np.array(profile["behavior"]) + np.random.normal(0, 0.02, 8),
-        0.01, 0.99
+        np.array(profile["behavior"]) + np.random.normal(0, 0.02, 8), 0.01, 0.99
     ).tolist()
 
     description = f"{epoch.capitalize()} {archetype}" + (f" ({profession})" if profession else "")
@@ -116,6 +110,7 @@ def create_character_tensor(
 # Fixtures
 # ============================================================================
 
+
 @pytest.fixture(autouse=True)
 def reset_state():
     """Reset API state before each test."""
@@ -136,21 +131,21 @@ def client(tmp_path) -> TestClient:
 
 
 @pytest.fixture
-def researcher_alice(client) -> Tuple[str, dict]:
+def researcher_alice(client) -> tuple[str, dict]:
     """Create researcher Alice with API key."""
     key = create_api_key("researcher-alice", "Alice's Research Key")
     return "researcher-alice", {API_KEY_HEADER: key}
 
 
 @pytest.fixture
-def researcher_bob(client) -> Tuple[str, dict]:
+def researcher_bob(client) -> tuple[str, dict]:
     """Create researcher Bob with API key."""
     key = create_api_key("researcher-bob", "Bob's Research Key")
     return "researcher-bob", {API_KEY_HEADER: key}
 
 
 @pytest.fixture
-def community_user(client) -> Tuple[str, dict]:
+def community_user(client) -> tuple[str, dict]:
     """Create community user with API key."""
     key = create_api_key("community-user", "Community Key")
     return "community-user", {API_KEY_HEADER: key}
@@ -159,6 +154,7 @@ def community_user(client) -> Tuple[str, dict]:
 # ============================================================================
 # Complete Workflow Tests
 # ============================================================================
+
 
 @pytest.mark.integration
 class TestResearchWorkflow:
@@ -169,9 +165,7 @@ class TestResearchWorkflow:
         user_id, headers = researcher_alice
 
         # Create detective tensor
-        tensor_data, metadata = create_character_tensor(
-            "detective", "investigator", "victorian"
-        )
+        tensor_data, metadata = create_character_tensor("detective", "investigator", "victorian")
         tensor_data["maturity"] = 0.3  # Start untrained
 
         response = client.post("/tensors", json=tensor_data, headers=headers)
@@ -198,9 +192,7 @@ class TestResearchWorkflow:
         assert final_data["maturity"] >= 0.95
         assert final_data["training_cycles"] >= 100
 
-    def test_collaborate_and_share(
-        self, client, researcher_alice, researcher_bob
-    ):
+    def test_collaborate_and_share(self, client, researcher_alice, researcher_bob):
         """Researchers collaborate through sharing."""
         alice_id, alice_headers = researcher_alice
         bob_id, bob_headers = researcher_bob
@@ -252,9 +244,7 @@ class TestResearchWorkflow:
         )
         assert alice_update.status_code == 403
 
-    def test_publish_template_for_community(
-        self, client, researcher_alice, community_user
-    ):
+    def test_publish_template_for_community(self, client, researcher_alice, community_user):
         """Researcher publishes tensor as public template."""
         alice_id, alice_headers = researcher_alice
         comm_id, comm_headers = community_user

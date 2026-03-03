@@ -6,25 +6,23 @@ Provides REST API for tensor semantic search and composition.
 Phase 6: Public API
 """
 
-from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from access.audit import AuditLogger
+from access.permissions import PermissionEnforcer
 from tensor_persistence import TensorDatabase
 from tensor_serialization import deserialize_tensor
-from access.permissions import PermissionEnforcer
-from access.audit import AuditLogger
 
+from ..auth import get_current_user
+from ..deps import get_audit_logger, get_enforcer, get_tensor_db, get_tensor_rag
 from ..models import (
+    ComposeRequest,
+    ComposeResponse,
     SearchRequest,
     SearchResponse,
     SearchResultItem,
     TensorValues,
-    ComposeRequest,
-    ComposeResponse,
 )
-from ..auth import get_current_user, get_optional_user
-from ..deps import get_tensor_db, get_enforcer, get_audit_logger, get_tensor_rag
-
 
 router = APIRouter(prefix="/search", tags=["search"])
 
@@ -32,6 +30,7 @@ router = APIRouter(prefix="/search", tags=["search"])
 # ============================================================================
 # Helper Functions
 # ============================================================================
+
 
 def tensor_to_values(tensor) -> TensorValues:
     """Convert TTMTensor to TensorValues model."""
@@ -46,6 +45,7 @@ def tensor_to_values(tensor) -> TensorValues:
 # ============================================================================
 # Search Endpoints
 # ============================================================================
+
 
 @router.post("", response_model=SearchResponse)
 async def semantic_search(
@@ -66,7 +66,7 @@ async def semantic_search(
     if rag is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Semantic search is not available (RAG not configured)"
+            detail="Semantic search is not available (RAG not configured)",
         )
 
     # Perform search with permission filtering
@@ -108,8 +108,7 @@ async def semantic_search(
 
     # Log search
     logger.log_access(
-        "search", user_id, "search", True,
-        {"query": request.query, "results": len(results)}
+        "search", user_id, "search", True, {"query": request.query, "results": len(results)}
     )
 
     return SearchResponse(
@@ -137,7 +136,7 @@ async def compose_tensors(
     if rag is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Tensor composition is not available (RAG not configured)"
+            detail="Tensor composition is not available (RAG not configured)",
         )
 
     # Verify access to all tensors
@@ -145,7 +144,7 @@ async def compose_tensors(
         if not enforcer.can_read(user_id, tensor_id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"No read access to tensor '{tensor_id}'"
+                detail=f"No read access to tensor '{tensor_id}'",
             )
 
     # Get tensor records
@@ -154,8 +153,7 @@ async def compose_tensors(
         record = db.get_tensor(tensor_id)
         if record is None:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Tensor '{tensor_id}' not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail=f"Tensor '{tensor_id}' not found"
             )
         tensor = deserialize_tensor(record.tensor_blob)
         tensors.append(tensor)
@@ -166,7 +164,7 @@ async def compose_tensors(
         if len(weights) != len(tensors):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Weights count ({len(weights)}) must match tensor count ({len(tensors)})"
+                detail=f"Weights count ({len(weights)}) must match tensor count ({len(tensors)})",
             )
 
     # Compose
@@ -178,8 +176,11 @@ async def compose_tensors(
 
     # Log composition
     logger.log_access(
-        "compose", user_id, "compose", True,
-        {"source_tensors": request.tensor_ids, "method": request.method}
+        "compose",
+        user_id,
+        "compose",
+        True,
+        {"source_tensors": request.tensor_ids, "method": request.method},
     )
 
     return ComposeResponse(
@@ -206,16 +207,14 @@ async def find_similar(
     # Check access to source
     if not enforcer.can_read(user_id, tensor_id):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"No read access to tensor '{tensor_id}'"
+            status_code=status.HTTP_403_FORBIDDEN, detail=f"No read access to tensor '{tensor_id}'"
         )
 
     # Get source record
     record = db.get_tensor(tensor_id)
     if record is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Tensor '{tensor_id}' not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Tensor '{tensor_id}' not found"
         )
 
     # Get RAG instance
@@ -223,7 +222,7 @@ async def find_similar(
     if rag is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Semantic search is not available (RAG not configured)"
+            detail="Semantic search is not available (RAG not configured)",
         )
 
     # Use description for search
@@ -245,14 +244,16 @@ async def find_similar(
         if not enforcer.can_read(user_id, result.tensor_id):
             continue
 
-        results.append(SearchResultItem(
-            tensor_id=result.tensor_id,
-            score=result.score,
-            entity_id=result.tensor_record.entity_id,
-            description=result.tensor_record.description,
-            category=result.tensor_record.category,
-            maturity=result.tensor_record.maturity,
-        ))
+        results.append(
+            SearchResultItem(
+                tensor_id=result.tensor_id,
+                score=result.score,
+                entity_id=result.tensor_record.entity_id,
+                description=result.tensor_record.description,
+                category=result.tensor_record.category,
+                maturity=result.tensor_record.maturity,
+            )
+        )
 
         if len(results) >= n_results:
             break

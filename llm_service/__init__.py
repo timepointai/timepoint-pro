@@ -33,19 +33,19 @@ Model Selection:
         model = service.select_model(ActionType.TEMPORAL_REASONING)
 """
 
-from llm_service.provider import LLMProvider, LLMResponse
-from llm_service.service import LLMService
 from llm_service.config import LLMServiceConfig
 from llm_service.model_selector import (
-    ModelSelector,
-    ModelCapability,
-    ActionType,
-    ModelProfile,
-    MODEL_REGISTRY,
     ACTION_REQUIREMENTS,
-    select_model_for_action,
+    MODEL_REGISTRY,
+    ActionType,
+    ModelCapability,
+    ModelProfile,
+    ModelSelector,
     get_fallback_models,
+    select_model_for_action,
 )
+from llm_service.provider import LLMProvider, LLMResponse
+from llm_service.service import LLMService
 
 __all__ = [
     # Core service

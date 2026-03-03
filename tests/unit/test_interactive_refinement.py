@@ -3,12 +3,8 @@ Tests for Interactive Refinement (Sprint 3.2)
 """
 
 import pytest
-from nl_interface import (
-    InteractiveRefiner,
-    ClarificationEngine,
-    Clarification,
-    RefinementStep
-)
+
+from nl_interface import Clarification, ClarificationEngine, InteractiveRefiner
 
 
 class TestClarificationEngine:
@@ -21,8 +17,7 @@ class TestClarificationEngine:
 
         # Should detect missing entity count
         entity_count_clarification = next(
-            (c for c in clarifications if c.field == "entity_count"),
-            None
+            (c for c in clarifications if c.field == "entity_count"), None
         )
         assert entity_count_clarification is not None
         assert entity_count_clarification.priority == 1  # Critical
@@ -34,8 +29,7 @@ class TestClarificationEngine:
 
         # Should detect missing timepoint count
         timepoint_clarification = next(
-            (c for c in clarifications if c.field == "timepoint_count"),
-            None
+            (c for c in clarifications if c.field == "timepoint_count"), None
         )
         assert timepoint_clarification is not None
         assert timepoint_clarification.priority == 1  # Critical
@@ -84,9 +78,7 @@ class TestClarificationEngine:
         assert "relationships" in focus
 
         # Multiple focus
-        focus = engine._detect_focus_areas(
-            "conversation, decisions, and relationships"
-        )
+        focus = engine._detect_focus_areas("conversation, decisions, and relationships")
         assert len(focus) >= 2
 
     def test_detect_animism_needs(self):
@@ -130,14 +122,10 @@ class TestClarificationEngine:
             question="How many entities?",
             suggestions=[],
             priority=1,
-            detected_reason="Test"
+            detected_reason="Test",
         )
 
-        updated = engine.answer_clarification(
-            clarification,
-            "5",
-            "Simulate a board meeting"
-        )
+        updated = engine.answer_clarification(clarification, "5", "Simulate a board meeting")
 
         assert "5 entities" in updated
 
@@ -150,14 +138,10 @@ class TestClarificationEngine:
             question="How many timepoints?",
             suggestions=[],
             priority=1,
-            detected_reason="Test"
+            detected_reason="Test",
         )
 
-        updated = engine.answer_clarification(
-            clarification,
-            "10",
-            "Simulate a board meeting"
-        )
+        updated = engine.answer_clarification(clarification, "10", "Simulate a board meeting")
 
         assert "10 timepoints" in updated
 
@@ -220,10 +204,7 @@ class TestInteractiveRefiner:
         """Test skip_clarifications flag"""
         refiner = InteractiveRefiner()
 
-        result = refiner.start_refinement(
-            "Simulate a board meeting",
-            skip_clarifications=True
-        )
+        result = refiner.start_refinement("Simulate a board meeting", skip_clarifications=True)
 
         # Should generate config even with incomplete description
         assert result["clarifications_needed"] is False
@@ -238,11 +219,7 @@ class TestInteractiveRefiner:
         assert result["clarifications_needed"] is True
 
         # Answer clarifications
-        answers = {
-            "entity_count": "5",
-            "timepoint_count": "10",
-            "focus": "dialog, decision_making"
-        }
+        answers = {"entity_count": "5", "timepoint_count": "10", "focus": "dialog, decision_making"}
 
         result = refiner.answer_clarifications(answers)
 
@@ -256,8 +233,7 @@ class TestInteractiveRefiner:
         refiner = InteractiveRefiner()
 
         refiner.start_refinement(
-            "Simulate a board meeting with 5 executives. 10 timepoints.",
-            skip_clarifications=True
+            "Simulate a board meeting with 5 executives. 10 timepoints.", skip_clarifications=True
         )
 
         preview = refiner.preview_config(format="json")
@@ -269,8 +245,7 @@ class TestInteractiveRefiner:
         refiner = InteractiveRefiner()
 
         refiner.start_refinement(
-            "Simulate a board meeting with 5 executives. 10 timepoints.",
-            skip_clarifications=True
+            "Simulate a board meeting with 5 executives. 10 timepoints.", skip_clarifications=True
         )
 
         preview = refiner.preview_config(format="summary")
@@ -283,8 +258,7 @@ class TestInteractiveRefiner:
         refiner = InteractiveRefiner()
 
         refiner.start_refinement(
-            "Simulate a board meeting with 5 executives. 10 timepoints.",
-            skip_clarifications=True
+            "Simulate a board meeting with 5 executives. 10 timepoints.", skip_clarifications=True
         )
 
         preview = refiner.preview_config(format="detailed")
@@ -299,15 +273,11 @@ class TestInteractiveRefiner:
 
         # Generate initial config
         refiner.start_refinement(
-            "Simulate a board meeting with 5 executives. 10 timepoints.",
-            skip_clarifications=True
+            "Simulate a board meeting with 5 executives. 10 timepoints.", skip_clarifications=True
         )
 
         # Adjust timepoint count
-        result = refiner.adjust_config(
-            {"timepoint_count": 15},
-            regenerate=False
-        )
+        result = refiner.adjust_config({"timepoint_count": 15}, regenerate=False)
 
         # Should have updated config
         assert result["config"]["timepoint_count"] == 15
@@ -319,15 +289,11 @@ class TestInteractiveRefiner:
 
         # Generate initial config
         refiner.start_refinement(
-            "Simulate a board meeting with 5 executives. 10 timepoints.",
-            skip_clarifications=True
+            "Simulate a board meeting with 5 executives. 10 timepoints.", skip_clarifications=True
         )
 
         # Adjust with regeneration
-        result = refiner.adjust_config(
-            {"timepoint_count": 20},
-            regenerate=True
-        )
+        result = refiner.adjust_config({"timepoint_count": 20}, regenerate=True)
 
         # Should have regenerated config
         assert result["config"] is not None
@@ -341,9 +307,8 @@ class TestInteractiveRefiner:
 
         # Generate valid config
         refiner.start_refinement(
-            "Simulate a board meeting with 5 executives. "
-            "10 timepoints. Focus on dialog.",
-            skip_clarifications=True
+            "Simulate a board meeting with 5 executives. 10 timepoints. Focus on dialog.",
+            skip_clarifications=True,
         )
 
         # Approve
@@ -358,8 +323,7 @@ class TestInteractiveRefiner:
 
         # Generate config
         refiner.start_refinement(
-            "Simulate a meeting with 5 people. 10 timepoints.",
-            skip_clarifications=True
+            "Simulate a meeting with 5 people. 10 timepoints.", skip_clarifications=True
         )
 
         # Manually invalidate
@@ -375,8 +339,7 @@ class TestInteractiveRefiner:
 
         # Generate config
         refiner.start_refinement(
-            "Simulate a board meeting with 5 executives.",
-            skip_clarifications=True
+            "Simulate a board meeting with 5 executives.", skip_clarifications=True
         )
 
         original_config = refiner.current_config
@@ -407,8 +370,7 @@ class TestInteractiveRefiner:
 
         # Generate config
         refiner.start_refinement(
-            "Simulate a board meeting with 5 executives. 10 timepoints.",
-            skip_clarifications=True
+            "Simulate a board meeting with 5 executives. 10 timepoints.", skip_clarifications=True
         )
 
         trace = refiner.export_refinement_trace()
@@ -427,7 +389,7 @@ class TestInteractiveRefiner:
 
         result = refiner.start_refinement(
             "Simulate a board meeting with 5 executives. 10 timepoints. Focus on dialog.",
-            skip_clarifications=True
+            skip_clarifications=True,
         )
 
         # Likely won't hit 0.99 confidence
@@ -476,7 +438,7 @@ class TestRefinementWorkflow:
             "Simulate the Constitutional Convention with 10 delegates. "
             "15 timepoints. Focus on dialog and decision making. "
             "Generate dialog and decisions.",
-            skip_clarifications=True
+            skip_clarifications=True,
         )
 
         assert result["config"] is not None
@@ -503,7 +465,7 @@ class TestRefinementWorkflow:
         answers = {
             "entity_count": "10",
             "timepoint_count": "15",
-            "focus": "dialog, decision_making"
+            "focus": "dialog, decision_making",
         }
         result = refiner.answer_clarifications(answers)
 
@@ -520,8 +482,7 @@ class TestRefinementWorkflow:
 
         # 1. Start
         refiner.start_refinement(
-            "Simulate a board meeting with 5 executives. 10 timepoints.",
-            skip_clarifications=True
+            "Simulate a board meeting with 5 executives. 10 timepoints.", skip_clarifications=True
         )
 
         # 2. Preview and decide to adjust
@@ -529,10 +490,7 @@ class TestRefinementWorkflow:
         assert "10" in preview  # Original timepoint count
 
         # 3. Adjust
-        result = refiner.adjust_config(
-            {"timepoint_count": 15},
-            regenerate=False
-        )
+        result = refiner.adjust_config({"timepoint_count": 15}, regenerate=False)
 
         assert result["config"]["timepoint_count"] == 15
 
@@ -546,8 +504,7 @@ class TestRefinementWorkflow:
 
         # 1. Start
         refiner.start_refinement(
-            "Simulate a board meeting with 5 executives.",
-            skip_clarifications=True
+            "Simulate a board meeting with 5 executives.", skip_clarifications=True
         )
 
         # 2. Reject
@@ -558,9 +515,6 @@ class TestRefinementWorkflow:
 
         # 3. Can answer clarifications and continue
         if result["clarifications_needed"]:
-            result = refiner.answer_clarifications({
-                "timepoint_count": "10",
-                "focus": "dialog"
-            })
+            result = refiner.answer_clarifications({"timepoint_count": "10", "focus": "dialog"})
 
         assert result["config"] is not None

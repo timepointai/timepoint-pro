@@ -4,23 +4,25 @@ Provider Protocol - Abstract interface for LLM providers
 Defines the contract that all LLM provider implementations must satisfy.
 """
 
-from typing import Protocol, Dict, Any, Optional, Type
-from pydantic import BaseModel
 from dataclasses import dataclass
+from typing import Any, Protocol
+
+from pydantic import BaseModel
 
 
 @dataclass
 class LLMResponse:
     """Standardized LLM response structure"""
+
     content: str
     model: str
-    tokens_used: Dict[str, int]  # {"prompt": N, "completion": N, "total": N}
+    tokens_used: dict[str, int]  # {"prompt": N, "completion": N, "total": N}
     cost_usd: float
     latency_ms: float
     success: bool
-    error: Optional[str] = None
-    raw_response: Optional[Any] = None
-    metadata: Optional[Dict[str, Any]] = None
+    error: str | None = None
+    raw_response: Any | None = None
+    metadata: dict[str, Any] | None = None
 
 
 class LLMProvider(Protocol):
@@ -39,8 +41,8 @@ class LLMProvider(Protocol):
         top_p: float = 0.9,
         frequency_penalty: float = 0.0,
         presence_penalty: float = 0.0,
-        model: Optional[str] = None,
-        **kwargs
+        model: str | None = None,
+        **kwargs,
     ) -> LLMResponse:
         """
         Make a chat completion call to the LLM.
@@ -65,11 +67,11 @@ class LLMProvider(Protocol):
         self,
         system: str,
         user: str,
-        schema: Type[BaseModel],
+        schema: type[BaseModel],
         temperature: float = 0.7,
         max_tokens: int = 1000,
-        model: Optional[str] = None,
-        **kwargs
+        model: str | None = None,
+        **kwargs,
     ) -> BaseModel:
         """
         Make a structured output call that returns a Pydantic model.

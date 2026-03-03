@@ -12,30 +12,27 @@ Tests:
 """
 
 import os
-import pytest
 import tempfile
 from pathlib import Path
 
-from generation.config_schema import SimulationConfig, TemporalConfig, EntityConfig, CompanyConfig
-from schemas import TemporalMode, ResolutionLevel
-from orchestrator import simulate_event
+import pytest
+
 from llm_v2 import LLMClient
-from storage import GraphStore
-from workflows import TemporalAgent, create_entity_training_workflow, synthesize_dialog
+from orchestrator import simulate_event
 from oxen_integration.data_formatters import EntityEvolutionFormatter
+from schemas import TemporalMode
+from storage import GraphStore
+from workflows import TemporalAgent, synthesize_dialog
 
 
 @pytest.mark.integration
 @pytest.mark.llm
-@pytest.mark.skipif(
-    not os.getenv("OPENROUTER_API_KEY"),
-    reason="OPENROUTER_API_KEY not set"
-)
+@pytest.mark.skipif(not os.getenv("OPENROUTER_API_KEY"), reason="OPENROUTER_API_KEY not set")
 def test_context_manager_integration():
     """Test full context manager integration with training data formatter"""
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("TEST: Context Manager Integration")
-    print("="*80)
+    print("=" * 80)
 
     # Setup LLM and storage
     api_key = os.getenv("OPENROUTER_API_KEY")
@@ -58,9 +55,9 @@ advocates for equal representation for all states regardless of size."""
         context={
             "max_entities": 2,
             "max_timepoints": 1,
-            "temporal_mode": TemporalMode.FORWARD.value
+            "temporal_mode": TemporalMode.FORWARD.value,
         },
-        save_to_db=True
+        save_to_db=True,
     )
 
     entities = result["entities"]
@@ -71,16 +68,9 @@ advocates for equal representation for all states regardless of size."""
 
     # Generate one more timepoint for T0->T1 transition
     print("\n2. Generating second timepoint (for evolution)...")
-    temporal_agent = TemporalAgent(
-        mode=TemporalMode.FORWARD,
-        store=store,
-        llm_client=llm
-    )
+    temporal_agent = TemporalAgent(mode=TemporalMode.FORWARD, store=store, llm_client=llm)
 
-    t1 = temporal_agent.generate_next_timepoint(
-        timepoints[0],
-        context={"iteration": 1, "total": 2}
-    )
+    t1 = temporal_agent.generate_next_timepoint(timepoints[0], context={"iteration": 1, "total": 2})
     store.save_timepoint(t1)
     timepoints.append(t1)
 
@@ -99,10 +89,16 @@ advocates for equal representation for all states regardless of size."""
 
     # Synthesize a dialog for M11 context
     try:
-        dialog = synthesize_dialog(entities, timepoints[0], [
-            {"event_description": tp.event_description, "timestamp": tp.timestamp.isoformat()}
-            for tp in timepoints
-        ], llm, store)
+        dialog = synthesize_dialog(
+            entities,
+            timepoints[0],
+            [
+                {"event_description": tp.event_description, "timestamp": tp.timestamp.isoformat()}
+                for tp in timepoints
+            ],
+            llm,
+            store,
+        )
         store.save_dialog(dialog)
         print(f"   ✓ Synthesized dialog with {len(dialog.messages)} messages")
     except Exception as e:
@@ -120,7 +116,7 @@ advocates for equal representation for all states regardless of size."""
     formatted_result = {
         "specification": result["specification"],
         "entities": entities,
-        "timepoints": timepoints
+        "timepoints": timepoints,
     }
 
     examples_with_context = formatter_with_context.format_batch([formatted_result])
@@ -147,7 +143,9 @@ advocates for equal representation for all states regardless of size."""
 
         print(f"   Baseline prompt: ~{tokens_without} words")
         print(f"   Enriched prompt: ~{tokens_with} words")
-        print(f"   Context added: ~{tokens_with - tokens_without} words ({((tokens_with/tokens_without - 1) * 100):.1f}% increase)")
+        print(
+            f"   Context added: ~{tokens_with - tokens_without} words ({((tokens_with / tokens_without - 1) * 100):.1f}% increase)"
+        )
 
         # Check for context sections
         context_indicators = [
@@ -157,7 +155,7 @@ advocates for equal representation for all states regardless of size."""
             "=== SCENE ATMOSPHERE ===",
             "=== DIALOG CONTEXT ===",
             "=== ENTITY STATE SUMMARY ===",
-            "=== CIRCADIAN CONTEXT ==="
+            "=== CIRCADIAN CONTEXT ===",
         ]
 
         print("\n7. Context sections detected:")
@@ -172,9 +170,9 @@ advocates for equal representation for all states regardless of size."""
     Path(db_path).unlink(missing_ok=True)
     print("   ✓ Removed temporary database")
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("✅ TEST COMPLETE: Context manager integration successful")
-    print("="*80)
+    print("=" * 80)
 
 
 if __name__ == "__main__":

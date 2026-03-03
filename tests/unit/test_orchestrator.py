@@ -13,30 +13,29 @@ Tests:
 6. Integration with existing workflows
 """
 
-import pytest
 import os
-from datetime import datetime
-from typing import Dict
 
+import pytest
+
+from llm import LLMClient
 from orchestrator import (
-    OrchestratorAgent,
-    SceneParser,
+    EntityRosterItem,
     KnowledgeSeeder,
+    OrchestratorAgent,
     RelationshipExtractor,
     ResolutionAssigner,
+    SceneParser,
     SceneSpecification,
-    EntityRosterItem,
     TimepointSpec,
-    simulate_event
+    simulate_event,
 )
-from llm import LLMClient
-from storage import GraphStore
 from schemas import ResolutionLevel, TemporalMode
-
+from storage import GraphStore
 
 # ============================================================================
 # Fixtures
 # ============================================================================
+
 
 @pytest.fixture
 def llm_client():
@@ -74,7 +73,7 @@ def sample_spec():
         temporal_scope={
             "start_date": "1787-05-25T09:00:00",
             "end_date": "1787-09-17T17:00:00",
-            "location": "Philadelphia, Pennsylvania State House"
+            "location": "Philadelphia, Pennsylvania State House",
         },
         entities=[
             EntityRosterItem(
@@ -85,26 +84,17 @@ def sample_spec():
                 initial_knowledge=[
                     "separation_of_powers",
                     "virginia_plan",
-                    "montesquieu_philosophy"
+                    "montesquieu_philosophy",
                 ],
-                relationships={
-                    "alexander_hamilton": "ally",
-                    "george_washington": "mentor"
-                }
+                relationships={"alexander_hamilton": "ally", "george_washington": "mentor"},
             ),
             EntityRosterItem(
                 entity_id="alexander_hamilton",
                 entity_type="human",
                 role="primary",
                 description="New York delegate, advocate for strong central government",
-                initial_knowledge=[
-                    "federalist_principles",
-                    "economic_policy",
-                    "new_york_politics"
-                ],
-                relationships={
-                    "james_madison": "ally"
-                }
+                initial_knowledge=["federalist_principles", "economic_policy", "new_york_politics"],
+                relationships={"james_madison": "ally"},
             ),
             EntityRosterItem(
                 entity_id="george_washington",
@@ -114,24 +104,18 @@ def sample_spec():
                 initial_knowledge=[
                     "military_strategy",
                     "national_unity",
-                    "revolutionary_war_experience"
+                    "revolutionary_war_experience",
                 ],
-                relationships={
-                    "james_madison": "student"
-                }
+                relationships={"james_madison": "student"},
             ),
             EntityRosterItem(
                 entity_id="pennsylvania_state_house",
                 entity_type="building",
                 role="environment",
                 description="Meeting location, later called Independence Hall",
-                initial_knowledge=[
-                    "declaration_signed_here",
-                    "summer_heat",
-                    "closed_windows"
-                ],
-                relationships={}
-            )
+                initial_knowledge=["declaration_signed_here", "summer_heat", "closed_windows"],
+                relationships={},
+            ),
         ],
         timepoints=[
             TimepointSpec(
@@ -140,7 +124,7 @@ def sample_spec():
                 event_description="Convention opens, Washington elected president",
                 entities_present=["james_madison", "alexander_hamilton", "george_washington"],
                 importance=0.9,
-                causal_parent=None
+                causal_parent=None,
             ),
             TimepointSpec(
                 timepoint_id="tp_002_virginia_plan",
@@ -148,7 +132,7 @@ def sample_spec():
                 event_description="Madison presents Virginia Plan",
                 entities_present=["james_madison", "george_washington"],
                 importance=0.95,
-                causal_parent="tp_001_opening"
+                causal_parent="tp_001_opening",
             ),
             TimepointSpec(
                 timepoint_id="tp_003_signing",
@@ -156,16 +140,17 @@ def sample_spec():
                 event_description="Constitution signed by delegates",
                 entities_present=["james_madison", "alexander_hamilton", "george_washington"],
                 importance=1.0,
-                causal_parent="tp_002_virginia_plan"
-            )
+                causal_parent="tp_002_virginia_plan",
+            ),
         ],
-        global_context="Summer 1787, Philadelphia. Secret convention to replace Articles of Confederation. Hot weather, windows closed for secrecy."
+        global_context="Summer 1787, Philadelphia. Secret convention to replace Articles of Confederation. Hot weather, windows closed for secrecy.",
     )
 
 
 # ============================================================================
 # Component Tests
 # ============================================================================
+
 
 class TestSceneParser:
     """Test SceneParser component"""
@@ -184,11 +169,7 @@ class TestSceneParser:
     def test_parse_with_context(self, llm_client):
         """Test parse with context parameters"""
         parser = SceneParser(llm_client)
-        context = {
-            "temporal_mode": "directorial",
-            "max_entities": 5,
-            "max_timepoints": 3
-        }
+        context = {"temporal_mode": "directorial", "max_entities": 5, "max_timepoints": 3}
         spec = parser.parse("simulate a test event", context)
 
         assert isinstance(spec, SceneSpecification)
@@ -268,8 +249,9 @@ class TestRelationshipExtractor:
 
         # All entities in tp_001_opening should have copresence edges
         # Madison, Hamilton, Washington were all present
-        assert graph.has_edge("james_madison", "george_washington") or \
-               graph.has_edge("george_washington", "james_madison")
+        assert graph.has_edge("james_madison", "george_washington") or graph.has_edge(
+            "george_washington", "james_madison"
+        )
 
 
 class TestResolutionAssigner:
@@ -285,7 +267,10 @@ class TestResolutionAssigner:
 
         # Primary actors should get high resolution
         assert assignments["james_madison"] in [ResolutionLevel.DIALOG, ResolutionLevel.TRAINED]
-        assert assignments["alexander_hamilton"] in [ResolutionLevel.DIALOG, ResolutionLevel.TRAINED]
+        assert assignments["alexander_hamilton"] in [
+            ResolutionLevel.DIALOG,
+            ResolutionLevel.TRAINED,
+        ]
 
         # Environment entities should get low resolution
         assert assignments["pennsylvania_state_house"] == ResolutionLevel.TENSOR_ONLY
@@ -308,6 +293,7 @@ class TestResolutionAssigner:
 # Integration Tests
 # ============================================================================
 
+
 class TestOrchestratorAgent:
     """Test complete OrchestratorAgent"""
 
@@ -317,7 +303,7 @@ class TestOrchestratorAgent:
         result = orchestrator.orchestrate(
             "simulate a test event",
             context={"max_entities": 3, "max_timepoints": 2},
-            save_to_db=False
+            save_to_db=False,
         )
 
         # Check result structure
@@ -339,10 +325,7 @@ class TestOrchestratorAgent:
     def test_orchestrate_saves_to_db(self, llm_client, store):
         """Test that orchestration saves to database"""
         orchestrator = OrchestratorAgent(llm_client, store)
-        result = orchestrator.orchestrate(
-            "simulate a test event",
-            save_to_db=True
-        )
+        result = orchestrator.orchestrate("simulate a test event", save_to_db=True)
 
         # Verify entities saved
         entities = store.get_all_entities()
@@ -365,7 +348,9 @@ class TestOrchestratorAgent:
         seeder = KnowledgeSeeder(store)
         exposure_events = seeder.seed_knowledge(sample_spec, create_exposure_events=False)
 
-        entities = orchestrator._create_entities(sample_spec, resolution_assignments, exposure_events)
+        entities = orchestrator._create_entities(
+            sample_spec, resolution_assignments, exposure_events
+        )
 
         assert len(entities) == 4
         assert entities[0].entity_id == "james_madison"
@@ -385,10 +370,7 @@ class TestOrchestratorAgent:
     def test_temporal_agent_creation(self, llm_client, store, sample_spec):
         """Test that temporal agent is created with correct mode"""
         orchestrator = OrchestratorAgent(llm_client, store)
-        result = orchestrator.orchestrate(
-            "simulate a test event",
-            save_to_db=False
-        )
+        result = orchestrator.orchestrate("simulate a test event", save_to_db=False)
 
         temporal_agent = result["temporal_agent"]
         assert temporal_agent is not None
@@ -398,6 +380,7 @@ class TestOrchestratorAgent:
 # ============================================================================
 # End-to-End Tests
 # ============================================================================
+
 
 class TestEndToEnd:
     """End-to-end integration tests"""
@@ -409,7 +392,7 @@ class TestEndToEnd:
             llm_client,
             store,
             context={"temporal_mode": "forward", "max_entities": 10, "max_timepoints": 5},
-            save_to_db=True
+            save_to_db=True,
         )
 
         # Verify complete result
@@ -432,17 +415,15 @@ class TestEndToEnd:
             "simulate the constitutional convention in the united states",
             real_llm_client,
             store,
-            context={
-                "temporal_mode": "forward",
-                "max_entities": 8,
-                "max_timepoints": 5
-            },
-            save_to_db=True
+            context={"temporal_mode": "forward", "max_entities": 8, "max_timepoints": 5},
+            save_to_db=True,
         )
 
         # Verify scene specification quality
         spec = result["specification"]
-        assert "constitutional" in spec.scene_title.lower() or "convention" in spec.scene_title.lower()
+        assert (
+            "constitutional" in spec.scene_title.lower() or "convention" in spec.scene_title.lower()
+        )
         assert "philadelphia" in spec.temporal_scope["location"].lower()
 
         # Verify entities include key figures
@@ -477,7 +458,7 @@ class TestEndToEnd:
                 real_llm_client,
                 store,
                 context={"temporal_mode": mode, "max_entities": 4, "max_timepoints": 3},
-                save_to_db=True
+                save_to_db=True,
             )
 
             assert result["specification"].temporal_mode == mode
@@ -490,17 +471,13 @@ class TestEndToEnd:
 # Convenience Function Tests
 # ============================================================================
 
+
 class TestConvenienceFunctions:
     """Test convenience functions"""
 
     def test_simulate_event_function(self, llm_client, store):
         """Test simulate_event convenience function"""
-        result = simulate_event(
-            "simulate a small gathering",
-            llm_client,
-            store,
-            save_to_db=False
-        )
+        result = simulate_event("simulate a small gathering", llm_client, store, save_to_db=False)
 
         assert "specification" in result
         assert "entities" in result

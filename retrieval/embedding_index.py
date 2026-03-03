@@ -7,10 +7,10 @@ Optional FAISS support for improved performance at scale.
 Phase 3: Retrieval System
 """
 
-import numpy as np
 from dataclasses import dataclass, field
-from typing import List, Tuple, Dict, Optional
 from pathlib import Path
+
+import numpy as np
 
 
 @dataclass
@@ -25,14 +25,15 @@ class EmbeddingIndex:
         embedding_dim: Dimension of embeddings (default 384 for MiniLM)
         use_faiss: Whether to use FAISS backend if available
     """
+
     embedding_dim: int = 384
     use_faiss: bool = False
 
     # Internal storage
-    _ids: List[str] = field(default_factory=list)
-    _embeddings: Optional[np.ndarray] = None
-    _id_to_idx: Dict[str, int] = field(default_factory=dict)
-    _faiss_index: Optional[object] = None
+    _ids: list[str] = field(default_factory=list)
+    _embeddings: np.ndarray | None = None
+    _id_to_idx: dict[str, int] = field(default_factory=dict)
+    _faiss_index: object | None = None
 
     def __post_init__(self):
         """Initialize the index."""
@@ -45,6 +46,7 @@ class EmbeddingIndex:
         if self.use_faiss:
             try:
                 import faiss
+
                 self._faiss_index = faiss.IndexFlatIP(self.embedding_dim)
                 self._faiss_available = True
             except ImportError:
@@ -139,11 +141,7 @@ class EmbeddingIndex:
 
         return True
 
-    def search(
-        self,
-        query: np.ndarray,
-        k: int = 10
-    ) -> List[Tuple[str, float]]:
+    def search(self, query: np.ndarray, k: int = 10) -> list[tuple[str, float]]:
         """
         Search for nearest neighbors.
 
@@ -178,14 +176,11 @@ class EmbeddingIndex:
             # Use numpy cosine similarity
             similarities = np.dot(self._embeddings, query)
             top_indices = np.argsort(similarities)[::-1][:k]
-            results = [
-                (self._ids[idx], float(similarities[idx]))
-                for idx in top_indices
-            ]
+            results = [(self._ids[idx], float(similarities[idx])) for idx in top_indices]
 
         return results
 
-    def get_embedding(self, tensor_id: str) -> Optional[np.ndarray]:
+    def get_embedding(self, tensor_id: str) -> np.ndarray | None:
         """
         Get embedding for a tensor ID.
 
@@ -207,6 +202,7 @@ class EmbeddingIndex:
 
         try:
             import faiss
+
             self._faiss_index = faiss.IndexFlatIP(self.embedding_dim)
             if self._embeddings is not None and len(self._embeddings) > 0:
                 self._faiss_index.add(self._embeddings)
@@ -221,6 +217,7 @@ class EmbeddingIndex:
             path: Path to save index (will create .npz file)
         """
         import json as _json
+
         path = Path(path)
 
         # Save embeddings and metadata as numpy archive (no pickle needed)
@@ -242,6 +239,7 @@ class EmbeddingIndex:
             path: Path to load index from
         """
         import json as _json
+
         path = Path(path)
         npz_path = str(path) + ".npz" if not str(path).endswith(".npz") else str(path)
 
@@ -249,7 +247,7 @@ class EmbeddingIndex:
 
         # Load IDs from JSON sidecar
         ids_json_path = npz_path.replace(".npz", ".ids.json")
-        with open(ids_json_path, "r") as f:
+        with open(ids_json_path) as f:
             self._ids = _json.load(f)
 
         self._id_to_idx = {id_: i for i, id_ in enumerate(self._ids)}

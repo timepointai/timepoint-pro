@@ -11,14 +11,13 @@ Expected behavior:
 4. M9 tracks entity generation events
 """
 
-import os
 import sys
 from pathlib import Path
 
 # Ensure we can import from project
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from generation.config_schema import SimulationConfig, TemporalConfig, EntityConfig, CompanyConfig
+from generation.config_schema import CompanyConfig, EntityConfig, SimulationConfig, TemporalConfig
 from generation.resilience_orchestrator import ResilientE2EWorkflowRunner
 from metadata.run_tracker import MetadataManager
 from schemas import TemporalMode
@@ -38,31 +37,22 @@ def create_missing_witness_config() -> SimulationConfig:
     return SimulationConfig(
         world_id="missing_witness_test",
         scenario_description=scenario.strip(),
-
-        temporal=TemporalConfig(
-            mode=TemporalMode.FORWARD,
-            use_agent=True
-        ),
-
+        temporal=TemporalConfig(mode=TemporalMode.FORWARD, use_agent=True),
         entities=EntityConfig(
             count=3,  # Only 3 initial entities (witness missing)
-            allow_animistic=False
+            allow_animistic=False,
         ),
-
-        timepoints=CompanyConfig(
-            count=2
-        ),
-
-        metadata={}
+        timepoints=CompanyConfig(count=2),
+        metadata={},
     )
 
 
 def main():
     """Run M9 missing witness test"""
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("M9 MISSING WITNESS TEST")
-    print("="*80 + "\n")
+    print("=" * 80 + "\n")
 
     print("🎯 Goal: Test M9 (On-Demand Entity Generation)")
     print("📊 Expected: Missing entities generated on query")
@@ -82,7 +72,7 @@ def main():
         print("🚀 Step 1: Running E2E workflow with ANDOS...\n")
         result = runner.run(config)
 
-        print(f"\n✅ E2E Complete:")
+        print("\n✅ E2E Complete:")
         print(f"   Run ID: {result.run_id}")
         print(f"   Entities: {result.entities_created} (should be 3)")
         print(f"   Timepoints: {result.timepoints_created}")
@@ -92,15 +82,15 @@ def main():
             run_id=result.run_id,
             mechanism="M9",
             function_name="test_m9_missing_witness",
-            context={"source": "explicit_andos_test", "test_type": "on_demand_generation"}
+            context={"source": "explicit_andos_test", "test_type": "on_demand_generation"},
         )
-        print(f"   ✓ Recorded M9 mechanism usage")
+        print("   ✓ Recorded M9 mechanism usage")
 
         # Step 2: Query for missing witness (Dr. Thompson)
-        print(f"\n🔍 Step 2: Query for missing witness...")
-        print(f"   ⚠️  Query execution pending (requires store access)")
-        print(f"   Would query: 'Dr. Thompson' at timepoint 2")
-        print(f"   Expected: M9 generates Dr. Thompson on-demand")
+        print("\n🔍 Step 2: Query for missing witness...")
+        print("   ⚠️  Query execution pending (requires store access)")
+        print("   Would query: 'Dr. Thompson' at timepoint 2")
+        print("   Expected: M9 generates Dr. Thompson on-demand")
 
         # Check for success
         if result.entities_created == 3 and result.timepoints_created >= 2:
@@ -115,6 +105,7 @@ def main():
     except Exception as e:
         print(f"\n❌ M9 test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
 

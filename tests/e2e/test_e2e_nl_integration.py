@@ -9,14 +9,15 @@ Tests the complete workflow:
 This test demonstrates Sprint 3 integrated with the existing system.
 """
 
-import pytest
 import os
+import shutil
+import tempfile
+
+import pytest
+
 from nl_interface import NLConfigGenerator
 from orchestrator import simulate_event
 from storage import GraphStore
-from llm_v2 import LLMClient
-import tempfile
-import shutil
 
 
 @pytest.mark.e2e
@@ -32,7 +33,7 @@ class TestNLOrchestratorIntegration:
 
     def teardown_method(self):
         """Cleanup test environment"""
-        if hasattr(self, 'temp_dir') and os.path.exists(self.temp_dir):
+        if hasattr(self, "temp_dir") and os.path.exists(self.temp_dir):
             shutil.rmtree(self.temp_dir)
 
     @pytest.mark.llm
@@ -46,9 +47,9 @@ class TestNLOrchestratorIntegration:
         3. Orchestrator executes the simulation
         4. Entities and timepoints are created
         """
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("Sprint 3 Integration Test: NL → Orchestrator Pipeline")
-        print("="*70)
+        print("=" * 70)
 
         # Phase 1: Natural Language → Config (Sprint 3)
         print("\n[Phase 1] Generating config from natural language...")
@@ -61,7 +62,7 @@ class TestNLOrchestratorIntegration:
         # Use mock mode (no API key needed for CI/CD)
         generator = NLConfigGenerator()
 
-        print(f"Description: \"{description}\"")
+        print(f'Description: "{description}"')
 
         config, confidence = generator.generate_config(description)
 
@@ -78,25 +79,25 @@ class TestNLOrchestratorIntegration:
 
         assert validation.is_valid, f"Validation failed: {validation.errors}"
 
-        print(f"✅ Config validated")
+        print("✅ Config validated")
         print(f"   Validation confidence: {validation.confidence_score:.1%}")
 
         # Phase 3: Execute with Orchestrator
         print("\n[Phase 3] Executing simulation with orchestrator...")
 
         result = simulate_event(
-            config['scenario'],
+            config["scenario"],
             llm_client,
             self.storage,
             context={
-                "max_entities": len(config['entities']),
-                "max_timepoints": min(config['timepoint_count'], 3),  # Limit for testing
-                "temporal_mode": config.get('temporal_mode', 'forward')
+                "max_entities": len(config["entities"]),
+                "max_timepoints": min(config["timepoint_count"], 3),  # Limit for testing
+                "temporal_mode": config.get("temporal_mode", "forward"),
             },
-            save_to_db=True
+            save_to_db=True,
         )
 
-        print(f"✅ Simulation executed")
+        print("✅ Simulation executed")
         print(f"   Scene: {result['specification'].scene_title}")
         print(f"   Entities created: {len(result['entities'])}")
         print(f"   Timepoints created: {len(result['timepoints'])}")
@@ -106,22 +107,22 @@ class TestNLOrchestratorIntegration:
         # Phase 4: Verify Results
         print("\n[Phase 4] Verifying results...")
 
-        assert len(result['entities']) >= 1, "Should create at least 1 entity"
-        assert len(result['timepoints']) >= 1, "Should create at least 1 timepoint"
-        assert result['graph'].number_of_nodes() >= 1, "Graph should have nodes"
+        assert len(result["entities"]) >= 1, "Should create at least 1 entity"
+        assert len(result["timepoints"]) >= 1, "Should create at least 1 timepoint"
+        assert result["graph"].number_of_nodes() >= 1, "Graph should have nodes"
 
-        print(f"✅ Results verified")
+        print("✅ Results verified")
 
         # Phase 5: Summary
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("Sprint 3 Integration: SUCCESS")
-        print("="*70)
+        print("=" * 70)
         print("Pipeline Stages:")
         print("  1. Natural Language Input ✅")
         print("  2. Config Generation (Sprint 3) ✅")
         print("  3. Config Validation (Sprint 3) ✅")
         print("  4. Orchestrator Execution ✅")
         print("  5. Entity & Timepoint Creation ✅")
-        print("="*70)
+        print("=" * 70)
         print("\nSprint 3 is FULLY INTEGRATED with Timepoint-Pro! 🎉")
-        print("="*70 + "\n")
+        print("=" * 70 + "\n")

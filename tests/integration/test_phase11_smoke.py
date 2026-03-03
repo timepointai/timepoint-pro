@@ -6,20 +6,18 @@ Tests that the new tensor initialization pipeline works end-to-end.
 """
 
 import os
+
 import pytest
 
+from generation.config_schema import CompanyConfig, EntityConfig, SimulationConfig, TemporalConfig
 from generation.resilience_orchestrator import ResilientE2EWorkflowRunner
-from generation.config_schema import SimulationConfig, EntityConfig, CompanyConfig, TemporalConfig
-from schemas import TemporalMode
 from metadata.run_tracker import MetadataManager
+from schemas import TemporalMode
 
 
 @pytest.mark.integration
 @pytest.mark.llm
-@pytest.mark.skipif(
-    not os.getenv("OPENROUTER_API_KEY"),
-    reason="OPENROUTER_API_KEY not set"
-)
+@pytest.mark.skipif(not os.getenv("OPENROUTER_API_KEY"), reason="OPENROUTER_API_KEY not set")
 def test_phase11_simple_scenario():
     """Test a simple 2-entity scenario with new baseline initialization"""
     print("🧪 Phase 11 Smoke Test - Simple Scenario")
@@ -34,9 +32,7 @@ def test_phase11_simple_scenario():
         entities=EntityConfig(count=2),
         timepoints=CompanyConfig(count=1),
         temporal=TemporalConfig(mode=TemporalMode.FORWARD),
-        metadata={
-            "test": "phase_11_smoke"
-        }
+        metadata={"test": "phase_11_smoke"},
     )
 
     print(f"✓ Config created: {config.world_id}")

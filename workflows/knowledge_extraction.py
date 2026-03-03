@@ -21,15 +21,16 @@ It returns structured KnowledgeItem objects with:
 This is mechanism M19 in the MECHANICS.md documentation.
 """
 
-from typing import List, Dict, Optional, Any
-from datetime import datetime
-from pydantic import BaseModel, Field, field_validator
 import json
 import logging
+from datetime import datetime
+from typing import Any, Optional
 
-from schemas import KnowledgeItem, KnowledgeExtractionResult, DialogTurn, Entity
-from llm_service.model_selector import ActionType, select_model_for_action, get_fallback_models
+from pydantic import BaseModel, Field, field_validator
+
+from llm_service.model_selector import ActionType, get_fallback_models
 from metadata.tracking import track_mechanism
+from schemas import Entity, KnowledgeExtractionResult, KnowledgeItem
 
 logger = logging.getLogger(__name__)
 
@@ -38,22 +39,37 @@ logger = logging.getLogger(__name__)
 # Pydantic models for LLM structured output
 # ============================================================================
 
+
 class ExtractedKnowledge(BaseModel):
     """Single knowledge item as extracted by the LLM agent."""
+
     content: str = Field(description="The complete semantic knowledge unit (not a single word)")
     speaker: str = Field(description="Entity ID who communicated this knowledge")
-    category: str = Field(description="One of: fact, decision, opinion, plan, revelation, question, agreement")
-    confidence: float = Field(default=0.9, ge=0.0, le=1.0, description="How confident the extraction is")
-    causal_relevance: float = Field(default=0.5, ge=0.0, le=1.0, description="How important for causal chains")
-    context: Optional[str] = Field(default=None, description="Why this knowledge matters")
-    source_turn_index: Optional[int] = Field(default=None, description="Which turn (0-indexed)")
+    category: str = Field(
+        description="One of: fact, decision, opinion, plan, revelation, question, agreement"
+    )
+    confidence: float = Field(
+        default=0.9, ge=0.0, le=1.0, description="How confident the extraction is"
+    )
+    causal_relevance: float = Field(
+        default=0.5, ge=0.0, le=1.0, description="How important for causal chains"
+    )
+    context: str | None = Field(default=None, description="Why this knowledge matters")
+    source_turn_index: int | None = Field(default=None, description="Which turn (0-indexed)")
 
 
 class KnowledgeExtractionResponse(BaseModel):
     """LLM response for knowledge extraction."""
-    items: List[ExtractedKnowledge] = Field(default_factory=list, description="Extracted knowledge items")
-    reasoning: Optional[str] = Field(default="", description="Brief reasoning about what was extracted and why")
-    skipped_content: Optional[Any] = Field(default=None, description="Content that was intentionally not extracted")
+
+    items: list[ExtractedKnowledge] = Field(
+        default_factory=list, description="Extracted knowledge items"
+    )
+    reasoning: str | None = Field(
+        default="", description="Brief reasoning about what was extracted and why"
+    )
+    skipped_content: Any | None = Field(
+        default=None, description="Content that was intentionally not extracted"
+    )
 
     @field_validator("skipped_content", mode="before")
     @classmethod
@@ -67,7 +83,8 @@ class KnowledgeExtractionResponse(BaseModel):
 # Helper functions for JSON parsing
 # ============================================================================
 
-def extract_json_from_response(text: str) -> Optional[Dict[str, Any]]:
+
+def extract_json_from_response(text: str) -> dict[str, Any] | None:
     """
     Extract JSON from LLM response, handling edge cases.
 
@@ -98,7 +115,7 @@ def extract_json_from_response(text: str) -> Optional[Dict[str, Any]]:
 
     # Try removing markdown code blocks
     if "```json" in text:
-        match = re.search(r'```json\s*(.*?)\s*```', text, re.DOTALL)
+        match = re.search(r"```json\s*(.*?)\s*```", text, re.DOTALL)
         if match:
             try:
                 return json.loads(match.group(1))
@@ -106,7 +123,7 @@ def extract_json_from_response(text: str) -> Optional[Dict[str, Any]]:
                 pass
 
     if "```" in text:
-        match = re.search(r'```\s*(.*?)\s*```', text, re.DOTALL)
+        match = re.search(r"```\s*(.*?)\s*```", text, re.DOTALL)
         if match:
             try:
                 return json.loads(match.group(1))
@@ -120,11 +137,11 @@ def extract_json_from_response(text: str) -> Optional[Dict[str, Any]]:
     json_end = -1
 
     for i, char in enumerate(text):
-        if char == '{':
+        if char == "{":
             if brace_count == 0:
                 json_start = i
             brace_count += 1
-        elif char == '}':
+        elif char == "}":
             brace_count -= 1
             if brace_count == 0 and json_start >= 0:
                 json_end = i + 1
@@ -139,7 +156,9 @@ def extract_json_from_response(text: str) -> Optional[Dict[str, Any]]:
     return None
 
 
-def parse_extraction_response_manual(text: str, entity_ids: List[str]) -> KnowledgeExtractionResponse:
+def parse_extraction_response_manual(
+    text: str, entity_ids: list[str]
+) -> KnowledgeExtractionResponse:
     """
     Manually parse extraction response with fallbacks.
 
@@ -171,7 +190,7 @@ def parse_extraction_response_manual(text: str, entity_ids: List[str]) -> Knowle
                         confidence=float(raw_item.get("confidence", 0.9)),
                         causal_relevance=float(raw_item.get("causal_relevance", 0.5)),
                         context=raw_item.get("context"),
-                        source_turn_index=raw_item.get("source_turn_index")
+                        source_turn_index=raw_item.get("source_turn_index"),
                     )
                     # Only keep items with meaningful content
                     if item.content and len(item.content) > 10:
@@ -182,7 +201,7 @@ def parse_extraction_response_manual(text: str, entity_ids: List[str]) -> Knowle
     return KnowledgeExtractionResponse(
         items=items,
         reasoning=data.get("reasoning", ""),
-        skipped_content=data.get("skipped_content")
+        skipped_content=data.get("skipped_content"),
     )
 
 
@@ -190,10 +209,9 @@ def parse_extraction_response_manual(text: str, entity_ids: List[str]) -> Knowle
 # Core extraction functions
 # ============================================================================
 
+
 def build_causal_context(
-    entities: List[Entity],
-    store: Optional['GraphStore'] = None,
-    limit_per_entity: int = 10
+    entities: list[Entity], store: Optional["GraphStore"] = None, limit_per_entity: int = 10
 ) -> str:
     """
     Build causal graph context for the knowledge extraction agent.
@@ -223,8 +241,12 @@ def build_causal_context(
         try:
             exposure_events = store.get_exposure_events(entity_id, limit=limit_per_entity)
             if exposure_events:
-                knowledge_items = [f"- {exp.information}" for exp in exposure_events[:limit_per_entity]]
-                context_parts.append(f"**{entity_id}** already knows:\n" + "\n".join(knowledge_items))
+                knowledge_items = [
+                    f"- {exp.information}" for exp in exposure_events[:limit_per_entity]
+                ]
+                context_parts.append(
+                    f"**{entity_id}** already knows:\n" + "\n".join(knowledge_items)
+                )
         except Exception as e:
             logger.debug(f"Could not retrieve exposures for {entity_id}: {e}")
 
@@ -233,7 +255,10 @@ def build_causal_context(
         if static_knowledge:
             static_items = static_knowledge[:5]  # Limit static knowledge
             if static_items:
-                context_parts.append(f"**{entity_id}** background knowledge:\n" + "\n".join(f"- {k}" for k in static_items))
+                context_parts.append(
+                    f"**{entity_id}** background knowledge:\n"
+                    + "\n".join(f"- {k}" for k in static_items)
+                )
 
     if not context_parts:
         return "This is the first interaction - no prior knowledge in the system."
@@ -242,10 +267,10 @@ def build_causal_context(
 
 
 def build_extraction_prompt(
-    dialog_turns: List[Dict[str, Any]],
-    entities: List[Entity],
+    dialog_turns: list[dict[str, Any]],
+    entities: list[Entity],
     causal_context: str,
-    timepoint_description: str
+    timepoint_description: str,
 ) -> str:
     """
     Build the prompt for the knowledge extraction agent.
@@ -348,12 +373,12 @@ Return a JSON object with:
 
 @track_mechanism("M19", "knowledge_extraction")
 def extract_knowledge_from_dialog(
-    dialog_turns: List[Dict[str, Any]],
-    entities: List[Entity],
-    timepoint: 'Timepoint',
-    llm: 'LLMClient',
-    store: Optional['GraphStore'] = None,
-    dialog_id: Optional[str] = None
+    dialog_turns: list[dict[str, Any]],
+    entities: list[Entity],
+    timepoint: "Timepoint",
+    llm: "LLMClient",
+    store: Optional["GraphStore"] = None,
+    dialog_id: str | None = None,
 ) -> KnowledgeExtractionResult:
     """
     Extract knowledge items from dialog using LLM-based agent.
@@ -393,12 +418,12 @@ def extract_knowledge_from_dialog(
     causal_context = build_causal_context(entities, store)
 
     # Build extraction prompt
-    timepoint_description = getattr(timepoint, 'event_description', 'Unknown event')
+    timepoint_description = getattr(timepoint, "event_description", "Unknown event")
     prompt = build_extraction_prompt(
         dialog_turns=dialog_turns,
         entities=entities,
         causal_context=causal_context,
-        timepoint_description=timepoint_description
+        timepoint_description=timepoint_description,
     )
 
     # Call LLM for extraction
@@ -410,7 +435,7 @@ def extract_knowledge_from_dialog(
             response_model=KnowledgeExtractionResponse,
             model=model,
             temperature=0.3,  # Lower temperature for more consistent extraction
-            max_tokens=4000
+            max_tokens=4000,
         )
 
         # Get entity IDs for listener assignment
@@ -422,16 +447,18 @@ def extract_knowledge_from_dialog(
             # Listeners are all entities except the speaker
             listeners = [eid for eid in entity_ids if eid != item.speaker]
 
-            knowledge_items.append(KnowledgeItem(
-                content=item.content,
-                speaker=item.speaker,
-                listeners=listeners,
-                category=item.category,
-                confidence=item.confidence,
-                context=item.context,
-                source_turn_index=item.source_turn_index,
-                causal_relevance=item.causal_relevance
-            ))
+            knowledge_items.append(
+                KnowledgeItem(
+                    content=item.content,
+                    speaker=item.speaker,
+                    listeners=listeners,
+                    category=item.category,
+                    confidence=item.confidence,
+                    context=item.context,
+                    source_turn_index=item.source_turn_index,
+                    causal_relevance=item.causal_relevance,
+                )
+            )
 
         # Log extraction results
         if knowledge_items:
@@ -454,7 +481,7 @@ def extract_knowledge_from_dialog(
             extraction_model=model,
             total_turns_analyzed=len(dialog_turns),
             items_per_turn=items_per_turn,
-            extraction_timestamp=datetime.now()
+            extraction_timestamp=datetime.now(),
         )
 
     except Exception as e:
@@ -469,7 +496,7 @@ def extract_knowledge_from_dialog(
                     response_model=KnowledgeExtractionResponse,
                     model=fallback_model,
                     temperature=0.3,
-                    max_tokens=4000
+                    max_tokens=4000,
                 )
 
                 # Convert to KnowledgeItem objects
@@ -477,19 +504,23 @@ def extract_knowledge_from_dialog(
                 knowledge_items = []
                 for item in response.items:
                     listeners = [eid for eid in entity_ids if eid != item.speaker]
-                    knowledge_items.append(KnowledgeItem(
-                        content=item.content,
-                        speaker=item.speaker,
-                        listeners=listeners,
-                        category=item.category,
-                        confidence=item.confidence,
-                        context=item.context,
-                        source_turn_index=item.source_turn_index,
-                        causal_relevance=item.causal_relevance
-                    ))
+                    knowledge_items.append(
+                        KnowledgeItem(
+                            content=item.content,
+                            speaker=item.speaker,
+                            listeners=listeners,
+                            category=item.category,
+                            confidence=item.confidence,
+                            context=item.context,
+                            source_turn_index=item.source_turn_index,
+                            causal_relevance=item.causal_relevance,
+                        )
+                    )
 
                 if knowledge_items:
-                    logger.info(f"[M19] Fallback model '{fallback_model}' extracted {len(knowledge_items)} items")
+                    logger.info(
+                        f"[M19] Fallback model '{fallback_model}' extracted {len(knowledge_items)} items"
+                    )
                     items_per_turn = len(knowledge_items) / max(1, len(dialog_turns))
                     return KnowledgeExtractionResult(
                         items=knowledge_items,
@@ -498,7 +529,7 @@ def extract_knowledge_from_dialog(
                         extraction_model=fallback_model,
                         total_turns_analyzed=len(dialog_turns),
                         items_per_turn=items_per_turn,
-                        extraction_timestamp=datetime.now()
+                        extraction_timestamp=datetime.now(),
                     )
                 else:
                     # Empty result is valid (casual dialog may have no knowledge)
@@ -509,15 +540,19 @@ def extract_knowledge_from_dialog(
                         extraction_model=fallback_model,
                         total_turns_analyzed=len(dialog_turns),
                         items_per_turn=0.0,
-                        extraction_timestamp=datetime.now()
+                        extraction_timestamp=datetime.now(),
                     )
 
             except Exception as fallback_error:
-                logger.warning(f"[M19] Fallback model '{fallback_model}' also failed: {fallback_error}")
+                logger.warning(
+                    f"[M19] Fallback model '{fallback_model}' also failed: {fallback_error}"
+                )
                 continue  # Try next fallback
 
         # All structured calls failed - try raw LLM call with manual parsing
-        logger.warning(f"[M19] All structured models failed, trying raw LLM call with manual parser...")
+        logger.warning(
+            "[M19] All structured models failed, trying raw LLM call with manual parser..."
+        )
         try:
             # Use a safe default model for raw call
             raw_model = "meta-llama/llama-3.1-70b-instruct"
@@ -525,7 +560,7 @@ def extract_knowledge_from_dialog(
                 model=raw_model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.3,
-                max_tokens=4000
+                max_tokens=4000,
             )
             raw_text = raw_response["choices"][0]["message"]["content"]
 
@@ -537,19 +572,23 @@ def extract_knowledge_from_dialog(
             knowledge_items = []
             for item in response.items:
                 listeners = [eid for eid in entity_ids if eid != item.speaker]
-                knowledge_items.append(KnowledgeItem(
-                    content=item.content,
-                    speaker=item.speaker,
-                    listeners=listeners,
-                    category=item.category,
-                    confidence=item.confidence,
-                    context=item.context,
-                    source_turn_index=item.source_turn_index,
-                    causal_relevance=item.causal_relevance
-                ))
+                knowledge_items.append(
+                    KnowledgeItem(
+                        content=item.content,
+                        speaker=item.speaker,
+                        listeners=listeners,
+                        category=item.category,
+                        confidence=item.confidence,
+                        context=item.context,
+                        source_turn_index=item.source_turn_index,
+                        causal_relevance=item.causal_relevance,
+                    )
+                )
 
             if knowledge_items:
-                logger.info(f"[M19] Raw LLM call + manual parser extracted {len(knowledge_items)} items")
+                logger.info(
+                    f"[M19] Raw LLM call + manual parser extracted {len(knowledge_items)} items"
+                )
                 items_per_turn = len(knowledge_items) / max(1, len(dialog_turns))
                 return KnowledgeExtractionResult(
                     items=knowledge_items,
@@ -558,13 +597,13 @@ def extract_knowledge_from_dialog(
                     extraction_model=raw_model,
                     total_turns_analyzed=len(dialog_turns),
                     items_per_turn=items_per_turn,
-                    extraction_timestamp=datetime.now()
+                    extraction_timestamp=datetime.now(),
                 )
         except Exception as raw_error:
             logger.error(f"[M19] Raw LLM fallback also failed: {raw_error}")
 
         # Return empty result on total failure (graceful degradation)
-        logger.error(f"[M19] Knowledge extraction completely failed")
+        logger.error("[M19] Knowledge extraction completely failed")
         return KnowledgeExtractionResult(
             items=[],
             dialog_id=dialog_id or f"dialog_{timepoint.timepoint_id}",
@@ -572,14 +611,14 @@ def extract_knowledge_from_dialog(
             extraction_model=model,
             total_turns_analyzed=len(dialog_turns),
             items_per_turn=0.0,
-            extraction_timestamp=datetime.now()
+            extraction_timestamp=datetime.now(),
         )
 
 
 def create_exposure_events_from_knowledge(
     extraction_result: KnowledgeExtractionResult,
-    timepoint: 'Timepoint',
-    store: Optional['GraphStore'] = None
+    timepoint: "Timepoint",
+    store: Optional["GraphStore"] = None,
 ) -> int:
     """
     Create exposure events from extracted knowledge items.
@@ -607,7 +646,7 @@ def create_exposure_events_from_knowledge(
     from workflows.dialog_synthesis import create_exposure_event
 
     events_created = 0
-    timestamp = getattr(timepoint, 'timestamp', datetime.now())
+    timestamp = getattr(timepoint, "timestamp", datetime.now())
 
     for item in extraction_result.items:
         # Create exposure for each listener
@@ -620,11 +659,13 @@ def create_exposure_events_from_knowledge(
                 timestamp=timestamp,
                 confidence=item.confidence,
                 store=store,
-                timepoint_id=timepoint.timepoint_id
+                timepoint_id=timepoint.timepoint_id,
             )
             events_created += 1
 
-    logger.info(f"[M19->M3] Created {events_created} exposure events from {len(extraction_result.items)} knowledge items")
+    logger.info(
+        f"[M19->M3] Created {events_created} exposure events from {len(extraction_result.items)} knowledge items"
+    )
     return events_created
 
 
@@ -632,18 +673,15 @@ def create_exposure_events_from_knowledge(
 # Utility functions
 # ============================================================================
 
+
 def filter_high_relevance_knowledge(
-    items: List[KnowledgeItem],
-    min_relevance: float = 0.6
-) -> List[KnowledgeItem]:
+    items: list[KnowledgeItem], min_relevance: float = 0.6
+) -> list[KnowledgeItem]:
     """Filter knowledge items by causal relevance threshold."""
     return [item for item in items if item.causal_relevance >= min_relevance]
 
 
-def get_knowledge_by_category(
-    items: List[KnowledgeItem],
-    category: str
-) -> List[KnowledgeItem]:
+def get_knowledge_by_category(items: list[KnowledgeItem], category: str) -> list[KnowledgeItem]:
     """Get knowledge items of a specific category."""
     return [item for item in items if item.category == category]
 

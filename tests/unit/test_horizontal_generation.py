@@ -4,30 +4,31 @@ Tests for Horizontal Data Generation (Sprint 1.2)
 Tests variation strategies and horizontal generation functionality.
 """
 
-import pytest
-import tempfile
 import json
+import tempfile
 from pathlib import Path
 
-from generation.horizontal_generator import HorizontalGenerator, VariationDeduplicator
-from generation.variation_strategies import (
-    VariationStrategyFactory,
-    PersonalityVariation,
-    KnowledgeVariation,
-    RelationshipVariation,
-    OutcomeVariation,
-    StartingConditionVariation
-)
+import pytest
+
 from generation.config_schema import (
-    SimulationConfig,
-    EntityConfig,
     CompanyConfig,
+    EntityConfig,
+    OutputConfig,
+    SimulationConfig,
     TemporalConfig,
     TemporalMode,
-    OutputConfig,
     VariationConfig,
 )
+from generation.horizontal_generator import HorizontalGenerator, VariationDeduplicator
 from generation.templates.loader import TemplateLoader
+from generation.variation_strategies import (
+    KnowledgeVariation,
+    OutcomeVariation,
+    PersonalityVariation,
+    RelationshipVariation,
+    StartingConditionVariation,
+    VariationStrategyFactory,
+)
 
 _loader = TemplateLoader()
 
@@ -162,7 +163,9 @@ class TestVariationStrategies:
         var2 = strategy.apply(base_config, variation_index=0, random_seed=42)
 
         # Should be identical
-        assert var1["metadata"]["personality_variations"] == var2["metadata"]["personality_variations"]
+        assert (
+            var1["metadata"]["personality_variations"] == var2["metadata"]["personality_variations"]
+        )
 
     def test_variation_diversity(self):
         """Test that different indices produce different variations"""
@@ -173,7 +176,9 @@ class TestVariationStrategies:
         var2 = strategy.apply(base_config, variation_index=1, random_seed=42)
 
         # Should be different
-        assert var1["metadata"]["personality_variations"] != var2["metadata"]["personality_variations"]
+        assert (
+            var1["metadata"]["personality_variations"] != var2["metadata"]["personality_variations"]
+        )
 
 
 class TestVariationDeduplicator:
@@ -232,9 +237,7 @@ class TestHorizontalGenerator:
         base_config = _loader.load_template("showcase/board_meeting")
 
         variations = generator.generate_variations(
-            base_config=base_config,
-            count=10,
-            strategies=["vary_personalities"]
+            base_config=base_config, count=10, strategies=["vary_personalities"]
         )
 
         assert len(variations) == 10
@@ -247,9 +250,7 @@ class TestHorizontalGenerator:
         base_config = _loader.load_template("showcase/board_meeting")
 
         variations = generator.generate_variations(
-            base_config=base_config,
-            count=5,
-            strategies=["vary_personalities", "vary_outcomes"]
+            base_config=base_config, count=5, strategies=["vary_personalities", "vary_outcomes"]
         )
 
         assert len(variations) == 5
@@ -260,10 +261,7 @@ class TestHorizontalGenerator:
         base_config = _loader.load_template("showcase/board_meeting")
 
         variations = generator.generate_variations(
-            base_config=base_config,
-            count=10,
-            strategies=["vary_personalities"],
-            parallel=False
+            base_config=base_config, count=10, strategies=["vary_personalities"], parallel=False
         )
 
         assert len(variations) == 10
@@ -278,7 +276,7 @@ class TestHorizontalGenerator:
             count=10,
             strategies=["vary_personalities"],
             parallel=True,
-            max_workers=2
+            max_workers=2,
         )
 
         assert len(variations) == 10
@@ -289,9 +287,7 @@ class TestHorizontalGenerator:
         base_config = _loader.load_template("showcase/board_meeting")
 
         generator.generate_variations(
-            base_config=base_config,
-            count=5,
-            strategies=["vary_personalities"]
+            base_config=base_config, count=5, strategies=["vary_personalities"]
         )
 
         stats = generator.get_generation_stats()
@@ -314,7 +310,7 @@ class TestHorizontalGenerator:
             base_config=base_config,
             count=5,
             strategies=["vary_personalities"],
-            progress_callback=progress_callback
+            progress_callback=progress_callback,
         )
 
         assert len(progress_updates) == 5
@@ -328,17 +324,11 @@ class TestHorizontalGenerator:
         base_config = _loader.load_template("showcase/board_meeting")
 
         vars1 = generator1.generate_variations(
-            base_config=base_config,
-            count=5,
-            strategies=["vary_personalities"],
-            random_seed=42
+            base_config=base_config, count=5, strategies=["vary_personalities"], random_seed=42
         )
 
         vars2 = generator2.generate_variations(
-            base_config=base_config,
-            count=5,
-            strategies=["vary_personalities"],
-            random_seed=42
+            base_config=base_config, count=5, strategies=["vary_personalities"], random_seed=42
         )
 
         # Should produce same variations
@@ -351,9 +341,7 @@ class TestHorizontalGenerator:
         base_config = _loader.load_template("showcase/board_meeting")
 
         variations = generator.generate_variations(
-            base_config=base_config,
-            count=10,
-            strategies=["vary_personalities", "vary_outcomes"]
+            base_config=base_config, count=10, strategies=["vary_personalities", "vary_outcomes"]
         )
 
         quality = generator.estimate_variation_quality(variations)
@@ -368,13 +356,11 @@ class TestHorizontalGenerator:
 
         configs = [
             _loader.load_template("showcase/board_meeting"),
-            _loader.load_template("showcase/jefferson_dinner")
+            _loader.load_template("showcase/jefferson_dinner"),
         ]
 
         results = generator.batch_generate(
-            base_configs=configs,
-            count_per_config=5,
-            strategies=["vary_personalities"]
+            base_configs=configs, count_per_config=5, strategies=["vary_personalities"]
         )
 
         assert len(results) == 2
@@ -389,19 +375,17 @@ class TestHorizontalGenerator:
         base_config = _loader.load_template("showcase/board_meeting")
 
         variations = generator.generate_variations(
-            base_config=base_config,
-            count=3,
-            strategies=["vary_personalities"]
+            base_config=base_config, count=3, strategies=["vary_personalities"]
         )
 
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as f:
             temp_path = f.name
 
         try:
             generator.export_variations(variations, temp_path, format="json")
 
             # Verify file exists and is valid JSON
-            with open(temp_path, 'r') as f:
+            with open(temp_path) as f:
                 data = json.load(f)
                 assert len(data) == 3
         finally:
@@ -413,19 +397,17 @@ class TestHorizontalGenerator:
         base_config = _loader.load_template("showcase/board_meeting")
 
         variations = generator.generate_variations(
-            base_config=base_config,
-            count=3,
-            strategies=["vary_personalities"]
+            base_config=base_config, count=3, strategies=["vary_personalities"]
         )
 
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.jsonl') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".jsonl") as f:
             temp_path = f.name
 
         try:
             generator.export_variations(variations, temp_path, format="jsonl")
 
             # Verify file exists and has correct number of lines
-            with open(temp_path, 'r') as f:
+            with open(temp_path) as f:
                 lines = f.readlines()
                 assert len(lines) == 3
                 # Each line should be valid JSON
@@ -441,9 +423,7 @@ class TestHorizontalGenerator:
 
         with pytest.raises(ValueError):
             generator.generate_variations(
-                base_config=base_config,
-                count=5,
-                strategies=["invalid_strategy"]
+                base_config=base_config, count=5, strategies=["invalid_strategy"]
             )
 
     def test_generator_no_strategies(self):
@@ -452,11 +432,7 @@ class TestHorizontalGenerator:
         base_config = _loader.load_template("showcase/board_meeting")
 
         with pytest.raises(ValueError, match="Must provide at least one"):
-            generator.generate_variations(
-                base_config=base_config,
-                count=5,
-                strategies=[]
-            )
+            generator.generate_variations(base_config=base_config, count=5, strategies=[])
 
     def test_generator_invalid_count(self):
         """Test generator with invalid count"""
@@ -465,9 +441,7 @@ class TestHorizontalGenerator:
 
         with pytest.raises(ValueError, match="Count must be at least 1"):
             generator.generate_variations(
-                base_config=base_config,
-                count=0,
-                strategies=["vary_personalities"]
+                base_config=base_config, count=0, strategies=["vary_personalities"]
             )
 
 
@@ -484,15 +458,10 @@ class TestHorizontalGenerationIntegration:
             entities=EntityConfig(count=4, types=["human"]),
             timepoints=CompanyConfig(count=2, resolution="hour"),
             temporal=TemporalConfig(mode=TemporalMode.FORWARD),
-            outputs=OutputConfig(
-                formats=["jsonl"],
-                export_ml_dataset=True
-            ),
+            outputs=OutputConfig(formats=["jsonl"], export_ml_dataset=True),
             variations=VariationConfig(
-                enabled=True,
-                count=100,
-                strategies=["vary_personalities", "vary_outcomes"]
-            )
+                enabled=True, count=100, strategies=["vary_personalities", "vary_outcomes"]
+            ),
         )
 
         # Generate variations
@@ -500,7 +469,7 @@ class TestHorizontalGenerationIntegration:
             base_config=base_config,
             count=20,
             strategies=["vary_personalities", "vary_outcomes"],
-            parallel=True
+            parallel=True,
         )
 
         assert len(variations) == 20
@@ -523,7 +492,7 @@ class TestHorizontalGenerationIntegration:
             count=100,
             strategies=["vary_personalities"],
             parallel=True,
-            max_workers=4
+            max_workers=4,
         )
 
         assert len(variations) == 100

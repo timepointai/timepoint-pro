@@ -4,28 +4,27 @@ FastAPI server for Timepoint Dashboard.
 Provides REST API for querying runs, analytics, narratives, and screenplays.
 """
 
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse
-from typing import List, Optional
 import json
 import math
 
-from models import (
-    PaginatedRunsResponse,
-    RunListItem,
-    RunDetails,
-    MetaAnalytics,
-    TemplatesResponse,
-    MechanismsResponse
-)
 from db import TimepointDB
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
+from models import (
+    MechanismsResponse,
+    MetaAnalytics,
+    PaginatedRunsResponse,
+    RunDetails,
+    RunListItem,
+    TemplatesResponse,
+)
 
 # Initialize FastAPI app
 app = FastAPI(
     title="Timepoint Dashboard API",
     description="REST API for querying Timepoint simulation runs",
-    version="1.0.0"
+    version="1.0.0",
 )
 
 # Enable CORS for API clients
@@ -49,20 +48,22 @@ async def root():
 
 @app.get("/api/runs", response_model=PaginatedRunsResponse, tags=["Runs"])
 async def list_runs(
-    template: Optional[str] = Query(None, description="Filter by template ID"),
-    status: Optional[str] = Query(None, description="Filter by status (completed, running, failed)"),
-    date_from: Optional[str] = Query(None, description="Filter by start date (ISO format)"),
-    date_to: Optional[str] = Query(None, description="Filter by end date (ISO format)"),
-    min_cost: Optional[float] = Query(None, description="Minimum cost filter"),
-    max_cost: Optional[float] = Query(None, description="Maximum cost filter"),
-    causal_mode: Optional[str] = Query(None, description="Filter by causal mode"),
-    mechanisms: Optional[str] = Query(None, description="Comma-separated list of mechanisms (e.g., 'M1,M5,M17')"),
-    min_entities: Optional[int] = Query(None, description="Minimum entities created"),
-    min_timepoints: Optional[int] = Query(None, description="Minimum timepoints created"),
+    template: str | None = Query(None, description="Filter by template ID"),
+    status: str | None = Query(None, description="Filter by status (completed, running, failed)"),
+    date_from: str | None = Query(None, description="Filter by start date (ISO format)"),
+    date_to: str | None = Query(None, description="Filter by end date (ISO format)"),
+    min_cost: float | None = Query(None, description="Minimum cost filter"),
+    max_cost: float | None = Query(None, description="Maximum cost filter"),
+    causal_mode: str | None = Query(None, description="Filter by causal mode"),
+    mechanisms: str | None = Query(
+        None, description="Comma-separated list of mechanisms (e.g., 'M1,M5,M17')"
+    ),
+    min_entities: int | None = Query(None, description="Minimum entities created"),
+    min_timepoints: int | None = Query(None, description="Minimum timepoints created"),
     sort_by: str = Query("started_at", description="Sort field"),
     order: str = Query("DESC", description="Sort order (ASC or DESC)"),
     page: int = Query(1, ge=1, description="Page number"),
-    limit: int = Query(50, ge=1, le=100, description="Items per page")
+    limit: int = Query(50, ge=1, le=100, description="Items per page"),
 ):
     """
     List all runs with filtering, sorting, and pagination.
@@ -71,7 +72,7 @@ async def list_runs(
     cost range, causal mode, mechanisms, and entity/timepoint counts.
     """
     # Parse mechanisms
-    mechanism_list = mechanisms.split(',') if mechanisms else None
+    mechanism_list = mechanisms.split(",") if mechanisms else None
 
     # Query database
     results, total = db.query_runs(
@@ -88,7 +89,7 @@ async def list_runs(
         sort_by=sort_by,
         order=order,
         page=page,
-        limit=limit
+        limit=limit,
     )
 
     # Calculate total pages
@@ -97,13 +98,7 @@ async def list_runs(
     # Convert to Pydantic models
     runs = [RunListItem(**run) for run in results]
 
-    return PaginatedRunsResponse(
-        runs=runs,
-        total=total,
-        page=page,
-        limit=limit,
-        pages=pages
-    )
+    return PaginatedRunsResponse(runs=runs, total=total, page=page, limit=limit, pages=pages)
 
 
 @app.get("/api/run/{run_id}", response_model=RunDetails, tags=["Runs"])
@@ -202,13 +197,9 @@ async def get_dialogs(run_id: str):
     if not narrative:
         raise HTTPException(status_code=404, detail=f"Narrative for run {run_id} not found")
 
-    dialogs = narrative.get('dialogs', [])
+    dialogs = narrative.get("dialogs", [])
 
-    return {
-        "run_id": run_id,
-        "dialog_count": len(dialogs),
-        "dialogs": dialogs
-    }
+    return {"run_id": run_id, "dialog_count": len(dialogs), "dialogs": dialogs}
 
 
 @app.get("/api/convergence-stats", tags=["Analytics"])
@@ -237,15 +228,15 @@ async def get_convergence_stats():
             "average_score": 0.0,
             "grade_distribution": {},
             "template_coverage": {},
-            "error": str(e)
+            "error": str(e),
         }
 
 
 @app.get("/api/convergence-sets", tags=["Analytics"])
 async def get_convergence_sets(
-    template_id: Optional[str] = Query(None, description="Filter by template ID"),
-    min_score: Optional[float] = Query(None, description="Minimum convergence score (0.0-1.0)"),
-    limit: int = Query(50, ge=1, le=100, description="Max results to return")
+    template_id: str | None = Query(None, description="Filter by template ID"),
+    min_score: float | None = Query(None, description="Minimum convergence score (0.0-1.0)"),
+    limit: int = Query(50, ge=1, le=100, description="Max results to return"),
 ):
     """
     Get list of convergence sets with optional filtering.
@@ -260,11 +251,7 @@ async def get_convergence_sets(
         from storage import GraphStore
 
         store = GraphStore("sqlite:///metadata/runs.db")
-        sets = store.get_convergence_sets(
-            template_id=template_id,
-            min_score=min_score,
-            limit=limit
-        )
+        sets = store.get_convergence_sets(template_id=template_id, min_score=min_score, limit=limit)
 
         # Convert to serializable format
         return [
@@ -283,7 +270,7 @@ async def get_convergence_sets(
             }
             for s in sets
         ]
-    except Exception as e:
+    except Exception:
         return []
 
 
@@ -295,8 +282,9 @@ async def get_convergence_set(set_id: str):
     Returns full convergence set with divergence points.
     """
     try:
-        from storage import GraphStore
         import json
+
+        from storage import GraphStore
 
         store = GraphStore("sqlite:///metadata/runs.db")
         s = store.get_convergence_set(set_id)
@@ -315,7 +303,9 @@ async def get_convergence_set(set_id: str):
             "robustness_grade": s.robustness_grade,
             "consensus_edge_count": s.consensus_edge_count,
             "contested_edge_count": s.contested_edge_count,
-            "divergence_points": json.loads(s.divergence_points) if isinstance(s.divergence_points, str) else s.divergence_points,
+            "divergence_points": json.loads(s.divergence_points)
+            if isinstance(s.divergence_points, str)
+            else s.divergence_points,
             "created_at": s.created_at.isoformat() if s.created_at else None,
         }
     except HTTPException:
@@ -328,6 +318,7 @@ async def get_convergence_set(set_id: str):
 async def export_run_tdf(run_id: str):
     """Export a run's data as TDF JSONL."""
     from datetime import datetime, timezone
+
     from fastapi.responses import JSONResponse
     from timepoint_tdf import from_pro
 
@@ -352,6 +343,7 @@ async def export_run_tdf(run_id: str):
 
 if __name__ == "__main__":
     import uvicorn
+
     print("🚀 Starting Timepoint Dashboard API on http://localhost:8000")
     print("📖 API docs: http://localhost:8000/docs")
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")

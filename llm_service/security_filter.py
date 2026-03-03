@@ -8,9 +8,8 @@ Protects against:
 - Harmful content in responses
 """
 
-from typing import List, Optional
-import re
 import html
+import re
 
 
 class SecurityFilter:
@@ -29,7 +28,7 @@ class SecurityFilter:
     def __init__(
         self,
         max_input_length: int = 50000,
-        dangerous_patterns: Optional[List[str]] = None,
+        dangerous_patterns: list[str] | None = None,
         strict_mode: bool = False,
     ):
         """
@@ -57,8 +56,7 @@ class SecurityFilter:
 
         # Compile patterns for efficiency
         self.compiled_patterns = [
-            re.compile(pattern, re.IGNORECASE | re.DOTALL)
-            for pattern in self.dangerous_patterns
+            re.compile(pattern, re.IGNORECASE | re.DOTALL) for pattern in self.dangerous_patterns
         ]
 
     def bleach_input(self, text: str) -> str:
@@ -83,7 +81,7 @@ class SecurityFilter:
                 raise ValueError(
                     f"Input exceeds maximum length: {len(text)} > {self.max_input_length}"
                 )
-            text = text[:self.max_input_length]
+            text = text[: self.max_input_length]
 
         # Remove HTML tags (preserve content)
         text = self._remove_html_tags(text)
@@ -94,7 +92,7 @@ class SecurityFilter:
                 if self.strict_mode:
                     raise ValueError(f"Input contains dangerous pattern: {pattern.pattern}")
                 # Remove matched content
-                text = pattern.sub('', text)
+                text = pattern.sub("", text)
 
         # Remove SQL injection patterns
         text = self._remove_sql_injection(text)
@@ -128,7 +126,7 @@ class SecurityFilter:
 
         return text
 
-    def detect_pii(self, text: str) -> List[str]:
+    def detect_pii(self, text: str) -> list[str]:
         """
         Detect potential PII in text (basic detection).
 
@@ -141,19 +139,19 @@ class SecurityFilter:
         pii_found = []
 
         # Email addresses
-        if re.search(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', text):
+        if re.search(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", text):
             pii_found.append("email")
 
         # Phone numbers (US format)
-        if re.search(r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b', text):
+        if re.search(r"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b", text):
             pii_found.append("phone")
 
         # SSN pattern
-        if re.search(r'\b\d{3}-\d{2}-\d{4}\b', text):
+        if re.search(r"\b\d{3}-\d{2}-\d{4}\b", text):
             pii_found.append("ssn")
 
         # Credit card numbers (basic pattern)
-        if re.search(r'\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b', text):
+        if re.search(r"\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b", text):
             pii_found.append("credit_card")
 
         return pii_found
@@ -170,23 +168,17 @@ class SecurityFilter:
         """
         # Email
         text = re.sub(
-            r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
-            '[EMAIL_REDACTED]',
-            text
+            r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", "[EMAIL_REDACTED]", text
         )
 
         # Phone numbers
-        text = re.sub(r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b', '[PHONE_REDACTED]', text)
+        text = re.sub(r"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b", "[PHONE_REDACTED]", text)
 
         # SSN
-        text = re.sub(r'\b\d{3}-\d{2}-\d{4}\b', '[SSN_REDACTED]', text)
+        text = re.sub(r"\b\d{3}-\d{2}-\d{4}\b", "[SSN_REDACTED]", text)
 
         # Credit cards
-        text = re.sub(
-            r'\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b',
-            '[CARD_REDACTED]',
-            text
-        )
+        text = re.sub(r"\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b", "[CARD_REDACTED]", text)
 
         return text
 
@@ -196,7 +188,7 @@ class SecurityFilter:
         text = html.unescape(text)
 
         # Remove tags
-        text = re.sub(r'<[^>]+>', '', text)
+        text = re.sub(r"<[^>]+>", "", text)
 
         return text
 
@@ -209,27 +201,27 @@ class SecurityFilter:
         ]
 
         for pattern in sql_patterns:
-            text = re.sub(pattern, '', text)
+            text = re.sub(pattern, "", text)
 
         return text
 
     def _remove_code_execution(self, text: str) -> str:
         """Remove patterns that could lead to code execution"""
         # Remove eval-like patterns
-        text = re.sub(r'(?i)(eval|exec|__import__|compile)\s*\(', '', text)
+        text = re.sub(r"(?i)(eval|exec|__import__|compile)\s*\(", "", text)
 
         # Remove system command patterns
-        text = re.sub(r'(?i)(system|popen|subprocess|os\.)\s*\(', '', text)
+        text = re.sub(r"(?i)(system|popen|subprocess|os\.)\s*\(", "", text)
 
         return text
 
     def _normalize_whitespace(self, text: str) -> str:
         """Normalize excessive whitespace"""
         # Replace multiple spaces with single space
-        text = re.sub(r' +', ' ', text)
+        text = re.sub(r" +", " ", text)
 
         # Replace multiple newlines with double newline
-        text = re.sub(r'\n\n+', '\n\n', text)
+        text = re.sub(r"\n\n+", "\n\n", text)
 
         # Strip leading/trailing whitespace
         text = text.strip()
@@ -240,7 +232,7 @@ class SecurityFilter:
         """Normalize text encoding"""
         # Convert to UTF-8 compatible format
         try:
-            text = text.encode('utf-8', errors='ignore').decode('utf-8')
+            text = text.encode("utf-8", errors="ignore").decode("utf-8")
         except Exception:
             pass  # Keep original if encoding fails
 
@@ -258,11 +250,11 @@ class SecurityFilter:
         """
         # Check for dangerous function calls in JSON values
         dangerous_in_json = [
-            r'__proto__',
-            r'constructor',
-            r'prototype',
-            r'eval',
-            r'function\s*\(',
+            r"__proto__",
+            r"constructor",
+            r"prototype",
+            r"eval",
+            r"function\s*\(",
         ]
 
         for pattern in dangerous_in_json:

@@ -10,26 +10,25 @@ TDD approach: These tests define the expected API behavior.
 """
 
 import asyncio
-import pytest
-import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-from pathlib import Path
 
 import numpy as np
+import pytest
 
-# These imports will fail until we implement the modules
-from training.job_queue import JobQueue, TrainingJob, JobStatus
-from training.parallel_trainer import ParallelTensorTrainer
+from schemas import TTMTensor
 from tensor_persistence import TensorDatabase, TensorRecord
 from tensor_serialization import serialize_tensor
-from schemas import TTMTensor
 
+# These imports will fail until we implement the modules
+from training.job_queue import JobQueue, JobStatus
+from training.parallel_trainer import ParallelTensorTrainer
 
 # ============================================================================
 # Fixtures
 # ============================================================================
+
 
 @pytest.fixture(scope="function")
 def tensor_db(tmp_path):
@@ -93,6 +92,7 @@ def multiple_tensor_records():
 # JobQueue Tests
 # ============================================================================
 
+
 @pytest.mark.integration
 class TestJobQueueCreation:
     """Tests for job creation and retrieval."""
@@ -103,10 +103,7 @@ class TestJobQueueCreation:
         tensor_db.save_tensor(sample_tensor_record)
 
         # Create job
-        job = job_queue.create_job(
-            tensor_id=sample_tensor_record.tensor_id,
-            target_maturity=0.95
-        )
+        job = job_queue.create_job(tensor_id=sample_tensor_record.tensor_id, target_maturity=0.95)
 
         assert job.job_id is not None
         assert job.tensor_id == sample_tensor_record.tensor_id
@@ -120,8 +117,7 @@ class TestJobQueueCreation:
         """Test retrieving a job by ID."""
         tensor_db.save_tensor(sample_tensor_record)
         created_job = job_queue.create_job(
-            tensor_id=sample_tensor_record.tensor_id,
-            target_maturity=0.95
+            tensor_id=sample_tensor_record.tensor_id, target_maturity=0.95
         )
 
         retrieved_job = job_queue.get_job(created_job.job_id)
@@ -155,10 +151,7 @@ class TestJobQueueAtomic:
     def test_acquire_job_atomically(self, job_queue, sample_tensor_record, tensor_db):
         """Test atomic acquisition of a job by a worker."""
         tensor_db.save_tensor(sample_tensor_record)
-        job = job_queue.create_job(
-            tensor_id=sample_tensor_record.tensor_id,
-            target_maturity=0.95
-        )
+        job = job_queue.create_job(tensor_id=sample_tensor_record.tensor_id, target_maturity=0.95)
 
         # Worker acquires job
         acquired = job_queue.acquire_job(job.job_id, worker_id="worker-001")
@@ -174,10 +167,7 @@ class TestJobQueueAtomic:
     def test_acquire_already_acquired_job_fails(self, job_queue, sample_tensor_record, tensor_db):
         """Test that a second worker cannot acquire an already-acquired job."""
         tensor_db.save_tensor(sample_tensor_record)
-        job = job_queue.create_job(
-            tensor_id=sample_tensor_record.tensor_id,
-            target_maturity=0.95
-        )
+        job = job_queue.create_job(tensor_id=sample_tensor_record.tensor_id, target_maturity=0.95)
 
         # First worker acquires
         job_queue.acquire_job(job.job_id, worker_id="worker-001")
@@ -194,10 +184,7 @@ class TestJobQueueAtomic:
     def test_concurrent_acquisition_only_one_wins(self, job_queue, sample_tensor_record, tensor_db):
         """Test that concurrent acquisition attempts result in only one winner."""
         tensor_db.save_tensor(sample_tensor_record)
-        job = job_queue.create_job(
-            tensor_id=sample_tensor_record.tensor_id,
-            target_maturity=0.95
-        )
+        job = job_queue.create_job(tensor_id=sample_tensor_record.tensor_id, target_maturity=0.95)
 
         results = []
 
@@ -207,10 +194,7 @@ class TestJobQueueAtomic:
 
         # Spawn multiple threads trying to acquire concurrently
         with ThreadPoolExecutor(max_workers=5) as executor:
-            futures = [
-                executor.submit(try_acquire, f"worker-{i}")
-                for i in range(5)
-            ]
+            futures = [executor.submit(try_acquire, f"worker-{i}") for i in range(5)]
             for f in futures:
                 f.result()
 
@@ -240,10 +224,7 @@ class TestJobQueueStatusTransitions:
     def test_complete_job_success(self, job_queue, sample_tensor_record, tensor_db):
         """Test marking a job as completed successfully."""
         tensor_db.save_tensor(sample_tensor_record)
-        job = job_queue.create_job(
-            tensor_id=sample_tensor_record.tensor_id,
-            target_maturity=0.95
-        )
+        job = job_queue.create_job(tensor_id=sample_tensor_record.tensor_id, target_maturity=0.95)
         job_queue.acquire_job(job.job_id, worker_id="worker-001")
 
         # Complete the job
@@ -257,10 +238,7 @@ class TestJobQueueStatusTransitions:
     def test_fail_job_with_error(self, job_queue, sample_tensor_record, tensor_db):
         """Test marking a job as failed with an error message."""
         tensor_db.save_tensor(sample_tensor_record)
-        job = job_queue.create_job(
-            tensor_id=sample_tensor_record.tensor_id,
-            target_maturity=0.95
-        )
+        job = job_queue.create_job(tensor_id=sample_tensor_record.tensor_id, target_maturity=0.95)
         job_queue.acquire_job(job.job_id, worker_id="worker-001")
 
         # Fail the job
@@ -274,10 +252,7 @@ class TestJobQueueStatusTransitions:
     def test_release_job_back_to_queue(self, job_queue, sample_tensor_record, tensor_db):
         """Test releasing a job back to pending (e.g., worker crashed)."""
         tensor_db.save_tensor(sample_tensor_record)
-        job = job_queue.create_job(
-            tensor_id=sample_tensor_record.tensor_id,
-            target_maturity=0.95
-        )
+        job = job_queue.create_job(tensor_id=sample_tensor_record.tensor_id, target_maturity=0.95)
         job_queue.acquire_job(job.job_id, worker_id="worker-001")
 
         # Release job
@@ -293,6 +268,7 @@ class TestJobQueueStatusTransitions:
 # ParallelTensorTrainer Tests
 # ============================================================================
 
+
 @pytest.mark.integration
 @pytest.mark.asyncio
 class TestParallelTrainerBasic:
@@ -300,10 +276,7 @@ class TestParallelTrainerBasic:
 
     async def test_trainer_initialization(self, tensor_db):
         """Test initializing the trainer."""
-        trainer = ParallelTensorTrainer(
-            tensor_db=tensor_db,
-            max_workers=4
-        )
+        trainer = ParallelTensorTrainer(tensor_db=tensor_db, max_workers=4)
 
         assert trainer.max_workers == 4
         assert trainer.tensor_db == tensor_db
@@ -316,7 +289,7 @@ class TestParallelTrainerBasic:
 
         results = await trainer.train_batch(
             tensor_ids=[sample_tensor_record.tensor_id],
-            target_maturity=0.5  # Lower for faster test
+            target_maturity=0.5,  # Lower for faster test
         )
 
         assert len(results) == 1
@@ -335,7 +308,7 @@ class TestParallelTrainerBasic:
         tensor_ids = [r.tensor_id for r in multiple_tensor_records]
         results = await trainer.train_batch(
             tensor_ids=tensor_ids,
-            target_maturity=0.3  # Lower for faster test
+            target_maturity=0.3,  # Lower for faster test
         )
 
         assert len(results) == len(multiple_tensor_records)
@@ -356,11 +329,15 @@ class TestParallelTrainerConcurrency:
         training_log = []
 
         class LoggingTrainer(ParallelTensorTrainer):
-            async def _train_tensor(self, tensor_id: str, target_maturity: float, worker_id: str, max_cycles: int = 1000):
+            async def _train_tensor(
+                self, tensor_id: str, target_maturity: float, worker_id: str, max_cycles: int = 1000
+            ):
                 training_log.append((worker_id, tensor_id, datetime.now()))
                 # Add small delay to allow other workers to pick up jobs
                 await asyncio.sleep(0.01)
-                return await super()._train_tensor(tensor_id, target_maturity, worker_id, max_cycles)
+                return await super()._train_tensor(
+                    tensor_id, target_maturity, worker_id, max_cycles
+                )
 
         trainer = LoggingTrainer(tensor_db=tensor_db, max_workers=3)
 
@@ -384,9 +361,13 @@ class TestParallelTrainerConcurrency:
         training_counts = {}
 
         class CountingTrainer(ParallelTensorTrainer):
-            async def _train_tensor(self, tensor_id: str, target_maturity: float, worker_id: str, max_cycles: int = 1000):
+            async def _train_tensor(
+                self, tensor_id: str, target_maturity: float, worker_id: str, max_cycles: int = 1000
+            ):
                 training_counts[tensor_id] = training_counts.get(tensor_id, 0) + 1
-                return await super()._train_tensor(tensor_id, target_maturity, worker_id, max_cycles)
+                return await super()._train_tensor(
+                    tensor_id, target_maturity, worker_id, max_cycles
+                )
 
         trainer = CountingTrainer(tensor_db=tensor_db, max_workers=5)
 
@@ -411,10 +392,7 @@ class TestParallelTrainerMaturity:
 
         trainer = ParallelTensorTrainer(tensor_db=tensor_db, max_workers=2)
 
-        await trainer.train_batch(
-            tensor_ids=[sample_tensor_record.tensor_id],
-            target_maturity=0.5
-        )
+        await trainer.train_batch(tensor_ids=[sample_tensor_record.tensor_id], target_maturity=0.5)
 
         updated_record = tensor_db.get_tensor(sample_tensor_record.tensor_id)
         assert updated_record.maturity > initial_maturity
@@ -426,10 +404,7 @@ class TestParallelTrainerMaturity:
 
         trainer = ParallelTensorTrainer(tensor_db=tensor_db, max_workers=2)
 
-        await trainer.train_batch(
-            tensor_ids=[sample_tensor_record.tensor_id],
-            target_maturity=0.5
-        )
+        await trainer.train_batch(tensor_ids=[sample_tensor_record.tensor_id], target_maturity=0.5)
 
         updated_record = tensor_db.get_tensor(sample_tensor_record.tensor_id)
         assert updated_record.training_cycles > 0
@@ -442,8 +417,7 @@ class TestParallelTrainerMaturity:
 
         target = 0.6
         results = await trainer.train_batch(
-            tensor_ids=[sample_tensor_record.tensor_id],
-            target_maturity=target
+            tensor_ids=[sample_tensor_record.tensor_id], target_maturity=target
         )
 
         result = results[sample_tensor_record.tensor_id]
@@ -462,10 +436,7 @@ class TestParallelTrainerErrorHandling:
         """Test handling of missing tensor gracefully."""
         trainer = ParallelTensorTrainer(tensor_db=tensor_db, max_workers=2)
 
-        results = await trainer.train_batch(
-            tensor_ids=["nonexistent-tensor"],
-            target_maturity=0.5
-        )
+        results = await trainer.train_batch(tensor_ids=["nonexistent-tensor"], target_maturity=0.5)
 
         assert len(results) == 1
         result = results["nonexistent-tensor"]
@@ -482,10 +453,7 @@ class TestParallelTrainerErrorHandling:
 
         # Include both existing and non-existing tensor IDs
         tensor_ids = [r.tensor_id for r in multiple_tensor_records]
-        results = await trainer.train_batch(
-            tensor_ids=tensor_ids,
-            target_maturity=0.3
-        )
+        results = await trainer.train_batch(tensor_ids=tensor_ids, target_maturity=0.3)
 
         # First 3 should succeed
         successes = [r for r in results.values() if r.success]
@@ -510,15 +478,10 @@ class TestParallelTrainerProgress:
             progress_updates.append((tensor_id, maturity, cycles))
 
         trainer = ParallelTensorTrainer(
-            tensor_db=tensor_db,
-            max_workers=2,
-            progress_callback=on_progress
+            tensor_db=tensor_db, max_workers=2, progress_callback=on_progress
         )
 
-        await trainer.train_batch(
-            tensor_ids=[sample_tensor_record.tensor_id],
-            target_maturity=0.5
-        )
+        await trainer.train_batch(tensor_ids=[sample_tensor_record.tensor_id], target_maturity=0.5)
 
         assert len(progress_updates) > 0
         # Maturity should increase over updates
@@ -536,7 +499,7 @@ class TestParallelTrainerProgress:
         training_task = asyncio.create_task(
             trainer.train_batch(
                 tensor_ids=[r.tensor_id for r in multiple_tensor_records],
-                target_maturity=0.8  # Higher to take longer
+                target_maturity=0.8,  # Higher to take longer
             )
         )
 

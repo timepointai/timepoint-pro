@@ -15,38 +15,34 @@ The old naive extraction produced trash like ["we'll", "thanks", "what", "michae
 M19 should produce meaningful items like ["Michael believes the deadline is unrealistic"].
 """
 
-import os
 import sys
-from pathlib import Path
 from datetime import datetime
-from typing import List
+from pathlib import Path
 
 # Ensure we can import from project
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from schemas import KnowledgeItem, KnowledgeExtractionResult, Entity
+from llm_service.model_selector import ActionType, select_model_for_action
+from schemas import Entity, KnowledgeExtractionResult, KnowledgeItem
+from workflows.dialog_synthesis import extract_knowledge_references
 from workflows.knowledge_extraction import (
-    extract_knowledge_from_dialog,
-    create_exposure_events_from_knowledge,
     build_causal_context,
     filter_high_relevance_knowledge,
     get_knowledge_by_category,
     summarize_extraction_result,
 )
-from workflows.dialog_synthesis import extract_knowledge_references
-from llm_service.model_selector import ActionType, select_model_for_action
 
 
 def test_deprecated_function():
     """Test that the deprecated extract_knowledge_references returns empty."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("TEST: Deprecated Function Returns Empty")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
     # The old function should now return empty
     result = extract_knowledge_references("Hello, We'll discuss What Michael said. Thanks!")
 
-    print(f"Input: 'Hello, We'll discuss What Michael said. Thanks!'")
+    print("Input: 'Hello, We'll discuss What Michael said. Thanks!'")
     print(f"Result: {result}")
 
     if result == []:
@@ -59,9 +55,9 @@ def test_deprecated_function():
 
 def test_model_selection():
     """Test that KNOWLEDGE_EXTRACTION action type selects appropriate model."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("TEST: Model Selection for Knowledge Extraction")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
     try:
         model = select_model_for_action(ActionType.KNOWLEDGE_EXTRACTION)
@@ -81,9 +77,9 @@ def test_model_selection():
 
 def test_filter_high_relevance():
     """Test filtering knowledge items by causal relevance."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("TEST: Filter High Relevance Knowledge")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
     # Create test items
     items = [
@@ -93,7 +89,7 @@ def test_filter_high_relevance():
             listeners=["cfo", "cto"],
             category="decision",
             confidence=0.9,
-            causal_relevance=0.8
+            causal_relevance=0.8,
         ),
         KnowledgeItem(
             content="It's a nice day",
@@ -101,7 +97,7 @@ def test_filter_high_relevance():
             listeners=["cfo"],
             category="opinion",
             confidence=0.7,
-            causal_relevance=0.2  # Low relevance
+            causal_relevance=0.2,  # Low relevance
         ),
         KnowledgeItem(
             content="The competitor filed for bankruptcy",
@@ -109,7 +105,7 @@ def test_filter_high_relevance():
             listeners=["ceo", "cto"],
             category="revelation",
             confidence=0.95,
-            causal_relevance=0.9
+            causal_relevance=0.9,
         ),
     ]
 
@@ -132,15 +128,43 @@ def test_filter_high_relevance():
 
 def test_get_by_category():
     """Test filtering knowledge items by category."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("TEST: Get Knowledge by Category")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
     items = [
-        KnowledgeItem(content="Budget approved", speaker="a", listeners=["b"], category="decision", confidence=0.9, causal_relevance=0.8),
-        KnowledgeItem(content="Meeting at 3pm", speaker="a", listeners=["b"], category="fact", confidence=0.9, causal_relevance=0.5),
-        KnowledgeItem(content="I think it's good", speaker="b", listeners=["a"], category="opinion", confidence=0.8, causal_relevance=0.3),
-        KnowledgeItem(content="We'll launch Q3", speaker="a", listeners=["b"], category="plan", confidence=0.85, causal_relevance=0.7),
+        KnowledgeItem(
+            content="Budget approved",
+            speaker="a",
+            listeners=["b"],
+            category="decision",
+            confidence=0.9,
+            causal_relevance=0.8,
+        ),
+        KnowledgeItem(
+            content="Meeting at 3pm",
+            speaker="a",
+            listeners=["b"],
+            category="fact",
+            confidence=0.9,
+            causal_relevance=0.5,
+        ),
+        KnowledgeItem(
+            content="I think it's good",
+            speaker="b",
+            listeners=["a"],
+            category="opinion",
+            confidence=0.8,
+            causal_relevance=0.3,
+        ),
+        KnowledgeItem(
+            content="We'll launch Q3",
+            speaker="a",
+            listeners=["b"],
+            category="plan",
+            confidence=0.85,
+            causal_relevance=0.7,
+        ),
     ]
 
     facts = get_knowledge_by_category(items, "fact")
@@ -162,14 +186,35 @@ def test_get_by_category():
 
 def test_summarize_result():
     """Test the extraction result summarization."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("TEST: Summarize Extraction Result")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
     items = [
-        KnowledgeItem(content="Budget approved", speaker="a", listeners=["b"], category="decision", confidence=0.9, causal_relevance=0.8),
-        KnowledgeItem(content="Meeting at 3pm", speaker="a", listeners=["b"], category="fact", confidence=0.9, causal_relevance=0.5),
-        KnowledgeItem(content="We'll launch Q3", speaker="a", listeners=["b"], category="plan", confidence=0.85, causal_relevance=0.7),
+        KnowledgeItem(
+            content="Budget approved",
+            speaker="a",
+            listeners=["b"],
+            category="decision",
+            confidence=0.9,
+            causal_relevance=0.8,
+        ),
+        KnowledgeItem(
+            content="Meeting at 3pm",
+            speaker="a",
+            listeners=["b"],
+            category="fact",
+            confidence=0.9,
+            causal_relevance=0.5,
+        ),
+        KnowledgeItem(
+            content="We'll launch Q3",
+            speaker="a",
+            listeners=["b"],
+            category="plan",
+            confidence=0.85,
+            causal_relevance=0.7,
+        ),
     ]
 
     result = KnowledgeExtractionResult(
@@ -179,7 +224,7 @@ def test_summarize_result():
         extraction_model="test_model",
         total_turns_analyzed=5,
         items_per_turn=0.6,
-        extraction_timestamp=datetime.now()
+        extraction_timestamp=datetime.now(),
     )
 
     summary = summarize_extraction_result(result)
@@ -195,9 +240,9 @@ def test_summarize_result():
 
 def test_build_causal_context_empty():
     """Test causal context building with no store."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("TEST: Build Causal Context (No Store)")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
     # Create test entities
     entities = [
@@ -218,9 +263,9 @@ def test_build_causal_context_empty():
 
 def main():
     """Run all M19 tests."""
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("M19 KNOWLEDGE EXTRACTION AGENT TESTS")
-    print("="*80 + "\n")
+    print("=" * 80 + "\n")
 
     print("Goal: Test M19 (Knowledge Extraction Agent)")
     print("Expected: LLM-based semantic extraction, not naive word grabbing")
@@ -237,9 +282,9 @@ def main():
     results.append(("Causal Context (Empty)", test_build_causal_context_empty()))
 
     # Summary
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("M19 TEST RESULTS")
-    print("="*80)
+    print("=" * 80)
 
     passed = sum(1 for _, r in results if r)
     total = len(results)
