@@ -6,31 +6,36 @@ Tests Mechanism 11 (Dialog Synthesis) and Mechanism 13 (Multi-Entity Synthesis)
 NO MOCKS - Using real implementations for reliability
 """
 
-import pytest
 import json
 import os
-import yaml
-from datetime import datetime, timedelta
+from datetime import datetime
 
+import pytest
+import yaml
+
+from llm_v2 import LLMClient  # Use new centralized service
+from query_interface import QueryIntent, QueryInterface
 from schemas import (
-    Entity, Timepoint, Dialog, DialogTurn, DialogData,
-    RelationshipTrajectory, RelationshipState, RelationshipMetrics,
-    Contradiction, ComparativeAnalysis, ResolutionLevel
+    Dialog,
+    Entity,
+    ResolutionLevel,
+    Timepoint,
 )
 from storage import GraphStore
-from llm_v2 import LLMClient  # Use new centralized service
-from workflows import (
-    synthesize_dialog, analyze_relationship_evolution,
-    detect_contradictions, synthesize_multi_entity_response,
-    couple_pain_to_cognition, couple_illness_to_cognition
-)
-from query_interface import QueryInterface, QueryIntent
 from validation import Validator
+from workflows import (
+    analyze_relationship_evolution,
+    couple_illness_to_cognition,
+    couple_pain_to_cognition,
+    detect_contradictions,
+    synthesize_dialog,
+    synthesize_multi_entity_response,
+)
 
 
 def load_config():
     """Load configuration"""
-    with open("conf/config.yaml", 'r') as f:
+    with open("conf/config.yaml") as f:
         return yaml.safe_load(f)
 
 
@@ -65,19 +70,22 @@ class TestPhase3DialogSynthesis:
                     "health_status": 0.9,
                     "pain_level": 0.2,  # Some dental pain
                     "pain_location": "teeth",
-                    "stamina": 0.8
+                    "stamina": 0.8,
                 },
                 "cognitive_tensor": {
-                    "knowledge_state": ["Washington was elected president", "Constitutional Convention delegate"],
+                    "knowledge_state": [
+                        "Washington was elected president",
+                        "Constitutional Convention delegate",
+                    ],
                     "emotional_valence": 0.1,  # Slightly positive
                     "emotional_arousal": 0.3,
                     "energy_budget": 80.0,
                     "decision_confidence": 0.9,
-                    "patience_threshold": 40.0
+                    "patience_threshold": 40.0,
                 },
                 "personality_traits": ["steadfast", "principled", "reserved"],
-                "current_goals": ["establish stable government", "set presidential precedents"]
-            }
+                "current_goals": ["establish stable government", "set presidential precedents"],
+            },
         )
 
         self.jefferson = Entity(
@@ -89,7 +97,7 @@ class TestPhase3DialogSynthesis:
                     "age": 46,
                     "health_status": 0.85,
                     "pain_level": 0.0,
-                    "stamina": 0.9
+                    "stamina": 0.9,
                 },
                 "cognitive_tensor": {
                     "knowledge_state": ["Declaration of Independence author", "Secretary of State"],
@@ -97,11 +105,11 @@ class TestPhase3DialogSynthesis:
                     "emotional_arousal": 0.4,
                     "energy_budget": 85.0,
                     "decision_confidence": 0.8,
-                    "patience_threshold": 50.0
+                    "patience_threshold": 50.0,
                 },
                 "personality_traits": ["intellectual", "idealistic", "diplomatic"],
-                "current_goals": ["promote republican ideals", "expand national territory"]
-            }
+                "current_goals": ["promote republican ideals", "expand national territory"],
+            },
         )
 
         # Save entities to REAL store
@@ -114,7 +122,7 @@ class TestPhase3DialogSynthesis:
             timestamp=datetime(1789, 4, 30, 12, 0),
             event_description="George Washington's presidential inauguration ceremony at Federal Hall",
             entities_present=["washington", "jefferson"],
-            resolution_level=ResolutionLevel.SCENE
+            resolution_level=ResolutionLevel.SCENE,
         )
         self.store.save_timepoint(self.timepoint)
 
@@ -142,14 +150,14 @@ class TestPhase3DialogSynthesis:
             entity_metadata={
                 "physical_tensor": {
                     "age": 45,  # Required field
-                    "fever": 39.0  # High fever
+                    "fever": 39.0,  # High fever
                 },
                 "cognitive_tensor": {
                     "decision_confidence": 0.9,
                     "risk_tolerance": 0.3,
-                    "social_engagement": 0.8
-                }
-            }
+                    "social_engagement": 0.8,
+                },
+            },
         )
 
         physical = sick_entity.physical_tensor
@@ -214,8 +222,12 @@ class TestPhase3MultiEntityAnalysis:
             entity_type="person",
             resolution_level=ResolutionLevel.SCENE,
             entity_metadata={
-                "knowledge_state": ["National Bank is essential", "Federal debt assumption necessary", "Strong central government needed"]
-            }
+                "knowledge_state": [
+                    "National Bank is essential",
+                    "Federal debt assumption necessary",
+                    "Strong central government needed",
+                ]
+            },
         )
 
         self.jefferson = Entity(
@@ -223,8 +235,12 @@ class TestPhase3MultiEntityAnalysis:
             entity_type="person",
             resolution_level=ResolutionLevel.SCENE,
             entity_metadata={
-                "knowledge_state": ["States rights are paramount", "Strict constitutional interpretation", "Agrarian republic ideal"]
-            }
+                "knowledge_state": [
+                    "States rights are paramount",
+                    "Strict constitutional interpretation",
+                    "Agrarian republic ideal",
+                ]
+            },
         )
 
         # Save entities to REAL store
@@ -236,7 +252,7 @@ class TestPhase3MultiEntityAnalysis:
             timestamp=datetime(1790, 1, 15),
             event_description="First Cabinet meeting discussing financial policy",
             entities_present=["hamilton", "jefferson"],
-            resolution_level=ResolutionLevel.SCENE
+            resolution_level=ResolutionLevel.SCENE,
         )
         self.store.save_timepoint(self.timepoint)
 
@@ -249,7 +265,7 @@ class TestPhase3MultiEntityAnalysis:
         trajectory = analyze_relationship_evolution(
             "hamilton",  # entity_a
             "jefferson",  # entity_b
-            timeline
+            timeline,
         )
 
         # Should return a trajectory (or handle if no trajectory data exists yet)
@@ -272,9 +288,7 @@ class TestPhase3MultiEntityAnalysis:
         query = "How did Hamilton and Jefferson's relationship evolve?"
 
         # Use REAL implementation
-        response = synthesize_multi_entity_response(
-            entities, query, [], self.llm, self.store
-        )
+        response = synthesize_multi_entity_response(entities, query, [], self.llm, self.store)
 
         # Should return structured analysis
         assert isinstance(response, str)
@@ -309,9 +323,7 @@ class TestPhase3Integration:
             entity_id="hamilton",
             entity_type="person",
             resolution_level=ResolutionLevel.SCENE,
-            entity_metadata={
-                "knowledge_state": ["National Bank advocate", "Federalist"]
-            }
+            entity_metadata={"knowledge_state": ["National Bank advocate", "Federalist"]},
         )
         self.jefferson = Entity(
             entity_id="jefferson",
@@ -319,7 +331,7 @@ class TestPhase3Integration:
             resolution_level=ResolutionLevel.SCENE,
             entity_metadata={
                 "knowledge_state": ["States rights advocate", "Democratic-Republican"]
-            }
+            },
         )
         self.store.save_entity(self.hamilton)
         self.store.save_entity(self.jefferson)
@@ -340,7 +352,7 @@ class TestPhase3Integration:
         query_intent = QueryIntent(
             context_entities=["hamilton", "jefferson"],
             information_type="relationships",
-            confidence=0.9
+            confidence=0.9,
         )
 
         # Use REAL implementation
@@ -367,14 +379,14 @@ class TestPhase3Validators:
                     "speaker": "washington",
                     "content": "I shall strive to be worthy of this high trust.",
                     "emotional_tone": "solemn",
-                    "confidence": 0.9
+                    "confidence": 0.9,
                 },
                 {
                     "speaker": "jefferson",
                     "content": "The nation needs strong leadership.",
                     "emotional_tone": "supportive",
-                    "confidence": 0.85
-                }
+                    "confidence": 0.85,
+                },
             ]
         }
 
@@ -384,16 +396,16 @@ class TestPhase3Validators:
                 entity_id="washington",
                 entity_metadata={
                     "physical_tensor": {"age": 57, "pain_level": 0.1, "stamina": 0.8},
-                    "cognitive_tensor": {"energy_budget": 70.0, "emotional_valence": 0.1}
-                }
+                    "cognitive_tensor": {"energy_budget": 70.0, "emotional_valence": 0.1},
+                },
             ),
             Entity(
                 entity_id="jefferson",
                 entity_metadata={
                     "physical_tensor": {"age": 46, "pain_level": 0.0, "stamina": 0.9},
-                    "cognitive_tensor": {"energy_budget": 90.0, "emotional_valence": 0.2}
-                }
-            )
+                    "cognitive_tensor": {"energy_budget": 90.0, "emotional_valence": 0.2},
+                },
+            ),
         ]
 
     def test_dialog_realism_validator(self):
@@ -416,7 +428,7 @@ if __name__ == "__main__":
     print("🧪 Testing Phase 3: Dialog Synthesis & Multi-Entity Analysis")
 
     # Test body-mind coupling
-    from schemas import PhysicalTensor, CognitiveTensor
+    from schemas import CognitiveTensor, PhysicalTensor
 
     physical = PhysicalTensor(age=57, pain_level=0.3, stamina=0.8)
     cognitive = CognitiveTensor(
@@ -424,19 +436,23 @@ if __name__ == "__main__":
         emotional_valence=0.0,
         energy_budget=100.0,
         decision_confidence=0.9,
-        patience_threshold=50.0
+        patience_threshold=50.0,
     )
 
     coupled = couple_pain_to_cognition(physical, cognitive)
     assert coupled.energy_budget < cognitive.energy_budget, "Pain should reduce energy"
-    assert coupled.emotional_valence < cognitive.emotional_valence, "Pain should reduce emotional valence"
+    assert coupled.emotional_valence < cognitive.emotional_valence, (
+        "Pain should reduce emotional valence"
+    )
 
     print("✅ Body-mind coupling works correctly")
 
     # Test illness coupling
     physical_sick = PhysicalTensor(fever=39.5)
     coupled_sick = couple_illness_to_cognition(physical_sick, cognitive)
-    assert coupled_sick.decision_confidence < cognitive.decision_confidence, "Fever should reduce confidence"
+    assert coupled_sick.decision_confidence < cognitive.decision_confidence, (
+        "Fever should reduce confidence"
+    )
 
     print("✅ Illness coupling works correctly")
     print("🎯 Phase 3 implementation ready for testing!")

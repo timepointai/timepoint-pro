@@ -1,5 +1,14 @@
 # Timepoint Pro Alpha
 
+## Changes 2026-03-02 — TDF package integration + branch protection
+
+- Replaced hand-rolled `TDFExporter` with canonical `timepoint-tdf` package (`from_pro` + `write_tdf_jsonl`)
+- `/api/data-export/{run_id}` now returns full payload (entities, dialogs, causal_edges, metadata)
+- Branch protection enforced on `main`: 1 approving review required, no force pushes
+- Codebase lint pass: 3898 issues auto-fixed via ruff
+
+---
+
 **Synthetic time travel through social simulation.**
 
 **The first practical SNAG engine: Social Network Augmented Generation.**

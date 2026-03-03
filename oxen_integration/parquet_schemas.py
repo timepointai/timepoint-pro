@@ -8,13 +8,14 @@ Phase 4: Oxen Integration
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 
 try:
     import pyarrow as pa
     import pyarrow.parquet as pq
+
     PYARROW_AVAILABLE = True
 except ImportError:
     PYARROW_AVAILABLE = False
@@ -37,6 +38,7 @@ EMBEDDING_DIMS = 384  # sentence-transformers all-MiniLM-L6-v2
 # Schema Definitions
 # ============================================================================
 
+
 def get_template_schema() -> "pa.Schema":
     """
     Schema for tensor templates (public archetypes).
@@ -48,36 +50,35 @@ def get_template_schema() -> "pa.Schema":
         PyArrow schema for templates.parquet
     """
     if not PYARROW_AVAILABLE:
-        raise ImportError("PyArrow is required for Parquet schemas. Install with: pip install pyarrow")
+        raise ImportError(
+            "PyArrow is required for Parquet schemas. Install with: pip install pyarrow"
+        )
 
-    return pa.schema([
-        # Identity
-        pa.field("template_id", pa.string(), nullable=False),
-        pa.field("name", pa.string(), nullable=False),
-        pa.field("description", pa.string(), nullable=False),
-        pa.field("category", pa.string(), nullable=False),  # e.g., "epoch/victorian"
-
-        # Tensor data - stored as separate arrays for clarity
-        pa.field("context_vector", pa.list_(pa.float32(), CONTEXT_DIMS), nullable=False),
-        pa.field("biology_vector", pa.list_(pa.float32(), BIOLOGY_DIMS), nullable=False),
-        pa.field("behavior_vector", pa.list_(pa.float32(), BEHAVIOR_DIMS), nullable=False),
-
-        # Quality metrics
-        pa.field("maturity", pa.float32(), nullable=False),
-        pa.field("training_cycles", pa.int32(), nullable=False),
-
-        # Embedding for semantic search (variable size to handle None)
-        pa.field("embedding", pa.list_(pa.float32()), nullable=True),
-
-        # Metadata
-        pa.field("created_at", pa.timestamp("ms"), nullable=False),
-        pa.field("updated_at", pa.timestamp("ms"), nullable=False),
-        pa.field("usage_count", pa.int32(), nullable=True),
-
-        # Version tracking
-        pa.field("version", pa.int32(), nullable=False),
-        pa.field("parent_version", pa.int32(), nullable=True),
-    ])
+    return pa.schema(
+        [
+            # Identity
+            pa.field("template_id", pa.string(), nullable=False),
+            pa.field("name", pa.string(), nullable=False),
+            pa.field("description", pa.string(), nullable=False),
+            pa.field("category", pa.string(), nullable=False),  # e.g., "epoch/victorian"
+            # Tensor data - stored as separate arrays for clarity
+            pa.field("context_vector", pa.list_(pa.float32(), CONTEXT_DIMS), nullable=False),
+            pa.field("biology_vector", pa.list_(pa.float32(), BIOLOGY_DIMS), nullable=False),
+            pa.field("behavior_vector", pa.list_(pa.float32(), BEHAVIOR_DIMS), nullable=False),
+            # Quality metrics
+            pa.field("maturity", pa.float32(), nullable=False),
+            pa.field("training_cycles", pa.int32(), nullable=False),
+            # Embedding for semantic search (variable size to handle None)
+            pa.field("embedding", pa.list_(pa.float32()), nullable=True),
+            # Metadata
+            pa.field("created_at", pa.timestamp("ms"), nullable=False),
+            pa.field("updated_at", pa.timestamp("ms"), nullable=False),
+            pa.field("usage_count", pa.int32(), nullable=True),
+            # Version tracking
+            pa.field("version", pa.int32(), nullable=False),
+            pa.field("parent_version", pa.int32(), nullable=True),
+        ]
+    )
 
 
 def get_instance_schema() -> "pa.Schema":
@@ -91,44 +92,40 @@ def get_instance_schema() -> "pa.Schema":
         PyArrow schema for instances.parquet
     """
     if not PYARROW_AVAILABLE:
-        raise ImportError("PyArrow is required for Parquet schemas. Install with: pip install pyarrow")
+        raise ImportError(
+            "PyArrow is required for Parquet schemas. Install with: pip install pyarrow"
+        )
 
-    return pa.schema([
-        # Identity
-        pa.field("instance_id", pa.string(), nullable=False),
-        pa.field("entity_id", pa.string(), nullable=False),
-        pa.field("world_id", pa.string(), nullable=False),
-
-        # Template reference (for inheritance tracking)
-        pa.field("base_template_id", pa.string(), nullable=True),
-
-        # Tensor data
-        pa.field("context_vector", pa.list_(pa.float32(), CONTEXT_DIMS), nullable=False),
-        pa.field("biology_vector", pa.list_(pa.float32(), BIOLOGY_DIMS), nullable=False),
-        pa.field("behavior_vector", pa.list_(pa.float32(), BEHAVIOR_DIMS), nullable=False),
-
-        # Quality metrics
-        pa.field("maturity", pa.float32(), nullable=False),
-        pa.field("training_cycles", pa.int32(), nullable=False),
-
-        # Embedding for semantic search (variable size to handle None)
-        pa.field("embedding", pa.list_(pa.float32()), nullable=True),
-
-        # Description for RAG
-        pa.field("description", pa.string(), nullable=True),
-        pa.field("category", pa.string(), nullable=True),
-
-        # Access control
-        pa.field("access_level", pa.string(), nullable=False),  # "private", "shared", "public"
-        pa.field("owner_id", pa.string(), nullable=False),
-
-        # Timestamps
-        pa.field("created_at", pa.timestamp("ms"), nullable=False),
-        pa.field("updated_at", pa.timestamp("ms"), nullable=False),
-
-        # Version tracking
-        pa.field("version", pa.int32(), nullable=False),
-    ])
+    return pa.schema(
+        [
+            # Identity
+            pa.field("instance_id", pa.string(), nullable=False),
+            pa.field("entity_id", pa.string(), nullable=False),
+            pa.field("world_id", pa.string(), nullable=False),
+            # Template reference (for inheritance tracking)
+            pa.field("base_template_id", pa.string(), nullable=True),
+            # Tensor data
+            pa.field("context_vector", pa.list_(pa.float32(), CONTEXT_DIMS), nullable=False),
+            pa.field("biology_vector", pa.list_(pa.float32(), BIOLOGY_DIMS), nullable=False),
+            pa.field("behavior_vector", pa.list_(pa.float32(), BEHAVIOR_DIMS), nullable=False),
+            # Quality metrics
+            pa.field("maturity", pa.float32(), nullable=False),
+            pa.field("training_cycles", pa.int32(), nullable=False),
+            # Embedding for semantic search (variable size to handle None)
+            pa.field("embedding", pa.list_(pa.float32()), nullable=True),
+            # Description for RAG
+            pa.field("description", pa.string(), nullable=True),
+            pa.field("category", pa.string(), nullable=True),
+            # Access control
+            pa.field("access_level", pa.string(), nullable=False),  # "private", "shared", "public"
+            pa.field("owner_id", pa.string(), nullable=False),
+            # Timestamps
+            pa.field("created_at", pa.timestamp("ms"), nullable=False),
+            pa.field("updated_at", pa.timestamp("ms"), nullable=False),
+            # Version tracking
+            pa.field("version", pa.int32(), nullable=False),
+        ]
+    )
 
 
 def get_version_history_schema() -> "pa.Schema":
@@ -141,43 +138,45 @@ def get_version_history_schema() -> "pa.Schema":
         PyArrow schema for versions.parquet
     """
     if not PYARROW_AVAILABLE:
-        raise ImportError("PyArrow is required for Parquet schemas. Install with: pip install pyarrow")
+        raise ImportError(
+            "PyArrow is required for Parquet schemas. Install with: pip install pyarrow"
+        )
 
-    return pa.schema([
-        # Identity
-        pa.field("version_id", pa.string(), nullable=False),
-        pa.field("tensor_type", pa.string(), nullable=False),  # "template" or "instance"
-        pa.field("tensor_id", pa.string(), nullable=False),
-
-        # Version chain
-        pa.field("version_number", pa.int32(), nullable=False),
-        pa.field("parent_version_id", pa.string(), nullable=True),
-        pa.field("oxen_commit", pa.string(), nullable=True),
-
-        # Delta (what changed)
-        pa.field("delta_context", pa.list_(pa.float32(), CONTEXT_DIMS), nullable=True),
-        pa.field("delta_biology", pa.list_(pa.float32(), BIOLOGY_DIMS), nullable=True),
-        pa.field("delta_behavior", pa.list_(pa.float32(), BEHAVIOR_DIMS), nullable=True),
-        pa.field("maturity_delta", pa.float32(), nullable=True),
-        pa.field("cycles_delta", pa.int32(), nullable=True),
-
-        # Metadata
-        pa.field("created_at", pa.timestamp("ms"), nullable=False),
-        pa.field("change_type", pa.string(), nullable=True),  # "training", "manual", "merge"
-        pa.field("change_notes", pa.string(), nullable=True),
-    ])
+    return pa.schema(
+        [
+            # Identity
+            pa.field("version_id", pa.string(), nullable=False),
+            pa.field("tensor_type", pa.string(), nullable=False),  # "template" or "instance"
+            pa.field("tensor_id", pa.string(), nullable=False),
+            # Version chain
+            pa.field("version_number", pa.int32(), nullable=False),
+            pa.field("parent_version_id", pa.string(), nullable=True),
+            pa.field("oxen_commit", pa.string(), nullable=True),
+            # Delta (what changed)
+            pa.field("delta_context", pa.list_(pa.float32(), CONTEXT_DIMS), nullable=True),
+            pa.field("delta_biology", pa.list_(pa.float32(), BIOLOGY_DIMS), nullable=True),
+            pa.field("delta_behavior", pa.list_(pa.float32(), BEHAVIOR_DIMS), nullable=True),
+            pa.field("maturity_delta", pa.float32(), nullable=True),
+            pa.field("cycles_delta", pa.int32(), nullable=True),
+            # Metadata
+            pa.field("created_at", pa.timestamp("ms"), nullable=False),
+            pa.field("change_type", pa.string(), nullable=True),  # "training", "manual", "merge"
+            pa.field("change_notes", pa.string(), nullable=True),
+        ]
+    )
 
 
 # ============================================================================
 # Conversion Utilities
 # ============================================================================
 
+
 def tensor_record_to_parquet_row(
     record: Any,  # TensorRecord
     tensor_arrays: tuple = None,  # (context, biology, behavior) np arrays
     embedding: np.ndarray = None,
-    is_template: bool = False
-) -> Dict[str, Any]:
+    is_template: bool = False,
+) -> dict[str, Any]:
     """
     Convert a TensorRecord to a dict suitable for Parquet.
 
@@ -245,10 +244,7 @@ def tensor_record_to_parquet_row(
         }
 
 
-def parquet_row_to_tensor_record(
-    row: Dict[str, Any],
-    is_template: bool = False
-) -> Any:
+def parquet_row_to_tensor_record(row: dict[str, Any], is_template: bool = False) -> Any:
     """
     Convert a Parquet row dict to a TensorRecord.
 
@@ -259,9 +255,9 @@ def parquet_row_to_tensor_record(
     Returns:
         TensorRecord object
     """
+    from schemas import TTMTensor
     from tensor_persistence import TensorRecord
     from tensor_serialization import serialize_tensor
-    from schemas import TTMTensor
 
     # Extract tensor vectors
     context = np.array(row["context_vector"], dtype=np.float32)
@@ -308,11 +304,8 @@ def parquet_row_to_tensor_record(
 # File I/O
 # ============================================================================
 
-def write_templates_parquet(
-    records: List[Any],
-    path: str,
-    append: bool = False
-) -> None:
+
+def write_templates_parquet(records: list[Any], path: str, append: bool = False) -> None:
     """
     Write tensor records to a templates Parquet file.
 
@@ -338,11 +331,7 @@ def write_templates_parquet(
     pq.write_table(table, path)
 
 
-def write_instances_parquet(
-    records: List[Any],
-    path: str,
-    append: bool = False
-) -> None:
+def write_instances_parquet(records: list[Any], path: str, append: bool = False) -> None:
     """
     Write tensor records to an instances Parquet file.
 
@@ -367,7 +356,7 @@ def write_instances_parquet(
     pq.write_table(table, path)
 
 
-def read_templates_parquet(path: str) -> List[Any]:
+def read_templates_parquet(path: str) -> list[Any]:
     """
     Read tensor records from a templates Parquet file.
 
@@ -385,7 +374,7 @@ def read_templates_parquet(path: str) -> List[Any]:
     return [parquet_row_to_tensor_record(row, is_template=True) for row in rows]
 
 
-def read_instances_parquet(path: str) -> List[Any]:
+def read_instances_parquet(path: str) -> list[Any]:
     """
     Read tensor records from an instances Parquet file.
 
@@ -407,6 +396,7 @@ def read_instances_parquet(path: str) -> List[Any]:
 # Schema Validation
 # ============================================================================
 
+
 def validate_parquet_file(path: str, expected_type: str = "instance") -> bool:
     """
     Validate that a Parquet file matches the expected schema.
@@ -421,7 +411,9 @@ def validate_parquet_file(path: str, expected_type: str = "instance") -> bool:
     if not PYARROW_AVAILABLE:
         raise ImportError("PyArrow required. Install with: pip install pyarrow")
 
-    expected_schema = get_template_schema() if expected_type == "template" else get_instance_schema()
+    expected_schema = (
+        get_template_schema() if expected_type == "template" else get_instance_schema()
+    )
 
     table = pq.read_table(path)
     actual_fields = set(table.schema.names)

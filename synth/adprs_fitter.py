@@ -8,15 +8,13 @@ global search) and warm-start (curve_fit for local refinement from priors).
 Part of Phase 2: Emergent Envelope Fitting from TTM Trajectories.
 """
 
-import math
 import logging
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any, Tuple
+from dataclasses import dataclass
 
 import numpy as np
 from scipy.optimize import curve_fit, differential_evolution
 
-from synth.fidelity_envelope import ADPRSEnvelope, ADPRSComposite
+from synth.fidelity_envelope import ADPRSComposite, ADPRSEnvelope
 
 logger = logging.getLogger(__name__)
 
@@ -52,13 +50,13 @@ class FitResult:
     """Result of fitting ADPRS parameters to an entity's trajectory."""
 
     entity_id: str
-    params: Dict[str, float]
+    params: dict[str, float]
     residual: float  # MSE
     n_points: int
     method: str  # "differential_evolution" or "curve_fit"
     converged: bool
-    prior_params: Optional[Dict[str, float]] = None
-    parameter_drift: Optional[Dict[str, float]] = None
+    prior_params: dict[str, float] | None = None
+    parameter_drift: dict[str, float] | None = None
 
     def to_envelope(self, duration_ms: float, t0_iso: str) -> ADPRSEnvelope:
         """Convert fitted parameters to an ADPRSEnvelope."""
@@ -93,7 +91,7 @@ class ADPRSFitter:
         tau: np.ndarray,
         activation: np.ndarray,
         entity_id: str,
-        prior_params: Optional[Dict[str, float]] = None,
+        prior_params: dict[str, float] | None = None,
         harmonics: int = 1,
     ) -> FitResult:
         """
@@ -113,6 +111,7 @@ class ADPRSFitter:
         """
         if harmonics > 1:
             from synth.harmonic_fitter import HarmonicFitter
+
             harmonic_fitter = HarmonicFitter(
                 min_points=self.min_points,
                 de_maxiter=self.de_maxiter,
@@ -120,8 +119,11 @@ class ADPRSFitter:
                 de_seed=self.de_seed,
             )
             return harmonic_fitter.fit_entity(
-                tau, activation, entity_id,
-                harmonics=harmonics, prior_params=prior_params,
+                tau,
+                activation,
+                entity_id,
+                harmonics=harmonics,
+                prior_params=prior_params,
             )
 
         tau = np.asarray(tau, dtype=np.float64)
@@ -137,15 +139,15 @@ class ADPRSFitter:
         if prior_params is not None:
             drift = {}
             for name in PARAM_NAMES:
-                drift[name] = abs(result.params[name] - prior_params.get(name, DEFAULT_PARAMS[name]))
+                drift[name] = abs(
+                    result.params[name] - prior_params.get(name, DEFAULT_PARAMS[name])
+                )
             result.parameter_drift = drift
             result.prior_params = prior_params
 
         return result
 
-    def _cold_fit(
-        self, tau: np.ndarray, activation: np.ndarray, entity_id: str
-    ) -> FitResult:
+    def _cold_fit(self, tau: np.ndarray, activation: np.ndarray, entity_id: str) -> FitResult:
         """Global optimization via differential_evolution."""
         try:
             de_result = differential_evolution(
@@ -178,7 +180,7 @@ class ADPRSFitter:
         tau: np.ndarray,
         activation: np.ndarray,
         entity_id: str,
-        prior_params: Dict[str, float],
+        prior_params: dict[str, float],
     ) -> FitResult:
         """Local refinement via curve_fit starting from prior parameters."""
         p0 = [prior_params.get(name, DEFAULT_PARAMS[name]) for name in PARAM_NAMES]
@@ -198,9 +200,7 @@ class ADPRSFitter:
             residual = float(np.mean((adprs_waveform(tau, *popt) - activation) ** 2))
             converged = True
         except Exception as e:
-            logger.warning(
-                "Warm fit failed for %s: %s — falling back to cold fit", entity_id, e
-            )
+            logger.warning("Warm fit failed for %s: %s — falling back to cold fit", entity_id, e)
             return self._cold_fit(tau, activation, entity_id)
 
         return FitResult(
@@ -213,9 +213,7 @@ class ADPRSFitter:
             prior_params=prior_params,
         )
 
-    def fit_all(
-        self, tracker, entities: list
-    ) -> Dict[str, FitResult]:
+    def fit_all(self, tracker, entities: list) -> dict[str, FitResult]:
         """
         Fit all entities with sufficient trajectory data.
 
@@ -257,7 +255,7 @@ class ADPRSFitter:
 
     @staticmethod
     def apply_to_entities(
-        results: Dict[str, "FitResult"],
+        results: dict[str, "FitResult"],
         entities: list,
         duration_ms: float,
         t0_iso: str,

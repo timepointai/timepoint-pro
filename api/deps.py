@@ -8,11 +8,11 @@ Phase 6: Public API
 
 import os
 from functools import lru_cache
-from typing import Optional, Generator, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
-from tensor_persistence import TensorDatabase
-from access.permissions import PermissionEnforcer
 from access.audit import AuditLogger
+from access.permissions import PermissionEnforcer
+from tensor_persistence import TensorDatabase
 
 if TYPE_CHECKING:
     from retrieval.tensor_rag import TensorRAG
@@ -22,37 +22,20 @@ if TYPE_CHECKING:
 # Configuration
 # ============================================================================
 
+
 class Settings:
     """API configuration settings."""
 
     def __init__(self):
-        self.db_path: str = os.getenv(
-            "TENSOR_DB_PATH",
-            "metadata/tensors.db"
-        )
-        self.enable_rag: bool = os.getenv(
-            "ENABLE_RAG",
-            "true"
-        ).lower() == "true"
-        self.embedding_model: str = os.getenv(
-            "EMBEDDING_MODEL",
-            "all-MiniLM-L6-v2"
-        )
-        self.api_title: str = os.getenv(
-            "API_TITLE",
-            "Timepoint-Pro Tensor API"
-        )
-        self.api_version: str = os.getenv(
-            "API_VERSION",
-            "0.1.0"
-        )
-        self.debug: bool = os.getenv(
-            "DEBUG",
-            "false"
-        ).lower() == "true"
+        self.db_path: str = os.getenv("TENSOR_DB_PATH", "metadata/tensors.db")
+        self.enable_rag: bool = os.getenv("ENABLE_RAG", "true").lower() == "true"
+        self.embedding_model: str = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+        self.api_title: str = os.getenv("API_TITLE", "Timepoint-Pro Tensor API")
+        self.api_version: str = os.getenv("API_VERSION", "0.1.0")
+        self.debug: bool = os.getenv("DEBUG", "false").lower() == "true"
 
 
-@lru_cache()
+@lru_cache
 def get_settings() -> Settings:
     """Get cached settings instance."""
     return Settings()
@@ -63,9 +46,9 @@ def get_settings() -> Settings:
 # ============================================================================
 
 # Global instances (initialized on first access)
-_tensor_db: Optional[TensorDatabase] = None
-_enforcer: Optional[PermissionEnforcer] = None
-_logger: Optional[AuditLogger] = None
+_tensor_db: TensorDatabase | None = None
+_enforcer: PermissionEnforcer | None = None
+_logger: AuditLogger | None = None
 _rag: Optional["TensorRAG"] = None
 
 
@@ -78,6 +61,7 @@ def _get_db_path() -> str:
 # ============================================================================
 # Database Dependencies
 # ============================================================================
+
 
 def get_tensor_db() -> TensorDatabase:
     """
@@ -134,6 +118,7 @@ def get_tensor_rag() -> Optional["TensorRAG"]:
     if _rag is None:
         try:
             from retrieval.tensor_rag import TensorRAG
+
             db = get_tensor_db()
             enforcer = get_enforcer()
             _rag = TensorRAG(
@@ -152,6 +137,7 @@ def get_tensor_rag() -> Optional["TensorRAG"]:
 # ============================================================================
 # Cleanup
 # ============================================================================
+
 
 def cleanup_dependencies() -> None:
     """
@@ -179,6 +165,7 @@ def reset_dependencies() -> None:
 # ============================================================================
 # Test Helpers
 # ============================================================================
+
 
 def override_db_path(path: str) -> None:
     """

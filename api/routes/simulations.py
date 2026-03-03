@@ -6,36 +6,33 @@ Provides endpoints for creating, monitoring, and managing simulation jobs.
 Phase 6: Public API - Simulation Endpoints
 """
 
-from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from ..auth import get_current_user
+from ..middleware.rate_limit import (
+    check_job_concurrency,
+    decrement_job_count,
+    get_job_count,
+    get_limiter,
+    increment_job_count,
+)
 from ..models_simulation import (
-    SimulationCreateRequest,
     SimulationCancelRequest,
+    SimulationCreateRequest,
     SimulationJobResponse,
-    SimulationResultResponse,
     SimulationListResponse,
+    SimulationResultResponse,
     SimulationStatsResponse,
     SimulationStatus,
     TemplateInfo,
     TemplateListResponse,
 )
 from ..simulation_runner import (
-    get_simulation_runner,
-    get_job,
-    list_jobs,
     SimulationJob,
+    get_job,
+    get_simulation_runner,
+    list_jobs,
 )
-from ..middleware.rate_limit import (
-    get_limiter,
-    limit_expensive,
-    check_job_concurrency,
-    increment_job_count,
-    decrement_job_count,
-    get_job_count,
-)
-
 
 router = APIRouter(prefix="/simulations", tags=["simulations"])
 limiter = get_limiter()
@@ -44,6 +41,7 @@ limiter = get_limiter()
 # ============================================================================
 # Helper Functions
 # ============================================================================
+
 
 def job_to_response(job: SimulationJob) -> SimulationJobResponse:
     """Convert internal job to API response."""
@@ -73,6 +71,7 @@ def job_to_response(job: SimulationJob) -> SimulationJobResponse:
 # ============================================================================
 # Job Management Endpoints
 # ============================================================================
+
 
 @router.post(
     "",
@@ -129,7 +128,7 @@ async def create_simulation(
 @limiter.limit("30/minute")
 async def list_simulations(
     request: Request,
-    status_filter: Optional[SimulationStatus] = None,
+    status_filter: SimulationStatus | None = None,
     page: int = 1,
     page_size: int = 20,
     user_id: str = Depends(get_current_user),
@@ -266,7 +265,7 @@ async def get_simulation_result(
 async def cancel_simulation(
     request: Request,
     job_id: str,
-    body: Optional[SimulationCancelRequest] = None,
+    body: SimulationCancelRequest | None = None,
     user_id: str = Depends(get_current_user),
 ):
     """Cancel a simulation job."""
@@ -314,6 +313,7 @@ async def cancel_simulation(
 # Template Endpoints
 # ============================================================================
 
+
 @router.get(
     "/templates",
     response_model=TemplateListResponse,
@@ -323,8 +323,8 @@ async def cancel_simulation(
 @limiter.limit("30/minute")
 async def list_templates(
     request: Request,
-    category: Optional[str] = None,
-    tier: Optional[str] = None,
+    category: str | None = None,
+    tier: str | None = None,
     user_id: str = Depends(get_current_user),
 ):
     """List available simulation templates."""
@@ -349,18 +349,20 @@ async def list_templates(
         if tier and template_tier != tier:
             continue
 
-        templates.append(TemplateInfo(
-            template_id=template_id,
-            name=template_data.get("name", template_id),
-            description=template_data.get("description", ""),
-            category=cat,
-            tier=template_tier,
-            mechanisms=template_data.get("mechanisms", []),
-            default_entity_count=template_data.get("entities", {}).get("count", 4),
-            default_timepoint_count=template_data.get("timepoints", {}).get("count", 5),
-            estimated_cost_usd=template_data.get("estimated_cost", 0.05),
-            estimated_duration_seconds=template_data.get("estimated_duration", 120),
-        ))
+        templates.append(
+            TemplateInfo(
+                template_id=template_id,
+                name=template_data.get("name", template_id),
+                description=template_data.get("description", ""),
+                category=cat,
+                tier=template_tier,
+                mechanisms=template_data.get("mechanisms", []),
+                default_entity_count=template_data.get("entities", {}).get("count", 4),
+                default_timepoint_count=template_data.get("timepoints", {}).get("count", 5),
+                estimated_cost_usd=template_data.get("estimated_cost", 0.05),
+                estimated_duration_seconds=template_data.get("estimated_duration", 120),
+            )
+        )
 
     return TemplateListResponse(
         templates=templates,

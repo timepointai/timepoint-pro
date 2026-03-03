@@ -7,14 +7,14 @@ Provides:
 - Deterministic responses for reproducibility
 """
 
-from typing import Type, Optional, Dict, Any
-from pydantic import BaseModel
-import time
-import re
 import hashlib
-import numpy as np
+import re
+import time
 
-from llm_service.provider import LLMProvider, LLMResponse
+import numpy as np
+from pydantic import BaseModel
+
+from llm_service.provider import LLMResponse
 from llm_service.response_parser import ResponseParser
 
 
@@ -61,8 +61,8 @@ class MockProvider:
         top_p: float = 0.9,
         frequency_penalty: float = 0.0,
         presence_penalty: float = 0.0,
-        model: Optional[str] = None,
-        **kwargs
+        model: str | None = None,
+        **kwargs,
     ) -> LLMResponse:
         """Make a mock or validation call"""
 
@@ -75,11 +75,11 @@ class MockProvider:
         self,
         system: str,
         user: str,
-        schema: Type[BaseModel],
+        schema: type[BaseModel],
         temperature: float = 0.7,
         max_tokens: int = 1000,
-        model: Optional[str] = None,
-        **kwargs
+        model: str | None = None,
+        **kwargs,
     ) -> BaseModel:
         """Make a mock structured call"""
 
@@ -106,7 +106,7 @@ class MockProvider:
         """List available test models"""
         return ["test-model", "mock-model"]
 
-    def _dry_run_call(self, system: str, user: str, model: Optional[str]) -> LLMResponse:
+    def _dry_run_call(self, system: str, user: str, model: str | None) -> LLMResponse:
         """Generate deterministic mock response"""
         # Generate deterministic content based on prompts
         seed_str = system + user
@@ -173,7 +173,7 @@ class MockProvider:
             },
         )
 
-    def _generate_mock_instance(self, schema: Type[BaseModel], seed_str: str) -> BaseModel:
+    def _generate_mock_instance(self, schema: type[BaseModel], seed_str: str) -> BaseModel:
         """Generate a mock instance with realistic data"""
         seed = int(hashlib.md5(seed_str.encode(), usedforsecurity=False).hexdigest(), 16) % 10000
         np.random.seed(seed)

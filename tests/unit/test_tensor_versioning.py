@@ -11,48 +11,44 @@ Tests cover:
 Note: These tests mock the Oxen client to avoid network calls.
 """
 
-import json
+from datetime import datetime
+from unittest.mock import MagicMock
+
 import numpy as np
 import pytest
-import tempfile
-from datetime import datetime
-from pathlib import Path
-from unittest.mock import MagicMock, patch
 
+from schemas import TTMTensor
 from tensor_persistence import TensorDatabase, TensorRecord
 from tensor_serialization import serialize_tensor
-from schemas import TTMTensor
 
 # Skip all tests if pyarrow is not available
 pytest.importorskip("pyarrow")
 
 from oxen_integration.parquet_schemas import (
-    get_template_schema,
-    get_instance_schema,
-    get_version_history_schema,
-    tensor_record_to_parquet_row,
-    parquet_row_to_tensor_record,
-    write_templates_parquet,
-    write_instances_parquet,
-    read_templates_parquet,
-    read_instances_parquet,
-    TENSOR_DIMS,
-    CONTEXT_DIMS,
-    BIOLOGY_DIMS,
     BEHAVIOR_DIMS,
+    BIOLOGY_DIMS,
+    CONTEXT_DIMS,
     EMBEDDING_DIMS,
+    TENSOR_DIMS,
+    get_instance_schema,
+    get_template_schema,
+    get_version_history_schema,
+    parquet_row_to_tensor_record,
+    read_instances_parquet,
+    read_templates_parquet,
+    tensor_record_to_parquet_row,
+    write_instances_parquet,
+    write_templates_parquet,
 )
-from oxen_integration.sync import TensorSyncManager, SyncState
+from oxen_integration.sync import SyncState, TensorSyncManager
 from oxen_integration.tensor_versioning import (
     TensorVersionController,
-    SyncResult,
-    FetchResult,
 )
-
 
 # ============================================================================
 # Fixtures
 # ============================================================================
+
 
 @pytest.fixture
 def sample_tensor():
@@ -100,6 +96,7 @@ def mock_oxen_client():
 # Schema Tests
 # ============================================================================
 
+
 @pytest.mark.unit
 class TestParquetSchemas:
     """Tests for Parquet schema definitions."""
@@ -110,10 +107,19 @@ class TestParquetSchemas:
         field_names = set(schema.names)
 
         required = {
-            "template_id", "name", "description", "category",
-            "context_vector", "biology_vector", "behavior_vector",
-            "maturity", "training_cycles", "embedding",
-            "created_at", "updated_at", "version"
+            "template_id",
+            "name",
+            "description",
+            "category",
+            "context_vector",
+            "biology_vector",
+            "behavior_vector",
+            "maturity",
+            "training_cycles",
+            "embedding",
+            "created_at",
+            "updated_at",
+            "version",
         }
 
         assert required.issubset(field_names)
@@ -124,10 +130,19 @@ class TestParquetSchemas:
         field_names = set(schema.names)
 
         required = {
-            "instance_id", "entity_id", "world_id",
-            "context_vector", "biology_vector", "behavior_vector",
-            "maturity", "training_cycles", "access_level", "owner_id",
-            "created_at", "updated_at", "version"
+            "instance_id",
+            "entity_id",
+            "world_id",
+            "context_vector",
+            "biology_vector",
+            "behavior_vector",
+            "maturity",
+            "training_cycles",
+            "access_level",
+            "owner_id",
+            "created_at",
+            "updated_at",
+            "version",
         }
 
         assert required.issubset(field_names)
@@ -138,9 +153,12 @@ class TestParquetSchemas:
         field_names = set(schema.names)
 
         required = {
-            "version_id", "tensor_type", "tensor_id",
-            "version_number", "parent_version_id",
-            "created_at"
+            "version_id",
+            "tensor_type",
+            "tensor_id",
+            "version_number",
+            "parent_version_id",
+            "created_at",
         }
 
         assert required.issubset(field_names)
@@ -157,6 +175,7 @@ class TestParquetSchemas:
 # ============================================================================
 # Conversion Tests
 # ============================================================================
+
 
 @pytest.mark.unit
 class TestRecordConversion:
@@ -231,6 +250,7 @@ class TestRecordConversion:
 # ============================================================================
 # File I/O Tests
 # ============================================================================
+
 
 @pytest.mark.unit
 class TestParquetIO:
@@ -326,6 +346,7 @@ class TestParquetIO:
 # Sync State Tests
 # ============================================================================
 
+
 @pytest.mark.unit
 class TestSyncState:
     """Tests for sync state management."""
@@ -387,6 +408,7 @@ class TestSyncState:
 # Version Controller Tests
 # ============================================================================
 
+
 @pytest.mark.unit
 class TestTensorVersionController:
     """Tests for TensorVersionController."""
@@ -394,8 +416,7 @@ class TestTensorVersionController:
     def test_controller_initialization(self, mock_oxen_client, tmp_path):
         """Controller should initialize with client and cache dir."""
         controller = TensorVersionController(
-            oxen_client=mock_oxen_client,
-            local_cache_dir=str(tmp_path / "cache")
+            oxen_client=mock_oxen_client, local_cache_dir=str(tmp_path / "cache")
         )
 
         assert controller.client == mock_oxen_client
@@ -404,13 +425,11 @@ class TestTensorVersionController:
     def test_create_experiment_branch(self, mock_oxen_client, tmp_path):
         """Should create experiment branch with prefix."""
         controller = TensorVersionController(
-            oxen_client=mock_oxen_client,
-            local_cache_dir=str(tmp_path / "cache")
+            oxen_client=mock_oxen_client, local_cache_dir=str(tmp_path / "cache")
         )
 
         branch = controller.create_experiment_branch(
-            name="test-experiment",
-            description="Test experiment"
+            name="test-experiment", description="Test experiment"
         )
 
         assert branch == "experiments/test-experiment"
@@ -419,19 +438,19 @@ class TestTensorVersionController:
     def test_create_training_branch(self, mock_oxen_client, tmp_path):
         """Should create training branch with prefix."""
         controller = TensorVersionController(
-            oxen_client=mock_oxen_client,
-            local_cache_dir=str(tmp_path / "cache")
+            oxen_client=mock_oxen_client, local_cache_dir=str(tmp_path / "cache")
         )
 
         branch = controller.create_training_branch(batch_id="batch-001")
 
         assert branch == "training/batch-001"
 
-    def test_detect_conflicts_finds_version_mismatch(self, sample_tensor, mock_oxen_client, tmp_path):
+    def test_detect_conflicts_finds_version_mismatch(
+        self, sample_tensor, mock_oxen_client, tmp_path
+    ):
         """Should detect conflicts when versions differ."""
         controller = TensorVersionController(
-            oxen_client=mock_oxen_client,
-            local_cache_dir=str(tmp_path / "cache")
+            oxen_client=mock_oxen_client, local_cache_dir=str(tmp_path / "cache")
         )
 
         local_record = TensorRecord(
@@ -462,8 +481,7 @@ class TestTensorVersionController:
     def test_resolve_conflict_highest_maturity(self, sample_tensor, mock_oxen_client, tmp_path):
         """Should resolve conflict using highest maturity."""
         controller = TensorVersionController(
-            oxen_client=mock_oxen_client,
-            local_cache_dir=str(tmp_path / "cache")
+            oxen_client=mock_oxen_client, local_cache_dir=str(tmp_path / "cache")
         )
 
         local_record = TensorRecord(
@@ -485,9 +503,7 @@ class TestTensorVersionController:
         )
 
         resolved = controller.resolve_conflict(
-            local_record,
-            remote_record,
-            strategy="highest_maturity"
+            local_record, remote_record, strategy="highest_maturity"
         )
 
         assert resolved.maturity == pytest.approx(0.9)
@@ -495,8 +511,7 @@ class TestTensorVersionController:
     def test_resolve_conflict_merge(self, sample_tensor, mock_oxen_client, tmp_path):
         """Should resolve conflict by merging tensor values."""
         controller = TensorVersionController(
-            oxen_client=mock_oxen_client,
-            local_cache_dir=str(tmp_path / "cache")
+            oxen_client=mock_oxen_client, local_cache_dir=str(tmp_path / "cache")
         )
 
         # Create tensors with different values
@@ -529,14 +544,11 @@ class TestTensorVersionController:
             training_cycles=15,
         )
 
-        resolved = controller.resolve_conflict(
-            local_record,
-            remote_record,
-            strategy="merge"
-        )
+        resolved = controller.resolve_conflict(local_record, remote_record, strategy="merge")
 
         # Merged values should be average
         from tensor_serialization import deserialize_tensor
+
         merged_tensor = deserialize_tensor(resolved.tensor_blob)
         ctx, _, _ = merged_tensor.to_arrays()
 
@@ -551,6 +563,7 @@ class TestTensorVersionController:
 # Sync Manager Tests
 # ============================================================================
 
+
 @pytest.mark.unit
 class TestTensorSyncManager:
     """Tests for TensorSyncManager."""
@@ -558,30 +571,30 @@ class TestTensorSyncManager:
     def test_sync_manager_initialization(self, tensor_db, mock_oxen_client, tmp_path):
         """SyncManager should initialize correctly."""
         controller = TensorVersionController(
-            oxen_client=mock_oxen_client,
-            local_cache_dir=str(tmp_path / "cache")
+            oxen_client=mock_oxen_client, local_cache_dir=str(tmp_path / "cache")
         )
 
         sync_mgr = TensorSyncManager(
             tensor_db=tensor_db,
             version_controller=controller,
-            state_file=str(tmp_path / "sync_state.json")
+            state_file=str(tmp_path / "sync_state.json"),
         )
 
         assert sync_mgr.tensor_db == tensor_db
         assert sync_mgr.version_controller == controller
 
-    def test_detect_local_changes_finds_new(self, tensor_db, mock_oxen_client, tmp_path, sample_tensor):
+    def test_detect_local_changes_finds_new(
+        self, tensor_db, mock_oxen_client, tmp_path, sample_tensor
+    ):
         """Should detect new tensors that haven't been synced."""
         controller = TensorVersionController(
-            oxen_client=mock_oxen_client,
-            local_cache_dir=str(tmp_path / "cache")
+            oxen_client=mock_oxen_client, local_cache_dir=str(tmp_path / "cache")
         )
 
         sync_mgr = TensorSyncManager(
             tensor_db=tensor_db,
             version_controller=controller,
-            state_file=str(tmp_path / "sync_state.json")
+            state_file=str(tmp_path / "sync_state.json"),
         )
 
         # Add a tensor to database
@@ -601,17 +614,18 @@ class TestTensorSyncManager:
         assert len(changes) == 1
         assert changes[0].tensor_id == "new-tensor"
 
-    def test_detect_local_changes_skips_synced(self, tensor_db, mock_oxen_client, tmp_path, sample_tensor):
+    def test_detect_local_changes_skips_synced(
+        self, tensor_db, mock_oxen_client, tmp_path, sample_tensor
+    ):
         """Should skip tensors that were already synced."""
         controller = TensorVersionController(
-            oxen_client=mock_oxen_client,
-            local_cache_dir=str(tmp_path / "cache")
+            oxen_client=mock_oxen_client, local_cache_dir=str(tmp_path / "cache")
         )
 
         sync_mgr = TensorSyncManager(
             tensor_db=tensor_db,
             version_controller=controller,
-            state_file=str(tmp_path / "sync_state.json")
+            state_file=str(tmp_path / "sync_state.json"),
         )
 
         # Add and mark as synced
@@ -650,14 +664,13 @@ class TestTensorSyncManager:
     def test_get_sync_status(self, tensor_db, mock_oxen_client, tmp_path, sample_tensor):
         """Should return sync status information."""
         controller = TensorVersionController(
-            oxen_client=mock_oxen_client,
-            local_cache_dir=str(tmp_path / "cache")
+            oxen_client=mock_oxen_client, local_cache_dir=str(tmp_path / "cache")
         )
 
         sync_mgr = TensorSyncManager(
             tensor_db=tensor_db,
             version_controller=controller,
-            state_file=str(tmp_path / "sync_state.json")
+            state_file=str(tmp_path / "sync_state.json"),
         )
 
         # Add some tensors
@@ -682,14 +695,13 @@ class TestTensorSyncManager:
     def test_reset_sync_state(self, tensor_db, mock_oxen_client, tmp_path):
         """Should reset sync state."""
         controller = TensorVersionController(
-            oxen_client=mock_oxen_client,
-            local_cache_dir=str(tmp_path / "cache")
+            oxen_client=mock_oxen_client, local_cache_dir=str(tmp_path / "cache")
         )
 
         sync_mgr = TensorSyncManager(
             tensor_db=tensor_db,
             version_controller=controller,
-            state_file=str(tmp_path / "sync_state.json")
+            state_file=str(tmp_path / "sync_state.json"),
         )
 
         # Add some state

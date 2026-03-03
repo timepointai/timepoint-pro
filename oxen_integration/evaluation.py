@@ -3,10 +3,11 @@ Evaluation framework for comparing base vs. fine-tuned models.
 
 Provides side-by-side comparison utilities for assessing fine-tuning quality.
 """
-from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional, Callable
-from datetime import datetime
+
 import json
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any
 
 
 @dataclass
@@ -14,22 +15,22 @@ class EvaluationExample:
     """Single example for evaluation."""
 
     prompt: str
-    expected_completion: Optional[str] = None
-    context: Dict[str, Any] = field(default_factory=dict)
+    expected_completion: str | None = None
+    context: dict[str, Any] = field(default_factory=dict)
 
     # Results
-    base_model_output: Optional[str] = None
-    finetuned_model_output: Optional[str] = None
+    base_model_output: str | None = None
+    finetuned_model_output: str | None = None
 
     # Scores (0-100)
-    base_model_score: Optional[float] = None
-    finetuned_model_score: Optional[float] = None
+    base_model_score: float | None = None
+    finetuned_model_score: float | None = None
 
     # Judging
-    human_preference: Optional[str] = None  # "base", "finetuned", "tie"
-    auto_judgment: Optional[str] = None
+    human_preference: str | None = None  # "base", "finetuned", "tie"
+    auto_judgment: str | None = None
 
-    def winner(self) -> Optional[str]:
+    def winner(self) -> str | None:
         """Determine winner based on scores."""
         if self.base_model_score is None or self.finetuned_model_score is None:
             return None
@@ -59,10 +60,10 @@ class EvaluationResults:
     avg_finetuned_score: float = 0.0
 
     # Per-category results
-    category_results: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    category_results: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     # Individual examples
-    examples: List[EvaluationExample] = field(default_factory=list)
+    examples: list[EvaluationExample] = field(default_factory=list)
 
     # Metadata
     evaluation_date: datetime = field(default_factory=datetime.utcnow)
@@ -99,11 +100,11 @@ Average Scores:
   Fine-tuned: {self.avg_finetuned_score:.1f}/100
   Improvement: {self.improvement_percentage():+.1f}%
 
-Evaluation Date: {self.evaluation_date.strftime('%Y-%m-%d %H:%M')}
+Evaluation Date: {self.evaluation_date.strftime("%Y-%m-%d %H:%M")}
 Evaluator: {self.evaluator}
 """
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "base_model_name": self.base_model_name,
@@ -127,9 +128,9 @@ class ModelEvaluator:
 
     def __init__(
         self,
-        base_model_client: Optional[Any] = None,
-        finetuned_model_client: Optional[Any] = None,
-        judge_model_client: Optional[Any] = None
+        base_model_client: Any | None = None,
+        finetuned_model_client: Any | None = None,
+        judge_model_client: Any | None = None,
     ):
         """
         Initialize evaluator.
@@ -145,10 +146,10 @@ class ModelEvaluator:
 
     def evaluate_side_by_side(
         self,
-        test_examples: List[Dict[str, Any]],
+        test_examples: list[dict[str, Any]],
         prompt_key: str = "prompt",
-        expected_key: Optional[str] = None,
-        use_human_eval: bool = False
+        expected_key: str | None = None,
+        use_human_eval: bool = False,
     ) -> EvaluationResults:
         """
         Run side-by-side evaluation of base vs. fine-tuned model.
@@ -163,10 +164,10 @@ class ModelEvaluator:
             EvaluationResults with comparisons
         """
         results = EvaluationResults(
-            base_model_name=getattr(self.base_model, 'model_name', 'base_model'),
-            finetuned_model_name=getattr(self.finetuned_model, 'model_name', 'finetuned_model'),
+            base_model_name=getattr(self.base_model, "model_name", "base_model"),
+            finetuned_model_name=getattr(self.finetuned_model, "model_name", "finetuned_model"),
             num_examples=len(test_examples),
-            evaluator="human" if use_human_eval else "auto"
+            evaluator="human" if use_human_eval else "auto",
         )
 
         total_base_score = 0.0
@@ -177,9 +178,7 @@ class ModelEvaluator:
             expected = example.get(expected_key) if expected_key else None
 
             eval_example = EvaluationExample(
-                prompt=prompt,
-                expected_completion=expected,
-                context=example
+                prompt=prompt, expected_completion=expected, context=example
             )
 
             # Generate outputs from both models
@@ -222,18 +221,14 @@ class ModelEvaluator:
     def _generate(self, model_client: Any, prompt: str) -> str:
         """Generate output from model."""
         # This is a placeholder - actual implementation depends on model client
-        if hasattr(model_client, 'generate'):
+        if hasattr(model_client, "generate"):
             return model_client.generate(prompt)
-        elif hasattr(model_client, 'complete'):
+        elif hasattr(model_client, "complete"):
             return model_client.complete(prompt)
         else:
             return "[Model output placeholder]"
 
-    def _auto_evaluate(
-        self,
-        example: EvaluationExample,
-        expected: Optional[str]
-    ):
+    def _auto_evaluate(self, example: EvaluationExample, expected: str | None):
         """
         Automatically evaluate outputs.
 
@@ -242,32 +237,24 @@ class ModelEvaluator:
         if self.judge_model and expected:
             # Use LLM as judge
             example.base_model_score = self._llm_judge(
-                example.prompt,
-                example.base_model_output,
-                expected
+                example.prompt, example.base_model_output, expected
             )
             example.finetuned_model_score = self._llm_judge(
-                example.prompt,
-                example.finetuned_model_output,
-                expected
+                example.prompt, example.finetuned_model_output, expected
             )
         else:
             # Simple heuristics
             if expected:
-                example.base_model_score = self._simple_score(
-                    example.base_model_output,
-                    expected
-                )
+                example.base_model_score = self._simple_score(example.base_model_output, expected)
                 example.finetuned_model_score = self._simple_score(
-                    example.finetuned_model_output,
-                    expected
+                    example.finetuned_model_output, expected
                 )
             else:
                 # If no expected output, give neutral scores
                 example.base_model_score = 50.0
                 example.finetuned_model_score = 50.0
 
-    def _simple_score(self, output: Optional[str], expected: str) -> float:
+    def _simple_score(self, output: str | None, expected: str) -> float:
         """
         Simple scoring based on length and keyword overlap.
 
@@ -298,12 +285,7 @@ class ModelEvaluator:
         # Weighted average
         return (overlap_score * 0.7) + (length_score * 0.3)
 
-    def _llm_judge(
-        self,
-        prompt: str,
-        output: Optional[str],
-        expected: str
-    ) -> float:
+    def _llm_judge(self, prompt: str, output: str | None, expected: str) -> float:
         """
         Use LLM as judge to score output.
 
@@ -338,7 +320,8 @@ Provide ONLY a number from 0-100 as your response."""
             judgment = self._generate(self.judge_model, judge_prompt)
             # Extract number from response
             import re
-            numbers = re.findall(r'\d+', judgment)
+
+            numbers = re.findall(r"\d+", judgment)
             if numbers:
                 score = float(numbers[0])
                 return min(100.0, max(0.0, score))
@@ -348,12 +331,7 @@ Provide ONLY a number from 0-100 as your response."""
         # Fallback to simple scoring
         return self._simple_score(output, expected)
 
-    def _human_evaluate(
-        self,
-        example: EvaluationExample,
-        current: int,
-        total: int
-    ):
+    def _human_evaluate(self, example: EvaluationExample, current: int, total: int):
         """
         Request human evaluation of outputs.
 
@@ -396,9 +374,9 @@ Provide ONLY a number from 0-100 as your response."""
 
         # Get preference
         pref = input("Which is better? [B]ase / [F]ine-tuned / [T]ie: ").strip().lower()
-        if pref in ('b', 'base'):
+        if pref in ("b", "base"):
             example.human_preference = "base"
-        elif pref in ('f', 'finetuned', 'fine-tuned'):
+        elif pref in ("f", "finetuned", "fine-tuned"):
             example.human_preference = "finetuned"
         else:
             example.human_preference = "tie"
@@ -413,9 +391,8 @@ class TimepointEvaluator:
 
     @staticmethod
     def create_test_prompts(
-        scenarios: List[str],
-        timepoint_configs: List[Dict[str, Any]]
-    ) -> List[Dict[str, str]]:
+        scenarios: list[str], timepoint_configs: list[dict[str, Any]]
+    ) -> list[dict[str, str]]:
         """
         Create evaluation prompts for Timepoint simulations.
 
@@ -435,27 +412,21 @@ class TimepointEvaluator:
 Scenario: {scenario}
 
 Configuration requirements:
-- Entities: {config.get('num_entities', 5)}
-- Timepoints: {config.get('num_timepoints', 3)}
-- Resolution: {config.get('resolution', 'hour')}
-- Mode: {config.get('mode', 'forward')}
+- Entities: {config.get("num_entities", 5)}
+- Timepoints: {config.get("num_timepoints", 3)}
+- Resolution: {config.get("resolution", "hour")}
+- Mode: {config.get("mode", "forward")}
 
 Provide the configuration in JSON format."""
 
-                test_examples.append({
-                    "prompt": prompt,
-                    "scenario": scenario,
-                    "config": config
-                })
+                test_examples.append({"prompt": prompt, "scenario": scenario, "config": config})
 
         return test_examples
 
     @staticmethod
     def evaluate_simulation_quality(
-        base_output: str,
-        finetuned_output: str,
-        context: Dict[str, Any]
-    ) -> Dict[str, float]:
+        base_output: str, finetuned_output: str, context: dict[str, Any]
+    ) -> dict[str, float]:
         """
         Evaluate quality of generated simulation configurations.
 

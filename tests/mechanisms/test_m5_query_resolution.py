@@ -2,19 +2,22 @@
 Comprehensive tests for Mechanism 5: Query Resolution
 Lazy elevation based on query patterns
 """
+
+from datetime import datetime
+
 import pytest
-from datetime import datetime, timedelta
-from storage import GraphStore
+
 from llm_v2 import LLMClient
 from query_interface import QueryInterface
-from schemas import Entity, Timepoint, ResolutionLevel, QueryHistory
-from resolution_engine import ResolutionEngine
+from schemas import Entity, ResolutionLevel, Timepoint
+from storage import GraphStore
 
 
 @pytest.fixture
 def setup_m5():
     """Setup for M5 tests with entities and timepoints"""
     import os
+
     store = GraphStore("sqlite:///:memory:")
     # Use real API key from environment (required - no mock mode)
     api_key = os.getenv("OPENROUTER_API_KEY", "dummy_key_will_fail")
@@ -27,7 +30,7 @@ def setup_m5():
         timestamp=datetime.now(),
         event_description="Test event for M5",
         entities_present=["entity_1", "entity_2"],
-        resolution_level=ResolutionLevel.SCENE
+        resolution_level=ResolutionLevel.SCENE,
     )
     store.save_timepoint(timepoint)
 
@@ -37,10 +40,7 @@ def setup_m5():
         entity_type="person",
         resolution_level=ResolutionLevel.TENSOR_ONLY,
         query_count=0,
-        entity_metadata={
-            "role": "delegate",
-            "knowledge_state": ["Basic knowledge"]
-        }
+        entity_metadata={"role": "delegate", "knowledge_state": ["Basic knowledge"]},
     )
 
     entity_med = Entity(
@@ -50,8 +50,8 @@ def setup_m5():
         query_count=5,
         entity_metadata={
             "role": "secretary",
-            "knowledge_state": ["Knowledge 1", "Knowledge 2", "Knowledge 3"]
-        }
+            "knowledge_state": ["Knowledge 1", "Knowledge 2", "Knowledge 3"],
+        },
     )
 
     entity_high = Entity(
@@ -61,8 +61,8 @@ def setup_m5():
         query_count=25,
         entity_metadata={
             "role": "president",
-            "knowledge_state": ["Detailed knowledge " + str(i) for i in range(10)]
-        }
+            "knowledge_state": ["Detailed knowledge " + str(i) for i in range(10)],
+        },
     )
 
     store.save_entity(entity_low)
@@ -76,7 +76,7 @@ def setup_m5():
         "timepoint": timepoint,
         "entity_low": entity_low,
         "entity_med": entity_med,
-        "entity_high": entity_high
+        "entity_high": entity_high,
     }
 
 
@@ -97,13 +97,15 @@ class TestM5QueryHistoryTracking:
         # But ensure the infrastructure works
         if not query_intent.target_entity:
             # Create a simpler test with direct call
-            from schemas import QueryHistory
             import uuid
+
+            from schemas import QueryHistory
+
             query_history = QueryHistory(
                 query_id=f"query_{uuid.uuid4().hex[:12]}",
                 entity_id="entity_low_res",
                 query_type="knowledge",
-                required_resolution="scene"
+                required_resolution="scene",
             )
             store.save_query_history(query_history)
 
@@ -375,7 +377,7 @@ class TestM5CostOptimization:
             entity_type="person",
             resolution_level=ResolutionLevel.TENSOR_ONLY,
             query_count=0,
-            entity_metadata={"role": "extra", "knowledge_state": ["Minimal"]}
+            entity_metadata={"role": "extra", "knowledge_state": ["Minimal"]},
         )
         store.save_entity(entity_unused)
 

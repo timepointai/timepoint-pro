@@ -4,13 +4,12 @@ Tests for Progress Tracking (Sprint 1.4)
 Tests progress updates, ETA calculation, cost tracking, and export functionality.
 """
 
-import pytest
-import tempfile
 import json
-from pathlib import Path
+import tempfile
 import time
+from pathlib import Path
 
-from generation.progress_tracker import ProgressTracker, GenerationMetrics
+from generation.progress_tracker import GenerationMetrics, ProgressTracker
 
 
 class TestGenerationMetrics:
@@ -27,10 +26,7 @@ class TestGenerationMetrics:
 
     def test_metrics_to_dict(self):
         """Test metrics conversion to dictionary"""
-        metrics = GenerationMetrics(
-            entities_generated=10,
-            tokens_consumed=5000
-        )
+        metrics = GenerationMetrics(entities_generated=10, tokens_consumed=5000)
         data = metrics.to_dict()
         assert data["entities_generated"] == 10
         assert data["tokens_consumed"] == 5000
@@ -41,10 +37,7 @@ class TestProgressTracker:
 
     def test_tracker_initialization(self):
         """Test tracker initialization"""
-        tracker = ProgressTracker(
-            total_entities=100,
-            total_timepoints=5
-        )
+        tracker = ProgressTracker(total_entities=100, total_timepoints=5)
         assert tracker.total_entities == 100
         assert tracker.total_timepoints == 5
         assert tracker.metrics.entities_generated == 0
@@ -220,14 +213,14 @@ class TestProgressTracker:
         tracker.complete()
 
         # Export to temp file
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as f:
             temp_path = f.name
 
         try:
             tracker.export_to_json(temp_path)
 
             # Verify file exists and is valid JSON
-            with open(temp_path, 'r') as f:
+            with open(temp_path) as f:
                 data = json.load(f)
 
             assert data["entities_generated"] == 25
@@ -257,10 +250,7 @@ class TestProgressTracker:
         def callback(state):
             callback_data.append(state)
 
-        tracker = ProgressTracker(
-            total_entities=10,
-            progress_callback=callback
-        )
+        tracker = ProgressTracker(total_entities=10, progress_callback=callback)
 
         tracker.start()
         tracker.update_entity_generated()

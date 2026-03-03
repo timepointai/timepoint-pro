@@ -12,13 +12,13 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional, List
 
 from tensor_persistence import TensorDatabase
 
 
 class JobStatus(str, Enum):
     """Status of a training job."""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -42,15 +42,16 @@ class TrainingJob:
         error_message: Error message (if failed)
         created_at: When job was created
     """
+
     job_id: str
     tensor_id: str
     status: JobStatus = JobStatus.PENDING
     target_maturity: float = 0.95
-    worker_id: Optional[str] = None
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+    worker_id: str | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
     cycles_completed: int = 0
-    error_message: Optional[str] = None
+    error_message: str | None = None
     created_at: datetime = field(default_factory=datetime.now)
 
     @classmethod
@@ -142,9 +143,7 @@ class JobQueue:
 
                 # Add created_at if missing
                 if "created_at" not in columns:
-                    cursor.execute(
-                        "ALTER TABLE training_jobs ADD COLUMN created_at TEXT"
-                    )
+                    cursor.execute("ALTER TABLE training_jobs ADD COLUMN created_at TEXT")
                     conn.commit()
         finally:
             conn.close()
@@ -158,11 +157,7 @@ class JobQueue:
         conn.execute("PRAGMA busy_timeout=5000")
         return conn
 
-    def create_job(
-        self,
-        tensor_id: str,
-        target_maturity: float = 0.95
-    ) -> TrainingJob:
+    def create_job(self, tensor_id: str, target_maturity: float = 0.95) -> TrainingJob:
         """
         Create a new training job.
 
@@ -201,7 +196,7 @@ class JobQueue:
                     job.cycles_completed,
                     job.error_message,
                     job.created_at.isoformat(),
-                )
+                ),
             )
             conn.commit()
         finally:
@@ -209,7 +204,7 @@ class JobQueue:
 
         return job
 
-    def get_job(self, job_id: str) -> Optional[TrainingJob]:
+    def get_job(self, job_id: str) -> TrainingJob | None:
         """
         Get a job by ID.
 
@@ -229,7 +224,7 @@ class JobQueue:
                 FROM training_jobs
                 WHERE job_id = ?
                 """,
-                (job_id,)
+                (job_id,),
             )
             row = cursor.fetchone()
 
@@ -239,7 +234,7 @@ class JobQueue:
         finally:
             conn.close()
 
-    def list_pending_jobs(self) -> List[TrainingJob]:
+    def list_pending_jobs(self) -> list[TrainingJob]:
         """
         List all pending jobs.
 
@@ -257,7 +252,7 @@ class JobQueue:
                 WHERE status = ?
                 ORDER BY created_at ASC
                 """,
-                (JobStatus.PENDING.value,)
+                (JobStatus.PENDING.value,),
             )
             rows = cursor.fetchall()
             return [TrainingJob.from_row(row) for row in rows]
@@ -298,7 +293,7 @@ class JobQueue:
                     datetime.now().isoformat(),
                     job_id,
                     JobStatus.PENDING.value,
-                )
+                ),
             )
             conn.commit()
 
@@ -307,7 +302,7 @@ class JobQueue:
         finally:
             conn.close()
 
-    def acquire_next_pending(self, worker_id: str) -> Optional[TrainingJob]:
+    def acquire_next_pending(self, worker_id: str) -> TrainingJob | None:
         """
         Atomically acquire the next available pending job.
 
@@ -333,7 +328,7 @@ class JobQueue:
                 ORDER BY created_at ASC
                 LIMIT 1
                 """,
-                (JobStatus.PENDING.value,)
+                (JobStatus.PENDING.value,),
             )
             row = cursor.fetchone()
 
@@ -359,7 +354,7 @@ class JobQueue:
                     datetime.now().isoformat(),
                     job_id,
                     JobStatus.PENDING.value,
-                )
+                ),
             )
 
             if cursor.rowcount == 1:
@@ -395,7 +390,7 @@ class JobQueue:
                     datetime.now().isoformat(),
                     cycles_completed,
                     job_id,
-                )
+                ),
             )
             conn.commit()
         finally:
@@ -425,7 +420,7 @@ class JobQueue:
                     datetime.now().isoformat(),
                     error_message,
                     job_id,
-                )
+                ),
             )
             conn.commit()
         finally:
@@ -451,13 +446,13 @@ class JobQueue:
                     started_at = NULL
                 WHERE job_id = ?
                 """,
-                (JobStatus.PENDING.value, job_id)
+                (JobStatus.PENDING.value, job_id),
             )
             conn.commit()
         finally:
             conn.close()
 
-    def list_running_jobs(self) -> List[TrainingJob]:
+    def list_running_jobs(self) -> list[TrainingJob]:
         """
         List all currently running jobs.
 
@@ -475,14 +470,14 @@ class JobQueue:
                 WHERE status = ?
                 ORDER BY started_at ASC
                 """,
-                (JobStatus.RUNNING.value,)
+                (JobStatus.RUNNING.value,),
             )
             rows = cursor.fetchall()
             return [TrainingJob.from_row(row) for row in rows]
         finally:
             conn.close()
 
-    def get_jobs_for_tensor(self, tensor_id: str) -> List[TrainingJob]:
+    def get_jobs_for_tensor(self, tensor_id: str) -> list[TrainingJob]:
         """
         Get all jobs for a specific tensor.
 
@@ -503,7 +498,7 @@ class JobQueue:
                 WHERE tensor_id = ?
                 ORDER BY created_at DESC
                 """,
-                (tensor_id,)
+                (tensor_id,),
             )
             rows = cursor.fetchall()
             return [TrainingJob.from_row(row) for row in rows]
@@ -536,7 +531,7 @@ class JobQueue:
                 WHERE status = ?
                   AND datetime(started_at) < datetime(?, 'unixepoch')
                 """,
-                (JobStatus.PENDING.value, JobStatus.RUNNING.value, cutoff)
+                (JobStatus.PENDING.value, JobStatus.RUNNING.value, cutoff),
             )
             conn.commit()
 

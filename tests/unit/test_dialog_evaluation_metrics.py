@@ -2,20 +2,21 @@
 Tests for Phase 6: Full-Run Evaluation Metrics — tactic evolution score,
 information asymmetry utilization score, and subtext density score.
 """
+
 import pytest
+
 from workflows.dialog_steering import (
-    _compute_tactic_evolution_score,
     _compute_info_asymmetry_utilization_score,
     _compute_subtext_density_score,
+    _compute_tactic_evolution_score,
 )
-
 
 # ---------------------------------------------------------------------------
 # _compute_tactic_evolution_score
 # ---------------------------------------------------------------------------
 
-class TestTacticEvolutionScore:
 
+class TestTacticEvolutionScore:
     def test_empty_arcs_returns_zero(self):
         assert _compute_tactic_evolution_score({}) == 0.0
 
@@ -83,8 +84,14 @@ class TestTacticEvolutionScore:
             f"E{i}": {
                 "dialog_attempts": [
                     {"tactic_used": t}
-                    for t in ["data_argument", "emotional_appeal", "humor_deflection",
-                              "alliance_appeal", "threat_escalation", "procedural_challenge"]
+                    for t in [
+                        "data_argument",
+                        "emotional_appeal",
+                        "humor_deflection",
+                        "alliance_appeal",
+                        "threat_escalation",
+                        "procedural_challenge",
+                    ]
                 ]
             }
             for i in range(5)
@@ -97,8 +104,8 @@ class TestTacticEvolutionScore:
 # _compute_info_asymmetry_utilization_score
 # ---------------------------------------------------------------------------
 
-class TestInfoAsymmetryUtilizationScore:
 
+class TestInfoAsymmetryUtilizationScore:
     def test_empty_inputs_returns_zero(self):
         assert _compute_info_asymmetry_utilization_score({}, []) == 0.0
 
@@ -115,13 +122,15 @@ class TestInfoAsymmetryUtilizationScore:
             }
         }
         # 3 out of 5 turns are strategic → 60% > 15% threshold
-        turns = [[
-            {"speaker": "Chen", "content": "line1", "dialog_move": "strategic_question"},
-            {"speaker": "Chen", "content": "line2", "dialog_move": "partial_disclosure"},
-            {"speaker": "Chen", "content": "line3", "dialog_move": "deflection"},
-            {"speaker": "Chen", "content": "line4", "dialog_move": "direct_statement"},
-            {"speaker": "Chen", "content": "line5", "dialog_move": "direct_statement"},
-        ]]
+        turns = [
+            [
+                {"speaker": "Chen", "content": "line1", "dialog_move": "strategic_question"},
+                {"speaker": "Chen", "content": "line2", "dialog_move": "partial_disclosure"},
+                {"speaker": "Chen", "content": "line3", "dialog_move": "deflection"},
+                {"speaker": "Chen", "content": "line4", "dialog_move": "direct_statement"},
+                {"speaker": "Chen", "content": "line5", "dialog_move": "direct_statement"},
+            ]
+        ]
         score = _compute_info_asymmetry_utilization_score(arcs, turns)
         assert score == 1.0
 
@@ -132,10 +141,12 @@ class TestInfoAsymmetryUtilizationScore:
             }
         }
         # All direct_statement → 0% strategic, below 15% threshold
-        turns = [[
-            {"speaker": "Chen", "content": "line1", "dialog_move": "direct_statement"},
-            {"speaker": "Chen", "content": "line2", "dialog_move": "direct_statement"},
-        ]]
+        turns = [
+            [
+                {"speaker": "Chen", "content": "line1", "dialog_move": "direct_statement"},
+                {"speaker": "Chen", "content": "line2", "dialog_move": "direct_statement"},
+            ]
+        ]
         score = _compute_info_asymmetry_utilization_score(arcs, turns)
         assert score == 0.0
 
@@ -144,43 +155,51 @@ class TestInfoAsymmetryUtilizationScore:
 # _compute_subtext_density_score
 # ---------------------------------------------------------------------------
 
-class TestSubtextDensityScore:
 
+class TestSubtextDensityScore:
     def test_empty_returns_zero(self):
         assert _compute_subtext_density_score([], {}) == 0.0
 
     def test_all_direct_statements(self):
-        turns = [[
-            {"speaker": "A", "content": "Hello", "dialog_move": "direct_statement"},
-            {"speaker": "B", "content": "Hi", "dialog_move": "direct_statement"},
-        ]]
+        turns = [
+            [
+                {"speaker": "A", "content": "Hello", "dialog_move": "direct_statement"},
+                {"speaker": "B", "content": "Hi", "dialog_move": "direct_statement"},
+            ]
+        ]
         score = _compute_subtext_density_score(turns, {})
         assert score == 0.0
 
     def test_all_non_direct_statements(self):
-        turns = [[
-            {"speaker": "A", "content": "Hello", "dialog_move": "deflection"},
-            {"speaker": "B", "content": "Hi", "dialog_move": "strategic_question"},
-        ]]
+        turns = [
+            [
+                {"speaker": "A", "content": "Hello", "dialog_move": "deflection"},
+                {"speaker": "B", "content": "Hi", "dialog_move": "strategic_question"},
+            ]
+        ]
         score = _compute_subtext_density_score(turns, {})
         assert score == 1.0
 
     def test_mixed_moves(self):
-        turns = [[
-            {"speaker": "A", "content": "a", "dialog_move": "direct_statement"},
-            {"speaker": "B", "content": "b", "dialog_move": "deflection"},
-            {"speaker": "A", "content": "c", "dialog_move": "humor"},
-            {"speaker": "B", "content": "d", "dialog_move": "direct_statement"},
-        ]]
+        turns = [
+            [
+                {"speaker": "A", "content": "a", "dialog_move": "direct_statement"},
+                {"speaker": "B", "content": "b", "dialog_move": "deflection"},
+                {"speaker": "A", "content": "c", "dialog_move": "humor"},
+                {"speaker": "B", "content": "d", "dialog_move": "direct_statement"},
+            ]
+        ]
         score = _compute_subtext_density_score(turns, {})
         assert score == pytest.approx(0.5, abs=0.01)
 
     def test_default_move_treated_as_direct(self):
         # Turns without dialog_move field default to direct_statement
-        turns = [[
-            {"speaker": "A", "content": "a"},
-            {"speaker": "B", "content": "b"},
-        ]]
+        turns = [
+            [
+                {"speaker": "A", "content": "a"},
+                {"speaker": "B", "content": "b"},
+            ]
+        ]
         score = _compute_subtext_density_score(turns, {})
         assert score == 0.0
 

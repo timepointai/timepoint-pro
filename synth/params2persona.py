@@ -10,10 +10,11 @@ aroused characters get higher temperature, fatigued characters get shorter
 max_tokens, rich-vocabulary characters get higher frequency_penalty, etc.
 """
 
-from dataclasses import dataclass, field
-from typing import Optional
-from datetime import datetime
 import logging
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Optional
+
 import numpy as np
 
 logger = logging.getLogger(__name__)
@@ -22,23 +23,25 @@ logger = logging.getLogger(__name__)
 @dataclass
 class PersonaParams:
     """LLM generation parameters derived from entity state."""
-    temperature: float = 0.7        # 0.3 - 1.2 (arousal -> varied; low energy -> constrained)
-    top_p: float = 0.9              # 0.7 - 0.98 (agitated -> focused sampling)
-    max_tokens: int = 250           # 50 - 500 (energy + turn position -> shorter when tired)
+
+    temperature: float = 0.7  # 0.3 - 1.2 (arousal -> varied; low energy -> constrained)
+    top_p: float = 0.9  # 0.7 - 0.98 (agitated -> focused sampling)
+    max_tokens: int = 250  # 50 - 500 (energy + turn position -> shorter when tired)
     frequency_penalty: float = 0.5  # 0.0 - 0.8 (behavior_vector vocabulary richness)
-    presence_penalty: float = 0.3   # 0.0 - 0.6 (behavior_vector novelty seeking)
+    presence_penalty: float = 0.3  # 0.0 - 0.6 (behavior_vector novelty seeking)
     source_entity_id: str = ""
     turn_position: int = 0
     modulation_rationale: str = ""
 
 
-def _safe_get_behavior_element(entity: 'Entity', index: int, default: float) -> float:
+def _safe_get_behavior_element(entity: "Entity", index: int, default: float) -> float:
     """Safely extract a behavior_vector element from entity tensor."""
     try:
         if not entity.tensor:
             return default
-        import json
         import base64
+        import json
+
         import msgspec
 
         tensor_dict = json.loads(entity.tensor)
@@ -60,12 +63,12 @@ def _safe_get_behavior_element(entity: 'Entity', index: int, default: float) -> 
 
 
 def compute_persona_params(
-    entity: 'Entity',
-    cognitive: 'CognitiveTensor',
+    entity: "Entity",
+    cognitive: "CognitiveTensor",
     turn_position: int,
     max_turns: int,
-    adprs_envelope: Optional['ADPRSEnvelope'] = None,
-    evaluation_time: Optional[datetime] = None,
+    adprs_envelope: Optional["ADPRSEnvelope"] = None,
+    evaluation_time: datetime | None = None,
 ) -> PersonaParams:
     """
     Compute per-turn LLM generation parameters from entity state.

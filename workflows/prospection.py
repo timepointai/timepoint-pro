@@ -11,18 +11,18 @@ Contains:
 - Helper functions for anxiety computation, energy costs
 """
 
-from typing import List, Dict, Optional
-from datetime import datetime
-import uuid
 import logging
+import uuid
+from datetime import datetime
+from typing import Optional
 
-from schemas import Entity, ProspectiveState, Expectation
 from metadata.tracking import track_mechanism
+from schemas import Entity, Expectation, ProspectiveState
 
 logger = logging.getLogger(__name__)
 
 
-def compute_anxiety_from_expectations(expectations: List[Expectation]) -> float:
+def compute_anxiety_from_expectations(expectations: list[Expectation]) -> float:
     """Calculate anxiety level from expectations"""
     if not expectations:
         return 0.0
@@ -43,12 +43,14 @@ def compute_anxiety_from_expectations(expectations: List[Expectation]) -> float:
             undesired_risk = probability
         # For desired outcomes, we might still have anxiety if probability is low
         elif exp.desired_outcome and probability < 0.5:
-            undesired_risk = (0.5 - probability) * 0.5  # Some anxiety about desired but unlikely outcomes
+            undesired_risk = (
+                0.5 - probability
+            ) * 0.5  # Some anxiety about desired but unlikely outcomes
 
         confidence_penalty = 1 - exp.confidence
 
         # Weight the factors: uncertainty, undesired risk, confidence
-        anxiety = (uncertainty * 0.3 + undesired_risk * 0.5 + confidence_penalty * 0.2)
+        anxiety = uncertainty * 0.3 + undesired_risk * 0.5 + confidence_penalty * 0.2
         anxiety_factors.append(anxiety)
 
     # Average anxiety across all expectations
@@ -58,8 +60,9 @@ def compute_anxiety_from_expectations(expectations: List[Expectation]) -> float:
     return min(1.0, max(0.0, base_anxiety))
 
 
-def estimate_energy_cost_for_preparation(action: str, hour: Optional[int] = None,
-                                         circadian_config: Optional[Dict] = None) -> float:
+def estimate_energy_cost_for_preparation(
+    action: str, hour: int | None = None, circadian_config: dict | None = None
+) -> float:
     """Estimate energy cost for a preparation action with optional M14 circadian adjustment"""
     # Base cost estimation
     action_costs = {
@@ -70,18 +73,16 @@ def estimate_energy_cost_for_preparation(action: str, hour: Optional[int] = None
         "seek_allies": 4.0,
         "avoid_conflict": 3.0,
         "stock_supplies": 5.0,
-        "plan_escape": 6.0
+        "plan_escape": 6.0,
     }
     base_cost = action_costs.get(action, 5.0)  # Default cost
 
     # Apply M14 circadian adjustment if hour and config provided
     if hour is not None and circadian_config:
         from validation import compute_energy_cost_with_circadian
+
         return compute_energy_cost_with_circadian(
-            activity=action,
-            hour=hour,
-            base_cost=base_cost,
-            circadian_config=circadian_config
+            activity=action, hour=hour, base_cost=base_cost, circadian_config=circadian_config
         )
 
     return base_cost
@@ -89,50 +90,49 @@ def estimate_energy_cost_for_preparation(action: str, hour: Optional[int] = None
 
 @track_mechanism("M15", "entity_prospection")
 def generate_prospective_state(
-    entity: Entity,
-    timepoint: 'Timepoint',
-    llm: 'LLMClient',
-    store: Optional['GraphStore'] = None
+    entity: Entity, timepoint: "Timepoint", llm: "LLMClient", store: Optional["GraphStore"] = None
 ) -> ProspectiveState:
     """Generate an entity's prospective state with expectations about the future"""
 
     # Get prospection config
     config = {}  # Would load from config in real implementation
-    forecast_horizon = config.get('forecast_horizon_days', 30)
-    max_expectations = config.get('max_expectations', 5)
+    forecast_horizon = config.get("forecast_horizon_days", 30)
+    max_expectations = config.get("max_expectations", 5)
 
     # Build context for LLM
     context = {
         "entity_id": entity.entity_id,
-        "entity_type": getattr(entity, 'entity_type', 'person'),
+        "entity_type": getattr(entity, "entity_type", "person"),
         "current_timepoint": timepoint.event_description,
         "current_timestamp": timepoint.timestamp.isoformat(),
-        "knowledge_sample": list(entity.entity_metadata.get("knowledge_state", []))[:10],  # Sample recent knowledge
-        "personality": getattr(entity, 'personality_traits', {}),
+        "knowledge_sample": list(entity.entity_metadata.get("knowledge_state", []))[
+            :10
+        ],  # Sample recent knowledge
+        "personality": getattr(entity, "personality_traits", {}),
         "forecast_horizon_days": forecast_horizon,
-        "max_expectations": max_expectations
+        "max_expectations": max_expectations,
     }
 
     # Generate expectations using LLM
     entity_context = {
-        'entity_id': entity.entity_id,
-        'entity_type': getattr(entity, 'entity_type', 'person'),
-        'knowledge_sample': list(entity.entity_metadata.get("knowledge_state", []))[:10],
-        'personality': getattr(entity, 'personality_traits', {}),
-        'forecast_horizon_days': forecast_horizon,
-        'max_expectations': max_expectations
+        "entity_id": entity.entity_id,
+        "entity_type": getattr(entity, "entity_type", "person"),
+        "knowledge_sample": list(entity.entity_metadata.get("knowledge_state", []))[:10],
+        "personality": getattr(entity, "personality_traits", {}),
+        "forecast_horizon_days": forecast_horizon,
+        "max_expectations": max_expectations,
     }
 
     timepoint_context = {
-        'current_timepoint': timepoint.event_description,
-        'current_timestamp': timepoint.timestamp.isoformat()
+        "current_timepoint": timepoint.event_description,
+        "current_timestamp": timepoint.timestamp.isoformat(),
     }
 
     try:
         expectations = llm.generate_expectations(entity_context, timepoint_context)
         if not isinstance(expectations, list):
             expectations = []
-    except Exception as e:
+    except Exception:
         # Fallback to mock expectations if LLM fails
         expectations = [
             Expectation(
@@ -140,15 +140,15 @@ def generate_prospective_state(
                 subjective_probability=0.7,
                 desired_outcome=True,
                 preparation_actions=["maintain_current_course"],
-                confidence=0.8
+                confidence=0.8,
             ),
             Expectation(
                 predicted_event="Unexpected challenges arise",
                 subjective_probability=0.3,
                 desired_outcome=False,
                 preparation_actions=["stay_alert", "prepare_contingencies"],
-                confidence=0.6
-            )
+                confidence=0.6,
+            ),
         ]
 
     # Limit to max expectations
@@ -169,22 +169,23 @@ def generate_prospective_state(
         entity_id=entity.entity_id,
         timepoint_id=timepoint.timepoint_id,
         forecast_horizon_days=forecast_horizon,
-        expectations=[exp.model_dump(mode='json') for exp in expectations],  # Store as dict for JSON
+        expectations=[
+            exp.model_dump(mode="json") for exp in expectations
+        ],  # Store as dict for JSON
         contingency_plans=contingency_plans,
         anxiety_level=anxiety_level,
-        forecast_confidence=getattr(entity, 'forecast_confidence', 1.0)
+        forecast_confidence=getattr(entity, "forecast_confidence", 1.0),
     )
 
     return prospective_state
 
 
 def influence_behavior_from_expectations(
-    entity: Entity,
-    prospective_state: ProspectiveState
+    entity: Entity, prospective_state: ProspectiveState
 ) -> Entity:
     """Modify entity behavior based on prospective expectations"""
     # Make a copy to avoid modifying the original
-    modified_entity = entity.copy() if hasattr(entity, 'copy') else entity
+    modified_entity = entity.copy() if hasattr(entity, "copy") else entity
 
     anxiety_level = prospective_state.anxiety_level
     expectations = prospective_state.expectations
@@ -192,16 +193,19 @@ def influence_behavior_from_expectations(
     # Parse expectations if they're stored as JSON strings
     if isinstance(expectations, str):
         import json
+
         expectations = json.loads(expectations)
 
     # Convert dict expectations back to objects for processing
-    expectation_objects = [Expectation(**exp) if isinstance(exp, dict) else exp for exp in expectations]
+    expectation_objects = [
+        Expectation(**exp) if isinstance(exp, dict) else exp for exp in expectations
+    ]
 
     # Get config values
     config = {}  # Would load from config
-    conservatism_multiplier = config.get('anxiety_conservatism_multiplier', 0.7)
-    preparation_energy_cost = config.get('preparation_energy_cost', 5)
-    anxiety_energy_penalty = config.get('anxiety_energy_penalty', 0.2)
+    conservatism_multiplier = config.get("anxiety_conservatism_multiplier", 0.7)
+    preparation_energy_cost = config.get("preparation_energy_cost", 5)
+    anxiety_energy_penalty = config.get("anxiety_energy_penalty", 0.2)
 
     # Make a deep copy of entity_metadata to avoid modifying the original
     modified_metadata = modified_entity.entity_metadata.copy()
@@ -210,7 +214,8 @@ def influence_behavior_from_expectations(
     if anxiety_level > 0.8:  # High anxiety threshold
         if "behavior_tensor" in modified_metadata:
             modified_metadata["behavior_tensor"]["risk_tolerance"] = (
-                modified_metadata["behavior_tensor"].get("risk_tolerance", 0.8) * conservatism_multiplier
+                modified_metadata["behavior_tensor"].get("risk_tolerance", 0.8)
+                * conservatism_multiplier
             )
             modified_metadata["cognitive_tensor"]["information_seeking"] = (
                 modified_metadata["cognitive_tensor"].get("information_seeking", 0.5) + 0.2
@@ -229,7 +234,7 @@ def influence_behavior_from_expectations(
         # Energy cost from preparation
         prep_cost = min(
             total_prep_energy * preparation_energy_cost,
-            current_energy * 0.5  # Max 50% reduction from preparation
+            current_energy * 0.5,  # Max 50% reduction from preparation
         )
 
         # Additional anxiety energy cost
@@ -248,13 +253,11 @@ def influence_behavior_from_expectations(
 
 
 def update_forecast_accuracy(
-    entity: Entity,
-    expectation: Expectation,
-    actual_outcome: bool
+    entity: Entity, expectation: Expectation, actual_outcome: bool
 ) -> Entity:
     """Update entity's forecasting ability based on prediction accuracy"""
     # Make a copy to avoid modifying the original
-    modified_entity = entity.copy() if hasattr(entity, 'copy') else entity
+    modified_entity = entity.copy() if hasattr(entity, "copy") else entity
 
     # Calculate prediction error
     predicted_prob = expectation.subjective_probability
@@ -263,14 +266,14 @@ def update_forecast_accuracy(
 
     # Get config
     config = {}  # Would load from config
-    confidence_decay = config.get('confidence_decay', 0.1)
-    overconfidence_penalty = config.get('overconfidence_penalty', 0.2)
+    confidence_decay = config.get("confidence_decay", 0.1)
+    overconfidence_penalty = config.get("overconfidence_penalty", 0.2)
 
     # Make a deep copy of entity_metadata
     modified_metadata = modified_entity.entity_metadata.copy()
 
     # Update forecast confidence based on error
-    current_confidence = modified_metadata.get('forecast_confidence', 1.0)
+    current_confidence = modified_metadata.get("forecast_confidence", 1.0)
     # Larger errors reduce confidence more
     confidence_reduction = prediction_error * confidence_decay
 
@@ -279,7 +282,7 @@ def update_forecast_accuracy(
         confidence_reduction += overconfidence_penalty
 
     new_confidence = current_confidence * (1.0 - confidence_reduction)
-    modified_metadata['forecast_confidence'] = max(0.1, new_confidence)  # Minimum confidence
+    modified_metadata["forecast_confidence"] = max(0.1, new_confidence)  # Minimum confidence
 
     # Update anxiety based on outcome
     if "cognitive_tensor" in modified_metadata:
@@ -287,16 +290,24 @@ def update_forecast_accuracy(
 
         if actual_outcome and expectation.desired_outcome:
             # Positive outcome for desired event - reduce anxiety/improve mood
-            modified_metadata["cognitive_tensor"]["emotional_valence"] = min(1.0, current_valence + 0.1)
+            modified_metadata["cognitive_tensor"]["emotional_valence"] = min(
+                1.0, current_valence + 0.1
+            )
         elif not actual_outcome and not expectation.desired_outcome:
             # Avoided undesired outcome - reduce anxiety/improve mood slightly
-            modified_metadata["cognitive_tensor"]["emotional_valence"] = min(1.0, current_valence + 0.05)
+            modified_metadata["cognitive_tensor"]["emotional_valence"] = min(
+                1.0, current_valence + 0.05
+            )
         elif actual_outcome and not expectation.desired_outcome:
             # Undesired outcome occurred - increase anxiety/reduce mood
-            modified_metadata["cognitive_tensor"]["emotional_valence"] = max(-1.0, current_valence - 0.1)
+            modified_metadata["cognitive_tensor"]["emotional_valence"] = max(
+                -1.0, current_valence - 0.1
+            )
         elif not actual_outcome and expectation.desired_outcome:
             # Desired outcome failed - increase anxiety/reduce mood significantly
-            modified_metadata["cognitive_tensor"]["emotional_valence"] = max(-1.0, current_valence - 0.2)
+            modified_metadata["cognitive_tensor"]["emotional_valence"] = max(
+                -1.0, current_valence - 0.2
+            )
 
     # Update the entity's metadata
     modified_entity.entity_metadata = modified_metadata
@@ -307,10 +318,10 @@ def update_forecast_accuracy(
 @track_mechanism("M15", "episodic_memory_generation")
 def generate_episodic_memory(
     entity: Entity,
-    dialog: 'Dialog',
-    llm: 'LLMClient',
-    store: Optional['GraphStore'] = None,
-) -> List[Dict]:
+    dialog: "Dialog",
+    llm: "LLMClient",
+    store: Optional["GraphStore"] = None,
+) -> list[dict]:
     """
     Post-dialog: generate personality-filtered memory of this conversation.
 
@@ -342,12 +353,13 @@ def generate_episodic_memory(
 
     # Build dialog summary for prompt
     turns_text = "\n".join(
-        f"  {t.get('speaker', '?')}: {t.get('content', '')[:150]}"
-        for t in turns[:12]
+        f"  {t.get('speaker', '?')}: {t.get('content', '')[:150]}" for t in turns[:12]
     )
 
     personality = entity.entity_metadata.get("personality_traits", [])
-    personality_text = ", ".join(str(t) for t in personality[:5]) if personality else "no explicit traits"
+    personality_text = (
+        ", ".join(str(t) for t in personality[:5]) if personality else "no explicit traits"
+    )
 
     system_prompt = (
         "You generate episodic memories from a character's perspective. "
@@ -386,21 +398,23 @@ Return JSON array:
         logger.warning(f"Episodic memory generation failed for {entity.entity_id}: {e}")
 
     # Fallback: simple summary
-    return [{
-        "dialog_id": dialog.dialog_id,
-        "summary": f"Participated in conversation at {dialog.timepoint_id}",
-        "emotional_residue": "neutral",
-        "salience": 0.3,
-    }]
+    return [
+        {
+            "dialog_id": dialog.dialog_id,
+            "summary": f"Participated in conversation at {dialog.timepoint_id}",
+            "emotional_residue": "neutral",
+            "salience": 0.3,
+        }
+    ]
 
 
 @track_mechanism("M15", "rumination_update")
 def update_rumination_topics(
     entity: Entity,
-    prospective_state: 'ProspectiveState',
-    dialog_turns: List[Dict],
-    llm: 'LLMClient',
-) -> List[Dict]:
+    prospective_state: "ProspectiveState",
+    dialog_turns: list[dict],
+    llm: "LLMClient",
+) -> list[dict]:
     """
     Update recurring concerns. Resolved topics decay; unresolved intensify.
 
@@ -433,8 +447,7 @@ def update_rumination_topics(
 
     # Get entity's turns from dialog
     entity_turns = [
-        t.get("content", "") for t in dialog_turns
-        if t.get("speaker") == entity.entity_id
+        t.get("content", "") for t in dialog_turns if t.get("speaker") == entity.entity_id
     ]
     dialog_content = " ".join(entity_turns)
 
@@ -456,22 +469,26 @@ def update_rumination_topics(
 
         # Drop topics with very low intensity
         if intensity > 0.05:
-            updated_topics.append({
-                "topic": topic_text,
-                "intensity": round(intensity, 2),
-                "first_appeared": topic.get("first_appeared", datetime.utcnow().isoformat()),
-                "recurrence_count": recurrence,
-            })
+            updated_topics.append(
+                {
+                    "topic": topic_text,
+                    "intensity": round(intensity, 2),
+                    "first_appeared": topic.get("first_appeared", datetime.utcnow().isoformat()),
+                    "recurrence_count": recurrence,
+                }
+            )
 
     # Try to identify new topics from dialog
     if entity_turns and llm:
         try:
-            system_prompt = "Identify recurring concerns from a character's dialog. Return JSON array."
+            system_prompt = (
+                "Identify recurring concerns from a character's dialog. Return JSON array."
+            )
             user_prompt = f"""CHARACTER: {entity.entity_id}
 THEIR DIALOG LINES:
 {chr(10).join(f'  "{t}"' for t in entity_turns[:5])}
 
-EXISTING CONCERNS: {', '.join(t['topic'] for t in updated_topics) or 'none'}
+EXISTING CONCERNS: {", ".join(t["topic"] for t in updated_topics) or "none"}
 
 Identify 0-2 NEW concerns (not already listed) this character seems worried about.
 Return JSON: [{{"topic": "concern", "intensity": 0.3-0.7}}]"""
@@ -488,12 +505,14 @@ Return JSON: [{{"topic": "concern", "intensity": 0.3-0.7}}]"""
                 new_topics = _json.loads(response.content)
                 if isinstance(new_topics, list):
                     for nt in new_topics[:2]:
-                        updated_topics.append({
-                            "topic": nt.get("topic", "unknown concern"),
-                            "intensity": nt.get("intensity", 0.4),
-                            "first_appeared": datetime.utcnow().isoformat(),
-                            "recurrence_count": 0,
-                        })
+                        updated_topics.append(
+                            {
+                                "topic": nt.get("topic", "unknown concern"),
+                                "intensity": nt.get("intensity", 0.4),
+                                "first_appeared": datetime.utcnow().isoformat(),
+                                "recurrence_count": 0,
+                            }
+                        )
         except Exception as e:
             logger.debug(f"New topic identification failed: {e}")
 
@@ -503,8 +522,8 @@ Return JSON: [{{"topic": "concern", "intensity": 0.3-0.7}}]"""
 @track_mechanism("M15", "proception_to_knowledge")
 def generate_knowledge_from_proception(
     entity: Entity,
-    prospective_state: 'ProspectiveState',
-    store: Optional['GraphStore'] = None,
+    prospective_state: "ProspectiveState",
+    store: Optional["GraphStore"] = None,
 ) -> int:
     """
     Proception generates knowledge items -> M3 exposure events.
@@ -542,6 +561,7 @@ def generate_knowledge_from_proception(
                 probability = exp.get("subjective_probability", 0.5)
                 if predicted and probability > 0.3:
                     from workflows.dialog_synthesis import create_exposure_event
+
                     create_exposure_event(
                         entity_id=entity.entity_id,
                         information=f"Expects: {predicted} (confidence: {probability:.0%})",
@@ -565,6 +585,7 @@ def generate_knowledge_from_proception(
         for topic in rumination:
             if isinstance(topic, dict) and topic.get("intensity", 0) > 0.5:
                 from workflows.dialog_synthesis import create_exposure_event
+
                 create_exposure_event(
                     entity_id=entity.entity_id,
                     information=f"Preoccupied with: {topic.get('topic', 'unknown')}",
@@ -577,17 +598,24 @@ def generate_knowledge_from_proception(
                 events_created += 1
 
     if events_created > 0:
-        logger.info(f"[M15→M3] Generated {events_created} knowledge items from proception for {entity.entity_id}")
+        logger.info(
+            f"[M15→M3] Generated {events_created} knowledge items from proception for {entity.entity_id}"
+        )
 
     return events_created
 
 
-def get_relevant_history_for_prospection(entity: Entity, timepoint: 'Timepoint',
-                                         n_events: int = 5) -> List[Dict]:
+def get_relevant_history_for_prospection(
+    entity: Entity, timepoint: "Timepoint", n_events: int = 5
+) -> list[dict]:
     """Get relevant historical events for prospection context"""
     # This would query the store for relevant past events
     # For now, return a placeholder
     return [
-        {"event": "Previous similar situation", "outcome": "successful", "lessons": ["be prepared"]},
-        {"event": "Recent challenge", "outcome": "managed", "lessons": ["adapt quickly"]}
+        {
+            "event": "Previous similar situation",
+            "outcome": "successful",
+            "lessons": ["be prepared"],
+        },
+        {"event": "Recent challenge", "outcome": "managed", "lessons": ["adapt quickly"]},
     ]

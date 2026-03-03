@@ -2,23 +2,21 @@
 """
 Test mechanism tracking by running one template.
 """
+
 import os
+
 import pytest
 
-from generation.config_schema import SimulationConfig
-from generation.templates.loader import TemplateLoader
 from generation.resilience_orchestrator import ResilientE2EWorkflowRunner
-from metadata.run_tracker import MetadataManager
+from generation.templates.loader import TemplateLoader
 from metadata.coverage_matrix import CoverageMatrix
+from metadata.run_tracker import MetadataManager
 
 
 @pytest.mark.mechanism
 @pytest.mark.llm
 @pytest.mark.e2e
-@pytest.mark.skipif(
-    not os.getenv("OPENROUTER_API_KEY"),
-    reason="OPENROUTER_API_KEY not set"
-)
+@pytest.mark.skipif(not os.getenv("OPENROUTER_API_KEY"), reason="OPENROUTER_API_KEY not set")
 def test_mechanism_tracking_jefferson_dinner():
     """Test that mechanisms are properly tracked during E2E workflow execution."""
 
@@ -68,8 +66,7 @@ def test_mechanism_tracking_jefferson_dinner():
 
     # Assert mechanisms were tracked
     assert len(result_metadata.mechanisms_used) > 0, (
-        "No mechanisms were tracked. "
-        "Check if decorators are properly applied and run_id is set"
+        "No mechanisms were tracked. Check if decorators are properly applied and run_id is set"
     )
 
     print()

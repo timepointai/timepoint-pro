@@ -6,7 +6,6 @@ See SYNTH.md for full specification.
 """
 
 from pydantic import BaseModel, Field
-from typing import Dict
 
 
 class VoiceConfig(BaseModel):
@@ -28,19 +27,11 @@ class VoiceConfig(BaseModel):
         # Temporarily exclude an entity
         voice = VoiceConfig(mute=True)
     """
-    mute: bool = Field(
-        default=False,
-        description="Exclude entity from active dialog synthesis"
-    )
-    solo: bool = Field(
-        default=False,
-        description="Focus on this entity only (others backgrounded)"
-    )
+
+    mute: bool = Field(default=False, description="Exclude entity from active dialog synthesis")
+    solo: bool = Field(default=False, description="Focus on this entity only (others backgrounded)")
     gain: float = Field(
-        default=1.0,
-        ge=0.0,
-        le=1.0,
-        description="Importance weight (0.0=silent, 1.0=full)"
+        default=1.0, ge=0.0, le=1.0, description="Importance weight (0.0=silent, 1.0=full)"
     )
 
     def is_active(self) -> bool:
@@ -83,7 +74,7 @@ class VoiceMixer:
 
     def __init__(self, default_voice: VoiceConfig = None):
         self.default_voice = default_voice or VoiceConfig()
-        self.voices: Dict[str, VoiceConfig] = {}
+        self.voices: dict[str, VoiceConfig] = {}
 
     def set_voice(self, entity_id: str, voice: VoiceConfig):
         """Set voice configuration for a specific entity."""
@@ -101,18 +92,12 @@ class VoiceMixer:
         Otherwise, return all non-muted entities.
         """
         # Check for any solo'd entities
-        solo_ids = [
-            eid for eid in entity_ids
-            if self.get_voice(eid).solo
-        ]
+        solo_ids = [eid for eid in entity_ids if self.get_voice(eid).solo]
         if solo_ids:
             return solo_ids
 
         # Filter out muted entities
-        return [
-            eid for eid in entity_ids
-            if not self.get_voice(eid).mute
-        ]
+        return [eid for eid in entity_ids if not self.get_voice(eid).mute]
 
     def get_entity_weight(self, entity_id: str) -> float:
         """Get the effective weight for an entity."""

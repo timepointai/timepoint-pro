@@ -10,18 +10,15 @@ SYNTH.md defines the SynthasAIzer paradigm:
 - Voice controls for entity mixing
 """
 
-import pytest
 import json
-from pathlib import Path
 from dataclasses import asdict
 
+import pytest
+
 from generation.templates.loader import (
-    TemplateLoader,
     PatchInfo,
-    TemplateInfo,
+    TemplateLoader,
 )
-from generation.config_schema import SimulationConfig
-from synth import EnvelopeConfig
 
 
 class TestPatchMetadataCompliance:
@@ -43,8 +40,13 @@ class TestPatchMetadataCompliance:
         assert len(categories) > 0, "No patch categories found"
 
         expected_categories = [
-            "corporate", "historical", "crisis", "mystical",
-            "mystery", "directorial", "convergence"
+            "corporate",
+            "historical",
+            "crisis",
+            "mystical",
+            "mystery",
+            "directorial",
+            "convergence",
         ]
         for cat in expected_categories:
             assert cat in categories, f"Missing expected category: {cat}"
@@ -57,9 +59,7 @@ class TestPatchMetadataCompliance:
             if patch is None:
                 missing_patches.append(template_id)
 
-        assert len(missing_patches) == 0, (
-            f"Templates missing patch metadata: {missing_patches}"
-        )
+        assert len(missing_patches) == 0, f"Templates missing patch metadata: {missing_patches}"
 
     def test_patch_metadata_required_fields(self, loader, all_templates):
         """Patch metadata should have all required fields."""
@@ -79,9 +79,7 @@ class TestPatchMetadataCompliance:
                 if missing:
                     incomplete_patches.append((template_id, missing))
 
-        assert len(incomplete_patches) == 0, (
-            f"Patches with missing fields: {incomplete_patches}"
-        )
+        assert len(incomplete_patches) == 0, f"Patches with missing fields: {incomplete_patches}"
 
     def test_patch_categories_match_catalog(self, loader, all_templates):
         """Patch category in template should match catalog classification."""
@@ -94,9 +92,7 @@ class TestPatchMetadataCompliance:
                 # Check if template is in the category it claims
                 templates_in_category = catalog.patches.get(patch.category, [])
                 if template_id not in templates_in_category:
-                    mismatches.append(
-                        (template_id, patch.category, templates_in_category)
-                    )
+                    mismatches.append((template_id, patch.category, templates_in_category))
 
         if mismatches:
             msg = "Patch category mismatches:\n"
@@ -126,9 +122,7 @@ class TestPatchMetadataCompliance:
             if patch and len(patch.tags) == 0:
                 empty_tags.append(template_id)
 
-        assert len(empty_tags) == 0, (
-            f"Templates with empty tags: {empty_tags}"
-        )
+        assert len(empty_tags) == 0, f"Templates with empty tags: {empty_tags}"
 
 
 class TestEnvelopeCompliance:
@@ -157,9 +151,7 @@ class TestEnvelopeCompliance:
 
         # Allow for some flexibility - warn but don't fail
         if missing_envelopes:
-            pytest.skip(
-                f"Some showcase templates missing envelopes: {missing_envelopes}"
-            )
+            pytest.skip(f"Some showcase templates missing envelopes: {missing_envelopes}")
 
     def test_envelope_values_valid(self, loader):
         """All envelope configs should have valid ADSR values."""
@@ -173,15 +165,11 @@ class TestEnvelopeCompliance:
                     for field in ["attack", "decay", "sustain", "release"]:
                         val = getattr(env, field, None)
                         if val is not None and (val < 0.0 or val > 1.0):
-                            invalid_envelopes.append(
-                                (template.id, field, val)
-                            )
+                            invalid_envelopes.append((template.id, field, val))
             except Exception:
                 pass  # Skip templates that fail to load
 
-        assert len(invalid_envelopes) == 0, (
-            f"Invalid envelope values: {invalid_envelopes}"
-        )
+        assert len(invalid_envelopes) == 0, f"Invalid envelope values: {invalid_envelopes}"
 
 
 class TestPatchLoaderMethods:
@@ -283,9 +271,7 @@ class TestCatalogPatchConsistency:
         # Note: Some templates might legitimately be in multiple categories
         # This test just warns
         if duplicates:
-            pytest.skip(
-                f"Templates in multiple categories (may be intentional): {duplicates}"
-            )
+            pytest.skip(f"Templates in multiple categories (may be intentional): {duplicates}")
 
 
 class TestCoreMechanismPatches:
@@ -303,16 +289,11 @@ class TestCoreMechanismPatches:
         for template_id in mechanism_patches:
             patch = loader.get_patch_metadata(template_id)
             if patch:
-                has_m_tag = any(
-                    t.startswith("M") and t[1:].isdigit()
-                    for t in patch.tags
-                )
+                has_m_tag = any(t.startswith("M") and t[1:].isdigit() for t in patch.tags)
                 if not has_m_tag:
                     missing_m_tags.append(template_id)
 
-        assert len(missing_m_tags) == 0, (
-            f"Mechanism patches without M* tags: {missing_m_tags}"
-        )
+        assert len(missing_m_tags) == 0, f"Mechanism patches without M* tags: {missing_m_tags}"
 
     def test_verified_mechanisms_covered(self, loader):
         """Verified templates should cover their declared mechanisms."""
@@ -342,8 +323,7 @@ class TestPortalPatches:
             patch = loader.get_patch_metadata(template_id)
             if patch:
                 has_portal_tag = any(
-                    "portal" in t.lower() or "backward" in t.lower()
-                    for t in patch.tags
+                    "portal" in t.lower() or "backward" in t.lower() for t in patch.tags
                 )
                 # Also check if template itself has portal mode
                 if not has_portal_tag:
@@ -351,9 +331,7 @@ class TestPortalPatches:
 
         # This is a soft check - some may use different naming
         if missing_tags:
-            pytest.skip(
-                f"Portal patches without portal/backward tags: {missing_tags}"
-            )
+            pytest.skip(f"Portal patches without portal/backward tags: {missing_tags}")
 
 
 if __name__ == "__main__":

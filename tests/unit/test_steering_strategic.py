@@ -2,28 +2,32 @@
 Tests for Phase 3: Strategic Steering Agent — dialog moves, move instructions,
 and information asymmetry computation.
 """
-import pytest
+
+from workflows.dialog_context import (
+    BackLayerContext,
+    FourthWallContext,
+    FrontLayerContext,
+    _compute_information_asymmetry,
+)
 from workflows.dialog_steering import (
     _MOVE_INSTRUCTIONS,
     _get_move_instruction,
 )
-from workflows.dialog_context import (
-    _compute_information_asymmetry,
-    FourthWallContext,
-    BackLayerContext,
-    FrontLayerContext,
-)
-
 
 # ---------------------------------------------------------------------------
 # _MOVE_INSTRUCTIONS
 # ---------------------------------------------------------------------------
 
-class TestMoveInstructions:
 
+class TestMoveInstructions:
     EXPECTED_MOVES = [
-        "direct_statement", "deflection", "strategic_question",
-        "alliance_signal", "partial_disclosure", "status_move", "humor",
+        "direct_statement",
+        "deflection",
+        "strategic_question",
+        "alliance_signal",
+        "partial_disclosure",
+        "status_move",
+        "humor",
     ]
 
     def test_all_expected_moves_present(self):
@@ -43,8 +47,8 @@ class TestMoveInstructions:
 # _get_move_instruction
 # ---------------------------------------------------------------------------
 
-class TestGetMoveInstruction:
 
+class TestGetMoveInstruction:
     def test_direct_statement_returns_empty(self):
         assert _get_move_instruction("direct_statement") == ""
 
@@ -79,8 +83,8 @@ class TestGetMoveInstruction:
 # _compute_information_asymmetry
 # ---------------------------------------------------------------------------
 
-class TestComputeInformationAsymmetry:
 
+class TestComputeInformationAsymmetry:
     def _make_fw_context(
         self,
         entity_id: str,

@@ -14,9 +14,9 @@ system, logs both, compares divergence. No fidelity decisions change.
 """
 
 import math
-from enum import Enum
 from datetime import datetime, timezone
-from typing import List, Dict, Any, Optional
+from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -28,6 +28,7 @@ class FidelityBand(str, Enum):
     Kept separate from schemas.ResolutionLevel to avoid circular imports.
     Maps 1:1 with ResolutionLevel ordinals for shadow comparison.
     """
+
     TENSOR = "tensor"
     SCENE = "scene"
     GRAPH = "graph"
@@ -101,11 +102,18 @@ class ADPRSEnvelope(BaseModel):
 
     Output is always clamped to [0, 1].
     """
-    A: float = Field(default=0.7, ge=0.0, le=1.0, description="Asymptotic decay rate (0=fast, 1=none)")
+
+    A: float = Field(
+        default=0.7, ge=0.0, le=1.0, description="Asymptotic decay rate (0=fast, 1=none)"
+    )
     D: float = Field(default=31536000000.0, ge=0.0, description="Duration in milliseconds")
     P: float = Field(default=2.0, ge=0.0, description="Number of oscillation periods")
-    R: float = Field(default=0.0, ge=0.0, description="Recurrence cycle length in ms (0=single-shot)")
-    S: float = Field(default=0.8, ge=0.0, le=1.0, description="Spread (0=baseline only, 1=full range)")
+    R: float = Field(
+        default=0.0, ge=0.0, description="Recurrence cycle length in ms (0=single-shot)"
+    )
+    S: float = Field(
+        default=0.8, ge=0.0, le=1.0, description="Spread (0=baseline only, 1=full range)"
+    )
     t0: str = Field(default="2025-01-01T00:00:00+00:00", description="Start time ISO 8601")
     baseline: float = Field(default=0.1, ge=0.0, le=1.0, description="Floor value when inactive")
 
@@ -174,7 +182,7 @@ class ADPRSEnvelope(BaseModel):
         """Map the waveform value at time t to a discrete FidelityBand."""
         return phi_to_resolution_band(self.evaluate(t))
 
-    def to_metadata_dict(self) -> Dict[str, Any]:
+    def to_metadata_dict(self) -> dict[str, Any]:
         """Serialize to a plain dict for entity_metadata JSON storage."""
         return {
             "A": self.A,
@@ -187,7 +195,7 @@ class ADPRSEnvelope(BaseModel):
         }
 
     @classmethod
-    def from_metadata_dict(cls, d: Dict[str, Any]) -> "ADPRSEnvelope":
+    def from_metadata_dict(cls, d: dict[str, Any]) -> "ADPRSEnvelope":
         """Deserialize from a metadata dict."""
         return cls(**d)
 
@@ -203,7 +211,8 @@ class ADPRSComposite(BaseModel):
 
     An empty composite always evaluates to 0.0.
     """
-    envelopes: List[ADPRSEnvelope] = Field(default_factory=list)
+
+    envelopes: list[ADPRSEnvelope] = Field(default_factory=list)
 
     def evaluate(self, t: datetime) -> float:
         """Evaluate the composite waveform (max of all envelopes)."""
@@ -215,14 +224,14 @@ class ADPRSComposite(BaseModel):
         """Map the composite value at time t to a discrete FidelityBand."""
         return phi_to_resolution_band(self.evaluate(t))
 
-    def to_metadata_dict(self) -> Dict[str, Any]:
+    def to_metadata_dict(self) -> dict[str, Any]:
         """Serialize to a plain dict for entity_metadata JSON storage."""
         return {
             "envelopes": [env.to_metadata_dict() for env in self.envelopes],
         }
 
     @classmethod
-    def from_metadata_dict(cls, d: Dict[str, Any]) -> "ADPRSComposite":
+    def from_metadata_dict(cls, d: dict[str, Any]) -> "ADPRSComposite":
         """Deserialize from a metadata dict."""
         envelopes = [ADPRSEnvelope.from_metadata_dict(e) for e in d.get("envelopes", [])]
         return cls(envelopes=envelopes)

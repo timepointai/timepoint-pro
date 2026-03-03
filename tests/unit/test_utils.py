@@ -6,7 +6,7 @@ Provides decorators and helpers to make tests more robust against LLM variabilit
 
 import functools
 import time
-from typing import Callable, Type
+from collections.abc import Callable
 
 
 def retry_on_llm_failure(max_attempts: int = 3, delay: float = 1.0):
@@ -31,6 +31,7 @@ def retry_on_llm_failure(max_attempts: int = 3, delay: float = 1.0):
         max_attempts: Maximum number of retry attempts
         delay: Delay between retries in seconds
     """
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
@@ -48,13 +49,10 @@ def retry_on_llm_failure(max_attempts: int = 3, delay: float = 1.0):
                     error_msg = str(e)
 
                     # Check if it's an LLM-related failure
-                    llm_related = any(keyword in error_msg.lower() for keyword in [
-                        'knowledge_state',
-                        'empty',
-                        'llm',
-                        'length',
-                        '0 > 0'
-                    ])
+                    llm_related = any(
+                        keyword in error_msg.lower()
+                        for keyword in ["knowledge_state", "empty", "llm", "length", "0 > 0"]
+                    )
 
                     if not llm_related or attempt == max_attempts - 1:
                         # Not LLM-related or final attempt, raise immediately
@@ -69,7 +67,7 @@ def retry_on_llm_failure(max_attempts: int = 3, delay: float = 1.0):
                 except Exception as e:
                     # Database constraint errors are NOT LLM-related, don't retry
                     error_msg = str(e)
-                    if 'UNIQUE constraint' in error_msg or 'IntegrityError' in error_msg:
+                    if "UNIQUE constraint" in error_msg or "IntegrityError" in error_msg:
                         raise
 
                     # Other exceptions, don't retry
@@ -80,6 +78,7 @@ def retry_on_llm_failure(max_attempts: int = 3, delay: float = 1.0):
                 raise last_exception
 
         return wrapper
+
     return decorator
 
 
@@ -92,12 +91,13 @@ def with_llm_warmup(warmup_calls: int = 1):
     Args:
         warmup_calls: Number of warmup calls to make
     """
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             # Check if first arg is 'self' with llm_client
-            if args and hasattr(args[0], 'llm_client'):
-                llm_client = args[0].llm_client if hasattr(args[0], 'llm_client') else None
+            if args and hasattr(args[0], "llm_client"):
+                llm_client = args[0].llm_client if hasattr(args[0], "llm_client") else None
 
                 if llm_client:
                     print(f"🔥 Warming up LLM with {warmup_calls} call(s)...")
@@ -111,18 +111,18 @@ def with_llm_warmup(warmup_calls: int = 1):
                                 entity_type="human",
                                 timepoint="warmup_tp",
                                 resolution_level=ResolutionLevel.TENSOR_ONLY,
-                                entity_metadata={"role": "warmup"}
+                                entity_metadata={"role": "warmup"},
                             )
                             llm_client.populate_entity(
-                                entity_schema=dummy_entity,
-                                context={"warmup": True}
+                                entity_schema=dummy_entity, context={"warmup": True}
                             )
                         except Exception as e:
-                            print(f"   Warmup call {i+1} failed: {e}")
+                            print(f"   Warmup call {i + 1} failed: {e}")
 
             return func(*args, **kwargs)
 
         return wrapper
+
     return decorator
 
 
@@ -135,11 +135,11 @@ def assert_knowledge_state_populated(entity, min_items: int = 1):
         min_items: Minimum number of knowledge items expected
     """
     # Handle EntityPopulation
-    if hasattr(entity, 'knowledge_state'):
+    if hasattr(entity, "knowledge_state"):
         knowledge = entity.knowledge_state
     # Handle Entity with nested cognitive_tensor
-    elif hasattr(entity, 'entity_metadata') and 'cognitive_tensor' in entity.entity_metadata:
-        knowledge = entity.entity_metadata['cognitive_tensor'].get('knowledge_state', [])
+    elif hasattr(entity, "entity_metadata") and "cognitive_tensor" in entity.entity_metadata:
+        knowledge = entity.entity_metadata["cognitive_tensor"].get("knowledge_state", [])
     else:
         raise ValueError(f"Cannot find knowledge_state in entity: {type(entity)}")
 
@@ -149,7 +149,7 @@ def assert_knowledge_state_populated(entity, min_items: int = 1):
    Expected: At least {min_items} knowledge items
    Got: {len(knowledge)} items
    Content: {knowledge}
-   Entity: {getattr(entity, 'entity_id', 'unknown')}
+   Entity: {getattr(entity, "entity_id", "unknown")}
 
 This may be due to LLM non-determinism. The test will automatically retry.
 """
@@ -163,11 +163,12 @@ def skip_if_llm_unavailable(func: Callable) -> Callable:
     Decorator to skip test if LLM is unavailable or rate-limited.
     """
     import os
+
     import pytest
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        if not os.getenv('OPENROUTER_API_KEY'):
+        if not os.getenv("OPENROUTER_API_KEY"):
             pytest.skip("OPENROUTER_API_KEY not set")
 
         return func(*args, **kwargs)

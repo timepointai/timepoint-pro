@@ -4,12 +4,12 @@ Fine-tuning utilities for Oxen.ai integration.
 Based on Oxen.ai's Marimo notebook workflow for LLM training.
 See: https://docs.oxen.ai/examples/notebooks/train_llm
 """
-from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional, Callable
-from datetime import datetime
-from pathlib import Path
+
 import json
-import tempfile
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any
 
 
 @dataclass
@@ -23,7 +23,7 @@ class FineTuneConfig:
     # Data column configuration
     prompt_column: str = "prompt"  # Column containing prompts/questions
     completion_column: str = "completion"  # Column containing completions/answers
-    system_message: Optional[str] = None  # Optional system message for all examples
+    system_message: str | None = None  # Optional system message for all examples
 
     # Training hyperparameters
     epochs: int = 3
@@ -50,17 +50,17 @@ class FineTuneConfig:
 
     # Output configuration
     output_dir: str = "finetune_output"
-    experiment_name: Optional[str] = None
+    experiment_name: str | None = None
 
     # Cost estimation
-    estimated_cost_usd: Optional[float] = None
-    max_cost_usd: Optional[float] = None  # Abort if estimate exceeds this
+    estimated_cost_usd: float | None = None
+    max_cost_usd: float | None = None  # Abort if estimate exceeds this
 
     # Metadata
     description: str = ""
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert config to dictionary."""
         return {
             "dataset_path": self.dataset_path,
@@ -128,23 +128,23 @@ class FineTuneJob:
     config: FineTuneConfig
     status: str = "pending"  # pending, running, completed, failed
     created_at: datetime = field(default_factory=datetime.utcnow)
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
 
     # Results
-    model_branch: Optional[str] = None  # Oxen branch where model is saved
-    final_loss: Optional[float] = None
-    eval_metrics: Dict[str, float] = field(default_factory=dict)
+    model_branch: str | None = None  # Oxen branch where model is saved
+    final_loss: float | None = None
+    eval_metrics: dict[str, float] = field(default_factory=dict)
 
     # Tracking
-    logs_url: Optional[str] = None
-    model_url: Optional[str] = None
-    notebook_url: Optional[str] = None
+    logs_url: str | None = None
+    model_url: str | None = None
+    notebook_url: str | None = None
 
     # Error handling
-    error_message: Optional[str] = None
+    error_message: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert job to dictionary."""
         return {
             "job_id": self.job_id,
@@ -168,11 +168,11 @@ class DataFormatter:
 
     @staticmethod
     def to_prompt_completion(
-        data: List[Dict[str, Any]],
+        data: list[dict[str, Any]],
         prompt_key: str,
         completion_key: str,
-        system_message: Optional[str] = None
-    ) -> List[Dict[str, str]]:
+        system_message: str | None = None,
+    ) -> list[dict[str, str]]:
         """
         Convert data to prompt/completion format.
 
@@ -191,10 +191,7 @@ class DataFormatter:
             if prompt_key not in item or completion_key not in item:
                 continue
 
-            example = {
-                "prompt": str(item[prompt_key]),
-                "completion": str(item[completion_key])
-            }
+            example = {"prompt": str(item[prompt_key]), "completion": str(item[completion_key])}
 
             if system_message:
                 example["system"] = system_message
@@ -205,11 +202,11 @@ class DataFormatter:
 
     @staticmethod
     def to_chat_format(
-        data: List[Dict[str, Any]],
+        data: list[dict[str, Any]],
         prompt_key: str,
         completion_key: str,
-        system_message: Optional[str] = None
-    ) -> List[Dict[str, List[Dict[str, str]]]]:
+        system_message: str | None = None,
+    ) -> list[dict[str, list[dict[str, str]]]]:
         """
         Convert data to OpenAI chat format.
 
@@ -242,11 +239,8 @@ class DataFormatter:
 
     @staticmethod
     def validate_dataset(
-        file_path: str,
-        prompt_column: str,
-        completion_column: str,
-        min_examples: int = 100
-    ) -> Dict[str, Any]:
+        file_path: str, prompt_column: str, completion_column: str, min_examples: int = 100
+    ) -> dict[str, Any]:
         """
         Validate dataset for fine-tuning.
 
@@ -268,7 +262,7 @@ class DataFormatter:
             "empty_completions": 0,
             "avg_prompt_length": 0,
             "avg_completion_length": 0,
-            "issues": []
+            "issues": [],
         }
 
         try:
@@ -276,7 +270,7 @@ class DataFormatter:
             prompt_lengths = []
             completion_lengths = []
 
-            with open(file_path, 'r') as f:
+            with open(file_path) as f:
                 for line_num, line in enumerate(f, 1):
                     try:
                         item = json.loads(line)
@@ -324,9 +318,7 @@ class DataFormatter:
                 )
 
             if results["empty_prompts"] > results["num_examples"] * 0.1:
-                results["issues"].append(
-                    f"{results['empty_prompts']} examples have empty prompts"
-                )
+                results["issues"].append(f"{results['empty_prompts']} examples have empty prompts")
 
             if results["empty_completions"] > results["num_examples"] * 0.1:
                 results["issues"].append(
@@ -342,11 +334,11 @@ class DataFormatter:
 
     @staticmethod
     def create_training_dataset(
-        input_data: List[Dict[str, Any]],
+        input_data: list[dict[str, Any]],
         prompt_template: str,
         completion_template: str,
         output_path: str,
-        format: str = "chat"  # "chat" or "completion"
+        format: str = "chat",  # "chat" or "completion"
     ) -> str:
         """
         Create a training dataset from Timepoint simulation data.
@@ -382,14 +374,11 @@ class DataFormatter:
                     example = {
                         "messages": [
                             {"role": "user", "content": prompt},
-                            {"role": "assistant", "content": completion}
+                            {"role": "assistant", "content": completion},
                         ]
                     }
                 else:  # completion format
-                    example = {
-                        "prompt": prompt,
-                        "completion": completion
-                    }
+                    example = {"prompt": prompt, "completion": completion}
 
                 formatted_examples.append(example)
 
@@ -398,9 +387,9 @@ class DataFormatter:
                 continue
 
         # Write to JSONL
-        with open(output_path, 'w') as f:
+        with open(output_path, "w") as f:
             for example in formatted_examples:
-                f.write(json.dumps(example) + '\n')
+                f.write(json.dumps(example) + "\n")
 
         return output_path
 
@@ -421,8 +410,8 @@ class FineTuneLauncher:
         self,
         config: FineTuneConfig,
         dataset_path: str,
-        approval_callback: Optional[Callable[[FineTuneConfig, Dict], bool]] = None
-    ) -> Optional[FineTuneJob]:
+        approval_callback: Callable[[FineTuneConfig, dict], bool] | None = None,
+    ) -> FineTuneJob | None:
         """
         Prepare fine-tuning job and request human approval.
 
@@ -438,25 +427,23 @@ class FineTuneLauncher:
         # Validate dataset
         print("🔍 Validating dataset...")
         validation = DataFormatter.validate_dataset(
-            dataset_path,
-            config.prompt_column,
-            config.completion_column
+            dataset_path, config.prompt_column, config.completion_column
         )
 
         print(f"   Examples: {validation['num_examples']}")
         print(f"   Valid: {validation['valid']}")
 
-        if validation['issues']:
+        if validation["issues"]:
             print("   Issues:")
-            for issue in validation['issues']:
+            for issue in validation["issues"]:
                 print(f"   - {issue}")
 
-        if not validation['valid']:
+        if not validation["valid"]:
             print("❌ Dataset validation failed")
             return None
 
         # Estimate cost
-        cost = config.estimate_cost(validation['num_examples'])
+        cost = config.estimate_cost(validation["num_examples"])
         print(f"\n💰 Estimated cost: ${cost:.2f}")
 
         if config.max_cost_usd and cost > config.max_cost_usd:
@@ -464,7 +451,7 @@ class FineTuneLauncher:
             return None
 
         # Display configuration summary
-        print(f"\n📋 Fine-tuning Configuration:")
+        print("\n📋 Fine-tuning Configuration:")
         print(f"   Model: {config.model_name}")
         print(f"   Dataset: {config.dataset_path}")
         print(f"   Examples: {validation['num_examples']}")
@@ -482,7 +469,7 @@ class FineTuneLauncher:
         else:
             # Default: interactive approval
             response = input("\n⚠️  Proceed with fine-tuning? This will incur costs. [y/N]: ")
-            approved = response.lower() in ('y', 'yes')
+            approved = response.lower() in ("y", "yes")
 
         if not approved:
             print("❌ Fine-tuning cancelled by user")
@@ -499,10 +486,7 @@ class FineTuneLauncher:
         print(f"\n✅ Fine-tuning job approved: {job_id}")
         return job
 
-    def launch_via_notebook(
-        self,
-        job: FineTuneJob
-    ) -> Dict[str, str]:
+    def launch_via_notebook(self, job: FineTuneJob) -> dict[str, str]:
         """
         Generate instructions for launching fine-tuning via Oxen Marimo notebook.
 
@@ -516,7 +500,7 @@ class FineTuneLauncher:
             Dictionary with notebook URL and instructions
         """
         estimated_cost = job.config.estimated_cost_usd if job.config.estimated_cost_usd else 0.0
-        lora_rank_str = str(job.config.lora_rank) if job.config.use_lora else 'N/A'
+        lora_rank_str = str(job.config.lora_rank) if job.config.use_lora else "N/A"
 
         instructions = {
             "notebook_url": "https://www.oxen.ai/ox/train-llm",
@@ -543,7 +527,7 @@ To launch fine-tuning on Oxen.ai:
 
 5. Run the notebook on A10G GPU
 
-6. Model will be saved to experiment branch: finetune_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}
+6. Model will be saved to experiment branch: finetune_{datetime.utcnow().strftime("%Y%m%d_%H%M%S")}
 
 Estimated cost: ${estimated_cost:.2f}
 """,
@@ -552,7 +536,7 @@ Estimated cost: ${estimated_cost:.2f}
 
         # Save config to file
         config_path = f"{job.job_id}_config.json"
-        with open(config_path, 'w') as f:
+        with open(config_path, "w") as f:
             json.dump(job.config.to_dict(), f, indent=2)
 
         instructions["config_file_path"] = config_path

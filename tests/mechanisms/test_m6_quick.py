@@ -3,25 +3,24 @@
 Quick test for M6 TTM Tensor Compression mechanism
 Tests that Phase 7 changes properly generate and compress tensors
 """
-import os
-import pytest
+
 import json
-import numpy as np
+import os
 from datetime import datetime
 
+import numpy as np
+import pytest
+
 from metadata.run_tracker import MetadataManager
-from metadata.tracking import set_current_run_id, set_metadata_manager, clear_current_run_id
+from metadata.tracking import clear_current_run_id, set_current_run_id, set_metadata_manager
 from schemas import Entity, ResolutionLevel, TemporalMode
-from tensors import generate_ttm_tensor, TensorCompressor
+from tensors import TensorCompressor, generate_ttm_tensor
 
 
 @pytest.mark.mechanism
 @pytest.mark.m6
 @pytest.mark.llm
-@pytest.mark.skipif(
-    not os.getenv("OPENROUTER_API_KEY"),
-    reason="OPENROUTER_API_KEY not set"
-)
+@pytest.mark.skipif(not os.getenv("OPENROUTER_API_KEY"), reason="OPENROUTER_API_KEY not set")
 def test_m6_tensor_compression():
     """Test M6 TTM Tensor Compression mechanism end-to-end."""
 
@@ -38,7 +37,7 @@ def test_m6_tensor_compression():
         template_id="m6_quick_test",
         causal_mode=TemporalMode.FORWARD,
         max_entities=2,
-        max_timepoints=1
+        max_timepoints=1,
     )
     set_current_run_id(run_id)
 
@@ -57,7 +56,7 @@ def test_m6_tensor_compression():
                     "fever": 37.1,
                     "mobility": 0.9,
                     "stamina": 0.7,
-                    "sensory_acuity": {"vision": 0.8, "hearing": 0.9}
+                    "sensory_acuity": {"vision": 0.8, "hearing": 0.9},
                 },
                 "cognitive_tensor": {
                     "knowledge_state": ["fact1", "fact2", "fact3"],
@@ -67,10 +66,10 @@ def test_m6_tensor_compression():
                     "decision_confidence": 0.75,
                     "patience_threshold": 60.0,
                     "risk_tolerance": 0.4,
-                    "social_engagement": 0.7
+                    "social_engagement": 0.7,
                 },
-                "personality_traits": [0.7, 0.6, 0.5, 0.8, 0.6]  # Big Five
-            }
+                "personality_traits": [0.7, 0.6, 0.5, 0.8, 0.6],  # Big Five
+            },
         )
 
         # Generate tensor
@@ -94,9 +93,11 @@ def test_m6_tensor_compression():
 
         # Parse the tensor and decode base64+msgpack to get the context vector as float array
         import base64
+
         import msgspec
+
         tensor_data = json.loads(test_entity.tensor)
-        context_bytes = base64.b64decode(tensor_data['context_vector'])
+        context_bytes = base64.b64decode(tensor_data["context_vector"])
         context_array = np.array(msgspec.msgpack.decode(context_bytes), dtype=np.float64)
 
         # This should trigger M6 mechanism via @track_mechanism decorator
@@ -119,19 +120,23 @@ def test_m6_tensor_compression():
             training_examples=0,
             cost_usd=0.0,
             llm_calls=0,
-            tokens_used=0
+            tokens_used=0,
         )
 
         # Query mechanism_usage table
         import sqlite3
+
         conn = sqlite3.connect("metadata/runs.db")
         cursor = conn.cursor()
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT mechanism, COUNT(*) as count
             FROM mechanism_usage
             WHERE run_id = ?
             GROUP BY mechanism
-        """, (run_id,))
+        """,
+            (run_id,),
+        )
 
         mechanisms_tracked = {row[0]: row[1] for row in cursor.fetchall()}
         conn.close()
@@ -154,7 +159,7 @@ def test_m6_tensor_compression():
             cost_usd=0.0,
             llm_calls=0,
             tokens_used=0,
-            error_message=str(e)
+            error_message=str(e),
         )
         raise
     finally:

@@ -10,16 +10,16 @@ Phase 5: Access Control
 
 import json
 import sqlite3
-from dataclasses import dataclass, field
+from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-from contextlib import contextmanager
-
+from typing import Any
 
 # ============================================================================
 # Data Classes
 # ============================================================================
+
 
 @dataclass
 class AccessAuditLog:
@@ -35,13 +35,14 @@ class AccessAuditLog:
         timestamp: When access occurred
         metadata: Additional context (optional)
     """
+
     tensor_id: str
     user_id: str
     action: str
     success: bool
-    timestamp: Optional[datetime] = None
-    metadata: Optional[Dict[str, Any]] = None
-    id: Optional[int] = None
+    timestamp: datetime | None = None
+    metadata: dict[str, Any] | None = None
+    id: int | None = None
 
     def __post_init__(self):
         if self.timestamp is None:
@@ -51,6 +52,7 @@ class AccessAuditLog:
 # ============================================================================
 # Audit Logger
 # ============================================================================
+
 
 class AuditLogger:
     """
@@ -139,7 +141,7 @@ class AuditLogger:
         user_id: str,
         action: str,
         success: bool,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: dict[str, Any] | None = None,
     ) -> int:
         """
         Log an access event.
@@ -157,21 +159,24 @@ class AuditLogger:
         now = datetime.utcnow().isoformat()
 
         with self._transaction() as conn:
-            cursor = conn.execute("""
+            cursor = conn.execute(
+                """
                 INSERT INTO access_audit_log
                 (tensor_id, user_id, action, success, timestamp, metadata_json)
                 VALUES (?, ?, ?, ?, ?, ?)
-            """, (
-                tensor_id,
-                user_id,
-                action,
-                1 if success else 0,
-                now,
-                json.dumps(metadata) if metadata else None,
-            ))
+            """,
+                (
+                    tensor_id,
+                    user_id,
+                    action,
+                    1 if success else 0,
+                    now,
+                    json.dumps(metadata) if metadata else None,
+                ),
+            )
             return cursor.lastrowid
 
-    def log_batch(self, events: List[AccessAuditLog]) -> List[int]:
+    def log_batch(self, events: list[AccessAuditLog]) -> list[int]:
         """
         Log multiple access events.
 
@@ -184,18 +189,23 @@ class AuditLogger:
         ids = []
         with self._transaction() as conn:
             for event in events:
-                cursor = conn.execute("""
+                cursor = conn.execute(
+                    """
                     INSERT INTO access_audit_log
                     (tensor_id, user_id, action, success, timestamp, metadata_json)
                     VALUES (?, ?, ?, ?, ?, ?)
-                """, (
-                    event.tensor_id,
-                    event.user_id,
-                    event.action,
-                    1 if event.success else 0,
-                    event.timestamp.isoformat() if event.timestamp else datetime.utcnow().isoformat(),
-                    json.dumps(event.metadata) if event.metadata else None,
-                ))
+                """,
+                    (
+                        event.tensor_id,
+                        event.user_id,
+                        event.action,
+                        1 if event.success else 0,
+                        event.timestamp.isoformat()
+                        if event.timestamp
+                        else datetime.utcnow().isoformat(),
+                        json.dumps(event.metadata) if event.metadata else None,
+                    ),
+                )
                 ids.append(cursor.lastrowid)
         return ids
 
@@ -203,11 +213,7 @@ class AuditLogger:
     # Queries
     # =========================================================================
 
-    def get_access_history(
-        self,
-        tensor_id: str,
-        limit: int = 100
-    ) -> List[AccessAuditLog]:
+    def get_access_history(self, tensor_id: str, limit: int = 100) -> list[AccessAuditLog]:
         """
         Get access history for a tensor.
 
@@ -219,20 +225,19 @@ class AuditLogger:
             List of AccessAuditLog events (newest first)
         """
         with self._transaction() as conn:
-            cursor = conn.execute("""
+            cursor = conn.execute(
+                """
                 SELECT * FROM access_audit_log
                 WHERE tensor_id = ?
                 ORDER BY timestamp DESC
                 LIMIT ?
-            """, (tensor_id, limit))
+            """,
+                (tensor_id, limit),
+            )
 
             return [self._row_to_log(row) for row in cursor.fetchall()]
 
-    def get_user_activity(
-        self,
-        user_id: str,
-        limit: int = 100
-    ) -> List[AccessAuditLog]:
+    def get_user_activity(self, user_id: str, limit: int = 100) -> list[AccessAuditLog]:
         """
         Get activity history for a user.
 
@@ -244,20 +249,19 @@ class AuditLogger:
             List of AccessAuditLog events (newest first)
         """
         with self._transaction() as conn:
-            cursor = conn.execute("""
+            cursor = conn.execute(
+                """
                 SELECT * FROM access_audit_log
                 WHERE user_id = ?
                 ORDER BY timestamp DESC
                 LIMIT ?
-            """, (user_id, limit))
+            """,
+                (user_id, limit),
+            )
 
             return [self._row_to_log(row) for row in cursor.fetchall()]
 
-    def get_recent_access(
-        self,
-        tensor_id: str,
-        hours: int = 24
-    ) -> List[AccessAuditLog]:
+    def get_recent_access(self, tensor_id: str, hours: int = 24) -> list[AccessAuditLog]:
         """
         Get recent access events for a tensor.
 
@@ -271,20 +275,20 @@ class AuditLogger:
         since = (datetime.utcnow() - timedelta(hours=hours)).isoformat()
 
         with self._transaction() as conn:
-            cursor = conn.execute("""
+            cursor = conn.execute(
+                """
                 SELECT * FROM access_audit_log
                 WHERE tensor_id = ? AND timestamp >= ?
                 ORDER BY timestamp DESC
-            """, (tensor_id, since))
+            """,
+                (tensor_id, since),
+            )
 
             return [self._row_to_log(row) for row in cursor.fetchall()]
 
     def get_failed_attempts(
-        self,
-        tensor_id: Optional[str] = None,
-        user_id: Optional[str] = None,
-        hours: int = 24
-    ) -> List[AccessAuditLog]:
+        self, tensor_id: str | None = None, user_id: str | None = None, hours: int = 24
+    ) -> list[AccessAuditLog]:
         """
         Get failed access attempts.
 
@@ -315,11 +319,8 @@ class AuditLogger:
             return [self._row_to_log(row) for row in cursor.fetchall()]
 
     def get_action_count(
-        self,
-        tensor_id: str,
-        action: Optional[str] = None,
-        hours: Optional[int] = None
-    ) -> Dict[str, int]:
+        self, tensor_id: str, action: str | None = None, hours: int | None = None
+    ) -> dict[str, int]:
         """
         Get action counts for a tensor.
 
@@ -349,7 +350,7 @@ class AuditLogger:
             cursor = conn.execute(query, params)
             return {row["action"]: row["count"] for row in cursor.fetchall()}
 
-    def get_user_count(self, tensor_id: str, hours: Optional[int] = None) -> int:
+    def get_user_count(self, tensor_id: str, hours: int | None = None) -> int:
         """
         Get count of unique users who accessed a tensor.
 
@@ -377,10 +378,8 @@ class AuditLogger:
     # =========================================================================
 
     def get_most_accessed_tensors(
-        self,
-        limit: int = 10,
-        hours: Optional[int] = None
-    ) -> List[Dict[str, Any]]:
+        self, limit: int = 10, hours: int | None = None
+    ) -> list[dict[str, Any]]:
         """
         Get most frequently accessed tensors.
 
@@ -417,10 +416,8 @@ class AuditLogger:
             ]
 
     def get_most_active_users(
-        self,
-        limit: int = 10,
-        hours: Optional[int] = None
-    ) -> List[Dict[str, Any]]:
+        self, limit: int = 10, hours: int | None = None
+    ) -> list[dict[str, Any]]:
         """
         Get most active users.
 
@@ -456,11 +453,7 @@ class AuditLogger:
                 for row in cursor.fetchall()
             ]
 
-    def get_access_summary(
-        self,
-        tensor_id: str,
-        hours: int = 24
-    ) -> Dict[str, Any]:
+    def get_access_summary(self, tensor_id: str, hours: int = 24) -> dict[str, Any]:
         """
         Get comprehensive access summary for a tensor.
 
@@ -475,7 +468,8 @@ class AuditLogger:
 
         with self._transaction() as conn:
             # Total accesses
-            cursor = conn.execute("""
+            cursor = conn.execute(
+                """
                 SELECT
                     COUNT(*) as total_accesses,
                     SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as successful,
@@ -483,16 +477,21 @@ class AuditLogger:
                     COUNT(DISTINCT user_id) as unique_users
                 FROM access_audit_log
                 WHERE tensor_id = ? AND timestamp >= ?
-            """, (tensor_id, since))
+            """,
+                (tensor_id, since),
+            )
             row = cursor.fetchone()
 
             # Action breakdown
-            cursor = conn.execute("""
+            cursor = conn.execute(
+                """
                 SELECT action, COUNT(*) as count
                 FROM access_audit_log
                 WHERE tensor_id = ? AND timestamp >= ?
                 GROUP BY action
-            """, (tensor_id, since))
+            """,
+                (tensor_id, since),
+            )
             actions = {r["action"]: r["count"] for r in cursor.fetchall()}
 
         return {
@@ -522,10 +521,7 @@ class AuditLogger:
         cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
 
         with self._transaction() as conn:
-            cursor = conn.execute(
-                "DELETE FROM access_audit_log WHERE timestamp < ?",
-                (cutoff,)
-            )
+            cursor = conn.execute("DELETE FROM access_audit_log WHERE timestamp < ?", (cutoff,))
             return cursor.rowcount
 
     def clear_tensor_logs(self, tensor_id: str) -> int:
@@ -539,10 +535,7 @@ class AuditLogger:
             Number of deleted records
         """
         with self._transaction() as conn:
-            cursor = conn.execute(
-                "DELETE FROM access_audit_log WHERE tensor_id = ?",
-                (tensor_id,)
-            )
+            cursor = conn.execute("DELETE FROM access_audit_log WHERE tensor_id = ?", (tensor_id,))
             return cursor.rowcount
 
     # =========================================================================

@@ -5,24 +5,20 @@ Tests waveform math, cold/warm fitting, FitResult conversion, and
 cross-run convergence — all pure math, no LLM/DB dependencies.
 """
 
-import math
-import pytest
-import numpy as np
 from types import SimpleNamespace
 
+import numpy as np
+
 from synth.adprs_fitter import (
-    adprs_waveform,
     ADPRSFitter,
     FitResult,
-    PARAM_BOUNDS,
-    PARAM_NAMES,
-    DEFAULT_PARAMS,
+    adprs_waveform,
 )
-from synth.fidelity_envelope import ADPRSEnvelope, ADPRSComposite
+from synth.fidelity_envelope import ADPRSEnvelope
 from synth.trajectory_tracker import TrajectoryTracker
 
-
 # --- Helpers ---
+
 
 def make_entity(entity_id, adprs_envelopes=None, fit_metadata=None):
     """Create a mock entity with optional ADPRS metadata."""
@@ -60,6 +56,7 @@ def generate_synthetic_data(A, P, S, baseline, n_points=20, noise=0.0):
 
 # --- adprs_waveform vectorized ---
 
+
 class TestAdprsWaveform:
     def test_vectorized(self):
         """Waveform should accept and return numpy arrays."""
@@ -88,15 +85,16 @@ class TestAdprsWaveform:
                 for S in [0.0, 0.5, 1.0]:
                     for bl in [0.0, 0.5, 1.0]:
                         result = adprs_waveform(tau, A, P, S, bl)
-                        assert np.all(result >= 0.0) and np.all(result <= 1.0), \
+                        assert np.all(result >= 0.0) and np.all(result <= 1.0), (
                             f"Out of range for A={A}, P={P}, S={S}, bl={bl}"
+                        )
 
     def test_matches_envelope_evaluate(self):
         """Waveform must match ADPRSEnvelope.evaluate() at sampled tau points."""
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta, timezone
+
         env = ADPRSEnvelope(
-            A=0.6, D=1000.0, P=3.0, R=0, S=0.7,
-            t0="2025-01-01T00:00:00+00:00", baseline=0.15
+            A=0.6, D=1000.0, P=3.0, R=0, S=0.7, t0="2025-01-01T00:00:00+00:00", baseline=0.15
         )
         t0 = datetime(2025, 1, 1, tzinfo=timezone.utc)
         taus = [0.0, 0.1, 0.25, 0.5, 0.75, 0.95]
@@ -104,12 +102,16 @@ class TestAdprsWaveform:
         for tau_val in taus:
             t = t0 + timedelta(milliseconds=env.D * tau_val)
             env_phi = env.evaluate(t)
-            waveform_phi = float(adprs_waveform(np.array([tau_val]), env.A, env.P, env.S, env.baseline)[0])
-            assert abs(env_phi - waveform_phi) < 1e-6, \
+            waveform_phi = float(
+                adprs_waveform(np.array([tau_val]), env.A, env.P, env.S, env.baseline)[0]
+            )
+            assert abs(env_phi - waveform_phi) < 1e-6, (
                 f"Mismatch at tau={tau_val}: envelope={env_phi}, waveform={waveform_phi}"
+            )
 
 
 # --- Cold fit ---
+
 
 class TestColdFit:
     def test_recover_monotone_decay(self):
@@ -141,6 +143,7 @@ class TestColdFit:
 
 # --- Warm fit ---
 
+
 class TestWarmFit:
     def test_refines_near_correct_prior(self):
         """Warm fit improves on a near-correct prior."""
@@ -163,11 +166,14 @@ class TestWarmFit:
         # The fallback to cold fit is an implementation detail — just verify
         # that it doesn't crash and produces a result
         fitter = ADPRSFitter(de_maxiter=100)
-        result = fitter.fit_entity(tau, activation, "e1", prior_params={"A": 0.99, "P": 7.5, "S": 0.01, "baseline": 0.99})
+        result = fitter.fit_entity(
+            tau, activation, "e1", prior_params={"A": 0.99, "P": 7.5, "S": 0.01, "baseline": 0.99}
+        )
         assert result.n_points == 20
 
 
 # --- FitResult.to_envelope ---
+
 
 class TestFitResultToEnvelope:
     def test_valid_envelope(self):
@@ -208,6 +214,7 @@ class TestFitResultToEnvelope:
 
 # --- apply_to_entities ---
 
+
 class TestApplyToEntities:
     def test_writes_metadata(self):
         """apply_to_entities writes adprs_envelopes and adprs_fit_metadata."""
@@ -233,10 +240,13 @@ class TestApplyToEntities:
 
     def test_increments_run_count(self):
         """Subsequent apply increments run_count and appends residual_history."""
-        entity = make_entity("e1", fit_metadata={
-            "run_count": 2,
-            "residual_history": [0.01, 0.005],
-        })
+        entity = make_entity(
+            "e1",
+            fit_metadata={
+                "run_count": 2,
+                "residual_history": [0.01, 0.005],
+            },
+        )
         result = FitResult(
             entity_id="e1",
             params={"A": 0.7, "P": 2.0, "S": 0.8, "baseline": 0.1},
@@ -255,10 +265,13 @@ class TestApplyToEntities:
 
     def test_bounds_residual_history(self):
         """Residual history is bounded to last 20 entries."""
-        entity = make_entity("e1", fit_metadata={
-            "run_count": 20,
-            "residual_history": [0.01] * 20,
-        })
+        entity = make_entity(
+            "e1",
+            fit_metadata={
+                "run_count": 20,
+                "residual_history": [0.01] * 20,
+            },
+        )
         result = FitResult(
             entity_id="e1",
             params={"A": 0.7, "P": 2.0, "S": 0.8, "baseline": 0.1},
@@ -276,6 +289,7 @@ class TestApplyToEntities:
 
 # --- Cross-run: prior params trigger warm start ---
 
+
 class TestCrossRunFitting:
     def test_prior_triggers_warm_start(self):
         """Entity with existing envelopes in metadata triggers warm-start fitting."""
@@ -284,8 +298,15 @@ class TestCrossRunFitting:
         # Create entity with prior envelope
         env_data = {
             "envelopes": [
-                {"A": 0.65, "D": 31536000000.0, "P": 2.1, "R": 0, "S": 0.75,
-                 "t0": "2026-01-01T00:00:00+00:00", "baseline": 0.12}
+                {
+                    "A": 0.65,
+                    "D": 31536000000.0,
+                    "P": 2.1,
+                    "R": 0,
+                    "S": 0.75,
+                    "t0": "2026-01-01T00:00:00+00:00",
+                    "baseline": 0.12,
+                }
             ]
         }
         entity = make_entity("e1", adprs_envelopes=env_data)
@@ -297,7 +318,9 @@ class TestCrossRunFitting:
         for i in range(len(tau)):
             entity_snap = make_entity("e1", adprs_envelopes=env_data)
             entity_snap.entity_metadata["cognitive_tensor"]["emotional_valence"] = 0.0
-            entity_snap.entity_metadata["cognitive_tensor"]["emotional_arousal"] = float(activation[i])
+            entity_snap.entity_metadata["cognitive_tensor"]["emotional_arousal"] = float(
+                activation[i]
+            )
             entity_snap.entity_metadata["cognitive_tensor"]["energy_budget"] = 50.0
             tracker.record_snapshot(entity_snap, make_timepoint(f"tp_{i}"), i)
 
@@ -329,6 +352,7 @@ class TestCrossRunFitting:
 
 
 # --- fit_all with tracker ---
+
 
 class TestFitAll:
     def test_skips_insufficient_data(self):

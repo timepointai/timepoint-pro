@@ -2,13 +2,25 @@
 """
 test_animistic_entities.py - Tests for Mechanism 16: Animistic Entity Extension
 """
-import numpy as np
-from datetime import datetime
 
-from schemas import Entity, AnimalEntity, BuildingEntity, AbstractEntity, AnyEntity, KamiEntity, AIEntity, ResolutionLevel
-from workflows import should_create_animistic_entity, create_animistic_entity, generate_animistic_entities_for_scene
-from validation import Validator
 import pytest
+
+from schemas import (
+    AbstractEntity,
+    AIEntity,
+    AnimalEntity,
+    AnyEntity,
+    BuildingEntity,
+    Entity,
+    KamiEntity,
+    ResolutionLevel,
+)
+from validation import Validator
+from workflows import (
+    create_animistic_entity,
+    generate_animistic_entities_for_scene,
+    should_create_animistic_entity,
+)
 
 
 @pytest.mark.animism
@@ -54,14 +66,14 @@ class TestAnimisticEntityCreation:
         """Test animal entity creation with proper metadata"""
         context = {
             "timepoint_context": "founding fathers 1789",
-            "current_timepoint": "tp_1789_04_30"
+            "current_timepoint": "tp_1789_04_30",
         }
         config = {
             "animism": {
                 "biological_defaults": {
                     "animal_health": 0.9,
                     "animal_energy": 0.8,
-                    "animal_training": 0.5
+                    "animal_training": 0.5,
                 }
             }
         }
@@ -86,10 +98,7 @@ class TestAnimisticEntityCreation:
         context = {"location": "federal_hall"}
         config = {
             "animism": {
-                "building_defaults": {
-                    "structural_integrity": 0.85,
-                    "maintenance_state": 0.8
-                }
+                "building_defaults": {"structural_integrity": 0.85, "maintenance_state": 0.8}
             }
         }
 
@@ -111,7 +120,7 @@ class TestAnimisticEntityCreation:
                 "abstract_defaults": {
                     "initial_intensity": 0.7,
                     "decay_rate": 0.01,
-                    "coherence": 0.9
+                    "coherence": 0.9,
                 }
             }
         }
@@ -155,7 +164,7 @@ class TestAnimisticEntityCreation:
                 "any_defaults": {
                     "adaptability_score": 0.9,
                     "stability_index": 0.7,
-                    "influence_radius": 15.0
+                    "influence_radius": 15.0,
                 }
             }
         }
@@ -186,7 +195,7 @@ class TestAnimisticEntityCreation:
                     "manifestation_probability": 0.2,
                     "spiritual_power": 0.8,
                     "visibility_state": "invisible",
-                    "disclosure_level": "rumored"
+                    "disclosure_level": "rumored",
                 }
             }
         }
@@ -204,14 +213,22 @@ class TestAnimisticEntityCreation:
         assert kami.disclosure_level == "rumored"
         assert len(kami.influence_domain) >= 1  # Should have at least one domain
         # Forest spirit should have nature-related domains (but generation is random, so just check structure)
-        valid_domains = ["nature", "weather", "emotions", "fate", "protection", "war", "wisdom", "trickery"]
+        valid_domains = [
+            "nature",
+            "weather",
+            "emotions",
+            "fate",
+            "protection",
+            "war",
+            "wisdom",
+            "trickery",
+        ]
         assert all(domain in valid_domains for domain in kami.influence_domain)
         assert len(kami.blessings_curses["blessings"]) > 0
         assert len(kami.blessings_curses["curses"]) > 0
 
     def test_create_ai_entity(self):
         """Test creation of AI-powered entities"""
-        from schemas import AIEntity
 
         context = {"timepoint_context": "digital_age"}
         config = {
@@ -220,7 +237,7 @@ class TestAnimisticEntityCreation:
                     "temperature": 0.8,
                     "model_name": "gpt-4",
                     "safety_level": "strict",
-                    "activation_threshold": 0.6
+                    "activation_threshold": 0.6,
                 }
             }
         }
@@ -259,13 +276,11 @@ class TestAnimisticEntityValidation:
             age=50,
             maintenance_state=0.8,
             constraints=["capacity_limited"],
-            affordances=["shelter"]
+            affordances=["shelter"],
         )
 
         entity = Entity(
-            entity_id="test_hall",
-            entity_type="building",
-            entity_metadata=building.dict()
+            entity_id="test_hall", entity_type="building", entity_metadata=building.dict()
         )
 
         # Valid action (within capacity)
@@ -287,13 +302,11 @@ class TestAnimisticEntityValidation:
             age=50,
             maintenance_state=0.8,
             constraints=[],
-            affordances=["shelter"]
+            affordances=["shelter"],
         )
 
         entity = Entity(
-            entity_id="crumbling_hall",
-            entity_type="building",
-            entity_metadata=building.dict()
+            entity_id="crumbling_hall", entity_type="building", entity_metadata=building.dict()
         )
 
         context = {"action": {"participant_count": 50}, "entities": [entity]}
@@ -309,14 +322,10 @@ class TestAnimisticEntityValidation:
             training_level=0.8,
             goals=["avoid_pain", "seek_food"],
             sensory_capabilities={},
-            physical_capabilities={}
+            physical_capabilities={},
         )
 
-        entity = Entity(
-            entity_id="sick_horse",
-            entity_type="animal",
-            entity_metadata=animal.dict()
-        )
+        entity = Entity(entity_id="sick_horse", entity_type="animal", entity_metadata=animal.dict())
 
         context = {"action": {"action_type": "mount"}, "entities": [entity]}
         result = Validator._validators["environmental_constraints"]["func"](entity, context)
@@ -332,13 +341,11 @@ class TestAnimisticEntityValidation:
             training_level=0.6,
             goals=["seek_food"],
             sensory_capabilities={"vision": 0.8},
-            physical_capabilities={"strength": 0.6}
+            physical_capabilities={"strength": 0.6},
         )
 
         entity = Entity(
-            entity_id="healthy_dog",
-            entity_type="animal",
-            entity_metadata=animal.dict()
+            entity_id="healthy_dog", entity_type="animal", entity_metadata=animal.dict()
         )
 
         result = Validator._validators["biological_plausibility"]["func"](entity, {})
@@ -361,13 +368,11 @@ class TestAnimisticEntityValidation:
             age=-5,  # Invalid age
             maintenance_state=0.8,
             constraints=[],
-            affordances=[]
+            affordances=[],
         )
 
         entity = Entity(
-            entity_id="invalid_building",
-            entity_type="building",
-            entity_metadata=building.dict()
+            entity_id="invalid_building", entity_type="building", entity_metadata=building.dict()
         )
 
         result = Validator._validators["biological_plausibility"]["func"](entity, {})
@@ -384,13 +389,11 @@ class TestAnimisticEntityValidation:
             carriers=["entity1", "entity2"],
             decay_rate=0.02,
             coherence=0.9,
-            manifestation_forms=["beliefs"]
+            manifestation_forms=["beliefs"],
         )
 
         entity = Entity(
-            entity_id="valid_concept",
-            entity_type="abstract",
-            entity_metadata=concept.dict()
+            entity_id="valid_concept", entity_type="abstract", entity_metadata=concept.dict()
         )
 
         result = Validator._validators["biological_plausibility"]["func"](entity, {})
@@ -417,14 +420,10 @@ class TestAnimisticEntityValidation:
             stability_index=0.6,
             influence_radius=10.0,
             resonance_patterns={"human": 0.8, "animal": 0.6},
-            adaptive_goals=["observe", "adapt", "influence"]
+            adaptive_goals=["observe", "adapt", "influence"],
         )
 
-        entity = Entity(
-            entity_id="valid_any",
-            entity_type="any",
-            entity_metadata=any_entity.dict()
-        )
+        entity = Entity(entity_id="valid_any", entity_type="any", entity_metadata=any_entity.dict())
 
         result = Validator._validators["biological_plausibility"]["func"](entity, {})
         assert result["valid"] == True
@@ -449,14 +448,10 @@ class TestAnimisticEntityValidation:
             manifestation_probability=0.1,
             spiritual_power=0.5,
             mortal_perception={"human": 0.2, "animal": 0.8},
-            blessings_curses={"blessings": ["protection"], "curses": ["illness"]}
+            blessings_curses={"blessings": ["protection"], "curses": ["illness"]},
         )
 
-        entity = Entity(
-            entity_id="valid_kami",
-            entity_type="kami",
-            entity_metadata=kami.dict()
-        )
+        entity = Entity(entity_id="valid_kami", entity_type="kami", entity_metadata=kami.dict())
 
         result = Validator._validators["biological_plausibility"]["func"](entity, {})
         assert result["valid"] == True
@@ -480,7 +475,6 @@ class TestAnimisticEntityValidation:
 
     def test_biological_plausibility_ai_entity(self):
         """Test biological plausibility for AI entities"""
-        from schemas import AIEntity
 
         # Valid AI entity
         ai_entity = AIEntity(
@@ -494,14 +488,10 @@ class TestAnimisticEntityValidation:
             input_bleaching_rules=["remove_script_tags", "prevent_prompt_injection"],
             output_filtering_rules=["filter_harmful_content", "add_content_warnings"],
             error_handling={"api_error": "I'm experiencing difficulties"},
-            fallback_responses=["I need a moment to process that."]
+            fallback_responses=["I need a moment to process that."],
         )
 
-        entity = Entity(
-            entity_id="valid_ai",
-            entity_type="ai",
-            entity_metadata=ai_entity.dict()
-        )
+        entity = Entity(entity_id="valid_ai", entity_type="ai", entity_metadata=ai_entity.dict())
 
         result = Validator._validators["biological_plausibility"]["func"](entity, {})
         assert result["valid"] == True
@@ -548,7 +538,7 @@ class TestSceneGeneration:
                 "entity_generation": {
                     "animal_probability": 1.0,  # Always generate
                     "building_probability": 0.0,  # Never generate
-                }
+                },
             }
         }
 
@@ -570,7 +560,7 @@ class TestSceneGeneration:
                 "entity_generation": {
                     "animal_probability": 1.0,
                     "building_probability": 1.0,
-                }
+                },
             }
         }
 
@@ -595,21 +585,17 @@ class TestAdvancedAnimisticValidators:
             manifestation_probability=0.1,
             spiritual_power=0.9,  # High power
             mortal_perception={"human": 0.2},
-            blessings_curses={"blessings": ["protection"], "curses": ["illness"]}
+            blessings_curses={"blessings": ["protection"], "curses": ["illness"]},
         )
 
-        kami_entity = Entity(
-            entity_id="fate_kami",
-            entity_type="kami",
-            entity_metadata=kami.dict()
-        )
+        kami_entity = Entity(entity_id="fate_kami", entity_type="kami", entity_metadata=kami.dict())
 
         # Action that might be influenced by fate kami
         action = {
             "action_type": "decision",
             "description": "making an important life choice",
             "participant_ids": ["character1"],
-            "outdoor": False
+            "outdoor": False,
         }
 
         context = {"action": action, "entities": [kami_entity]}
@@ -638,22 +624,24 @@ class TestAdvancedAnimisticValidators:
             stability_index=0.8,  # Good stability
             influence_radius=10.0,
             resonance_patterns={"human": 0.8},
-            adaptive_goals=["observe", "adapt", "influence", "transform"]
+            adaptive_goals=["observe", "adapt", "influence", "transform"],
         )
 
         entity = Entity(
-            entity_id="adaptive_being",
-            entity_type="any",
-            entity_metadata=any_entity.dict()
+            entity_id="adaptive_being", entity_type="any", entity_metadata=any_entity.dict()
         )
 
         # Good context alignment
-        context = {"context_goals": ["observe surroundings", "adapt to situation", "influence events"]}
+        context = {
+            "context_goals": ["observe surroundings", "adapt to situation", "influence events"]
+        }
         result = Validator._validators["adaptive_entity_behavior"]["func"](entity, context)
         assert result["valid"] == True
 
         # Poor context alignment
-        context = {"context_goals": ["destroy everything", "cause chaos"]}  # No alignment with entity's goals
+        context = {
+            "context_goals": ["destroy everything", "cause chaos"]
+        }  # No alignment with entity's goals
         result = Validator._validators["adaptive_entity_behavior"]["func"](entity, context)
         assert result["valid"] == False
         assert "poor adaptation" in result["message"]

@@ -2,10 +2,12 @@
 Tests for Report Generator (Sprint 2.2)
 """
 
-import pytest
 import json
-from reporting.report_generator import ReportGenerator
+
+import pytest
+
 from reporting.query_engine import EnhancedQueryEngine
+from reporting.report_generator import ReportGenerator
 
 
 @pytest.fixture
@@ -25,10 +27,7 @@ class TestSummaryReport:
 
     def test_generate_summary_report_markdown(self, report_generator):
         """Test generating summary report in Markdown"""
-        report = report_generator.generate_summary_report(
-            world_id="test_world",
-            format="markdown"
-        )
+        report = report_generator.generate_summary_report(world_id="test_world", format="markdown")
 
         assert isinstance(report, str)
         assert "# Simulation Summary: test_world" in report
@@ -38,10 +37,7 @@ class TestSummaryReport:
 
     def test_generate_summary_report_json(self, report_generator):
         """Test generating summary report in JSON"""
-        report = report_generator.generate_summary_report(
-            world_id="test_world",
-            format="json"
-        )
+        report = report_generator.generate_summary_report(world_id="test_world", format="json")
 
         assert isinstance(report, str)
         data = json.loads(report)
@@ -53,9 +49,7 @@ class TestSummaryReport:
     def test_generate_summary_report_without_stats(self, report_generator):
         """Test generating summary report without statistics"""
         report = report_generator.generate_summary_report(
-            world_id="test_world",
-            format="markdown",
-            include_stats=False
+            world_id="test_world", format="markdown", include_stats=False
         )
 
         assert "# Simulation Summary: test_world" in report
@@ -65,10 +59,7 @@ class TestSummaryReport:
 
     def test_summary_report_includes_timeline_table(self, report_generator):
         """Test that summary report includes timeline table"""
-        report = report_generator.generate_summary_report(
-            world_id="test_world",
-            format="markdown"
-        )
+        report = report_generator.generate_summary_report(world_id="test_world", format="markdown")
 
         assert "### Timeline Overview" in report
         assert "| Timepoint | Event Type | Description | Importance |" in report
@@ -80,8 +71,7 @@ class TestRelationshipReport:
     def test_generate_relationship_report_markdown(self, report_generator):
         """Test generating relationship report in Markdown"""
         report = report_generator.generate_relationship_report(
-            world_id="test_world",
-            format="markdown"
+            world_id="test_world", format="markdown"
         )
 
         assert isinstance(report, str)
@@ -91,10 +81,7 @@ class TestRelationshipReport:
 
     def test_generate_relationship_report_json(self, report_generator):
         """Test generating relationship report in JSON"""
-        report = report_generator.generate_relationship_report(
-            world_id="test_world",
-            format="json"
-        )
+        report = report_generator.generate_relationship_report(world_id="test_world", format="json")
 
         data = json.loads(report)
         assert data["title"] == "Relationship Analysis: test_world"
@@ -103,9 +90,7 @@ class TestRelationshipReport:
     def test_relationship_report_with_entity_filter(self, report_generator):
         """Test relationship report with entity filter"""
         report = report_generator.generate_relationship_report(
-            world_id="test_world",
-            entity_ids=["alice", "bob"],
-            format="json"
+            world_id="test_world", entity_ids=["alice", "bob"], format="json"
         )
 
         data = json.loads(report)
@@ -114,8 +99,7 @@ class TestRelationshipReport:
     def test_relationship_report_includes_table(self, report_generator):
         """Test that relationship report includes entity table"""
         report = report_generator.generate_relationship_report(
-            world_id="test_world",
-            format="markdown"
+            world_id="test_world", format="markdown"
         )
 
         assert "### Entity Relationships" in report
@@ -128,8 +112,7 @@ class TestKnowledgeReport:
     def test_generate_knowledge_report_markdown(self, report_generator):
         """Test generating knowledge report in Markdown"""
         report = report_generator.generate_knowledge_report(
-            world_id="test_world",
-            format="markdown"
+            world_id="test_world", format="markdown"
         )
 
         assert isinstance(report, str)
@@ -139,10 +122,7 @@ class TestKnowledgeReport:
 
     def test_generate_knowledge_report_json(self, report_generator):
         """Test generating knowledge report in JSON"""
-        report = report_generator.generate_knowledge_report(
-            world_id="test_world",
-            format="json"
-        )
+        report = report_generator.generate_knowledge_report(world_id="test_world", format="json")
 
         data = json.loads(report)
         assert data["title"] == "Knowledge Flow Analysis: test_world"
@@ -151,9 +131,7 @@ class TestKnowledgeReport:
     def test_knowledge_report_with_timepoint_range(self, report_generator):
         """Test knowledge report with timepoint range"""
         report = report_generator.generate_knowledge_report(
-            world_id="test_world",
-            timepoint_range=(0, 5),
-            format="json"
+            world_id="test_world", timepoint_range=(0, 5), format="json"
         )
 
         data = json.loads(report)
@@ -162,8 +140,7 @@ class TestKnowledgeReport:
     def test_knowledge_report_includes_flow_table(self, report_generator):
         """Test that knowledge report includes flow table"""
         report = report_generator.generate_knowledge_report(
-            world_id="test_world",
-            format="markdown"
+            world_id="test_world", format="markdown"
         )
 
         assert "### Knowledge Transfer Events" in report
@@ -176,9 +153,7 @@ class TestEntityComparisonReport:
     def test_generate_comparison_report_markdown(self, report_generator):
         """Test generating comparison report in Markdown"""
         report = report_generator.generate_entity_comparison_report(
-            world_id="test_world",
-            entity_ids=["alice", "bob"],
-            format="markdown"
+            world_id="test_world", entity_ids=["alice", "bob"], format="markdown"
         )
 
         assert isinstance(report, str)
@@ -189,9 +164,7 @@ class TestEntityComparisonReport:
     def test_generate_comparison_report_json(self, report_generator):
         """Test generating comparison report in JSON"""
         report = report_generator.generate_entity_comparison_report(
-            world_id="test_world",
-            entity_ids=["alice", "bob"],
-            format="json"
+            world_id="test_world", entity_ids=["alice", "bob"], format="json"
         )
 
         data = json.loads(report)
@@ -205,7 +178,7 @@ class TestEntityComparisonReport:
             world_id="test_world",
             entity_ids=["alice", "bob"],
             aspects=["personality"],
-            format="json"
+            format="json",
         )
 
         data = json.loads(report)
@@ -214,9 +187,7 @@ class TestEntityComparisonReport:
     def test_comparison_report_includes_similarity_table(self, report_generator):
         """Test that comparison report includes similarity table"""
         report = report_generator.generate_entity_comparison_report(
-            world_id="test_world",
-            entity_ids=["alice", "bob"],
-            format="markdown"
+            world_id="test_world", entity_ids=["alice", "bob"], format="markdown"
         )
 
         assert "### Entity Similarity Scores" in report
@@ -229,9 +200,7 @@ class TestReportFormatting:
     def test_json_report_with_custom_indent(self, report_generator):
         """Test JSON report with custom indentation"""
         report = report_generator.generate_summary_report(
-            world_id="test_world",
-            format="json",
-            indent=4
+            world_id="test_world", format="json", indent=4
         )
 
         # Should have 4-space indentation
@@ -239,20 +208,14 @@ class TestReportFormatting:
 
     def test_csv_format_for_relationship_report(self, report_generator):
         """Test CSV format for relationship report"""
-        report = report_generator.generate_relationship_report(
-            world_id="test_world",
-            format="csv"
-        )
+        report = report_generator.generate_relationship_report(world_id="test_world", format="csv")
 
         # CSV should have Key,Value format for dict-based data
         assert "Key,Value" in report or "Entity 1,Entity 2" in report
 
     def test_markdown_report_structure(self, report_generator):
         """Test Markdown report has proper structure"""
-        report = report_generator.generate_summary_report(
-            world_id="test_world",
-            format="markdown"
-        )
+        report = report_generator.generate_summary_report(world_id="test_world", format="markdown")
 
         # Check for proper heading hierarchy
         assert report.count("# ") >= 1  # Title
@@ -271,7 +234,7 @@ class TestReportMetadata:
             report_generator.generate_knowledge_report("test_world", format="json"),
             report_generator.generate_entity_comparison_report(
                 "test_world", ["alice", "bob"], format="json"
-            )
+            ),
         ]
 
         for report in reports:
@@ -289,7 +252,7 @@ class TestReportMetadata:
             report_generator.generate_knowledge_report("test_world", format="json"),
             report_generator.generate_entity_comparison_report(
                 "test_world", ["alice", "bob"], format="json"
-            )
+            ),
         ]
 
         for report in reports:
@@ -300,11 +263,15 @@ class TestReportMetadata:
         """Test that all reports include report_type"""
         report_types = {
             "summary": report_generator.generate_summary_report("test_world", format="json"),
-            "relationships": report_generator.generate_relationship_report("test_world", format="json"),
-            "knowledge_flow": report_generator.generate_knowledge_report("test_world", format="json"),
+            "relationships": report_generator.generate_relationship_report(
+                "test_world", format="json"
+            ),
+            "knowledge_flow": report_generator.generate_knowledge_report(
+                "test_world", format="json"
+            ),
             "entity_comparison": report_generator.generate_entity_comparison_report(
                 "test_world", ["alice", "bob"], format="json"
-            )
+            ),
         }
 
         for expected_type, report in report_types.items():

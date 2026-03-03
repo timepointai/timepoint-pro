@@ -2,16 +2,17 @@
 """
 check_deps.py - Check if all required dependencies are installed
 """
+
 import sys
 
 required = {
-    'sqlmodel': 'sqlmodel',
-    'bleach': 'bleach',
-    'hydra': 'hydra-core',
-    'pytest': 'pytest',
-    'pytest_asyncio': 'pytest-asyncio',
-    'pytest_cov': 'pytest-cov',
-    'dotenv': 'python-dotenv',
+    "sqlmodel": "sqlmodel",
+    "bleach": "bleach",
+    "hydra": "hydra-core",
+    "pytest": "pytest",
+    "pytest_asyncio": "pytest-asyncio",
+    "pytest_cov": "pytest-cov",
+    "dotenv": "python-dotenv",
 }
 
 print("Checking test dependencies...\n")
@@ -35,10 +36,10 @@ if missing:
     for pkg in missing:
         print(f"   - {pkg}")
 
-    print(f"\nTo install missing dependencies:")
+    print("\nTo install missing dependencies:")
     print(f"  pip install {' '.join(missing)}")
-    print(f"\nOr install all at once:")
-    print(f"  pip install -r requirements-test.txt")
+    print("\nOr install all at once:")
+    print("  pip install -r requirements-test.txt")
     sys.exit(1)
 else:
     print("\n✅ All test dependencies installed!")

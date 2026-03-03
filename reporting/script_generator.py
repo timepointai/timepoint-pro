@@ -9,26 +9,27 @@ Converts temporal simulation data into screenplay/storyboard formats by:
 - Respecting temporal modes and causal chains
 """
 
-from typing import Dict, Any, List, Optional, Tuple
-from datetime import datetime
-from dataclasses import dataclass, field
-from enum import Enum
 import json
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any
 
 
 @dataclass
 class DialogLine:
     """Single line of dialog in a scene"""
+
     speaker: str
     content: str
-    emotional_tone: Optional[str] = None
-    parenthetical: Optional[str] = None
-    timestamp: Optional[datetime] = None
+    emotional_tone: str | None = None
+    parenthetical: str | None = None
+    timestamp: datetime | None = None
 
 
 @dataclass
 class SceneAtmosphere:
     """Atmosphere/mood of a scene"""
+
     tension_level: float = 0.5
     formality_level: float = 0.5
     emotional_valence: float = 0.0
@@ -40,30 +41,33 @@ class SceneAtmosphere:
 @dataclass
 class SceneEnvironment:
     """Physical environment of a scene"""
+
     location: str = "UNKNOWN LOCATION"
     interior: bool = True
     time_of_day: str = "DAY"
     lighting_level: float = 0.7
     ambient_temperature: float = 20.0
-    weather: Optional[str] = None
-    architectural_style: Optional[str] = None
+    weather: str | None = None
+    architectural_style: str | None = None
 
 
 @dataclass
 class Character:
     """Character appearing in the script"""
+
     id: str
     name: str
     entity_type: str = "human"
-    role: Optional[str] = None
-    description: Optional[str] = None
+    role: str | None = None
+    description: str | None = None
     first_appearance_scene: int = 1
-    personality_traits: List[float] = field(default_factory=lambda: [0.5, 0.5, 0.5, 0.5, 0.5])
+    personality_traits: list[float] = field(default_factory=lambda: [0.5, 0.5, 0.5, 0.5, 0.5])
 
 
 @dataclass
 class Scene:
     """Single scene in the screenplay"""
+
     scene_number: int
     timepoint_id: str
     heading: str
@@ -71,27 +75,28 @@ class Scene:
     environment: SceneEnvironment
     atmosphere: SceneAtmosphere
     description: str
-    characters_present: List[str]
-    dialog: List[DialogLine]
-    action_beats: List[str]
+    characters_present: list[str]
+    dialog: list[DialogLine]
+    action_beats: list[str]
     duration_estimate_seconds: int = 0
-    causal_parent: Optional[str] = None
-    causal_children: List[str] = field(default_factory=list)
-    key_events: List[str] = field(default_factory=list)
-    visual_notes: Optional[str] = None
-    production_notes: Optional[str] = None
+    causal_parent: str | None = None
+    causal_children: list[str] = field(default_factory=list)
+    key_events: list[str] = field(default_factory=list)
+    visual_notes: str | None = None
+    production_notes: str | None = None
 
 
 @dataclass
 class ScriptData:
     """Complete screenplay data structure"""
+
     title: str
     world_id: str
     generated_at: datetime
     temporal_mode: str = "forward"
-    scenes: List[Scene] = field(default_factory=list)
-    characters: List[Character] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    scenes: list[Scene] = field(default_factory=list)
+    characters: list[Character] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class ScriptGenerator:
@@ -117,10 +122,7 @@ class ScriptGenerator:
         self.store = store
 
     def generate_script_structure(
-        self,
-        world_id: str,
-        title: Optional[str] = None,
-        temporal_mode: str = "forward"
+        self, world_id: str, title: str | None = None, temporal_mode: str = "forward"
     ) -> ScriptData:
         """
         Generate complete screenplay structure from database.
@@ -143,7 +145,7 @@ class ScriptGenerator:
                 world_id=world_id,
                 generated_at=datetime.utcnow(),
                 temporal_mode=temporal_mode,
-                metadata={"error": "No timepoints found for world_id"}
+                metadata={"error": "No timepoints found for world_id"},
             )
 
         # Sort timepoints by causal order (respects temporal mode)
@@ -178,19 +180,19 @@ class ScriptGenerator:
                 "total_duration_estimate": sum(s.duration_estimate_seconds for s in scenes),
                 "entities_count": len(characters),
                 "dialog_turns": sum(len(s.dialog) for s in scenes),
-                "mechanisms_used": self._detect_mechanisms_used()
-            }
+                "mechanisms_used": self._detect_mechanisms_used(),
+            },
         )
 
         return script_data
 
     def generate_script_structure_from_data(
         self,
-        timepoints: List[Any],
-        entities: List[Any],
+        timepoints: list[Any],
+        entities: list[Any],
         world_id: str,
-        title: Optional[str] = None,
-        temporal_mode: str = "forward"
+        title: str | None = None,
+        temporal_mode: str = "forward",
     ) -> ScriptData:
         """
         Generate complete screenplay structure from in-memory data.
@@ -215,7 +217,7 @@ class ScriptGenerator:
                 world_id=world_id,
                 generated_at=datetime.utcnow(),
                 temporal_mode=temporal_mode,
-                metadata={"error": "No timepoints provided"}
+                metadata={"error": "No timepoints provided"},
             )
 
         # Sort timepoints by causal order (respects temporal mode)
@@ -250,20 +252,21 @@ class ScriptGenerator:
                 "total_duration_estimate": sum(s.duration_estimate_seconds for s in scenes),
                 "entities_count": len(characters),
                 "dialog_turns": sum(len(s.dialog) for s in scenes),
-                "mechanisms_used": self._detect_mechanisms_used()
-            }
+                "mechanisms_used": self._detect_mechanisms_used(),
+            },
         )
 
         return script_data
 
-    def _query_timepoints(self, world_id: str) -> List[Any]:
+    def _query_timepoints(self, world_id: str) -> list[Any]:
         """Query all timepoints for a world (simulation)"""
         # In practice, world_id might be a prefix or first timepoint_id
         # This is a simplified query - adjust based on your DB structure
 
         try:
             # Try to get all timepoints that share a common prefix or timeline_id
-            from sqlmodel import select, Session
+            from sqlmodel import Session, select
+
             from schemas import Timepoint
 
             with Session(self.store.engine) as session:
@@ -282,10 +285,8 @@ class ScriptGenerator:
             return []
 
     def _order_timepoints_by_causality(
-        self,
-        timepoints: List[Any],
-        temporal_mode: str
-    ) -> List[Any]:
+        self, timepoints: list[Any], temporal_mode: str
+    ) -> list[Any]:
         """
         Order timepoints based on temporal mode and causal relationships.
 
@@ -301,13 +302,14 @@ class ScriptGenerator:
         else:
             return self._order_chronologically(timepoints)
 
-    def _order_chronologically(self, timepoints: List[Any]) -> List[Any]:
+    def _order_chronologically(self, timepoints: list[Any]) -> list[Any]:
         """Order timepoints chronologically by timestamp"""
         return sorted(timepoints, key=lambda tp: tp.timestamp)
 
-    def _extract_characters(self, timepoints: List[Any]) -> List[Character]:
+    def _extract_characters(self, timepoints: list[Any]) -> list[Character]:
         """Extract unique characters from all timepoints"""
-        from sqlmodel import select, Session
+        from sqlmodel import Session, select
+
         from schemas import Entity
 
         character_dict = {}
@@ -323,7 +325,9 @@ class ScriptGenerator:
 
                             if entity:
                                 # Extract personality traits
-                                personality = entity.entity_metadata.get("personality_traits", [0.5] * 5)
+                                personality = entity.entity_metadata.get(
+                                    "personality_traits", [0.5] * 5
+                                )
 
                                 # Create character
                                 character = Character(
@@ -332,7 +336,7 @@ class ScriptGenerator:
                                     entity_type=entity.entity_type,
                                     role=entity.entity_metadata.get("role"),
                                     description=self._generate_character_description(entity),
-                                    personality_traits=personality
+                                    personality_traits=personality,
                                 )
                                 character_dict[entity_id] = character
         except Exception as e:
@@ -341,10 +345,8 @@ class ScriptGenerator:
         return list(character_dict.values())
 
     def _extract_characters_from_data(
-        self,
-        timepoints: List[Any],
-        entities: List[Any]
-    ) -> List[Character]:
+        self, timepoints: list[Any], entities: list[Any]
+    ) -> list[Character]:
         """
         Extract unique characters from provided entities.
 
@@ -360,14 +362,14 @@ class ScriptGenerator:
         # Create entity lookup by ID
         entity_dict = {}
         for entity in entities:
-            entity_id = entity.entity_id if hasattr(entity, 'entity_id') else str(entity)
+            entity_id = entity.entity_id if hasattr(entity, "entity_id") else str(entity)
             entity_dict[entity_id] = entity
 
         character_dict = {}
 
         # For each timepoint, extract entities present
         for tp in timepoints:
-            entities_present = tp.entities_present if hasattr(tp, 'entities_present') else []
+            entities_present = tp.entities_present if hasattr(tp, "entities_present") else []
 
             for entity_id in entities_present:
                 if entity_id not in character_dict:
@@ -375,28 +377,27 @@ class ScriptGenerator:
 
                     if entity:
                         # Extract personality traits
-                        entity_metadata = entity.entity_metadata if hasattr(entity, 'entity_metadata') else {}
+                        entity_metadata = (
+                            entity.entity_metadata if hasattr(entity, "entity_metadata") else {}
+                        )
                         personality = entity_metadata.get("personality_traits", [0.5] * 5)
 
                         # Create character
                         character = Character(
                             id=entity_id,
                             name=self._format_character_name(entity_id),
-                            entity_type=entity.entity_type if hasattr(entity, 'entity_type') else 'human',
+                            entity_type=entity.entity_type
+                            if hasattr(entity, "entity_type")
+                            else "human",
                             role=entity_metadata.get("role"),
                             description=self._generate_character_description(entity),
-                            personality_traits=personality
+                            personality_traits=personality,
                         )
                         character_dict[entity_id] = character
 
         return list(character_dict.values())
 
-    def _generate_scene(
-        self,
-        timepoint: Any,
-        scene_number: int,
-        temporal_mode: str
-    ) -> Scene:
+    def _generate_scene(self, timepoint: Any, scene_number: int, temporal_mode: str) -> Scene:
         """Generate a Scene from a Timepoint"""
         # Query environment
         environment = self._query_environment(timepoint.timepoint_id)
@@ -435,7 +436,7 @@ class ScriptGenerator:
             causal_parent=timepoint.causal_parent,
             key_events=[timepoint.event_description[:100]],
             visual_notes=self._generate_visual_notes(atmosphere),
-            production_notes=None
+            production_notes=None,
         )
 
         return scene
@@ -443,11 +444,14 @@ class ScriptGenerator:
     def _query_environment(self, timepoint_id: str) -> SceneEnvironment:
         """Query EnvironmentEntity for timepoint"""
         try:
-            from sqlmodel import select, Session
+            from sqlmodel import Session, select
+
             from schemas import EnvironmentEntity
 
             with Session(self.store.engine) as session:
-                stmt = select(EnvironmentEntity).where(EnvironmentEntity.timepoint_id == timepoint_id)
+                stmt = select(EnvironmentEntity).where(
+                    EnvironmentEntity.timepoint_id == timepoint_id
+                )
                 env = session.exec(stmt).first()
 
                 if env:
@@ -458,7 +462,7 @@ class ScriptGenerator:
                         lighting_level=env.lighting_level,
                         ambient_temperature=env.ambient_temperature,
                         weather=env.weather,
-                        architectural_style=env.architectural_style
+                        architectural_style=env.architectural_style,
                     )
         except Exception as e:
             print(f"Warning: Could not query environment for {timepoint_id}: {e}")
@@ -468,7 +472,8 @@ class ScriptGenerator:
     def _query_atmosphere(self, timepoint_id: str) -> SceneAtmosphere:
         """Query AtmosphereEntity for timepoint"""
         try:
-            from sqlmodel import select, Session
+            from sqlmodel import Session, select
+
             from schemas import AtmosphereEntity
 
             with Session(self.store.engine) as session:
@@ -482,19 +487,20 @@ class ScriptGenerator:
                         emotional_valence=atm.emotional_valence,
                         emotional_arousal=atm.emotional_arousal,
                         social_cohesion=atm.social_cohesion,
-                        energy_level=atm.energy_level
+                        energy_level=atm.energy_level,
                     )
         except Exception as e:
             print(f"Warning: Could not query atmosphere for {timepoint_id}: {e}")
 
         return SceneAtmosphere()
 
-    def _query_dialog(self, timepoint_id: str) -> List[DialogLine]:
+    def _query_dialog(self, timepoint_id: str) -> list[DialogLine]:
         """Query Dialog records for timepoint"""
         dialog_lines = []
 
         try:
-            from sqlmodel import select, Session
+            from sqlmodel import Session, select
+
             from schemas import Dialog
 
             with Session(self.store.engine) as session:
@@ -503,7 +509,11 @@ class ScriptGenerator:
 
                 for dialog_record in dialogs:
                     # Parse turns from JSON
-                    turns = json.loads(dialog_record.turns) if isinstance(dialog_record.turns, str) else dialog_record.turns
+                    turns = (
+                        json.loads(dialog_record.turns)
+                        if isinstance(dialog_record.turns, str)
+                        else dialog_record.turns
+                    )
 
                     for turn in turns:
                         # Handle both dict and object formats
@@ -528,7 +538,7 @@ class ScriptGenerator:
                             content=content,
                             emotional_tone=emotional_tone,
                             parenthetical=parenthetical,
-                            timestamp=timestamp
+                            timestamp=timestamp,
                         )
                         dialog_lines.append(dialog_line)
         except Exception as e:
@@ -545,10 +555,7 @@ class ScriptGenerator:
         return f"{int_ext} {location} - {time}"
 
     def _generate_scene_description(
-        self,
-        timepoint: Any,
-        environment: SceneEnvironment,
-        atmosphere: SceneAtmosphere
+        self, timepoint: Any, environment: SceneEnvironment, atmosphere: SceneAtmosphere
     ) -> str:
         """Generate prose scene description"""
         parts = []
@@ -576,14 +583,16 @@ class ScriptGenerator:
 
         return " ".join(parts)
 
-    def _extract_action_beats(self, event_description: str) -> List[str]:
+    def _extract_action_beats(self, event_description: str) -> list[str]:
         """Extract action beats from event description"""
         # Simple implementation: split on sentences
         # In production, could use NLP to extract actions
-        beats = [s.strip() for s in event_description.split('.') if s.strip()]
+        beats = [s.strip() for s in event_description.split(".") if s.strip()]
         return beats
 
-    def _estimate_scene_duration(self, dialog_lines: List[DialogLine], action_beats: List[str]) -> int:
+    def _estimate_scene_duration(
+        self, dialog_lines: list[DialogLine], action_beats: list[str]
+    ) -> int:
         """Estimate scene duration in seconds (rough heuristic)"""
         # Rough estimates:
         # - Dialog: 3 seconds per line
@@ -639,7 +648,7 @@ class ScriptGenerator:
 
         return ", ".join(parts) if parts else None
 
-    def _update_character_first_appearances(self, characters: List[Character], scenes: List[Scene]):
+    def _update_character_first_appearances(self, characters: list[Character], scenes: list[Scene]):
         """Update first appearance scene number for each character"""
         for character in characters:
             for scene in scenes:
@@ -647,7 +656,7 @@ class ScriptGenerator:
                     character.first_appearance_scene = scene.scene_number
                     break
 
-    def _generate_title(self, timepoints: List[Any], characters: List[Character]) -> str:
+    def _generate_title(self, timepoints: list[Any], characters: list[Character]) -> str:
         """Auto-generate script title"""
         if not timepoints:
             return "Untitled Simulation"
@@ -662,7 +671,7 @@ class ScriptGenerator:
         else:
             return f"Simulation with {len(characters)} Characters"
 
-    def _detect_mechanisms_used(self) -> List[str]:
+    def _detect_mechanisms_used(self) -> list[str]:
         """Detect which mechanisms were used in this simulation"""
         # This would query metadata or check which tables have data
         # For now, return common mechanisms

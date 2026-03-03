@@ -69,8 +69,9 @@ def build_system_prompt(persona_text: str, context_files: list[tuple[str, str]])
     return "\n".join(parts)
 
 
-def chat_once(client: OpenRouterClient, model: str, messages: list[dict],
-              max_tokens: int, temperature: float) -> str:
+def chat_once(
+    client: OpenRouterClient, model: str, messages: list[dict], max_tokens: int, temperature: float
+) -> str:
     """Send messages to the LLM and return the assistant response text."""
     response = client.chat.completions.create(
         model=model,
@@ -81,8 +82,14 @@ def chat_once(client: OpenRouterClient, model: str, messages: list[dict],
     return response["choices"][0]["message"]["content"]
 
 
-def run_batch(client: OpenRouterClient, model: str, system_prompt: str,
-              questions: list[str], max_tokens: int, temperature: float):
+def run_batch(
+    client: OpenRouterClient,
+    model: str,
+    system_prompt: str,
+    questions: list[str],
+    max_tokens: int,
+    temperature: float,
+):
     """Ask each question independently, print answer, exit."""
     for question in questions:
         messages = [
@@ -95,8 +102,9 @@ def run_batch(client: OpenRouterClient, model: str, system_prompt: str,
         print(answer)
 
 
-def run_interactive(client: OpenRouterClient, model: str, system_prompt: str,
-                    max_tokens: int, temperature: float):
+def run_interactive(
+    client: OpenRouterClient, model: str, system_prompt: str, max_tokens: int, temperature: float
+):
     """Interactive stdin/stdout loop. Conversation history accumulates."""
     messages = [{"role": "system", "content": system_prompt}]
     print("Persona chat ready. Type your message (Ctrl+C to exit).\n")
@@ -123,29 +131,28 @@ def main():
         description="Chat with testing personas using arbitrary context files."
     )
     parser.add_argument(
-        "--persona", required=True,
+        "--persona",
+        required=True,
         choices=["AGENT1", "AGENT2", "AGENT3", "AGENT4"],
-        help="Persona to chat with (loads docs/testing_personas/AGENT{N}.md)"
+        help="Persona to chat with (loads docs/testing_personas/AGENT{N}.md)",
     )
     parser.add_argument(
-        "--context", nargs="*", default=[],
-        help="Context files to include in system prompt"
+        "--context", nargs="*", default=[], help="Context files to include in system prompt"
     )
     parser.add_argument(
-        "--max-tokens", type=int, default=1000,
-        help="Max tokens per response (default: 1000)"
+        "--max-tokens", type=int, default=1000, help="Max tokens per response (default: 1000)"
     )
     parser.add_argument(
-        "--model", default="anthropic/claude-opus-4-6",
-        help="Model to use (default: anthropic/claude-opus-4-6)"
+        "--model",
+        default="anthropic/claude-opus-4-6",
+        help="Model to use (default: anthropic/claude-opus-4-6)",
     )
+    parser.add_argument("--temperature", type=float, default=0.7, help="Temperature (default: 0.7)")
     parser.add_argument(
-        "--temperature", type=float, default=0.7,
-        help="Temperature (default: 0.7)"
-    )
-    parser.add_argument(
-        "--batch", action="append", default=[],
-        help="Ask one question, print answer, exit (repeatable)"
+        "--batch",
+        action="append",
+        default=[],
+        help="Ask one question, print answer, exit (repeatable)",
     )
 
     args = parser.parse_args()

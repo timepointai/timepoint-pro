@@ -1,24 +1,23 @@
 """
 Unit tests for Oxen.ai integration module.
 """
-import pytest
+
+import json
 import os
 import tempfile
-import json
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch
+
+import pytest
 
 from oxen_integration import (
-    OxenClient,
+    AuthenticationError,
     AuthManager,
     ConfigManager,
+    OxenClient,
     OxenConfig,
-    UploadResult,
     RepositoryInfo,
-    AuthenticationError,
-    UploadError,
-    RepositoryError,
-    ConfigurationError,
+    UploadResult,
 )
 
 
@@ -104,15 +103,13 @@ class TestConfigManager:
             config_path = Path(tmp_dir) / "oxen_config.json"
             manager = ConfigManager(config_path)
 
-            config = OxenConfig(
-                api_token="save_token", default_namespace="save_user"
-            )
+            config = OxenConfig(api_token="save_token", default_namespace="save_user")
             manager.save(config)
 
             assert config_path.exists()
 
             # Load and verify
-            with open(config_path, "r") as f:
+            with open(config_path) as f:
                 saved_data = json.load(f)
 
             assert saved_data["api_token"] == "save_token"
@@ -233,8 +230,7 @@ class TestOxenClient:
 
             file_url = client.get_finetune_url("datasets/data.jsonl")
             assert (
-                file_url
-                == "https://www.oxen.ai/fine-tune?repo=user/repo&file=datasets/data.jsonl"
+                file_url == "https://www.oxen.ai/fine-tune?repo=user/repo&file=datasets/data.jsonl"
             )
 
 

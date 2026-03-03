@@ -8,32 +8,33 @@ Phase 2: Parallel Training Infrastructure
 """
 
 import asyncio
-import json
 import base64
-from typing import Dict, List, Optional, Callable, TypedDict
+import json
+from collections.abc import Callable
 from datetime import datetime
+from typing import TypedDict
 
 from schemas import Entity, TTMTensor
 from tensor_persistence import TensorDatabase, TensorRecord
-from tensor_serialization import serialize_tensor, deserialize_tensor
+from tensor_serialization import deserialize_tensor, serialize_tensor
 from training.parallel_trainer import ParallelTensorTrainer, TrainingResult
-from training.job_queue import JobQueue
 
 
 class TrainingNodeState(TypedDict):
     """State for training node in LangGraph workflow."""
-    entities: List[Entity]
+
+    entities: list[Entity]
     tensor_db: TensorDatabase
     target_maturity: float
     max_workers: int
-    training_results: Dict[str, TrainingResult]
+    training_results: dict[str, TrainingResult]
 
 
 def create_parallel_training_node(
     tensor_db: TensorDatabase,
     target_maturity: float = 0.95,
     max_workers: int = 4,
-    progress_callback: Optional[Callable[[str, float, int], None]] = None
+    progress_callback: Callable[[str, float, int], None] | None = None,
 ):
     """
     Create a LangGraph node function for parallel tensor training.
@@ -55,7 +56,8 @@ def create_parallel_training_node(
         training_node = create_parallel_training_node(tensor_db)
         workflow.add_node("parallel_training", training_node)
     """
-    def parallel_training_node(state: Dict) -> Dict:
+
+    def parallel_training_node(state: dict) -> dict:
         """
         LangGraph node for parallel tensor training.
 
@@ -96,17 +98,12 @@ def create_parallel_training_node(
         print(f"  Training {len(tensor_ids)} tensors with {max_workers} workers...")
 
         trainer = ParallelTensorTrainer(
-            tensor_db=tensor_db,
-            max_workers=max_workers,
-            progress_callback=progress_callback
+            tensor_db=tensor_db, max_workers=max_workers, progress_callback=progress_callback
         )
 
         # Run async training in event loop
         results = asyncio.run(
-            trainer.train_batch(
-                tensor_ids=tensor_ids,
-                target_maturity=target_maturity
-            )
+            trainer.train_batch(tensor_ids=tensor_ids, target_maturity=target_maturity)
         )
 
         # Step 3: Update entities with trained tensors
@@ -125,11 +122,8 @@ def create_parallel_training_node(
 
 
 def _ensure_tensor_persisted(
-    entity: Entity,
-    tensor_db: TensorDatabase,
-    world_id: str,
-    run_id: str
-) -> Optional[str]:
+    entity: Entity, tensor_db: TensorDatabase, world_id: str, run_id: str
+) -> str | None:
     """
     Ensure an entity's tensor is persisted to the database.
 
@@ -162,7 +156,7 @@ def _ensure_tensor_persisted(
         ttm_tensor = TTMTensor(
             context_vector=base64.b64decode(tensor_data["context_vector"]),
             biology_vector=base64.b64decode(tensor_data["biology_vector"]),
-            behavior_vector=base64.b64decode(tensor_data["behavior_vector"])
+            behavior_vector=base64.b64decode(tensor_data["behavior_vector"]),
         )
 
         record = TensorRecord(
@@ -170,8 +164,8 @@ def _ensure_tensor_persisted(
             entity_id=entity.entity_id,
             world_id=world_id,
             tensor_blob=serialize_tensor(ttm_tensor),
-            maturity=getattr(entity, 'tensor_maturity', 0.0),
-            training_cycles=getattr(entity, 'tensor_training_cycles', 0)
+            maturity=getattr(entity, "tensor_maturity", 0.0),
+            training_cycles=getattr(entity, "tensor_training_cycles", 0),
         )
 
         tensor_db.save_tensor(record)
@@ -183,9 +177,7 @@ def _ensure_tensor_persisted(
 
 
 def _update_entities_from_training(
-    entities: List[Entity],
-    results: Dict[str, TrainingResult],
-    tensor_db: TensorDatabase
+    entities: list[Entity], results: dict[str, TrainingResult], tensor_db: TensorDatabase
 ) -> None:
     """
     Update entities with trained tensor data.
@@ -227,18 +219,26 @@ def _update_entities_from_training(
         try:
             trained_tensor = deserialize_tensor(record.tensor_blob)
 
-            entity.tensor = json.dumps({
-                "context_vector": base64.b64encode(trained_tensor.context_vector).decode('utf-8'),
-                "biology_vector": base64.b64encode(trained_tensor.biology_vector).decode('utf-8'),
-                "behavior_vector": base64.b64encode(trained_tensor.behavior_vector).decode('utf-8')
-            })
+            entity.tensor = json.dumps(
+                {
+                    "context_vector": base64.b64encode(trained_tensor.context_vector).decode(
+                        "utf-8"
+                    ),
+                    "biology_vector": base64.b64encode(trained_tensor.biology_vector).decode(
+                        "utf-8"
+                    ),
+                    "behavior_vector": base64.b64encode(trained_tensor.behavior_vector).decode(
+                        "utf-8"
+                    ),
+                }
+            )
 
             # Update maturity metadata
             entity.tensor_maturity = matching_result.final_maturity
             entity.tensor_training_cycles = matching_result.cycles_completed
 
             # Mark as trained in metadata
-            if not hasattr(entity, 'entity_metadata') or entity.entity_metadata is None:
+            if not hasattr(entity, "entity_metadata") or entity.entity_metadata is None:
                 entity.entity_metadata = {}
             entity.entity_metadata["needs_training"] = False
             entity.entity_metadata["training_completed_at"] = datetime.now().isoformat()
@@ -254,7 +254,7 @@ def extend_workflow_with_training(
     after_node: str = "compress_tensors",
     before_node: str = "progressive_training_check",
     target_maturity: float = 0.95,
-    max_workers: int = 4
+    max_workers: int = 4,
 ):
     """
     Extend an existing LangGraph workflow with parallel training.
@@ -281,9 +281,7 @@ def extend_workflow_with_training(
     """
     # Create the training node
     training_node = create_parallel_training_node(
-        tensor_db=tensor_db,
-        target_maturity=target_maturity,
-        max_workers=max_workers
+        tensor_db=tensor_db, target_maturity=target_maturity, max_workers=max_workers
     )
 
     # Add node
@@ -298,14 +296,14 @@ def extend_workflow_with_training(
 
 
 async def train_entities_async(
-    entities: List[Entity],
+    entities: list[Entity],
     tensor_db: TensorDatabase,
     world_id: str = "default",
-    run_id: Optional[str] = None,
+    run_id: str | None = None,
     target_maturity: float = 0.95,
     max_workers: int = 4,
-    progress_callback: Optional[Callable[[str, float, int], None]] = None
-) -> Dict[str, TrainingResult]:
+    progress_callback: Callable[[str, float, int], None] | None = None,
+) -> dict[str, TrainingResult]:
     """
     Convenience function to train entity tensors asynchronously.
 
@@ -346,15 +344,10 @@ async def train_entities_async(
 
     # Create trainer and run
     trainer = ParallelTensorTrainer(
-        tensor_db=tensor_db,
-        max_workers=max_workers,
-        progress_callback=progress_callback
+        tensor_db=tensor_db, max_workers=max_workers, progress_callback=progress_callback
     )
 
-    results = await trainer.train_batch(
-        tensor_ids=tensor_ids,
-        target_maturity=target_maturity
-    )
+    results = await trainer.train_batch(tensor_ids=tensor_ids, target_maturity=target_maturity)
 
     # Update entities
     _update_entities_from_training(entities, results, tensor_db)

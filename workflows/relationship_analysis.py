@@ -11,15 +11,17 @@ Contains:
 - Helper functions for relationship events, beliefs, roles
 """
 
-from typing import List, Dict, Optional
-from datetime import datetime
 import json
+from datetime import datetime
+from typing import Optional
 
-from schemas import (
-    Entity, RelationshipTrajectory, RelationshipState,
-    RelationshipMetrics, Contradiction
-)
 from metadata.tracking import track_mechanism
+from schemas import (
+    Contradiction,
+    Entity,
+    RelationshipState,
+    RelationshipTrajectory,
+)
 
 # Import compute_relationship_metrics from dialog_synthesis to avoid duplication
 from workflows.dialog_synthesis import compute_relationship_metrics
@@ -28,10 +30,10 @@ from workflows.dialog_synthesis import compute_relationship_metrics
 def analyze_relationship_evolution(
     entity_a: str,
     entity_b: str,
-    timeline: List[Dict],
-    start_time: Optional[datetime] = None,
-    end_time: Optional[datetime] = None,
-    store: Optional['GraphStore'] = None
+    timeline: list[dict],
+    start_time: datetime | None = None,
+    end_time: datetime | None = None,
+    store: Optional["GraphStore"] = None,
 ) -> RelationshipTrajectory:
     """Track relationship changes across timepoints"""
 
@@ -45,13 +47,14 @@ def analyze_relationship_evolution(
             end_timepoint="unknown",
             states="[]",
             overall_trend="stable",
-            key_events=[]
+            key_events=[],
         )
 
     # Get timepoints in range
     timepoints = store.get_timepoints_in_range(start_time, end_time)
     relevant_timepoints = [
-        tp for tp in timepoints
+        tp
+        for tp in timepoints
         if entity_a in tp.entities_present and entity_b in tp.entities_present
     ]
 
@@ -64,7 +67,7 @@ def analyze_relationship_evolution(
             end_timepoint="none",
             states="[]",
             overall_trend="no_interaction",
-            key_events=[]
+            key_events=[],
         )
 
     states = []
@@ -89,7 +92,7 @@ def analyze_relationship_evolution(
             timestamp=tp.timestamp,
             timepoint_id=tp.timepoint_id,
             metrics=metrics,
-            recent_events=recent_events
+            recent_events=recent_events,
         )
         states.append(state)
 
@@ -117,8 +120,8 @@ def analyze_relationship_evolution(
     for s in states:
         state_dict = s.dict()
         # Convert any datetime objects to ISO format strings
-        if 'timestamp' in state_dict and hasattr(state_dict['timestamp'], 'isoformat'):
-            state_dict['timestamp'] = state_dict['timestamp'].isoformat()
+        if "timestamp" in state_dict and hasattr(state_dict["timestamp"], "isoformat"):
+            state_dict["timestamp"] = state_dict["timestamp"].isoformat()
         serializable_states.append(state_dict)
 
     return RelationshipTrajectory(
@@ -129,21 +132,19 @@ def analyze_relationship_evolution(
         end_timepoint=relevant_timepoints[-1].timepoint_id,
         states=json.dumps(serializable_states),
         overall_trend=overall_trend,
-        key_events=list(set(key_events))  # Remove duplicates
+        key_events=list(set(key_events)),  # Remove duplicates
     )
 
 
 def detect_contradictions(
-    entities: List[Entity],
-    timepoint: 'Timepoint',
-    store: Optional['GraphStore'] = None
-) -> List[Contradiction]:
+    entities: list[Entity], timepoint: "Timepoint", store: Optional["GraphStore"] = None
+) -> list[Contradiction]:
     """Find inconsistent beliefs or knowledge between entities"""
 
     contradictions = []
 
     for i, entity_a in enumerate(entities):
-        for entity_b in entities[i+1:]:  # Skip self-comparisons (Phase 7.5: Fixed enumerate bug)
+        for entity_b in entities[i + 1 :]:  # Skip self-comparisons (Phase 7.5: Fixed enumerate bug)
             # Compare knowledge claims
             knowledge_a = set(entity_a.entity_metadata.get("knowledge_state", []))
             knowledge_b = set(entity_b.entity_metadata.get("knowledge_state", []))
@@ -170,7 +171,8 @@ def detect_contradictions(
                             severity=conflict_severity,
                             timepoint_id=timepoint.timepoint_id,
                             context=f"Conflicting beliefs on '{topic}': {entity_a.entity_id} believes {belief_a:.2f}, {entity_b.entity_id} believes {belief_b:.2f}",
-                            resolution_possible=conflict_severity < 0.8  # Very extreme conflicts may be unresolvable
+                            resolution_possible=conflict_severity
+                            < 0.8,  # Very extreme conflicts may be unresolvable
                         )
                         contradictions.append(contradiction)
 
@@ -179,12 +181,12 @@ def detect_contradictions(
 
 @track_mechanism("M13", "multi_entity_synthesis")
 def synthesize_multi_entity_response(
-    entities: List[str],
+    entities: list[str],
     query: str,
-    timeline: List[Dict],
-    llm: 'LLMClient',
-    store: Optional['GraphStore'] = None
-) -> Dict:
+    timeline: list[dict],
+    llm: "LLMClient",
+    store: Optional["GraphStore"] = None,
+) -> dict:
     """Generate response requiring multiple entity perspectives"""
 
     if not store:
@@ -203,22 +205,19 @@ def synthesize_multi_entity_response(
         knowledge = entity_obj.entity_metadata.get("knowledge_state", [])
         personality = entity_obj.entity_metadata.get("personality_traits", ["unknown"])
 
-        entity_states.append({
-            "entity_id": entity_a,
-            "knowledge": knowledge,
-            "personality": personality,
-            "role": infer_historical_role(entity_a)
-        })
+        entity_states.append(
+            {
+                "entity_id": entity_a,
+                "knowledge": knowledge,
+                "personality": personality,
+                "role": infer_historical_role(entity_a),
+            }
+        )
 
         # Get relationship trajectories with other entities
-        for entity_b in entities[i+1:]:
-            trajectory = analyze_relationship_evolution(
-                entity_a, entity_b, timeline, store=store
-            )
-            trajectories.append({
-                "entities": [entity_a, entity_b],
-                "trajectory": trajectory.dict()
-            })
+        for entity_b in entities[i + 1 :]:
+            trajectory = analyze_relationship_evolution(entity_a, entity_b, timeline, store=store)
+            trajectories.append({"entities": [entity_a, entity_b], "trajectory": trajectory.dict()})
 
     # Detect contradictions
     entity_objects = [store.get_entity(eid) for eid in entities if store.get_entity(eid)]
@@ -240,8 +239,10 @@ def synthesize_multi_entity_response(
         "query": query,
         "timeline_context": {
             "span": f"{len(timeline)} timepoints" if timeline else "unknown",
-            "current_event": current_tp.get("event_description", "unknown") if current_tp else "unknown"
-        }
+            "current_event": current_tp.get("event_description", "unknown")
+            if current_tp
+            else "unknown",
+        },
     }
 
     # Generate comparative analysis
@@ -275,13 +276,14 @@ Return only valid JSON, no other text."""
     try:
         response = json.loads(response_data)
     except:
-            response = {"error": "Failed to parse LLM response"}
+        response = {"error": "Failed to parse LLM response"}
 
     return response
 
 
-def get_relationship_events(entity_a: str, entity_b: str, timepoint_id: str,
-                           store: Optional['GraphStore'] = None) -> List[str]:
+def get_relationship_events(
+    entity_a: str, entity_b: str, timepoint_id: str, store: Optional["GraphStore"] = None
+) -> list[str]:
     """Get recent events that affected the relationship between two entities"""
     if not store:
         return []
@@ -296,12 +298,14 @@ def get_relationship_events(entity_a: str, entity_b: str, timepoint_id: str,
             turns = json.loads(dialog.turns)
             for turn in turns:
                 if turn.get("speaker") in [entity_a, entity_b]:
-                    relevant_events.append(f"{turn.get('speaker')}: {turn.get('content', '')[:100]}...")
+                    relevant_events.append(
+                        f"{turn.get('speaker')}: {turn.get('content', '')[:100]}..."
+                    )
 
     return relevant_events[:3]  # Limit to 3 most recent
 
 
-def get_belief_on_topic(entity: Entity, topic: str) -> Optional[float]:
+def get_belief_on_topic(entity: Entity, topic: str) -> float | None:
     """Extract entity's belief strength on a topic (-1.0 to 1.0)"""
     # Simple heuristic: look for topic in knowledge and assign belief based on context
     knowledge = entity.entity_metadata.get("knowledge_state", [])
@@ -312,9 +316,9 @@ def get_belief_on_topic(entity: Entity, topic: str) -> Optional[float]:
             if any(neg in item.lower() for neg in ["not", "never", "against", "opposed"]):
                 return -0.7  # Negative belief
             elif any(pos in item.lower() for pos in ["support", "favor", "agree", "good"]):
-                return 0.7   # Positive belief
+                return 0.7  # Positive belief
             else:
-                return 0.0   # Neutral belief
+                return 0.0  # Neutral belief
 
     return None  # No belief found on topic
 
@@ -326,6 +330,6 @@ def infer_historical_role(entity_id: str) -> str:
         "jefferson": "Secretary of State/Philosopher",
         "hamilton": "Secretary of Treasury/Financial Expert",
         "adams": "Vice President/Diplomat",
-        "madison": "Secretary of State/Constitutional Scholar"
+        "madison": "Secretary of State/Constitutional Scholar",
     }
     return role_map.get(entity_id.lower(), "Historical Figure")

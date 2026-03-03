@@ -21,13 +21,13 @@ Usage:
     workflow.add_node("parallel_training", training_node)
 """
 
-from training.job_queue import JobQueue, TrainingJob, JobStatus
+from training.job_queue import JobQueue, JobStatus, TrainingJob
 from training.parallel_trainer import ParallelTensorTrainer, TrainingResult
 from training.training_node import (
+    TrainingNodeState,
     create_parallel_training_node,
     extend_workflow_with_training,
     train_entities_async,
-    TrainingNodeState,
 )
 
 __all__ = [

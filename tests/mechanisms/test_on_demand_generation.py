@@ -5,11 +5,13 @@ Tests that unknown entities are generated dynamically when queried.
 """
 
 import os
-import pytest
 import tempfile
+
+import pytest
+
+from llm_v2 import LLMClient
 from query_interface import QueryInterface
 from storage import GraphStore
-from llm_v2 import LLMClient
 
 
 @pytest.mark.unit
@@ -21,13 +23,14 @@ def test_entity_gap_detection():
     class MockQueryInterface:
         def extract_entity_names(self, query):
             import re
+
             entity_names = set()
 
             # Pattern for numbered entities
             numbered_patterns = [
-                r'attendee\s*#?\s*(\d+)',
-                r'person\s*#?\s*(\d+)',
-                r'member\s*#?\s*(\d+)'
+                r"attendee\s*#?\s*(\d+)",
+                r"person\s*#?\s*(\d+)",
+                r"member\s*#?\s*(\d+)",
             ]
 
             for pattern in numbered_patterns:
@@ -63,16 +66,13 @@ def test_entity_gap_detection():
 
 @pytest.mark.integration
 @pytest.mark.llm
-@pytest.mark.skipif(
-    not os.getenv("OPENROUTER_API_KEY"),
-    reason="OPENROUTER_API_KEY not set"
-)
+@pytest.mark.skipif(not os.getenv("OPENROUTER_API_KEY"), reason="OPENROUTER_API_KEY not set")
 def test_on_demand_generation():
     """Test on-demand entity generation with real LLM"""
     print("\n🎭 Testing On-Demand Entity Generation")
 
     # Create temporary database for testing
-    with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as f:
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
         test_db = f.name
 
     try:
@@ -83,15 +83,16 @@ def test_on_demand_generation():
         query_interface = QueryInterface(store, llm_client)
 
         # Create a test timepoint
-        from schemas import Timepoint, ResolutionLevel
         from datetime import datetime
+
+        from schemas import ResolutionLevel, Timepoint
 
         timepoint = Timepoint(
             timepoint_id="test_inauguration",
             timestamp=datetime(1789, 4, 30, 12, 0),
             event_description="Inauguration ceremony at Federal Hall",
             entities_present=["george_washington", "john_adams", "thomas_jefferson"],
-            resolution_level=ResolutionLevel.SCENE
+            resolution_level=ResolutionLevel.SCENE,
         )
         store.save_timepoint(timepoint)
 

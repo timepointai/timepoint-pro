@@ -6,26 +6,19 @@ spectral distance, and HarmonicFitResult — all pure math, no LLM/DB
 dependencies.
 """
 
-import pytest
 import numpy as np
 
-from synth.harmonic_fitter import (
-    harmonic_adprs_waveform,
-    HarmonicFitter,
-    HarmonicFitResult,
-    HARMONIC_PARAM_BOUNDS,
-    HARMONIC_PARAM_NAMES,
-    HARMONIC_DEFAULT_PARAMS,
-)
 from synth.adprs_fitter import adprs_waveform
-
+from synth.harmonic_fitter import (
+    HarmonicFitResult,
+    HarmonicFitter,
+    harmonic_adprs_waveform,
+)
 
 # --- Helpers ---
 
 
-def generate_harmonic_data(
-    P1, c1, A1, c2, A2, c3, A3, baseline, n_points=20, noise=0.0
-):
+def generate_harmonic_data(P1, c1, A1, c2, A2, c3, A3, baseline, n_points=20, noise=0.0):
     """Generate tau/activation data from known harmonic ADPRS params."""
     tau = np.linspace(0.0, 0.95, n_points)  # Avoid tau=1 where decay -> 0
     activation = harmonic_adprs_waveform(tau, P1, c1, A1, c2, A2, c3, A3, baseline)
@@ -77,9 +70,7 @@ class TestHarmonicWaveform:
         for P1 in [0.5, 2.0, 8.0]:
             for c1 in [0.01, 0.5, 1.0]:
                 for baseline in [0.0, 0.5, 1.0]:
-                    result = harmonic_adprs_waveform(
-                        tau, P1, c1, 0.7, 0.3, 0.5, 0.2, 0.5, baseline
-                    )
+                    result = harmonic_adprs_waveform(tau, P1, c1, 0.7, 0.3, 0.5, 0.2, 0.5, baseline)
                     assert np.all(result >= 0.0) and np.all(result <= 1.0), (
                         f"Out of range for P1={P1}, c1={c1}, baseline={baseline}"
                     )
@@ -89,12 +80,8 @@ class TestHarmonicWaveform:
         tau = np.linspace(0.0, 0.95, 50)
         P1, c1, A1, baseline = 2.0, 0.8, 0.7, 0.1
 
-        fundamental_only = harmonic_adprs_waveform(
-            tau, P1, c1, A1, 0.0, 0.5, 0.0, 0.5, baseline
-        )
-        with_harmonics = harmonic_adprs_waveform(
-            tau, P1, c1, A1, 0.3, 0.6, 0.2, 0.5, baseline
-        )
+        fundamental_only = harmonic_adprs_waveform(tau, P1, c1, A1, 0.0, 0.5, 0.0, 0.5, baseline)
+        with_harmonics = harmonic_adprs_waveform(tau, P1, c1, A1, 0.3, 0.6, 0.2, 0.5, baseline)
 
         # Signals should not be identical
         diff = np.abs(fundamental_only - with_harmonics)
@@ -102,17 +89,13 @@ class TestHarmonicWaveform:
 
     def test_boundary_tau_zero(self):
         """At tau=0, sin(0)=0 so phi = baseline."""
-        result = harmonic_adprs_waveform(
-            np.array([0.0]), 2.0, 0.8, 0.7, 0.3, 0.5, 0.2, 0.5, 0.1
-        )
+        result = harmonic_adprs_waveform(np.array([0.0]), 2.0, 0.8, 0.7, 0.3, 0.5, 0.2, 0.5, 0.1)
         # sin(0)=0 for all harmonics, so all oscillation terms are 0
         assert abs(result[0] - 0.1) < 1e-10
 
     def test_boundary_tau_one(self):
         """At tau=1, decay=0 so phi = baseline."""
-        result = harmonic_adprs_waveform(
-            np.array([1.0]), 2.0, 0.8, 0.7, 0.3, 0.5, 0.2, 0.5, 0.1
-        )
+        result = harmonic_adprs_waveform(np.array([1.0]), 2.0, 0.8, 0.7, 0.3, 0.5, 0.2, 0.5, 0.1)
         # (1-1)^exp = 0 for all harmonics (with A < 1), so phi = baseline
         # Note: when A=1.0, exponent=0 so decay=1, but for A<1 decay=0
         # A1=0.7, A2=0.5, A3=0.5 all < 1, so all decay terms are 0
@@ -150,9 +133,7 @@ class TestHarmonicFitter:
         c3, A3 = 0.15, 0.6
         baseline = 0.05
 
-        tau, activation = generate_harmonic_data(
-            P1, c1, A1, c2, A2, c3, A3, baseline, n_points=40
-        )
+        tau, activation = generate_harmonic_data(P1, c1, A1, c2, A2, c3, A3, baseline, n_points=40)
 
         fitter = HarmonicFitter(de_maxiter=300, de_seed=42)
         result = fitter.fit_entity(tau, activation, "e1", harmonics=3)
@@ -218,9 +199,13 @@ class TestHarmonicFitter:
         )
 
         prior = {
-            "P1": 2.1, "c1": 0.75, "A1": 0.65,
-            "c2": 0.0, "A2": 0.5,
-            "c3": 0.0, "A3": 0.5,
+            "P1": 2.1,
+            "c1": 0.75,
+            "A1": 0.65,
+            "c2": 0.0,
+            "A2": 0.5,
+            "c3": 0.0,
+            "A3": 0.5,
             "baseline": 0.12,
         }
 
@@ -296,7 +281,16 @@ class TestHarmonicFitResult:
         """Result has all expected fields."""
         result = HarmonicFitResult(
             entity_id="e1",
-            params={"P1": 2.0, "c1": 0.8, "A1": 0.7, "c2": 0.0, "A2": 0.5, "c3": 0.0, "A3": 0.5, "baseline": 0.1},
+            params={
+                "P1": 2.0,
+                "c1": 0.8,
+                "A1": 0.7,
+                "c2": 0.0,
+                "A2": 0.5,
+                "c3": 0.0,
+                "A3": 0.5,
+                "baseline": 0.1,
+            },
             spectral_signature=[0.8, 0.0, 0.0],
             residual=0.005,
             n_points=20,

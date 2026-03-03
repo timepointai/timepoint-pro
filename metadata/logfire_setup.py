@@ -8,12 +8,12 @@ No mocks - uses real logfire library.
 """
 
 import os
-from typing import Optional, Any
 from contextlib import contextmanager
 
 # Try to import logfire, fallback to simple console logging
 try:
     import logfire
+
     LOGFIRE_AVAILABLE = True
 except ImportError:
     LOGFIRE_AVAILABLE = False
@@ -101,7 +101,7 @@ class LogfireManager:
 
 
 # Global logfire manager instance
-_logfire_manager: Optional[LogfireManager] = None
+_logfire_manager: LogfireManager | None = None
 
 
 def get_logfire() -> LogfireManager:

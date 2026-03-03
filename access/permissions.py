@@ -11,16 +11,15 @@ Phase 5: Access Control
 
 import json
 import sqlite3
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Set
-from contextlib import contextmanager
-
 
 # ============================================================================
 # Exceptions
 # ============================================================================
+
 
 class PermissionDenied(Exception):
     """Raised when a user lacks permission for an action."""
@@ -29,14 +28,13 @@ class PermissionDenied(Exception):
         self.user_id = user_id
         self.tensor_id = tensor_id
         self.action = action
-        super().__init__(
-            f"User '{user_id}' cannot {action} tensor '{tensor_id}'"
-        )
+        super().__init__(f"User '{user_id}' cannot {action} tensor '{tensor_id}'")
 
 
 # ============================================================================
 # Data Classes
 # ============================================================================
+
 
 @dataclass
 class TensorPermission:
@@ -56,16 +54,17 @@ class TensorPermission:
         accessed_at: When tensor was last accessed
         access_count: Total access count
     """
+
     tensor_id: str
     owner_id: str
     access_level: str = "private"
-    shared_with: List[str] = field(default_factory=list)
-    shared_groups: List[str] = field(default_factory=list)
+    shared_with: list[str] = field(default_factory=list)
+    shared_groups: list[str] = field(default_factory=list)
     api_enabled: bool = False
     rate_limit: int = 100
-    created_at: Optional[datetime] = None
-    modified_at: Optional[datetime] = None
-    accessed_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    modified_at: datetime | None = None
+    accessed_at: datetime | None = None
     access_count: int = 0
 
     def __post_init__(self):
@@ -82,6 +81,7 @@ class TensorPermission:
 # ============================================================================
 # Permission Enforcer
 # ============================================================================
+
 
 class PermissionEnforcer:
     """
@@ -177,7 +177,7 @@ class PermissionEnforcer:
     # Permission CRUD
     # =========================================================================
 
-    def get_permission(self, tensor_id: str) -> Optional[TensorPermission]:
+    def get_permission(self, tensor_id: str) -> TensorPermission | None:
         """
         Get permission record for a tensor.
 
@@ -189,8 +189,7 @@ class PermissionEnforcer:
         """
         with self._transaction() as conn:
             cursor = conn.execute(
-                "SELECT * FROM tensor_permissions WHERE tensor_id = ?",
-                (tensor_id,)
+                "SELECT * FROM tensor_permissions WHERE tensor_id = ?", (tensor_id,)
             )
             row = cursor.fetchone()
             if row is None:
@@ -206,7 +205,9 @@ class PermissionEnforcer:
                 rate_limit=row["rate_limit"],
                 created_at=datetime.fromisoformat(row["created_at"]),
                 modified_at=datetime.fromisoformat(row["modified_at"]),
-                accessed_at=datetime.fromisoformat(row["accessed_at"]) if row["accessed_at"] else None,
+                accessed_at=datetime.fromisoformat(row["accessed_at"])
+                if row["accessed_at"]
+                else None,
                 access_count=row["access_count"],
             )
 
@@ -221,25 +222,28 @@ class PermissionEnforcer:
         permission.modified_at = datetime.utcnow()
 
         with self._transaction() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT OR REPLACE INTO tensor_permissions
                 (tensor_id, owner_id, access_level, shared_with_json,
                  shared_groups_json, api_enabled, rate_limit, created_at,
                  modified_at, accessed_at, access_count)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                permission.tensor_id,
-                permission.owner_id,
-                permission.access_level,
-                json.dumps(permission.shared_with),
-                json.dumps(permission.shared_groups),
-                1 if permission.api_enabled else 0,
-                permission.rate_limit,
-                permission.created_at.isoformat() if permission.created_at else now,
-                now,
-                permission.accessed_at.isoformat() if permission.accessed_at else None,
-                permission.access_count,
-            ))
+            """,
+                (
+                    permission.tensor_id,
+                    permission.owner_id,
+                    permission.access_level,
+                    json.dumps(permission.shared_with),
+                    json.dumps(permission.shared_groups),
+                    1 if permission.api_enabled else 0,
+                    permission.rate_limit,
+                    permission.created_at.isoformat() if permission.created_at else now,
+                    now,
+                    permission.accessed_at.isoformat() if permission.accessed_at else None,
+                    permission.access_count,
+                ),
+            )
 
     def delete_permission(self, tensor_id: str) -> bool:
         """
@@ -253,16 +257,12 @@ class PermissionEnforcer:
         """
         with self._transaction() as conn:
             cursor = conn.execute(
-                "DELETE FROM tensor_permissions WHERE tensor_id = ?",
-                (tensor_id,)
+                "DELETE FROM tensor_permissions WHERE tensor_id = ?", (tensor_id,)
             )
             return cursor.rowcount > 0
 
     def create_default_permission(
-        self,
-        tensor_id: str,
-        owner_id: str,
-        access_level: str = "private"
+        self, tensor_id: str, owner_id: str, access_level: str = "private"
     ) -> TensorPermission:
         """
         Create default permission for a new tensor.
@@ -377,12 +377,7 @@ class PermissionEnforcer:
         # Must be able to read to fork
         return self.can_read(user_id, tensor_id)
 
-    def enforce(
-        self,
-        user_id: str,
-        tensor_id: str,
-        action: str
-    ) -> None:
+    def enforce(self, user_id: str, tensor_id: str, action: str) -> None:
         """
         Enforce permission, raise if denied.
 
@@ -412,12 +407,7 @@ class PermissionEnforcer:
     # Access Management
     # =========================================================================
 
-    def grant_access(
-        self,
-        owner_id: str,
-        tensor_id: str,
-        target_user_id: str
-    ) -> bool:
+    def grant_access(self, owner_id: str, tensor_id: str, target_user_id: str) -> bool:
         """
         Grant read access to a user.
 
@@ -443,12 +433,7 @@ class PermissionEnforcer:
 
         return True
 
-    def revoke_access(
-        self,
-        owner_id: str,
-        tensor_id: str,
-        target_user_id: str
-    ) -> bool:
+    def revoke_access(self, owner_id: str, tensor_id: str, target_user_id: str) -> bool:
         """
         Revoke read access from a user.
 
@@ -474,12 +459,7 @@ class PermissionEnforcer:
 
         return True
 
-    def set_access_level(
-        self,
-        owner_id: str,
-        tensor_id: str,
-        access_level: str
-    ) -> bool:
+    def set_access_level(self, owner_id: str, tensor_id: str, access_level: str) -> bool:
         """
         Change tensor access level.
 
@@ -502,12 +482,7 @@ class PermissionEnforcer:
         self.set_permission(perm)
         return True
 
-    def grant_group_access(
-        self,
-        owner_id: str,
-        tensor_id: str,
-        group_id: str
-    ) -> bool:
+    def grant_group_access(self, owner_id: str, tensor_id: str, group_id: str) -> bool:
         """
         Grant read access to a group.
 
@@ -531,12 +506,7 @@ class PermissionEnforcer:
 
         return True
 
-    def revoke_group_access(
-        self,
-        owner_id: str,
-        tensor_id: str,
-        group_id: str
-    ) -> bool:
+    def revoke_group_access(self, owner_id: str, tensor_id: str, group_id: str) -> bool:
         """
         Revoke read access from a group.
 
@@ -564,7 +534,7 @@ class PermissionEnforcer:
     # User Groups
     # =========================================================================
 
-    def get_user_groups(self, user_id: str) -> Set[str]:
+    def get_user_groups(self, user_id: str) -> set[str]:
         """
         Get groups a user belongs to.
 
@@ -579,10 +549,7 @@ class PermissionEnforcer:
             return self._user_groups[user_id]
 
         with self._transaction() as conn:
-            cursor = conn.execute(
-                "SELECT group_id FROM user_groups WHERE user_id = ?",
-                (user_id,)
-            )
+            cursor = conn.execute("SELECT group_id FROM user_groups WHERE user_id = ?", (user_id,))
             groups = {row["group_id"] for row in cursor.fetchall()}
 
         # Cache it
@@ -598,10 +565,13 @@ class PermissionEnforcer:
             group_id: Group identifier
         """
         with self._transaction() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT OR IGNORE INTO user_groups (user_id, group_id)
                 VALUES (?, ?)
-            """, (user_id, group_id))
+            """,
+                (user_id, group_id),
+            )
 
         # Invalidate cache
         if user_id in self._user_groups:
@@ -617,15 +587,14 @@ class PermissionEnforcer:
         """
         with self._transaction() as conn:
             conn.execute(
-                "DELETE FROM user_groups WHERE user_id = ? AND group_id = ?",
-                (user_id, group_id)
+                "DELETE FROM user_groups WHERE user_id = ? AND group_id = ?", (user_id, group_id)
             )
 
         # Invalidate cache
         if user_id in self._user_groups:
             del self._user_groups[user_id]
 
-    def get_group_members(self, group_id: str) -> List[str]:
+    def get_group_members(self, group_id: str) -> list[str]:
         """
         Get all members of a group.
 
@@ -636,10 +605,7 @@ class PermissionEnforcer:
             List of user IDs
         """
         with self._transaction() as conn:
-            cursor = conn.execute(
-                "SELECT user_id FROM user_groups WHERE group_id = ?",
-                (group_id,)
-            )
+            cursor = conn.execute("SELECT user_id FROM user_groups WHERE group_id = ?", (group_id,))
             return [row["user_id"] for row in cursor.fetchall()]
 
     # =========================================================================
@@ -658,21 +624,20 @@ class PermissionEnforcer:
         now = datetime.utcnow().isoformat()
 
         with self._transaction() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 UPDATE tensor_permissions
                 SET accessed_at = ?, access_count = access_count + 1
                 WHERE tensor_id = ?
-            """, (now, tensor_id))
+            """,
+                (now, tensor_id),
+            )
 
     # =========================================================================
     # Queries
     # =========================================================================
 
-    def list_accessible_tensors(
-        self,
-        user_id: str,
-        include_public: bool = True
-    ) -> List[str]:
+    def list_accessible_tensors(self, user_id: str, include_public: bool = True) -> list[str]:
         """
         List all tensor IDs accessible by a user.
 
@@ -712,7 +677,7 @@ class PermissionEnforcer:
 
         return accessible
 
-    def list_owned_tensors(self, owner_id: str) -> List[str]:
+    def list_owned_tensors(self, owner_id: str) -> list[str]:
         """
         List tensor IDs owned by a user.
 
@@ -724,12 +689,11 @@ class PermissionEnforcer:
         """
         with self._transaction() as conn:
             cursor = conn.execute(
-                "SELECT tensor_id FROM tensor_permissions WHERE owner_id = ?",
-                (owner_id,)
+                "SELECT tensor_id FROM tensor_permissions WHERE owner_id = ?", (owner_id,)
             )
             return [row["tensor_id"] for row in cursor.fetchall()]
 
-    def list_shared_tensors(self, user_id: str) -> List[str]:
+    def list_shared_tensors(self, user_id: str) -> list[str]:
         """
         List tensors shared with a user (not owned, not public).
 
@@ -743,9 +707,7 @@ class PermissionEnforcer:
         user_groups = self.get_user_groups(user_id)
 
         with self._transaction() as conn:
-            cursor = conn.execute(
-                "SELECT * FROM tensor_permissions WHERE access_level = 'shared'"
-            )
+            cursor = conn.execute("SELECT * FROM tensor_permissions WHERE access_level = 'shared'")
             for row in cursor.fetchall():
                 if row["owner_id"] == user_id:
                     continue

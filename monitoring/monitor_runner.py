@@ -12,18 +12,18 @@ Usage:
 
 import argparse
 import os
+import select
 import subprocess
 import sys
 import threading
 import time
 from datetime import datetime
 from pathlib import Path
-import select
 
-from monitoring.config import MonitorConfig, MonitorState, DisplayMode, OutputFormat
-from monitoring.stream_parser import StreamParser
+from monitoring.config import DisplayMode, MonitorConfig, MonitorState
 from monitoring.db_inspector import DBInspector
 from monitoring.llm_explainer import LLMExplainer
+from monitoring.stream_parser import StreamParser
 
 
 class SimulationMonitor:
@@ -39,7 +39,7 @@ class SimulationMonitor:
             system_prompt_file=config.system_prompt_file,
             max_input_tokens=config.max_input_tokens,
             max_output_tokens=config.max_output_tokens,
-            api_key=config.openrouter_api_key
+            api_key=config.openrouter_api_key,
         )
 
         self.process: subprocess.Popen = None
@@ -55,7 +55,9 @@ class SimulationMonitor:
 
         print("=" * 80)
         print(f"TIMEPOINT MONITOR | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"Mode: {self.config.display_mode.value.upper()} | Interval: {self.config.update_interval}s")
+        print(
+            f"Mode: {self.config.display_mode.value.upper()} | Interval: {self.config.update_interval}s"
+        )
         if self.chat_enabled:
             print("Chat Mode: ENABLED (type messages and press Enter to ask questions)")
         print("=" * 80)
@@ -64,7 +66,9 @@ class SimulationMonitor:
         # Start subprocess (keep stdin for interactive prompts)
         # If auto-confirm is enabled, use PIPE for stdin so we can write to it
         # If chat is enabled, we need PIPE to separate chat from subprocess input
-        stdin_mode = subprocess.PIPE if (self.config.auto_confirm or self.chat_enabled) else sys.stdin
+        stdin_mode = (
+            subprocess.PIPE if (self.config.auto_confirm or self.chat_enabled) else sys.stdin
+        )
 
         # Set auto-confirm environment variable if enabled
         env = os.environ.copy()
@@ -81,7 +85,7 @@ class SimulationMonitor:
             stdin=stdin_mode,
             text=True,
             bufsize=1,
-            env=env
+            env=env,
         )
 
         # Start chat listener thread if enabled
@@ -152,7 +156,9 @@ class SimulationMonitor:
                 # Note: Auto-confirmation is handled via TIMEPOINT_AUTO_CONFIRM environment variable
                 # The subprocess will auto-confirm without needing stdin interaction
                 if self.config.auto_confirm:
-                    print("\n>>> AUTO-CONFIRMING (TIMEPOINT_AUTO_CONFIRM environment variable set) <<<\n")
+                    print(
+                        "\n>>> AUTO-CONFIRMING (TIMEPOINT_AUTO_CONFIRM environment variable set) <<<\n"
+                    )
                 else:
                     # Alert user that input is needed
                     print("\n>>> USER INPUT REQUIRED: Type 'y' or 'n' and press Enter <<<\n")
@@ -162,10 +168,7 @@ class SimulationMonitor:
         if not self.state.is_running:
             return
 
-        self.update_timer = threading.Timer(
-            self.config.update_interval,
-            self._generate_llm_update
-        )
+        self.update_timer = threading.Timer(self.config.update_interval, self._generate_llm_update)
         self.update_timer.daemon = True
         self.update_timer.start()
 
@@ -188,8 +191,8 @@ class SimulationMonitor:
 
         # Display
         if explanation:
-            timestamp = datetime.now().strftime('%H:%M:%S')
-            model_name = self.config.llm_model.split('/')[-1]
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            model_name = self.config.llm_model.split("/")[-1]
             print()
             print(f"--- LLM SUMMARY ({model_name} @ {timestamp}) ---")
             print(explanation)
@@ -201,6 +204,7 @@ class SimulationMonitor:
 
     def _start_chat_listener(self):
         """Start background thread to listen for user chat input"""
+
         def chat_loop():
             while self.state.is_running:
                 # Use select to check if stdin has data (non-blocking)
@@ -239,7 +243,7 @@ class SimulationMonitor:
             context_parts.append(db_snapshot_text)
             context_parts.append("")
 
-        context_parts.append(f"=== USER QUESTION ===")
+        context_parts.append("=== USER QUESTION ===")
         context_parts.append(message)
 
         context = "\n".join(context_parts)
@@ -249,7 +253,7 @@ class SimulationMonitor:
             response = self.llm_explainer.generate_explanation_with_context(context)
 
             # Display chat exchange
-            timestamp = datetime.now().strftime('%H:%M:%S')
+            timestamp = datetime.now().strftime("%H:%M:%S")
             print()
             print(f"--- CHAT ({timestamp}) ---")
             print(f"Q: {message}")
@@ -280,56 +284,52 @@ def main():
     parser.add_argument(
         "command",
         nargs="+",
-        help="Command to monitor (e.g., python3.10 run_all_mechanism_tests.py --quick)"
+        help="Command to monitor (e.g., python3.10 run_all_mechanism_tests.py --quick)",
     )
     parser.add_argument(
         "--mode",
         choices=["raw", "llm", "both"],
         default="both",
-        help="Display mode: raw logs, llm summaries, or both (default: both)"
+        help="Display mode: raw logs, llm summaries, or both (default: both)",
     )
     parser.add_argument(
         "--interval",
         type=int,
         default=300,
-        help="Seconds between LLM updates (default: 300 = 5 min)"
+        help="Seconds between LLM updates (default: 300 = 5 min)",
     )
     parser.add_argument(
         "--llm-model",
         default="meta-llama/llama-3.1-8b-instruct:free",
-        help="OpenRouter model name (default: llama-3.1-8b-instruct:free)"
+        help="OpenRouter model name (default: llama-3.1-8b-instruct:free)",
     )
     parser.add_argument(
         "--max-input-tokens",
         type=int,
         default=4000,
-        help="Max tokens to send to LLM (default: 4000)"
+        help="Max tokens to send to LLM (default: 4000)",
     )
     parser.add_argument(
         "--max-output-tokens",
         type=int,
         default=150,
-        help="Max tokens in LLM response (default: 150)"
+        help="Max tokens in LLM response (default: 150)",
     )
-    parser.add_argument(
-        "--system-prompt-file",
-        type=Path,
-        help="Custom system prompt file"
-    )
+    parser.add_argument("--system-prompt-file", type=Path, help="Custom system prompt file")
     parser.add_argument(
         "--no-db-inspection",
         action="store_true",
-        help="Disable database/narrative queries (faster but less detail)"
+        help="Disable database/narrative queries (faster but less detail)",
     )
     parser.add_argument(
         "--auto-confirm",
         action="store_true",
-        help="Automatically confirm expensive runs (bypass confirmation prompts)"
+        help="Automatically confirm expensive runs (bypass confirmation prompts)",
     )
     parser.add_argument(
         "--enable-chat",
         action="store_true",
-        help="Enable interactive chat mode (ask questions while monitoring)"
+        help="Enable interactive chat mode (ask questions while monitoring)",
     )
 
     args = parser.parse_args()
@@ -346,7 +346,7 @@ def main():
         enable_db_inspection=not args.no_db_inspection,
         openrouter_api_key=os.getenv("OPENROUTER_API_KEY"),
         auto_confirm=args.auto_confirm,
-        enable_chat=args.enable_chat
+        enable_chat=args.enable_chat,
     )
 
     # Create and start monitor

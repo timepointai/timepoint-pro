@@ -16,28 +16,32 @@ Architecture:
     → Feed to create_entity_training_workflow() and TemporalAgent
 """
 
-from typing import List, Dict, Optional, Any, Tuple
-from datetime import datetime, timedelta
-from pydantic import BaseModel
 import json
 import time
 import warnings
+from datetime import datetime, timedelta
+from typing import Any
+
 import networkx as nx
+from pydantic import BaseModel
 
-from schemas import (
-    Entity, Timepoint, ResolutionLevel, TemporalMode,
-    ExposureEvent, CognitiveTensor
-)
 from llm import LLMClient
-from schemas import EntityPopulation  # Canonical location (breaks circular dep)
-from storage import GraphStore
-from workflows import TemporalAgent, create_entity_training_workflow
 from metadata.tracking import track_mechanism
-
+from schemas import (
+    CognitiveTensor,
+    Entity,
+    ExposureEvent,
+    ResolutionLevel,
+    TemporalMode,
+    Timepoint,
+)
+from storage import GraphStore
+from workflows import TemporalAgent
 
 # ============================================================================
 # Helper Functions
 # ============================================================================
+
 
 def parse_iso_datetime(iso_string: str) -> datetime:
     """
@@ -59,9 +63,9 @@ def parse_iso_datetime(iso_string: str) -> datetime:
         datetime(2023, 3, 1, 0, 0, 0)
     """
     # Handle 'Z' suffix (UTC timezone indicator)
-    if iso_string.endswith('Z'):
+    if iso_string.endswith("Z"):
         # Replace 'Z' with '+00:00' for fromisoformat compatibility
-        iso_string = iso_string[:-1] + '+00:00'
+        iso_string = iso_string[:-1] + "+00:00"
 
     return datetime.fromisoformat(iso_string)
 
@@ -70,40 +74,45 @@ def parse_iso_datetime(iso_string: str) -> datetime:
 # Structured Output Schemas for LLM Responses
 # ============================================================================
 
+
 class EntityRosterItem(BaseModel):
     """Single entity in a scene"""
+
     entity_id: str
     entity_type: str = "human"
     role: str  # "primary", "secondary", "background", "environment"
     description: str
-    initial_knowledge: List[str] = []
-    relationships: Dict[str, str] = {}  # entity_id -> relationship_type
+    initial_knowledge: list[str] = []
+    relationships: dict[str, str] = {}  # entity_id -> relationship_type
 
 
 class TimepointSpec(BaseModel):
     """Single timepoint specification"""
+
     timepoint_id: str
     timestamp: str  # ISO format datetime
     event_description: str
-    entities_present: List[str]
+    entities_present: list[str]
     importance: float = 0.5  # 0.0-1.0
-    causal_parent: Optional[str] = None
+    causal_parent: str | None = None
 
 
 class SceneSpecification(BaseModel):
     """Complete scene specification from natural language"""
+
     scene_title: str
     scene_description: str
     temporal_mode: str = "forward"
-    temporal_scope: Dict[str, str]  # start_date, end_date, location
-    entities: List[EntityRosterItem]
-    timepoints: List[TimepointSpec]
+    temporal_scope: dict[str, str]  # start_date, end_date, location
+    entities: list[EntityRosterItem]
+    timepoints: list[TimepointSpec]
     global_context: str
 
 
 # ============================================================================
 # Component 1: Scene Parser
 # ============================================================================
+
 
 class SceneParser:
     """
@@ -119,7 +128,7 @@ class SceneParser:
     def __init__(self, llm_client: LLMClient):
         self.llm = llm_client
 
-    def parse(self, event_description: str, context: Optional[Dict] = None) -> SceneSpecification:
+    def parse(self, event_description: str, context: dict | None = None) -> SceneSpecification:
         """
         Parse natural language description into scene specification.
 
@@ -145,7 +154,7 @@ class SceneParser:
             response = self._call_llm_structured(prompt, SceneSpecification, context)
             return response
 
-    def _build_parsing_prompt(self, event_description: str, context: Dict) -> str:
+    def _build_parsing_prompt(self, event_description: str, context: dict) -> str:
         """Build prompt for scene parsing"""
         preferred_mode = context.get("temporal_mode", "forward")
         max_entities = context.get("max_entities", 20)
@@ -158,8 +167,12 @@ class SceneParser:
             entity_instruction = f"**Entities** (REQUIRED: exactly {max_entities}): You MUST generate exactly {max_entities} entities. This is a hard requirement. List of people, objects, places, concepts involved"
             timepoint_instruction = f"**Timepoints** (REQUIRED: exactly {max_timepoints}): You MUST generate exactly {max_timepoints} timepoints. This is a hard requirement. Key moments in the event sequence"
         else:
-            entity_instruction = f"**Entities** (max {max_entities}): List of people, objects, places involved"
-            timepoint_instruction = f"**Timepoints** (max {max_timepoints}): Key moments in the event sequence"
+            entity_instruction = (
+                f"**Entities** (max {max_entities}): List of people, objects, places involved"
+            )
+            timepoint_instruction = (
+                f"**Timepoints** (max {max_timepoints}): Key moments in the event sequence"
+            )
 
         prompt = f"""You are a historical scene analyzer. Parse this event description into a structured simulation specification.
 
@@ -226,7 +239,9 @@ Schema:
 
         return prompt
 
-    def _call_llm_structured(self, prompt: str, response_model: type, context: Optional[Dict] = None) -> Any:
+    def _call_llm_structured(
+        self, prompt: str, response_model: type, context: dict | None = None
+    ) -> Any:
         """Call LLM and parse structured response - REQUIRES REAL LLM"""
         import os
 
@@ -254,25 +269,37 @@ Schema:
                 # User specified a model - respect it, don't hardcode
                 model = None  # Let LLMClient use its configured default_model
                 max_output_tokens = min(int(estimated_tokens * 2.0), 42000)
-                print(f"   ✅ Using override model: {model_override} with {max_output_tokens:,} token limit")
+                print(
+                    f"   ✅ Using override model: {model_override} with {max_output_tokens:,} token limit"
+                )
             elif estimated_tokens > 50000:
                 # No override + ultra-large scenario - use Llama 405B with extended token limit
                 model = "meta-llama/llama-3.1-405b-instruct"
-                max_output_tokens = min(int(estimated_tokens * 1.5), 100000)  # 1.5x safety margin, cap at 100k
-                print(f"   🚀 Ultra-large scenario detected: Using Llama 405B with {max_output_tokens:,} token limit")
-                print(f"   📊 Estimated: {max_entities} entities × {max_timepoints} timepoints = ~{estimated_tokens:,} tokens")
+                max_output_tokens = min(
+                    int(estimated_tokens * 1.5), 100000
+                )  # 1.5x safety margin, cap at 100k
+                print(
+                    f"   🚀 Ultra-large scenario detected: Using Llama 405B with {max_output_tokens:,} token limit"
+                )
+                print(
+                    f"   📊 Estimated: {max_entities} entities × {max_timepoints} timepoints = ~{estimated_tokens:,} tokens"
+                )
             else:
                 # No override + standard/large scenario - use Llama 4 Scout (327K context)
                 model = None  # Use default (Scout)
-                max_output_tokens = min(int(estimated_tokens * 2.0), 42000)  # 2x safety margin, cap at 42k
-                print(f"   ✅ Standard scenario: Using Llama 4 Scout with {max_output_tokens:,} token limit")
+                max_output_tokens = min(
+                    int(estimated_tokens * 2.0), 42000
+                )  # 2x safety margin, cap at 42k
+                print(
+                    f"   ✅ Standard scenario: Using Llama 4 Scout with {max_output_tokens:,} token limit"
+                )
 
             result = self.llm.generate_structured(
                 prompt=prompt,
                 response_model=response_model,
                 model=model,
                 temperature=0.3,  # Lower temperature for structured output
-                max_tokens=max_output_tokens
+                max_tokens=max_output_tokens,
             )
 
             return result
@@ -308,7 +335,11 @@ Schema:
                     "  • For very large scales, use standard mode instead of MAX mode"
                 ) from e
 
-            elif "validation" in error_str or "field required" in error_str or "pydantic" in error_str:
+            elif (
+                "validation" in error_str
+                or "field required" in error_str
+                or "pydantic" in error_str
+            ):
                 raise RuntimeError(
                     f"Scene parsing failed: {e}\n\n"
                     "Response validation failed (schema mismatch). This usually means:\n"
@@ -341,11 +372,7 @@ Schema:
         return max_entities > 40 or max_timepoints > 80 or estimated_tokens > 12000
 
     def _generate_chunked(
-        self,
-        event_description: str,
-        context: Dict,
-        max_entities: int,
-        max_timepoints: int
+        self, event_description: str, context: dict, max_entities: int, max_timepoints: int
     ) -> SceneSpecification:
         """
         Multi-pass chunked generation for very large scenes.
@@ -359,7 +386,7 @@ Schema:
         """
         print("\n🔄 CHUNKED GENERATION MODE")
         print(f"   Request: {max_entities} entities × {max_timepoints} timepoints")
-        print(f"   Strategy: Multi-pass hierarchical generation")
+        print("   Strategy: Multi-pass hierarchical generation")
         print()
 
         # Pass 1: Generate entity roster (lightweight)
@@ -369,26 +396,35 @@ Schema:
 
         # Pass 2: Generate timepoint skeleton
         print("\n⏰ Pass 2/4: Generating timepoint skeleton...")
-        timepoint_skeleton = self._generate_timepoint_skeleton(event_description, context, max_timepoints, entity_roster)
+        timepoint_skeleton = self._generate_timepoint_skeleton(
+            event_description, context, max_timepoints, entity_roster
+        )
         print(f"   ✓ Generated {len(timepoint_skeleton)} timepoints")
 
         # Pass 3: Fill entity details in batches
         print("\n👥 Pass 3/4: Filling entity details...")
-        filled_entities = self._fill_entity_details(event_description, entity_roster, timepoint_skeleton, context)
+        filled_entities = self._fill_entity_details(
+            event_description, entity_roster, timepoint_skeleton, context
+        )
         print(f"   ✓ Filled details for {len(filled_entities)} entities")
 
         # Pass 4: Fill timepoint details in batches
         print("\n📝 Pass 4/4: Filling timepoint details...")
-        filled_timepoints = self._fill_timepoint_details(event_description, timepoint_skeleton, filled_entities, context)
+        filled_timepoints = self._fill_timepoint_details(
+            event_description, timepoint_skeleton, filled_entities, context
+        )
         print(f"   ✓ Filled details for {len(filled_timepoints)} timepoints")
 
         # Extract temporal scope from context or use defaults
         preferred_mode = context.get("temporal_mode", "forward")
-        temporal_scope = context.get("temporal_scope", {
-            "start_date": "2024-01-01T00:00:00",
-            "end_date": "2024-12-31T23:59:59",
-            "location": "Unknown"
-        })
+        temporal_scope = context.get(
+            "temporal_scope",
+            {
+                "start_date": "2024-01-01T00:00:00",
+                "end_date": "2024-12-31T23:59:59",
+                "location": "Unknown",
+            },
+        )
 
         # Assemble final SceneSpecification
         scene_spec = SceneSpecification(
@@ -398,18 +434,15 @@ Schema:
             temporal_scope=temporal_scope,
             entities=filled_entities,
             timepoints=filled_timepoints,
-            global_context=f"Generated via chunked multi-pass generation. {event_description}"
+            global_context=f"Generated via chunked multi-pass generation. {event_description}",
         )
 
         print("\n✅ Chunked generation complete!")
         return scene_spec
 
     def _generate_entity_roster(
-        self,
-        event_description: str,
-        context: Dict,
-        count: int
-    ) -> List[EntityRosterItem]:
+        self, event_description: str, context: dict, count: int
+    ) -> list[EntityRosterItem]:
         """Pass 1: Generate entity roster with minimal details
 
         If entity_config.profiles is specified, load predefined profiles from JSON files.
@@ -453,12 +486,15 @@ Schema:
                         entity_type="human",
                         role="primary",  # Profiles are for primary characters
                         description=profile_data.get("description", f"{full_name} - Founder"),
-                        initial_knowledge=profile_data.get("initial_knowledge", [
-                            f"Expert in {profile_data.get('archetype_id', 'business')}",
-                            *[f"Strength: {s}" for s in profile_data.get("strengths", [])[:2]],
-                            *[f"Weakness: {w}" for w in profile_data.get("weaknesses", [])[:2]]
-                        ]),
-                        relationships={}  # Will be filled later
+                        initial_knowledge=profile_data.get(
+                            "initial_knowledge",
+                            [
+                                f"Expert in {profile_data.get('archetype_id', 'business')}",
+                                *[f"Strength: {s}" for s in profile_data.get("strengths", [])[:2]],
+                                *[f"Weakness: {w}" for w in profile_data.get("weaknesses", [])[:2]],
+                            ],
+                        ),
+                        relationships={},  # Will be filled later
                     )
                     loaded_entities.append(entity)
                     print(f"   ✓ Loaded profile: {full_name} ({entity_id})")
@@ -518,25 +554,31 @@ Return EXACTLY {remaining_count} entities. This is critical."""
             elapsed = time.time() - start_time
             if elapsed > absolute_timeout:
                 if loaded_entities:
-                    print(f"   ⚠️  Absolute timeout ({absolute_timeout}s) exceeded, returning {len(loaded_entities)} loaded profiles")
+                    print(
+                        f"   ⚠️  Absolute timeout ({absolute_timeout}s) exceeded, returning {len(loaded_entities)} loaded profiles"
+                    )
                     return loaded_entities
                 raise TimeoutError(f"Entity roster generation exceeded {absolute_timeout}s timeout")
 
             try:
                 result = self.llm.generate_structured(
                     prompt=prompt,
-                    response_model=type('EntityList', (BaseModel,), {
-                        '__annotations__': {'entities': List[EntityRosterItem]}
-                    }),
+                    response_model=type(
+                        "EntityList",
+                        (BaseModel,),
+                        {"__annotations__": {"entities": list[EntityRosterItem]}},
+                    ),
                     model=model,
                     temperature=0.5,
                     max_tokens=max_tokens,
-                    timeout=180.0
+                    timeout=180.0,
                 )
 
                 # Validate we got the right count
                 if len(result.entities) < remaining_count * 0.8:  # Allow 20% tolerance
-                    print(f"   ⚠️  Only got {len(result.entities)}/{remaining_count} entities, retrying...")
+                    print(
+                        f"   ⚠️  Only got {len(result.entities)}/{remaining_count} entities, retrying..."
+                    )
                     retry_count += 1
                     if retry_count <= max_retries:
                         # Escalate to 405B on retry
@@ -546,7 +588,9 @@ Return EXACTLY {remaining_count} entities. This is critical."""
 
                 # Merge loaded profiles with LLM-generated entities
                 all_entities = loaded_entities + result.entities
-                print(f"   ✓ Total entities: {len(all_entities)} ({len(loaded_entities)} from profiles + {len(result.entities)} generated)")
+                print(
+                    f"   ✓ Total entities: {len(all_entities)} ({len(loaded_entities)} from profiles + {len(result.entities)} generated)"
+                )
                 return all_entities
 
             except Exception as e:
@@ -554,15 +598,19 @@ Return EXACTLY {remaining_count} entities. This is critical."""
                 if retry_count > max_retries:
                     # If we have loaded profiles, return them even if LLM generation failed
                     if loaded_entities:
-                        print(f"   ⚠️  LLM generation failed after {max_retries + 1} attempts, but returning {len(loaded_entities)} loaded profiles")
+                        print(
+                            f"   ⚠️  LLM generation failed after {max_retries + 1} attempts, but returning {len(loaded_entities)} loaded profiles"
+                        )
                         return loaded_entities
-                    raise RuntimeError(f"Failed to generate entity roster after {max_retries + 1} attempts: {e}") from e
+                    raise RuntimeError(
+                        f"Failed to generate entity roster after {max_retries + 1} attempts: {e}"
+                    ) from e
 
                 print(f"   ⚠️  Attempt {retry_count} failed: {e}")
-                print(f"   🚀 Escalating to Llama 405B...")
+                print("   🚀 Escalating to Llama 405B...")
                 model = "meta-llama/llama-3.1-405b-instruct"
                 max_tokens = min((remaining_count * 120) + 2000, 100000)
-                time.sleep(2 ** retry_count)  # Exponential backoff
+                time.sleep(2**retry_count)  # Exponential backoff
 
         # Should never reach here, but just in case - return loaded profiles if we have them
         if loaded_entities:
@@ -573,10 +621,10 @@ Return EXACTLY {remaining_count} entities. This is critical."""
     def _generate_timepoint_skeleton(
         self,
         event_description: str,
-        context: Dict,
+        context: dict,
         count: int,
-        entity_roster: List[EntityRosterItem]
-    ) -> List[TimepointSpec]:
+        entity_roster: list[EntityRosterItem],
+    ) -> list[TimepointSpec]:
         """Pass 2: Generate timepoint skeleton with minimal details"""
 
         entity_ids = [e.entity_id for e in entity_roster[:20]]  # Sample for context
@@ -585,7 +633,7 @@ Return EXACTLY {remaining_count} entities. This is critical."""
 
 Event: {event_description}
 
-Available entities (first 20): {', '.join(entity_ids)}
+Available entities (first 20): {", ".join(entity_ids)}
 
 Generate EXACTLY {count} timepoints (key moments in the event sequence).
 
@@ -622,17 +670,21 @@ Return EXACTLY {count} timepoints. This is critical."""
             try:
                 result = self.llm.generate_structured(
                     prompt=prompt,
-                    response_model=type('TimepointList', (BaseModel,), {
-                        '__annotations__': {'timepoints': List[TimepointSpec]}
-                    }),
+                    response_model=type(
+                        "TimepointList",
+                        (BaseModel,),
+                        {"__annotations__": {"timepoints": list[TimepointSpec]}},
+                    ),
                     model=model,
                     temperature=0.5,
                     max_tokens=max_tokens,
-                    timeout=180.0
+                    timeout=180.0,
                 )
 
                 if len(result.timepoints) < count * 0.8:
-                    print(f"   ⚠️  Only got {len(result.timepoints)}/{count} timepoints, retrying...")
+                    print(
+                        f"   ⚠️  Only got {len(result.timepoints)}/{count} timepoints, retrying..."
+                    )
                     retry_count += 1
                     if retry_count <= max_retries:
                         model = "meta-llama/llama-3.1-405b-instruct"
@@ -644,30 +696,32 @@ Return EXACTLY {count} timepoints. This is critical."""
             except Exception as e:
                 retry_count += 1
                 if retry_count > max_retries:
-                    raise RuntimeError(f"Failed to generate timepoint skeleton after {max_retries + 1} attempts: {e}") from e
+                    raise RuntimeError(
+                        f"Failed to generate timepoint skeleton after {max_retries + 1} attempts: {e}"
+                    ) from e
 
                 print(f"   ⚠️  Attempt {retry_count} failed: {e}")
-                print(f"   🚀 Escalating to Llama 405B...")
+                print("   🚀 Escalating to Llama 405B...")
                 model = "meta-llama/llama-3.1-405b-instruct"
                 max_tokens = min((count * 100) + 2000, 100000)
-                time.sleep(2 ** retry_count)
+                time.sleep(2**retry_count)
 
         raise RuntimeError("Failed to generate timepoint skeleton")
 
     def _fill_entity_details(
         self,
         event_description: str,
-        entity_roster: List[EntityRosterItem],
-        timepoint_skeleton: List[TimepointSpec],
-        context: Dict
-    ) -> List[EntityRosterItem]:
+        entity_roster: list[EntityRosterItem],
+        timepoint_skeleton: list[TimepointSpec],
+        context: dict,
+    ) -> list[EntityRosterItem]:
         """Pass 3: Fill in entity details in batches"""
 
         batch_size = 30  # Process 30 entities at a time
         filled_entities = []
 
         for i in range(0, len(entity_roster), batch_size):
-            batch = entity_roster[i:i + batch_size]
+            batch = entity_roster[i : i + batch_size]
             batch_num = (i // batch_size) + 1
             total_batches = (len(entity_roster) + batch_size - 1) // batch_size
 
@@ -679,10 +733,10 @@ Return EXACTLY {count} timepoints. This is critical."""
             prompt = f"""Fill in details for these entities in the event: {event_description}
 
 Entities to fill:
-{json.dumps([{'entity_id': e.entity_id, 'description': e.description} for e in batch], indent=2)}
+{json.dumps([{"entity_id": e.entity_id, "description": e.description} for e in batch], indent=2)}
 
 Available entities for relationships:
-{', '.join(all_entity_ids[:50])}
+{", ".join(all_entity_ids[:50])}
 
 For each entity, add:
 - initial_knowledge: List of 3-8 knowledge items this entity knows at start
@@ -704,22 +758,27 @@ Return JSON matching this structure:
             try:
                 result = self.llm.generate_structured(
                     prompt=prompt,
-                    response_model=type('EntityDetailsList', (BaseModel,), {
-                        '__annotations__': {'entities': List[Dict]}
-                    }),
+                    response_model=type(
+                        "EntityDetailsList",
+                        (BaseModel,),
+                        {"__annotations__": {"entities": list[dict]}},
+                    ),
                     model=None,
                     temperature=0.6,
                     max_tokens=min(len(batch) * 200 + 1000, 24000),
-                    timeout=120.0
+                    timeout=120.0,
                 )
 
                 # Merge details back into original roster
                 for orig_entity in batch:
                     # Find matching detailed entity
-                    detailed = next((e for e in result.entities if e.get('entity_id') == orig_entity.entity_id), None)
+                    detailed = next(
+                        (e for e in result.entities if e.get("entity_id") == orig_entity.entity_id),
+                        None,
+                    )
                     if detailed:
-                        orig_entity.initial_knowledge = detailed.get('initial_knowledge', [])
-                        orig_entity.relationships = detailed.get('relationships', {})
+                        orig_entity.initial_knowledge = detailed.get("initial_knowledge", [])
+                        orig_entity.relationships = detailed.get("relationships", {})
 
                 filled_entities.extend(batch)
 
@@ -733,10 +792,10 @@ Return JSON matching this structure:
     def _fill_timepoint_details(
         self,
         event_description: str,
-        timepoint_skeleton: List[TimepointSpec],
-        entity_roster: List[EntityRosterItem],
-        context: Dict
-    ) -> List[TimepointSpec]:
+        timepoint_skeleton: list[TimepointSpec],
+        entity_roster: list[EntityRosterItem],
+        context: dict,
+    ) -> list[TimepointSpec]:
         """Pass 4: Fill in timepoint details in batches"""
 
         batch_size = 40  # Process 40 timepoints at a time
@@ -744,7 +803,7 @@ Return JSON matching this structure:
         entity_ids = [e.entity_id for e in entity_roster]
 
         for i in range(0, len(timepoint_skeleton), batch_size):
-            batch = timepoint_skeleton[i:i + batch_size]
+            batch = timepoint_skeleton[i : i + batch_size]
             batch_num = (i // batch_size) + 1
             total_batches = (len(timepoint_skeleton) + batch_size - 1) // batch_size
 
@@ -753,10 +812,10 @@ Return JSON matching this structure:
             prompt = f"""Fill in participant lists for these timepoints in the event: {event_description}
 
 Timepoints to fill:
-{json.dumps([{'timepoint_id': t.timepoint_id, 'timestamp': t.timestamp, 'event_description': t.event_description} for t in batch], indent=2)}
+{json.dumps([{"timepoint_id": t.timepoint_id, "timestamp": t.timestamp, "event_description": t.event_description} for t in batch], indent=2)}
 
 Available entities:
-{', '.join(entity_ids[:100])}
+{", ".join(entity_ids[:100])}
 
 For each timepoint, add:
 - entities_present: List of entity_ids present at this moment (3-20 entities typically)
@@ -776,22 +835,33 @@ Return JSON matching this structure:
             try:
                 result = self.llm.generate_structured(
                     prompt=prompt,
-                    response_model=type('TimepointDetailsList', (BaseModel,), {
-                        '__annotations__': {'timepoints': List[Dict]}
-                    }),
+                    response_model=type(
+                        "TimepointDetailsList",
+                        (BaseModel,),
+                        {"__annotations__": {"timepoints": list[dict]}},
+                    ),
                     model=None,
                     temperature=0.5,
                     max_tokens=min(len(batch) * 100 + 1000, 24000),
-                    timeout=120.0
+                    timeout=120.0,
                 )
 
                 # Merge details back into skeleton
                 for orig_tp in batch:
-                    detailed = next((t for t in result.timepoints if t.get('timepoint_id') == orig_tp.timepoint_id), None)
+                    detailed = next(
+                        (
+                            t
+                            for t in result.timepoints
+                            if t.get("timepoint_id") == orig_tp.timepoint_id
+                        ),
+                        None,
+                    )
                     if detailed:
-                        orig_tp.entities_present = detailed.get('entities_present', [])
+                        orig_tp.entities_present = detailed.get("entities_present", [])
                         # Validate entity IDs exist
-                        orig_tp.entities_present = [eid for eid in orig_tp.entities_present if eid in entity_ids]
+                        orig_tp.entities_present = [
+                            eid for eid in orig_tp.entities_present if eid in entity_ids
+                        ]
 
                 filled_timepoints.extend(batch)
 
@@ -810,7 +880,7 @@ Return JSON matching this structure:
             temporal_scope={
                 "start_date": "2024-01-01T09:00:00",
                 "end_date": "2024-01-01T17:00:00",
-                "location": "Test Location"
+                "location": "Test Location",
             },
             entities=[
                 EntityRosterItem(
@@ -819,7 +889,7 @@ Return JSON matching this structure:
                     role="primary",
                     description="Primary test entity",
                     initial_knowledge=["fact1", "fact2", "fact3"],
-                    relationships={"test_entity_2": "ally", "test_entity_3": "colleague"}
+                    relationships={"test_entity_2": "ally", "test_entity_3": "colleague"},
                 ),
                 EntityRosterItem(
                     entity_id="test_entity_2",
@@ -827,7 +897,7 @@ Return JSON matching this structure:
                     role="secondary",
                     description="Secondary test entity",
                     initial_knowledge=["fact4", "fact5"],
-                    relationships={"test_entity_1": "ally"}
+                    relationships={"test_entity_1": "ally"},
                 ),
                 EntityRosterItem(
                     entity_id="test_entity_3",
@@ -835,8 +905,8 @@ Return JSON matching this structure:
                     role="secondary",
                     description="Third test entity",
                     initial_knowledge=["fact6", "fact7", "fact8"],
-                    relationships={"test_entity_1": "colleague"}
-                )
+                    relationships={"test_entity_1": "colleague"},
+                ),
             ],
             timepoints=[
                 TimepointSpec(
@@ -845,7 +915,7 @@ Return JSON matching this structure:
                     event_description="Scene opening",
                     entities_present=["test_entity_1", "test_entity_2", "test_entity_3"],
                     importance=0.8,
-                    causal_parent=None
+                    causal_parent=None,
                 ),
                 TimepointSpec(
                     timepoint_id="tp_002",
@@ -853,7 +923,7 @@ Return JSON matching this structure:
                     event_description="Mid-scene development",
                     entities_present=["test_entity_1", "test_entity_2", "test_entity_3"],
                     importance=0.7,
-                    causal_parent="tp_001"
+                    causal_parent="tp_001",
                 ),
                 TimepointSpec(
                     timepoint_id="tp_003",
@@ -861,16 +931,17 @@ Return JSON matching this structure:
                     event_description="Scene conclusion",
                     entities_present=["test_entity_1", "test_entity_2", "test_entity_3"],
                     importance=0.9,
-                    causal_parent="tp_002"
-                )
+                    causal_parent="tp_002",
+                ),
             ],
-            global_context="Test context for development"
+            global_context="Test context for development",
         )
 
 
 # ============================================================================
 # Component 2: Knowledge Seeder
 # ============================================================================
+
 
 class KnowledgeSeeder:
     """
@@ -886,10 +957,8 @@ class KnowledgeSeeder:
 
     @track_mechanism("M3", "exposure_event_tracking")
     def seed_knowledge(
-        self,
-        spec: SceneSpecification,
-        create_exposure_events: bool = True
-    ) -> Dict[str, List[ExposureEvent]]:
+        self, spec: SceneSpecification, create_exposure_events: bool = True
+    ) -> dict[str, list[ExposureEvent]]:
         """
         Create initial knowledge exposure events for all entities.
 
@@ -917,7 +986,7 @@ class KnowledgeSeeder:
                     source="scene_initialization",
                     timestamp=start_time - timedelta(days=1),  # Before scene starts
                     confidence=1.0,  # Initial knowledge is certain
-                    timepoint_id=f"pre_{spec.timepoints[0].timepoint_id if spec.timepoints else 'scene'}"
+                    timepoint_id=f"pre_{spec.timepoints[0].timepoint_id if spec.timepoints else 'scene'}",
                 )
 
                 events.append(event)
@@ -928,7 +997,9 @@ class KnowledgeSeeder:
 
             exposure_map[entity_item.entity_id] = events
 
-        print(f"🌱 Seeded {sum(len(events) for events in exposure_map.values())} knowledge items across {len(exposure_map)} entities")
+        print(
+            f"🌱 Seeded {sum(len(events) for events in exposure_map.values())} knowledge items across {len(exposure_map)} entities"
+        )
 
         return exposure_map
 
@@ -936,6 +1007,7 @@ class KnowledgeSeeder:
 # ============================================================================
 # Component 3: Relationship Extractor
 # ============================================================================
+
 
 class RelationshipExtractor:
     """
@@ -966,7 +1038,7 @@ class RelationshipExtractor:
                 entity_item.entity_id,
                 entity_type=entity_item.entity_type,
                 role=entity_item.role,
-                description=entity_item.description
+                description=entity_item.description,
             )
 
         # Add edges for declared relationships
@@ -976,10 +1048,7 @@ class RelationshipExtractor:
                     # Weight relationships based on type (simple heuristic)
                     weight = self._relationship_weight(rel_type)
                     graph.add_edge(
-                        entity_item.entity_id,
-                        target_id,
-                        relationship=rel_type,
-                        weight=weight
+                        entity_item.entity_id, target_id, relationship=rel_type, weight=weight
                     )
 
         # Add co-presence edges based on timepoint attendance
@@ -1001,7 +1070,7 @@ class RelationshipExtractor:
             "enemy": 0.1,
             "mentor": 0.85,
             "student": 0.75,
-            "family": 0.95
+            "family": 0.95,
         }
         return weights.get(rel_type.lower(), 0.5)
 
@@ -1011,19 +1080,16 @@ class RelationshipExtractor:
             entities = tp.entities_present
             # Add edge between all pairs present at this timepoint
             for i, e1 in enumerate(entities):
-                for e2 in entities[i+1:]:
+                for e2 in entities[i + 1 :]:
                     if e1 in graph.nodes and e2 in graph.nodes:
                         if not graph.has_edge(e1, e2):
-                            graph.add_edge(
-                                e1, e2,
-                                relationship="copresent",
-                                weight=0.4
-                            )
+                            graph.add_edge(e1, e2, relationship="copresent", weight=0.4)
 
 
 # ============================================================================
 # Component 4: Resolution Assigner
 # ============================================================================
+
 
 class ResolutionAssigner:
     """
@@ -1038,10 +1104,8 @@ class ResolutionAssigner:
 
     @track_mechanism("M1", "heterogeneous_fidelity_resolution")
     def assign_resolutions(
-        self,
-        spec: SceneSpecification,
-        graph: nx.Graph
-    ) -> Tuple[Dict[str, ResolutionLevel], float]:
+        self, spec: SceneSpecification, graph: nx.Graph
+    ) -> tuple[dict[str, ResolutionLevel], float]:
         """
         Assign resolution levels based on role and centrality.
 
@@ -1060,7 +1124,7 @@ class ResolutionAssigner:
             try:
                 # Suppress RuntimeWarning for small graphs (k >= N - 1 for N * N square matrix)
                 with warnings.catch_warnings():
-                    warnings.filterwarnings('ignore', category=RuntimeWarning)
+                    warnings.filterwarnings("ignore", category=RuntimeWarning)
                     centrality = nx.eigenvector_centrality(graph, max_iter=1000)
             except:
                 # Fallback to degree centrality if eigenvector fails
@@ -1094,29 +1158,33 @@ class ResolutionAssigner:
         # Calculate cost estimates based on resolution distribution
         cost_per_level = {
             ResolutionLevel.TRAINED: 0.50,  # $0.50 per entity (model training)
-            ResolutionLevel.DIALOG: 0.15,   # $0.15 per entity (dialog synthesis)
-            ResolutionLevel.GRAPH: 0.05,    # $0.05 per entity (graph processing)
-            ResolutionLevel.SCENE: 0.02,    # $0.02 per entity (scene aggregation)
-            ResolutionLevel.TENSOR_ONLY: 0.005  # $0.005 per entity (tensor compression)
+            ResolutionLevel.DIALOG: 0.15,  # $0.15 per entity (dialog synthesis)
+            ResolutionLevel.GRAPH: 0.05,  # $0.05 per entity (graph processing)
+            ResolutionLevel.SCENE: 0.02,  # $0.02 per entity (scene aggregation)
+            ResolutionLevel.TENSOR_ONLY: 0.005,  # $0.005 per entity (tensor compression)
         }
 
         estimated_cost = sum(cost_per_level.get(level, 0.0) for level in assignments.values())
 
         counts = {
-            'TRAINED': sum(1 for v in assignments.values() if v == ResolutionLevel.TRAINED),
-            'DIALOG': sum(1 for v in assignments.values() if v == ResolutionLevel.DIALOG),
-            'GRAPH': sum(1 for v in assignments.values() if v == ResolutionLevel.GRAPH),
-            'SCENE': sum(1 for v in assignments.values() if v == ResolutionLevel.SCENE),
-            'TENSOR': sum(1 for v in assignments.values() if v == ResolutionLevel.TENSOR_ONLY)
+            "TRAINED": sum(1 for v in assignments.values() if v == ResolutionLevel.TRAINED),
+            "DIALOG": sum(1 for v in assignments.values() if v == ResolutionLevel.DIALOG),
+            "GRAPH": sum(1 for v in assignments.values() if v == ResolutionLevel.GRAPH),
+            "SCENE": sum(1 for v in assignments.values() if v == ResolutionLevel.SCENE),
+            "TENSOR": sum(1 for v in assignments.values() if v == ResolutionLevel.TENSOR_ONLY),
         }
 
-        print(f"🎯 Assigned resolutions: "
-              f"TRAINED={counts['TRAINED']}, "
-              f"DIALOG={counts['DIALOG']}, "
-              f"GRAPH={counts['GRAPH']}, "
-              f"SCENE={counts['SCENE']}, "
-              f"TENSOR={counts['TENSOR']}")
-        print(f"💰 Estimated cost: ${estimated_cost:.2f} (vs ${len(assignments) * 0.50:.2f} naive full-resolution)")
+        print(
+            f"🎯 Assigned resolutions: "
+            f"TRAINED={counts['TRAINED']}, "
+            f"DIALOG={counts['DIALOG']}, "
+            f"GRAPH={counts['GRAPH']}, "
+            f"SCENE={counts['SCENE']}, "
+            f"TENSOR={counts['TENSOR']}"
+        )
+        print(
+            f"💰 Estimated cost: ${estimated_cost:.2f} (vs ${len(assignments) * 0.50:.2f} naive full-resolution)"
+        )
         print(f"📊 Cost reduction: {(1 - estimated_cost / (len(assignments) * 0.50)) * 100:.1f}%")
 
         return assignments, estimated_cost
@@ -1125,6 +1193,7 @@ class ResolutionAssigner:
 # ============================================================================
 # Main Orchestrator Agent
 # ============================================================================
+
 
 class OrchestratorAgent:
     """
@@ -1155,11 +1224,8 @@ class OrchestratorAgent:
 
     @track_mechanism("M17", "modal_temporal_causality")
     def orchestrate(
-        self,
-        event_description: str,
-        context: Optional[Dict] = None,
-        save_to_db: bool = True
-    ) -> Dict[str, Any]:
+        self, event_description: str, context: dict | None = None, save_to_db: bool = True
+    ) -> dict[str, Any]:
         """
         Complete orchestration: natural language → ready-to-simulate scene.
 
@@ -1191,7 +1257,9 @@ class OrchestratorAgent:
 
         # Step 2: Seed initial knowledge
         print("\n🌱 Step 2: Seeding initial knowledge...")
-        exposure_events = self.knowledge_seeder.seed_knowledge(spec, create_exposure_events=save_to_db)
+        exposure_events = self.knowledge_seeder.seed_knowledge(
+            spec, create_exposure_events=save_to_db
+        )
 
         # Step 3: Build relationship graph
         print("\n🕸️  Step 3: Building relationship graph...")
@@ -1201,12 +1269,16 @@ class OrchestratorAgent:
         relationship_trajectories = []
         if save_to_db:
             print("\n💑 Step 3.5: Creating relationship trajectories...")
-            relationship_trajectories = self._create_relationship_trajectories(graph, spec, save_to_db=True)
+            relationship_trajectories = self._create_relationship_trajectories(
+                graph, spec, save_to_db=True
+            )
             print(f"   ✓ Created {len(relationship_trajectories)} relationship trajectories")
 
         # Step 4: Assign resolution levels
         print("\n🎯 Step 4: Assigning resolution levels...")
-        resolution_assignments, cost_estimate = self.resolution_assigner.assign_resolutions(spec, graph)
+        resolution_assignments, cost_estimate = self.resolution_assigner.assign_resolutions(
+            spec, graph
+        )
 
         # Step 4.5: Generate animistic entities if configured (M16)
         entity_metadata_config = context.get("entity_metadata", {})
@@ -1218,8 +1290,7 @@ class OrchestratorAgent:
             # Generate animistic entities using the mechanism function
             try:
                 animistic_entities = generate_animistic_entities_for_scene(
-                    scene_context=spec,
-                    config={"animism": animistic_config}
+                    scene_context=spec, config={"animism": animistic_config}
                 )
 
                 # Convert Entity objects back to EntityRosterItem for merging into spec
@@ -1228,9 +1299,11 @@ class OrchestratorAgent:
                         entity_id=anim_entity.entity_id,
                         entity_type=anim_entity.entity_type,
                         role="environment",  # Animistic entities are environmental forces
-                        description=anim_entity.entity_metadata.get("description", f"Animistic {anim_entity.entity_type}"),
+                        description=anim_entity.entity_metadata.get(
+                            "description", f"Animistic {anim_entity.entity_type}"
+                        ),
                         initial_knowledge=[],
-                        relationships={}
+                        relationships={},
                     )
                     spec.entities.append(roster_item)
 
@@ -1262,11 +1335,7 @@ class OrchestratorAgent:
         # Step 8: Create TemporalAgent
         print("\n🕐 Step 8: Creating temporal agent...")
         temporal_mode = TemporalMode(spec.temporal_mode)
-        temporal_agent = TemporalAgent(
-            mode=temporal_mode,
-            store=self.store,
-            llm_client=self.llm
-        )
+        temporal_agent = TemporalAgent(mode=temporal_mode, store=self.store, llm_client=self.llm)
         print(f"   ✓ Temporal agent created with mode: {temporal_mode.value}")
 
         print("\n✅ ORCHESTRATION COMPLETE\n")
@@ -1280,17 +1349,17 @@ class OrchestratorAgent:
             "relationship_trajectories": relationship_trajectories,
             "temporal_agent": temporal_agent,
             "resolution_assignments": resolution_assignments,
-            "estimated_cost": cost_estimate
+            "estimated_cost": cost_estimate,
         }
 
-    def _fuzzy_match_entity(self, entity_id: str, metadata_dict: Dict) -> Optional[Dict]:
+    def _fuzzy_match_entity(self, entity_id: str, metadata_dict: dict) -> dict | None:
         """Fuzzy match entity_id to metadata keys using partial name matching"""
         # Try exact match first
         if entity_id in metadata_dict:
             return metadata_dict[entity_id]
 
         # Try partial matching - split on underscore and check if key contains any part
-        entity_parts = entity_id.lower().split('_')
+        entity_parts = entity_id.lower().split("_")
         for key, value in metadata_dict.items():
             key_lower = key.lower()
             # Check if any significant part of entity_id appears in the key
@@ -1303,10 +1372,10 @@ class OrchestratorAgent:
     def _create_entities(
         self,
         spec: SceneSpecification,
-        resolution_assignments: Dict[str, ResolutionLevel],
-        exposure_events: Dict[str, List[ExposureEvent]],
-        context: Optional[Dict] = None
-    ) -> List[Entity]:
+        resolution_assignments: dict[str, ResolutionLevel],
+        exposure_events: dict[str, list[ExposureEvent]],
+        context: dict | None = None,
+    ) -> list[Entity]:
         """Create Entity objects from specification"""
         from schemas import PhysicalTensor
 
@@ -1318,16 +1387,11 @@ class OrchestratorAgent:
             # Create cognitive tensor with initial knowledge
             knowledge_state = entity_item.initial_knowledge
             cognitive = CognitiveTensor(
-                knowledge_state=knowledge_state,
-                energy_budget=100.0,
-                decision_confidence=0.8
+                knowledge_state=knowledge_state, energy_budget=100.0, decision_confidence=0.8
             )
 
             # Get resolution level
-            resolution = resolution_assignments.get(
-                entity_item.entity_id,
-                ResolutionLevel.SCENE
-            )
+            resolution = resolution_assignments.get(entity_item.entity_id, ResolutionLevel.SCENE)
 
             # Get first timepoint for temporal assignment
             first_tp = spec.timepoints[0] if spec.timepoints else None
@@ -1338,7 +1402,7 @@ class OrchestratorAgent:
                 "role": entity_item.role,
                 "description": entity_item.description,
                 "scene_context": spec.global_context,
-                "orchestrated": True
+                "orchestrated": True,
             }
 
             # M8: Initialize physical_tensor (ALWAYS for humans, optionally from embodied_constraints)
@@ -1358,7 +1422,7 @@ class OrchestratorAgent:
                     mobility=embodied.get("mobility", 1.0),
                     stamina=embodied.get("stamina", 1.0),
                     sensory_acuity=embodied.get("sensory_acuity", {"vision": 1.0, "hearing": 1.0}),
-                    location=embodied.get("location", None)
+                    location=embodied.get("location", None),
                 )
                 metadata["physical_tensor"] = physical.model_dump()
             else:
@@ -1373,7 +1437,7 @@ class OrchestratorAgent:
                     mobility=0.0,  # Non-humans typically don't move
                     stamina=1.0,
                     sensory_acuity={"vision": 0.5, "hearing": 0.5},  # Limited sensory capabilities
-                    location=None
+                    location=None,
                 )
                 metadata["physical_tensor"] = physical.model_dump()
 
@@ -1387,7 +1451,12 @@ class OrchestratorAgent:
             modeling_entity = prospection.get("modeling_entity")
 
             # Debug logging for M15
-            if prospection and entity_item.entity_id in ["sherlock_holmes", "holmes", "detective", "moriarty"]:
+            if prospection and entity_item.entity_id in [
+                "sherlock_holmes",
+                "holmes",
+                "detective",
+                "moriarty",
+            ]:
                 print(f"   [M15 DEBUG] Entity: {entity_item.entity_id}")
                 print(f"   [M15 DEBUG] modeling_entity from config: {modeling_entity}")
                 print(f"   [M15 DEBUG] Match: {entity_item.entity_id == modeling_entity}")
@@ -1396,7 +1465,9 @@ class OrchestratorAgent:
                 metadata["prospection_ability"] = prospection.get("prospection_ability", 0.0)
                 metadata["theory_of_mind"] = prospection.get("theory_of_mind", 0.0)
                 metadata["target_entity"] = prospection.get("target_entity")
-                print(f"   ✓ Set prospection_ability={metadata['prospection_ability']} for {entity_item.entity_id}")
+                print(
+                    f"   ✓ Set prospection_ability={metadata['prospection_ability']} for {entity_item.entity_id}"
+                )
 
             # M16: Initialize animistic consciousness (fuzzy match)
             animistic_dict = entity_metadata_config.get("animistic_entities", {})
@@ -1412,11 +1483,12 @@ class OrchestratorAgent:
                 entity_type=entity_item.entity_type,
                 timepoint=first_tp.timepoint_id if first_tp else None,
                 resolution_level=resolution,
-                entity_metadata=metadata
+                entity_metadata=metadata,
             )
 
             # Phase 7: Generate TTM tensor for entity (Phase 7 orchestrator completion)
             from tensors import generate_ttm_tensor
+
             tensor_json = generate_ttm_tensor(entity)
             if tensor_json:
                 entity.tensor = tensor_json
@@ -1433,6 +1505,7 @@ class OrchestratorAgent:
 
             if prospection_ability > 0.0 and first_tp:
                 from workflows import generate_prospective_state
+
                 print(f"   🔮 [M15] Generating prospective state for {entity.entity_id}")
                 try:
                     # Create Timepoint object for prospection generation
@@ -1440,23 +1513,23 @@ class OrchestratorAgent:
                         timepoint_id=first_tp.timepoint_id,
                         timestamp=parse_iso_datetime(first_tp.timestamp),
                         event_description=first_tp.event_description,
-                        entities_present=first_tp.entities_present
+                        entities_present=first_tp.entities_present,
                     )
 
                     # Generate prospective state
                     prospective_state = generate_prospective_state(
-                        entity,
-                        first_timepoint,
-                        self.llm,
-                        self.store
+                        entity, first_timepoint, self.llm, self.store
                     )
 
                     # Store in entity metadata (use mode='json' to serialize datetime fields)
-                    entity.entity_metadata["prospective_state"] = prospective_state.model_dump(mode='json')
+                    entity.entity_metadata["prospective_state"] = prospective_state.model_dump(
+                        mode="json"
+                    )
                     print(f"   ✓ Generated prospective state for {entity.entity_id}")
                 except Exception as e:
                     print(f"   ⚠️  Prospection generation failed for {entity.entity_id}: {e}")
                     import traceback
+
                     traceback.print_exc()
 
             entities.append(entity)
@@ -1464,7 +1537,7 @@ class OrchestratorAgent:
         print(f"   ✓ Created {len(entities)} entity objects")
         return entities
 
-    def _create_timepoints(self, spec: SceneSpecification) -> List[Timepoint]:
+    def _create_timepoints(self, spec: SceneSpecification) -> list[Timepoint]:
         """Create Timepoint objects from specification"""
         timepoints = []
 
@@ -1479,10 +1552,7 @@ class OrchestratorAgent:
                 entities_present=tp_spec.entities_present,
                 causal_parent=tp_spec.causal_parent,
                 resolution_level=ResolutionLevel.SCENE,  # Default
-                timepoint_metadata={
-                    "importance": tp_spec.importance,
-                    "orchestrated": True
-                }
+                timepoint_metadata={"importance": tp_spec.importance, "orchestrated": True},
             )
 
             timepoints.append(timepoint)
@@ -1491,10 +1561,7 @@ class OrchestratorAgent:
         return timepoints
 
     def _create_relationship_trajectories(
-        self,
-        graph: nx.Graph,
-        spec: SceneSpecification,
-        save_to_db: bool = True
+        self, graph: nx.Graph, spec: SceneSpecification, save_to_db: bool = True
     ):
         """
         Create initial relationship trajectories from graph edges.
@@ -1527,26 +1594,26 @@ class OrchestratorAgent:
 
         # Iterate through all edges in the graph
         for entity_a, entity_b, edge_data in graph.edges(data=True):
-            relationship_type = edge_data.get('relationship', 'unknown')
-            weight = edge_data.get('weight', 0.5)
+            relationship_type = edge_data.get("relationship", "unknown")
+            weight = edge_data.get("weight", 0.5)
 
             # Create relationship metrics based on type
             # Higher weights for positive relationships
             metrics = {
-                'trust': weight,
-                'affection': weight if relationship_type in ['friend', 'ally', 'family'] else 0.3,
-                'respect': weight,
-                'cooperation': weight if relationship_type in ['colleague', 'ally'] else 0.5
+                "trust": weight,
+                "affection": weight if relationship_type in ["friend", "ally", "family"] else 0.3,
+                "respect": weight,
+                "cooperation": weight if relationship_type in ["colleague", "ally"] else 0.5,
             }
 
             # Create initial state (will be serialized to JSON)
             state = {
-                'entity_a': entity_a,
-                'entity_b': entity_b,
-                'timestamp': timestamp.isoformat(),  # Convert to ISO string for JSON
-                'timepoint_id': first_tp.timepoint_id,
-                'metrics': metrics,
-                'recent_events': []
+                "entity_a": entity_a,
+                "entity_b": entity_b,
+                "timestamp": timestamp.isoformat(),  # Convert to ISO string for JSON
+                "timepoint_id": first_tp.timepoint_id,
+                "metrics": metrics,
+                "recent_events": [],
             }
 
             # Create trajectory
@@ -1557,11 +1624,11 @@ class OrchestratorAgent:
                 start_timepoint=first_tp.timepoint_id,
                 end_timepoint=first_tp.timepoint_id,
                 states=json.dumps([state]),  # Serialize to JSON string
-                overall_trend='stable',  # Initial relationships are stable
+                overall_trend="stable",  # Initial relationships are stable
                 key_events=[],
                 relationship_type=relationship_type,
                 current_strength=weight,
-                context_summary=f"Initial {relationship_type} relationship between {entity_a} and {entity_b}"
+                context_summary=f"Initial {relationship_type} relationship between {entity_a} and {entity_b}",
             )
 
             trajectories.append(trajectory)
@@ -1573,9 +1640,7 @@ class OrchestratorAgent:
         return trajectories
 
     def _detect_and_generate_missing_entities(
-        self,
-        spec: SceneSpecification,
-        save_to_db: bool = True
+        self, spec: SceneSpecification, save_to_db: bool = True
     ) -> None:
         """
         Detect and generate missing entities mentioned in event descriptions (M9).
@@ -1592,10 +1657,7 @@ class OrchestratorAgent:
         existing_entities = set(e.entity_id for e in spec.entities)
 
         # Collect all text to search for entity mentions
-        texts_to_search = [
-            spec.scene_description,
-            spec.global_context
-        ]
+        texts_to_search = [spec.scene_description, spec.global_context]
 
         # Add timepoint descriptions
         for tp in spec.timepoints:
@@ -1631,7 +1693,7 @@ class OrchestratorAgent:
                     role=role,
                     description=description,
                     initial_knowledge=[f"Present at {spec.scene_title}"],
-                    relationships={}
+                    relationships={},
                 )
 
                 # Add to spec
@@ -1654,13 +1716,14 @@ class OrchestratorAgent:
 # Convenience Functions
 # ============================================================================
 
+
 def simulate_event(
     event_description: str,
     llm_client: LLMClient,
     store: GraphStore,
-    context: Optional[Dict] = None,
-    save_to_db: bool = True
-) -> Dict[str, Any]:
+    context: dict | None = None,
+    save_to_db: bool = True,
+) -> dict[str, Any]:
     """
     Convenience function for complete event simulation.
 

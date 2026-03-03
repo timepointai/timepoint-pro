@@ -6,11 +6,8 @@ validated simulation configuration, including interactive refinement.
 """
 
 import pytest
-from nl_interface import (
-    NLConfigGenerator,
-    InteractiveRefiner,
-    ClarificationEngine
-)
+
+from nl_interface import ClarificationEngine, InteractiveRefiner, NLConfigGenerator
 
 
 class TestE2ENLToConfig:
@@ -72,7 +69,9 @@ class TestE2ENLToConfig:
         generator = NLConfigGenerator()
 
         # Generate config
-        description = "Simulate a crisis meeting with 3 people. 5 timepoints. Focus on stress and decisions."
+        description = (
+            "Simulate a crisis meeting with 3 people. 5 timepoints. Focus on stress and decisions."
+        )
         config, confidence = generator.generate_config(description)
 
         # Validate config
@@ -100,7 +99,7 @@ class TestE2ENLToConfig:
             "timepoint_count": 101,  # Exceeds maximum
             "temporal_mode": "forward",
             "focus": ["dialog"],
-            "outputs": ["dialog"]
+            "outputs": ["dialog"],
         }
 
         validation = generator.validate_config(invalid_config)
@@ -176,11 +175,7 @@ class TestE2EInteractiveRefinement:
         assert result["config"] is None
 
         # Answer clarifications
-        answers = {
-            "entity_count": "5",
-            "timepoint_count": "10",
-            "focus": "dialog, decision_making"
-        }
+        answers = {"entity_count": "5", "timepoint_count": "10", "focus": "dialog, decision_making"}
 
         result = refiner.answer_clarifications(answers)
 
@@ -195,7 +190,7 @@ class TestE2EInteractiveRefinement:
         # Generate initial config
         refiner.start_refinement(
             "Simulate a meeting with 5 people. 10 timepoints. Focus on dialog.",
-            skip_clarifications=True
+            skip_clarifications=True,
         )
 
         # Get initial timepoint count
@@ -203,10 +198,7 @@ class TestE2EInteractiveRefinement:
         initial_timepoints = initial_config["timepoint_count"]
 
         # Adjust timepoint count
-        result = refiner.adjust_config(
-            {"timepoint_count": 15},
-            regenerate=False
-        )
+        result = refiner.adjust_config({"timepoint_count": 15}, regenerate=False)
 
         # Should have updated config
         assert result["config"]["timepoint_count"] == 15
@@ -218,8 +210,7 @@ class TestE2EInteractiveRefinement:
 
         # Generate initial config
         refiner.start_refinement(
-            "Simulate a meeting with 5 people. 10 timepoints.",
-            skip_clarifications=True
+            "Simulate a meeting with 5 people. 10 timepoints.", skip_clarifications=True
         )
 
         first_config = refiner.current_config
@@ -241,8 +232,7 @@ class TestE2EInteractiveRefinement:
 
         # Go through refinement workflow
         refiner.start_refinement(
-            "Simulate a board meeting with 5 executives. 10 timepoints.",
-            skip_clarifications=True
+            "Simulate a board meeting with 5 executives. 10 timepoints.", skip_clarifications=True
         )
 
         refiner.adjust_config({"timepoint_count": 15}, regenerate=False)
@@ -394,7 +384,7 @@ class TestE2EFullStack:
             answers = {
                 "timepoint_count": "15",
                 "focus": "dialog, decision_making",
-                "outputs": "dialog, decisions"
+                "outputs": "dialog, decisions",
             }
             result = refiner.answer_clarifications(answers)
 
@@ -404,10 +394,7 @@ class TestE2EFullStack:
 
         # 5. Make adjustments if needed
         if result["config"]["timepoint_count"] != 20:
-            result = refiner.adjust_config(
-                {"timepoint_count": 20},
-                regenerate=False
-            )
+            result = refiner.adjust_config({"timepoint_count": 20}, regenerate=False)
 
         # 6. Approve final config
         final_config = refiner.approve_config()
@@ -444,7 +431,7 @@ class TestE2EFullStack:
         descriptions = [
             "Simulate a board meeting with 5 executives. 10 timepoints.",
             "Simulate Apollo 13 crisis with 4 people. 8 timepoints.",
-            "Simulate a negotiation with 2 parties. 5 timepoints."
+            "Simulate a negotiation with 2 parties. 5 timepoints.",
         ]
 
         for desc in descriptions:
@@ -483,7 +470,7 @@ class TestE2EIntegrationWithExistingSystem:
             "timepoint_count",
             "temporal_mode",
             "focus",
-            "outputs"
+            "outputs",
         ]
 
         for field in required_fields:
@@ -510,14 +497,19 @@ class TestE2EIntegrationWithExistingSystem:
         """Test NL-generated configs use valid focus areas"""
         generator = NLConfigGenerator()
 
-        description = "Simulate a meeting with 3 people. Focus on dialog and decisions. 5 timepoints."
+        description = (
+            "Simulate a meeting with 3 people. Focus on dialog and decisions. 5 timepoints."
+        )
 
         config, _ = generator.generate_config(description)
 
         # Verify focus areas are valid
         valid_focus = {
-            "dialog", "decision_making", "relationships",
-            "stress_responses", "knowledge_propagation"
+            "dialog",
+            "decision_making",
+            "relationships",
+            "stress_responses",
+            "knowledge_propagation",
         }
 
         for focus in config["focus"]:

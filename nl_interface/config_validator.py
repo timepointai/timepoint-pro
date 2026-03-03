@@ -5,16 +5,18 @@ Provides semantic validation and constraint checking beyond Pydantic schema vali
 Ensures generated configs are not only well-formed but also sensible and executable.
 """
 
-from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
+from typing import Any
+
 from pydantic import BaseModel, Field, field_validator
 
 
 class EntityConfig(BaseModel):
     """Entity configuration"""
+
     name: str
     role: str
-    personality_traits: Optional[Dict[str, float]] = None
+    personality_traits: dict[str, float] | None = None
 
 
 class SimulationConfig(BaseModel):
@@ -23,26 +25,31 @@ class SimulationConfig(BaseModel):
 
     This is the target format for NL → Config translation.
     """
+
     scenario: str = Field(..., description="Descriptive title for the scenario")
-    entities: List[EntityConfig] = Field(..., description="List of entities to simulate")
+    entities: list[EntityConfig] = Field(..., description="List of entities to simulate")
     timepoint_count: int = Field(..., ge=1, le=100, description="Number of timepoints")
     temporal_mode: str = Field(
         ...,
         description="Temporal causality mode",
-        pattern="^(forward|directorial|branching|cyclical|portal)$"
+        pattern="^(forward|directorial|branching|cyclical|portal)$",
     )
-    focus: List[str] = Field(..., description="Simulation focus areas")
-    outputs: List[str] = Field(..., description="Desired outputs")
+    focus: list[str] = Field(..., description="Simulation focus areas")
+    outputs: list[str] = Field(..., description="Desired outputs")
 
     # Optional fields
-    start_time: Optional[str] = Field(None, description="ISO datetime for scenario start")
-    animism_level: Optional[int] = Field(None, ge=0, le=3, description="Animistic entity support level")
-    resolution_mode: Optional[str] = Field(None, description="Resolution elevation strategy")
-    generation_mode: Optional[str] = Field(None, description="horizontal or vertical")
-    variation_count: Optional[int] = Field(None, ge=1, le=1000, description="For horizontal generation")
-    variation_strategy: Optional[str] = Field(None, description="Variation strategy name")
+    start_time: str | None = Field(None, description="ISO datetime for scenario start")
+    animism_level: int | None = Field(
+        None, ge=0, le=3, description="Animistic entity support level"
+    )
+    resolution_mode: str | None = Field(None, description="Resolution elevation strategy")
+    generation_mode: str | None = Field(None, description="horizontal or vertical")
+    variation_count: int | None = Field(
+        None, ge=1, le=1000, description="For horizontal generation"
+    )
+    variation_strategy: str | None = Field(None, description="Variation strategy name")
 
-    @field_validator('entities')
+    @field_validator("entities")
     @classmethod
     def validate_entity_count(cls, v):
         """Ensure reasonable entity count"""
@@ -52,26 +59,27 @@ class SimulationConfig(BaseModel):
             raise ValueError("Maximum 100 entities allowed")
         return v
 
-    @field_validator('focus')
+    @field_validator("focus")
     @classmethod
     def validate_focus_areas(cls, v):
         """Ensure valid focus areas"""
         valid_focus = {
-            "dialog", "decision_making", "relationships",
-            "stress_responses", "knowledge_propagation"
+            "dialog",
+            "decision_making",
+            "relationships",
+            "stress_responses",
+            "knowledge_propagation",
         }
         invalid = set(v) - valid_focus
         if invalid:
             raise ValueError(f"Invalid focus areas: {invalid}. Valid: {valid_focus}")
         return v
 
-    @field_validator('outputs')
+    @field_validator("outputs")
     @classmethod
     def validate_outputs(cls, v):
         """Ensure valid output types"""
-        valid_outputs = {
-            "dialog", "decisions", "relationships", "knowledge_flow"
-        }
+        valid_outputs = {"dialog", "decisions", "relationships", "knowledge_flow"}
         invalid = set(v) - valid_outputs
         if invalid:
             raise ValueError(f"Invalid outputs: {invalid}. Valid: {valid_outputs}")
@@ -80,10 +88,11 @@ class SimulationConfig(BaseModel):
 
 class ValidationResult(BaseModel):
     """Result of configuration validation"""
+
     is_valid: bool
-    errors: List[str] = Field(default_factory=list)
-    warnings: List[str] = Field(default_factory=list)
-    suggestions: List[str] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    suggestions: list[str] = Field(default_factory=list)
     confidence_score: float = Field(default=1.0, ge=0.0, le=1.0)
 
 
@@ -114,7 +123,7 @@ class ConfigValidator:
         self.max_timepoints = 100
         self.max_variation_count = 1000
 
-    def validate(self, config_dict: Dict[str, Any]) -> ValidationResult:
+    def validate(self, config_dict: dict[str, Any]) -> ValidationResult:
         """
         Validate configuration.
 
@@ -171,9 +180,7 @@ class ConfigValidator:
                 f"Large timepoint count ({config.timepoint_count}). "
                 "This will be expensive and time-consuming."
             )
-            result.suggestions.append(
-                "For initial simulations, 3-15 timepoints is recommended."
-            )
+            result.suggestions.append("For initial simulations, 3-15 timepoints is recommended.")
 
         if config.timepoint_count > self.max_timepoints:
             result.is_valid = False
@@ -201,7 +208,7 @@ class ConfigValidator:
         """Check historical dates and entity roles are plausible"""
         if config.start_time:
             try:
-                dt = datetime.fromisoformat(config.start_time.replace('Z', '+00:00'))
+                dt = datetime.fromisoformat(config.start_time.replace("Z", "+00:00"))
 
                 # Check if date is too far in the future
                 if dt.year > 2100:
@@ -277,7 +284,7 @@ class ConfigValidator:
         warning_penalty = min(0.2, len(result.warnings) * 0.05)
         return 1.0 - warning_penalty
 
-    def suggest_fixes(self, config_dict: Dict[str, Any]) -> List[str]:
+    def suggest_fixes(self, config_dict: dict[str, Any]) -> list[str]:
         """
         Suggest fixes for invalid configuration.
 
@@ -292,6 +299,4 @@ class ConfigValidator:
         if result.is_valid:
             return ["Configuration is valid!"]
 
-        return result.suggestions + [
-            f"Fix error: {error}" for error in result.errors
-        ]
+        return result.suggestions + [f"Fix error: {error}" for error in result.errors]

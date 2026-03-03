@@ -10,28 +10,26 @@ Tests cover:
 - Batch operations
 - Optimistic locking for collision detection
 """
-import pytest
+
 import numpy as np
-import tempfile
-import time
-from datetime import datetime
-from pathlib import Path
+import pytest
+
+from schemas import TTMTensor
+from tensor_persistence import TensorDatabase, TensorRecord
 
 # These imports will fail until implementation exists
 # That's expected in TDD - tests define the API contract
 from tensor_serialization import (
-    serialize_tensor,
     deserialize_tensor,
-    tensor_to_dict,
     dict_to_tensor,
+    serialize_tensor,
+    tensor_to_dict,
 )
-from tensor_persistence import TensorDatabase, TensorRecord, TensorVersion
-from schemas import TTMTensor
-
 
 # ============================================================================
 # Fixtures
 # ============================================================================
+
 
 @pytest.fixture
 def sample_arrays():
@@ -64,6 +62,7 @@ def tensor_db(tmp_path):
 def sample_record(sample_ttm_tensor):
     """Sample TensorRecord for database tests."""
     from tensor_serialization import serialize_tensor
+
     return TensorRecord(
         tensor_id="test-tensor-001",
         entity_id="entity-001",
@@ -77,6 +76,7 @@ def sample_record(sample_ttm_tensor):
 # ============================================================================
 # Serialization Tests
 # ============================================================================
+
 
 @pytest.mark.unit
 class TestTensorSerialization:
@@ -149,6 +149,7 @@ class TestTensorSerialization:
 # ============================================================================
 # Database CRUD Tests
 # ============================================================================
+
 
 @pytest.mark.unit
 class TestTensorDatabaseCRUD:
@@ -260,6 +261,7 @@ class TestTensorDatabaseCRUD:
 # Maturity Query Tests
 # ============================================================================
 
+
 @pytest.mark.unit
 class TestMaturityQueries:
     """Tests for maturity-based tensor queries."""
@@ -316,6 +318,7 @@ class TestMaturityQueries:
 # Version History Tests
 # ============================================================================
 
+
 @pytest.mark.unit
 class TestVersionHistory:
     """Tests for tensor version tracking."""
@@ -368,7 +371,7 @@ class TestVersionHistory:
 
     def test_version_preserves_tensor_blob(self, tensor_db, sample_ttm_tensor):
         """Each version should preserve its tensor values."""
-        from tensor_serialization import serialize_tensor, deserialize_tensor
+        from tensor_serialization import deserialize_tensor, serialize_tensor
 
         # Create record with initial tensor
         record = TensorRecord(
@@ -408,6 +411,7 @@ class TestVersionHistory:
 # ============================================================================
 # Batch Operations Tests
 # ============================================================================
+
 
 @pytest.mark.unit
 class TestBatchOperations:
@@ -487,6 +491,7 @@ class TestBatchOperations:
 # Optimistic Locking Tests
 # ============================================================================
 
+
 @pytest.mark.unit
 class TestOptimisticLocking:
     """Tests for collision detection via optimistic locking."""
@@ -497,10 +502,7 @@ class TestOptimisticLocking:
 
         # Update with correct expected version
         sample_record.maturity = 0.95
-        success = tensor_db.save_tensor_with_lock(
-            sample_record,
-            expected_version=1
-        )
+        success = tensor_db.save_tensor_with_lock(sample_record, expected_version=1)
         assert success is True
 
         record = tensor_db.get_tensor(sample_record.tensor_id)
@@ -519,7 +521,7 @@ class TestOptimisticLocking:
         sample_record.maturity = 0.95
         success = tensor_db.save_tensor_with_lock(
             sample_record,
-            expected_version=1  # Stale!
+            expected_version=1,  # Stale!
         )
         assert success is False
 
@@ -542,16 +544,14 @@ class TestOptimisticLocking:
 
         # Our update should fail due to version mismatch
         sample_record.maturity = 0.95
-        success = tensor_db.save_tensor_with_lock(
-            sample_record,
-            expected_version=expected_version
-        )
+        success = tensor_db.save_tensor_with_lock(sample_record, expected_version=expected_version)
         assert success is False
 
 
 # ============================================================================
 # Training History Tests
 # ============================================================================
+
 
 @pytest.mark.unit
 class TestTrainingHistory:
@@ -584,13 +584,14 @@ class TestTrainingHistory:
 # Integration Tests
 # ============================================================================
 
+
 @pytest.mark.integration
 class TestTensorPersistenceIntegration:
     """Integration tests for full tensor lifecycle."""
 
     def test_full_tensor_lifecycle(self, tensor_db):
         """Test complete lifecycle: create -> train -> query -> version."""
-        from tensor_serialization import serialize_tensor, deserialize_tensor
+        from tensor_serialization import serialize_tensor
 
         # 1. Create initial tensor
         initial = TTMTensor.from_arrays(
@@ -630,7 +631,7 @@ class TestTensorPersistenceIntegration:
 
     def test_entity_tensor_roundtrip(self, tensor_db, sample_ttm_tensor):
         """Test saving and loading tensor for entity."""
-        from tensor_serialization import serialize_tensor, deserialize_tensor
+        from tensor_serialization import deserialize_tensor, serialize_tensor
 
         entity_id = "entity-roundtrip-test"
 

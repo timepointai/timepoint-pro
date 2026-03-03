@@ -7,30 +7,28 @@ including branching, syncing, and conflict resolution.
 Phase 4: Oxen Integration
 """
 
+import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
-import uuid
+from typing import Any
 
 from .client import OxenClient
-from .parquet_schemas import (
-    write_templates_parquet,
-    write_instances_parquet,
-    read_templates_parquet,
-    read_instances_parquet,
-    tensor_record_to_parquet_row,
-)
 from .exceptions import RepositoryError
+from .parquet_schemas import (
+    write_instances_parquet,
+    write_templates_parquet,
+)
 
 
 @dataclass
 class SyncResult:
     """Result of a sync operation."""
+
     synced_count: int
-    version: Optional[str] = None
-    errors: List[str] = None
-    conflicts: List[str] = None
+    version: str | None = None
+    errors: list[str] = None
+    conflicts: list[str] = None
 
     def __post_init__(self):
         if self.errors is None:
@@ -42,10 +40,11 @@ class SyncResult:
 @dataclass
 class FetchResult:
     """Result of a fetch operation."""
+
     fetched_count: int
-    version: Optional[str] = None
-    new_templates: List[str] = None
-    new_instances: List[str] = None
+    version: str | None = None
+    new_templates: list[str] = None
+    new_instances: list[str] = None
 
     def __post_init__(self):
         if self.new_templates is None:
@@ -74,7 +73,7 @@ class TensorVersionController:
         self,
         oxen_client: OxenClient,
         repo_name: str = "tensor-store",
-        local_cache_dir: Optional[str] = None
+        local_cache_dir: str | None = None,
     ):
         """
         Initialize TensorVersionController.
@@ -86,11 +85,13 @@ class TensorVersionController:
         """
         self.client = oxen_client
         self.repo_name = repo_name
-        self.local_cache_dir = Path(local_cache_dir) if local_cache_dir else Path("metadata/tensor_cache")
+        self.local_cache_dir = (
+            Path(local_cache_dir) if local_cache_dir else Path("metadata/tensor_cache")
+        )
         self.local_cache_dir.mkdir(parents=True, exist_ok=True)
 
         # Track sync state
-        self._last_sync_version: Optional[str] = None
+        self._last_sync_version: str | None = None
 
     # ========================================================================
     # Template Publishing
@@ -100,7 +101,7 @@ class TensorVersionController:
         self,
         record: Any,  # TensorRecord
         branch: str = "main",
-        commit_message: Optional[str] = None
+        commit_message: str | None = None,
     ) -> str:
         """
         Publish a tensor template to Oxen.
@@ -134,17 +135,14 @@ class TensorVersionController:
                 file_path=str(local_path),
                 commit_message=message,
                 dst_path=dst_path,
-                create_repo_if_missing=True
+                create_repo_if_missing=True,
             )
             return result.commit_id
         except Exception as e:
             raise RepositoryError(f"Failed to publish template: {e}")
 
     def publish_templates_batch(
-        self,
-        records: List[Any],
-        branch: str = "main",
-        commit_message: Optional[str] = None
+        self, records: list[Any], branch: str = "main", commit_message: str | None = None
     ) -> str:
         """
         Publish multiple templates in a single commit.
@@ -161,7 +159,7 @@ class TensorVersionController:
             raise ValueError("No records to publish")
 
         # Group by category
-        by_category: Dict[str, List[Any]] = {}
+        by_category: dict[str, list[Any]] = {}
         for record in records:
             category = record.category or "uncategorized"
             if category not in by_category:
@@ -189,7 +187,7 @@ class TensorVersionController:
                     file_path=str(local_path),
                     commit_message=message,
                     dst_path=dst_path,
-                    create_repo_if_missing=True
+                    create_repo_if_missing=True,
                 )
                 last_commit = result.commit_id
             except Exception as e:
@@ -204,10 +202,10 @@ class TensorVersionController:
     def sync_local_to_remote(
         self,
         tensor_db: Any,  # TensorDatabase
-        since_version: Optional[str] = None,
+        since_version: str | None = None,
         include_templates: bool = True,
         include_instances: bool = True,
-        min_maturity: float = 0.0
+        min_maturity: float = 0.0,
     ) -> SyncResult:
         """
         Sync local tensors to Oxen remote.
@@ -246,14 +244,17 @@ class TensorVersionController:
         if templates:
             try:
                 # Write to single batch file
-                batch_file = self.local_cache_dir / f"sync_templates_{datetime.now().strftime('%Y%m%d_%H%M%S')}.parquet"
+                batch_file = (
+                    self.local_cache_dir
+                    / f"sync_templates_{datetime.now().strftime('%Y%m%d_%H%M%S')}.parquet"
+                )
                 write_templates_parquet(templates, str(batch_file))
 
                 result = self.client.upload_dataset(
                     file_path=str(batch_file),
                     commit_message=f"Sync {len(templates)} templates from local",
                     dst_path=f"templates/sync/{batch_file.name}",
-                    create_repo_if_missing=True
+                    create_repo_if_missing=True,
                 )
                 synced += len(templates)
                 self._last_sync_version = result.commit_id
@@ -264,14 +265,17 @@ class TensorVersionController:
         # Sync instances
         if instances:
             try:
-                batch_file = self.local_cache_dir / f"sync_instances_{datetime.now().strftime('%Y%m%d_%H%M%S')}.parquet"
+                batch_file = (
+                    self.local_cache_dir
+                    / f"sync_instances_{datetime.now().strftime('%Y%m%d_%H%M%S')}.parquet"
+                )
                 write_instances_parquet(instances, str(batch_file))
 
                 result = self.client.upload_dataset(
                     file_path=str(batch_file),
                     commit_message=f"Sync {len(instances)} instances from local",
                     dst_path=f"instances/sync/{batch_file.name}",
-                    create_repo_if_missing=True
+                    create_repo_if_missing=True,
                 )
                 synced += len(instances)
                 self._last_sync_version = result.commit_id
@@ -279,16 +283,12 @@ class TensorVersionController:
             except Exception as e:
                 errors.append(f"Instance sync failed: {e}")
 
-        return SyncResult(
-            synced_count=synced,
-            version=self._last_sync_version,
-            errors=errors
-        )
+        return SyncResult(synced_count=synced, version=self._last_sync_version, errors=errors)
 
     def fetch_remote_updates(
         self,
         tensor_db: Any,  # TensorDatabase
-        branch: str = "main"
+        branch: str = "main",
     ) -> FetchResult:
         """
         Fetch new tensors from Oxen remote.
@@ -319,7 +319,7 @@ class TensorVersionController:
             fetched_count=fetched,
             version=self._last_sync_version,
             new_templates=new_templates,
-            new_instances=new_instances
+            new_instances=new_instances,
         )
 
     # ========================================================================
@@ -327,10 +327,7 @@ class TensorVersionController:
     # ========================================================================
 
     def create_experiment_branch(
-        self,
-        name: str,
-        description: str,
-        from_branch: str = "main"
+        self, name: str, description: str, from_branch: str = "main"
     ) -> str:
         """
         Create an experiment branch for tensor training experiments.
@@ -355,11 +352,7 @@ class TensorVersionController:
         except Exception as e:
             raise RepositoryError(f"Failed to create experiment branch: {e}")
 
-    def create_training_branch(
-        self,
-        batch_id: str,
-        from_branch: str = "main"
-    ) -> str:
+    def create_training_branch(self, batch_id: str, from_branch: str = "main") -> str:
         """
         Create a branch for a training batch.
 
@@ -379,10 +372,7 @@ class TensorVersionController:
             raise RepositoryError(f"Failed to create training branch: {e}")
 
     def merge_training_results(
-        self,
-        training_branch: str,
-        target_branch: str = "main",
-        require_maturity: float = 0.95
+        self, training_branch: str, target_branch: str = "main", require_maturity: float = 0.95
     ) -> str:
         """
         Merge training results back to main branch.
@@ -401,7 +391,7 @@ class TensorVersionController:
             commit_id = self.client.merge_branch(
                 source_branch=training_branch,
                 target_branch=target_branch,
-                message=f"Merge training results from {training_branch}"
+                message=f"Merge training results from {training_branch}",
             )
             return commit_id
         except Exception as e:
@@ -412,10 +402,8 @@ class TensorVersionController:
     # ========================================================================
 
     def detect_conflicts(
-        self,
-        local_records: List[Any],
-        remote_records: List[Any]
-    ) -> List[Tuple[Any, Any]]:
+        self, local_records: list[Any], remote_records: list[Any]
+    ) -> list[tuple[Any, Any]]:
         """
         Detect conflicts between local and remote tensors.
 
@@ -453,7 +441,7 @@ class TensorVersionController:
         self,
         local: Any,  # TensorRecord
         remote: Any,  # TensorRecord
-        strategy: str = "highest_maturity"
+        strategy: str = "highest_maturity",
     ) -> Any:
         """
         Resolve a conflict between local and remote tensors.
@@ -473,9 +461,10 @@ class TensorVersionController:
         Returns:
             Resolved TensorRecord
         """
-        from tensor_serialization import serialize_tensor, deserialize_tensor
-        from schemas import TTMTensor
         import numpy as np
+
+        from schemas import TTMTensor
+        from tensor_serialization import deserialize_tensor, serialize_tensor
 
         if strategy == "highest_maturity":
             return local if local.maturity >= remote.maturity else remote
@@ -506,11 +495,12 @@ class TensorVersionController:
             merged_tensor = TTMTensor.from_arrays(
                 np.array(merged_ctx, dtype=np.float32),
                 np.array(merged_bio, dtype=np.float32),
-                np.array(merged_beh, dtype=np.float32)
+                np.array(merged_beh, dtype=np.float32),
             )
 
             # Use higher maturity and combined cycles
             from tensor_persistence import TensorRecord
+
             return TensorRecord(
                 tensor_id=local.tensor_id,
                 entity_id=local.entity_id,
@@ -532,8 +522,8 @@ class TensorVersionController:
 
     def get_sync_status(
         self,
-        tensor_db: Any  # TensorDatabase
-    ) -> Dict[str, Any]:
+        tensor_db: Any,  # TensorDatabase
+    ) -> dict[str, Any]:
         """
         Get sync status between local and remote.
 
@@ -556,6 +546,6 @@ class TensorVersionController:
         }
 
     @property
-    def last_sync_version(self) -> Optional[str]:
+    def last_sync_version(self) -> str | None:
         """Get the last sync version."""
         return self._last_sync_version

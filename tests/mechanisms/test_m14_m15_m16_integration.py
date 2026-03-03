@@ -1,27 +1,26 @@
 """
 Quick test to verify M14, M15, M16 integration into E2E workflow
 """
+
 import os
-import pytest
 import sqlite3
 import uuid
 
-from orchestrator import OrchestratorAgent
+import pytest
+
 from generation.templates.loader import TemplateLoader
 from llm_v2 import LLMClient
-from storage import GraphStore
 from metadata.run_tracker import MetadataManager
-from metadata.tracking import set_metadata_manager, set_current_run_id, clear_current_run_id
+from metadata.tracking import clear_current_run_id, set_current_run_id, set_metadata_manager
+from orchestrator import OrchestratorAgent
 from schemas import TemporalMode
+from storage import GraphStore
 
 
 @pytest.mark.mechanism
 @pytest.mark.m14
 @pytest.mark.llm
-@pytest.mark.skipif(
-    not os.getenv("OPENROUTER_API_KEY"),
-    reason="OPENROUTER_API_KEY not set"
-)
+@pytest.mark.skipif(not os.getenv("OPENROUTER_API_KEY"), reason="OPENROUTER_API_KEY not set")
 def test_m14_mechanism_integration():
     """Test that M14 (Circadian Patterns) fires during E2E execution with hospital_crisis template."""
 
@@ -51,20 +50,21 @@ def test_m14_mechanism_integration():
         template_id="hospital_crisis",
         causal_mode=TemporalMode.FORWARD,
         max_entities=10,
-        max_timepoints=10
+        max_timepoints=10,
     )
 
     try:
         # Run orchestrator
         orchestrator = OrchestratorAgent(llm, store)
-        result = orchestrator.orchestrate(config.scenario_description, context=config.metadata or {})
+        result = orchestrator.orchestrate(
+            config.scenario_description, context=config.metadata or {}
+        )
 
         # Check if M14 fired
         conn = sqlite3.connect("metadata/runs.db")
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT COUNT(*) FROM mechanism_usage WHERE run_id = ? AND mechanism = 'M14'",
-            (run_id,)
+            "SELECT COUNT(*) FROM mechanism_usage WHERE run_id = ? AND mechanism = 'M14'", (run_id,)
         )
         m14_count = cursor.fetchone()[0]
         conn.close()
@@ -72,8 +72,8 @@ def test_m14_mechanism_integration():
         if m14_count > 0:
             print(f"\n✅ M14 fired {m14_count} times during orchestration!")
         else:
-            print(f"\n⚠️  M14 did not fire during orchestration")
-            print(f"   This might be expected if dialog synthesis wasn't called")
+            print("\n⚠️  M14 did not fire during orchestration")
+            print("   This might be expected if dialog synthesis wasn't called")
 
     except Exception as e:
         print(f"\n❌ Error during orchestration: {e}")
@@ -87,7 +87,7 @@ def test_m14_mechanism_integration():
             training_examples=0,
             cost_usd=0.0,
             llm_calls=0,
-            tokens_used=0
+            tokens_used=0,
         )
 
 

@@ -31,11 +31,11 @@ Usage:
     )
 """
 
-from enum import Enum, auto
-from typing import Dict, List, Optional, Set, Any
-from dataclasses import dataclass, field
-from functools import lru_cache
 import logging
+from dataclasses import dataclass, field
+from enum import Enum, auto
+from functools import lru_cache
+from typing import Any
 
 from metadata.tracking import track_mechanism
 
@@ -44,113 +44,116 @@ logger = logging.getLogger(__name__)
 
 class ModelCapability(Enum):
     """Capabilities that models may have"""
+
     # Output capabilities
-    STRUCTURED_JSON = auto()      # Reliable JSON output
-    LONG_FORM_TEXT = auto()       # Good at long narrative generation
-    DIALOG_GENERATION = auto()    # Natural conversational output
-    CODE_GENERATION = auto()      # Can write/analyze code
+    STRUCTURED_JSON = auto()  # Reliable JSON output
+    LONG_FORM_TEXT = auto()  # Good at long narrative generation
+    DIALOG_GENERATION = auto()  # Natural conversational output
+    CODE_GENERATION = auto()  # Can write/analyze code
 
     # Reasoning capabilities
-    MATHEMATICAL = auto()         # Strong math/calculation ability
-    LOGICAL_REASONING = auto()    # Step-by-step reasoning
-    CAUSAL_REASONING = auto()     # Understanding cause/effect
-    TEMPORAL_REASONING = auto()   # Time-aware reasoning
+    MATHEMATICAL = auto()  # Strong math/calculation ability
+    LOGICAL_REASONING = auto()  # Step-by-step reasoning
+    CAUSAL_REASONING = auto()  # Understanding cause/effect
+    TEMPORAL_REASONING = auto()  # Time-aware reasoning
 
     # Context capabilities
-    LARGE_CONTEXT = auto()        # 32k+ context window
-    VERY_LARGE_CONTEXT = auto()   # 128k+ context window
+    LARGE_CONTEXT = auto()  # 32k+ context window
+    VERY_LARGE_CONTEXT = auto()  # 128k+ context window
 
     # Performance characteristics
-    FAST_INFERENCE = auto()       # Low latency
-    COST_EFFICIENT = auto()       # Lower cost per token
-    HIGH_QUALITY = auto()         # Best output quality
+    FAST_INFERENCE = auto()  # Low latency
+    COST_EFFICIENT = auto()  # Lower cost per token
+    HIGH_QUALITY = auto()  # Best output quality
 
     # Memory/state
-    STATEFUL = auto()             # Can maintain conversation state
-    INSTRUCTION_FOLLOWING = auto() # Good at following complex instructions
+    STATEFUL = auto()  # Can maintain conversation state
+    INSTRUCTION_FOLLOWING = auto()  # Good at following complex instructions
 
 
 class ActionType(Enum):
     """Types of actions that require LLM calls"""
+
     # Entity operations
-    ENTITY_POPULATION = auto()         # Populate entity tensors
-    ENTITY_ENRICHMENT = auto()         # Enrich with background
-    PERSONALITY_INFERENCE = auto()     # Infer personality traits
+    ENTITY_POPULATION = auto()  # Populate entity tensors
+    ENTITY_ENRICHMENT = auto()  # Enrich with background
+    PERSONALITY_INFERENCE = auto()  # Infer personality traits
 
     # Dialog operations
-    DIALOG_SYNTHESIS = auto()          # Generate conversations
-    DIALOG_CONTINUATION = auto()       # Continue existing dialog
-    DIALOG_SINGLE_TURN = auto()        # Generate ONE character turn (per-turn mode)
-    DIALOG_STEERING = auto()           # Steering agent: select next speaker, manage narrative
-    DIALOG_QUALITY_SEMANTIC = auto()   # Semantic quality evaluation of dialog
+    DIALOG_SYNTHESIS = auto()  # Generate conversations
+    DIALOG_CONTINUATION = auto()  # Continue existing dialog
+    DIALOG_SINGLE_TURN = auto()  # Generate ONE character turn (per-turn mode)
+    DIALOG_STEERING = auto()  # Steering agent: select next speaker, manage narrative
+    DIALOG_QUALITY_SEMANTIC = auto()  # Semantic quality evaluation of dialog
 
     # Temporal operations
-    TEMPORAL_REASONING = auto()        # Causal chain reasoning
-    COUNTERFACTUAL_PREDICTION = auto() # What-if scenarios
-    PROSPECTION = auto()               # Future prediction
+    TEMPORAL_REASONING = auto()  # Causal chain reasoning
+    COUNTERFACTUAL_PREDICTION = auto()  # What-if scenarios
+    PROSPECTION = auto()  # Future prediction
 
     # Scene operations
-    SCENE_ATMOSPHERE = auto()          # Generate scene descriptions
-    CROWD_DYNAMICS = auto()            # Model group behavior
+    SCENE_ATMOSPHERE = auto()  # Generate scene descriptions
+    CROWD_DYNAMICS = auto()  # Model group behavior
 
     # Validation operations
-    CONSISTENCY_CHECK = auto()         # Validate temporal consistency
-    RELEVANCE_SCORING = auto()         # Score relevance
+    CONSISTENCY_CHECK = auto()  # Validate temporal consistency
+    RELEVANCE_SCORING = auto()  # Score relevance
 
     # Structured data
-    STRUCTURED_OUTPUT = auto()         # Generic structured output
-    SCHEMA_EXTRACTION = auto()         # Extract to schema
+    STRUCTURED_OUTPUT = auto()  # Generic structured output
+    SCHEMA_EXTRACTION = auto()  # Extract to schema
 
     # Summary/analysis
-    SUMMARIZATION = auto()             # Summarize content
-    NARRATIVE_EXPORT = auto()          # Generate narrative
+    SUMMARIZATION = auto()  # Summarize content
+    NARRATIVE_EXPORT = auto()  # Generate narrative
 
     # Knowledge operations (M19)
-    KNOWLEDGE_EXTRACTION = auto()      # Extract knowledge items from dialog
+    KNOWLEDGE_EXTRACTION = auto()  # Extract knowledge items from dialog
 
     # Portal mode operations (M17)
     PORTAL_BACKWARD_REASONING = auto()  # Generate candidate antecedents (needs large output)
-    PORTAL_PATH_SCORING = auto()        # Judge LLM evaluation of path realism
+    PORTAL_PATH_SCORING = auto()  # Judge LLM evaluation of path realism
     PORTAL_FORWARD_SIMULATION = auto()  # Mini-simulation state generation
 
     # Branching mode operations (M12)
     BRANCHING_CONSEQUENT_GENERATION = auto()  # Generate forward consequent states from branches
 
     # Directorial mode operations (M17)
-    DIRECTORIAL_NARRATIVE_PLANNING = auto()   # Plan five-act narrative structure
-    DIRECTORIAL_SCENE_GENERATION = auto()     # Generate directed scenes with POV/framing
+    DIRECTORIAL_NARRATIVE_PLANNING = auto()  # Plan five-act narrative structure
+    DIRECTORIAL_SCENE_GENERATION = auto()  # Generate directed scenes with POV/framing
 
     # Cyclical mode operations (M17)
     CYCLICAL_SEMANTICS_INTERPRETATION = auto()  # Determine cycle type and semantics
-    CYCLICAL_VARIATION_GENERATION = auto()      # Generate cycle variations with escalation
+    CYCLICAL_VARIATION_GENERATION = auto()  # Generate cycle variations with escalation
 
 
 @dataclass
 class ModelProfile:
     """Profile of a model's capabilities and characteristics"""
-    model_id: str                      # OpenRouter model identifier
-    display_name: str                  # Human-readable name
-    provider: str                      # Provider (meta, qwen, deepseek, etc.)
-    license: str                       # License type
+
+    model_id: str  # OpenRouter model identifier
+    display_name: str  # Human-readable name
+    provider: str  # Provider (meta, qwen, deepseek, etc.)
+    license: str  # License type
 
     # Capabilities
-    capabilities: Set[ModelCapability] = field(default_factory=set)
+    capabilities: set[ModelCapability] = field(default_factory=set)
 
     # Context window
-    context_tokens: int = 4096         # Max context (input + output) tokens
+    context_tokens: int = 4096  # Max context (input + output) tokens
 
     # Output limits - IMPORTANT: separate from context window!
     # Most models have lower output limits than context windows
-    max_output_tokens: int = 4096      # Max output tokens the model can generate
+    max_output_tokens: int = 4096  # Max output tokens the model can generate
 
     # Performance
-    relative_speed: float = 1.0        # 1.0 = baseline, >1 = faster
-    relative_cost: float = 1.0         # 1.0 = baseline, <1 = cheaper
-    relative_quality: float = 1.0      # 1.0 = baseline, >1 = better
+    relative_speed: float = 1.0  # 1.0 = baseline, >1 = faster
+    relative_cost: float = 1.0  # 1.0 = baseline, <1 = cheaper
+    relative_quality: float = 1.0  # 1.0 = baseline, >1 = better
 
     # Restrictions
-    allows_synthetic_data: bool = True # Can use for synthetic data generation
-    allows_commercial: bool = True     # Commercial use allowed
+    allows_synthetic_data: bool = True  # Can use for synthetic data generation
+    allows_commercial: bool = True  # Commercial use allowed
     training_data_unrestricted: bool = True  # Outputs can train ANY model (MIT/Apache-2.0 only)
 
     # Notes
@@ -161,7 +164,7 @@ class ModelProfile:
 # MODEL REGISTRY - Open Source Models for Commercial Synthetic Data
 # =============================================================================
 
-MODEL_REGISTRY: Dict[str, ModelProfile] = {
+MODEL_REGISTRY: dict[str, ModelProfile] = {
     # =========================================================================
     # LLAMA FAMILY (Meta) - Llama 3.x license allows commercial use
     # WARNING: Llama license restricts using outputs to train non-Llama models.
@@ -184,9 +187,8 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
         relative_cost=0.3,
         relative_quality=0.7,
         training_data_unrestricted=False,  # Llama license restricts training non-Llama models
-        notes="Fast, cheap, good for simple tasks"
+        notes="Fast, cheap, good for simple tasks",
     ),
-
     "meta-llama/llama-3.1-70b-instruct": ModelProfile(
         model_id="meta-llama/llama-3.1-70b-instruct",
         display_name="Llama 3.1 70B",
@@ -207,9 +209,8 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
         relative_cost=1.0,
         relative_quality=1.0,
         training_data_unrestricted=False,  # Llama license restricts training non-Llama models
-        notes="Excellent general-purpose model, good balance"
+        notes="Excellent general-purpose model, good balance",
     ),
-
     "meta-llama/llama-3.1-405b-instruct": ModelProfile(
         model_id="meta-llama/llama-3.1-405b-instruct",
         display_name="Llama 3.1 405B",
@@ -234,9 +235,8 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
         relative_cost=3.0,
         relative_quality=1.3,
         training_data_unrestricted=False,  # Llama license restricts training non-Llama models
-        notes="Highest quality Llama, use for complex reasoning"
+        notes="Highest quality Llama, use for complex reasoning",
     ),
-
     # Llama 4 Scout (newer)
     "meta-llama/llama-4-scout": ModelProfile(
         model_id="meta-llama/llama-4-scout",
@@ -257,9 +257,8 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
         relative_cost=0.8,
         relative_quality=1.1,
         training_data_unrestricted=False,  # Llama license restricts training non-Llama models
-        notes="Newer Llama 4 model, good speed/quality balance"
+        notes="Newer Llama 4 model, good speed/quality balance",
     ),
-
     # =========================================================================
     # QWEN FAMILY (Alibaba) - Apache 2.0 / Qwen License
     # Note: Qwen license has commercial use restrictions for >100M users
@@ -280,9 +279,8 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
         relative_speed=2.0,
         relative_cost=0.25,
         relative_quality=0.65,
-        notes="Very fast, good for simple JSON tasks"
+        notes="Very fast, good for simple JSON tasks",
     ),
-
     "qwen/qwen-2.5-72b-instruct": ModelProfile(
         model_id="qwen/qwen-2.5-72b-instruct",
         display_name="Qwen 2.5 72B",
@@ -303,9 +301,8 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
         relative_speed=1.0,
         relative_cost=0.9,
         relative_quality=1.05,
-        notes="Strong alternative to Llama 70B, good math"
+        notes="Strong alternative to Llama 70B, good math",
     ),
-
     "qwen/qwq-32b-preview": ModelProfile(
         model_id="qwen/qwq-32b-preview",
         display_name="QwQ 32B (Reasoning)",
@@ -324,9 +321,8 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
         relative_speed=0.7,
         relative_cost=1.2,
         relative_quality=1.15,
-        notes="Specialized reasoning model, excellent for causal/temporal"
+        notes="Specialized reasoning model, excellent for causal/temporal",
     ),
-
     # =========================================================================
     # DEEPSEEK FAMILY - MIT License (most permissive!)
     # =========================================================================
@@ -346,9 +342,8 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
         relative_speed=1.3,
         relative_cost=0.5,
         relative_quality=0.9,
-        notes="MIT license - most permissive for synthetic data"
+        notes="MIT license - most permissive for synthetic data",
     ),
-
     "deepseek/deepseek-r1": ModelProfile(
         model_id="deepseek/deepseek-r1",
         display_name="DeepSeek R1 (Reasoning)",
@@ -369,9 +364,8 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
         relative_speed=0.6,
         relative_cost=1.5,
         relative_quality=1.25,
-        notes="MIT license, excellent reasoning, best for complex causal chains"
+        notes="MIT license, excellent reasoning, best for complex causal chains",
     ),
-
     # =========================================================================
     # MISTRAL FAMILY - Apache 2.0
     # =========================================================================
@@ -391,9 +385,8 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
         relative_speed=2.5,
         relative_cost=0.2,
         relative_quality=0.6,
-        notes="Apache 2.0, very fast and cheap"
+        notes="Apache 2.0, very fast and cheap",
     ),
-
     "mistralai/mixtral-8x7b-instruct": ModelProfile(
         model_id="mistralai/mixtral-8x7b-instruct",
         display_name="Mixtral 8x7B",
@@ -411,9 +404,8 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
         relative_speed=1.5,
         relative_cost=0.6,
         relative_quality=0.85,
-        notes="Apache 2.0, good MoE model, fast inference"
+        notes="Apache 2.0, good MoE model, fast inference",
     ),
-
     "mistralai/mixtral-8x22b-instruct": ModelProfile(
         model_id="mistralai/mixtral-8x22b-instruct",
         display_name="Mixtral 8x22B",
@@ -432,9 +424,8 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
         relative_speed=1.0,
         relative_cost=1.1,
         relative_quality=1.05,
-        notes="Apache 2.0, strong general-purpose MoE"
+        notes="Apache 2.0, strong general-purpose MoE",
     ),
-
     # =========================================================================
     # GOOGLE GEMINI (Preview) - Use with explicit --gemini-flash flag
     # Note: Google TOS may restrict synthetic data generation. Use when:
@@ -460,14 +451,13 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
         },
         context_tokens=1048576,  # 1M tokens!
         max_output_tokens=8192,  # Gemini Flash output limit
-        relative_speed=2.5,      # Optimized for low latency
-        relative_cost=0.5,       # $0.50/M input, $3.00/M output
-        relative_quality=1.2,    # High quality reasoning
+        relative_speed=2.5,  # Optimized for low latency
+        relative_cost=0.5,  # $0.50/M input, $3.00/M output
+        relative_quality=1.2,  # High quality reasoning
         allows_synthetic_data=False,  # TOS restriction - explicit opt-in only
         training_data_unrestricted=False,  # Google TOS prohibits
-        notes="1M context, multimodal, fast inference. Use --gemini-flash flag for explicit selection."
+        notes="1M context, multimodal, fast inference. Use --gemini-flash flag for explicit selection.",
     ),
-
     # =========================================================================
     # GROQ - Removed (February 2026)
     # groq/llama-3.3-70b-versatile and groq/llama-3.1-70b-versatile were
@@ -483,149 +473,140 @@ MODEL_REGISTRY: Dict[str, ModelProfile] = {
 # ACTION TO CAPABILITY MAPPING
 # =============================================================================
 
-ACTION_REQUIREMENTS: Dict[ActionType, Dict[str, Any]] = {
+ACTION_REQUIREMENTS: dict[ActionType, dict[str, Any]] = {
     # Entity operations need good instruction following
     ActionType.ENTITY_POPULATION: {
         "required": {ModelCapability.STRUCTURED_JSON, ModelCapability.INSTRUCTION_FOLLOWING},
         "preferred": {ModelCapability.HIGH_QUALITY},
         "min_context_tokens": 4096,
     },
-
     ActionType.ENTITY_ENRICHMENT: {
         "required": {ModelCapability.LONG_FORM_TEXT},
         "preferred": {ModelCapability.HIGH_QUALITY},
         "min_context_tokens": 8192,
     },
-
     ActionType.PERSONALITY_INFERENCE: {
         "required": {ModelCapability.STRUCTURED_JSON, ModelCapability.LOGICAL_REASONING},
         "preferred": {ModelCapability.HIGH_QUALITY},
         "min_context_tokens": 4096,
     },
-
     # Dialog needs natural language generation
     ActionType.DIALOG_SYNTHESIS: {
         "required": {ModelCapability.DIALOG_GENERATION, ModelCapability.STRUCTURED_JSON},
         "preferred": {ModelCapability.HIGH_QUALITY, ModelCapability.LARGE_CONTEXT},
         "min_context_tokens": 16384,
     },
-
     ActionType.DIALOG_CONTINUATION: {
         "required": {ModelCapability.DIALOG_GENERATION},
         "preferred": {ModelCapability.LARGE_CONTEXT},
         "min_context_tokens": 32768,
     },
-
     ActionType.DIALOG_SINGLE_TURN: {
         "required": {ModelCapability.DIALOG_GENERATION},
         "preferred": {ModelCapability.HIGH_QUALITY, ModelCapability.INSTRUCTION_FOLLOWING},
         "min_context_tokens": 8192,
     },
-
     ActionType.DIALOG_STEERING: {
         "required": {ModelCapability.STRUCTURED_JSON, ModelCapability.LOGICAL_REASONING},
         "preferred": {ModelCapability.HIGH_QUALITY, ModelCapability.CAUSAL_REASONING},
         "min_context_tokens": 32768,
     },
-
     ActionType.DIALOG_QUALITY_SEMANTIC: {
         "required": {ModelCapability.STRUCTURED_JSON, ModelCapability.LOGICAL_REASONING},
         "preferred": {ModelCapability.HIGH_QUALITY},
         "min_context_tokens": 16384,
     },
-
     # Temporal reasoning needs strong causal models
     ActionType.TEMPORAL_REASONING: {
         "required": {ModelCapability.CAUSAL_REASONING, ModelCapability.TEMPORAL_REASONING},
         "preferred": {ModelCapability.HIGH_QUALITY, ModelCapability.LOGICAL_REASONING},
         "min_context_tokens": 16384,
     },
-
     ActionType.COUNTERFACTUAL_PREDICTION: {
         "required": {ModelCapability.CAUSAL_REASONING, ModelCapability.LOGICAL_REASONING},
         "preferred": {ModelCapability.HIGH_QUALITY},
         "min_context_tokens": 16384,
     },
-
     ActionType.PROSPECTION: {
         "required": {ModelCapability.TEMPORAL_REASONING, ModelCapability.STRUCTURED_JSON},
         "preferred": {ModelCapability.CAUSAL_REASONING},
         "min_context_tokens": 8192,
     },
-
     # Scene operations need creative generation
     ActionType.SCENE_ATMOSPHERE: {
         "required": {ModelCapability.LONG_FORM_TEXT},
         "preferred": {ModelCapability.HIGH_QUALITY},
         "min_context_tokens": 4096,
     },
-
     ActionType.CROWD_DYNAMICS: {
         "required": {ModelCapability.STRUCTURED_JSON},
         "preferred": {ModelCapability.LOGICAL_REASONING},
         "min_context_tokens": 8192,
     },
-
     # Validation needs fast, accurate responses
     ActionType.CONSISTENCY_CHECK: {
         "required": {ModelCapability.LOGICAL_REASONING, ModelCapability.STRUCTURED_JSON},
         "preferred": {ModelCapability.FAST_INFERENCE},
         "min_context_tokens": 16384,
     },
-
     ActionType.RELEVANCE_SCORING: {
         "required": {ModelCapability.INSTRUCTION_FOLLOWING},
         "preferred": {ModelCapability.FAST_INFERENCE, ModelCapability.COST_EFFICIENT},
         "min_context_tokens": 2048,
     },
-
     # Structured output needs reliable JSON
     ActionType.STRUCTURED_OUTPUT: {
         "required": {ModelCapability.STRUCTURED_JSON},
         "preferred": {ModelCapability.INSTRUCTION_FOLLOWING},
         "min_context_tokens": 4096,
     },
-
     ActionType.SCHEMA_EXTRACTION: {
         "required": {ModelCapability.STRUCTURED_JSON, ModelCapability.INSTRUCTION_FOLLOWING},
         "preferred": {ModelCapability.HIGH_QUALITY},
         "min_context_tokens": 8192,
     },
-
     # Summary/narrative
     ActionType.SUMMARIZATION: {
         "required": {ModelCapability.INSTRUCTION_FOLLOWING},
         "preferred": {ModelCapability.LARGE_CONTEXT, ModelCapability.COST_EFFICIENT},
         "min_context_tokens": 32768,
     },
-
     ActionType.NARRATIVE_EXPORT: {
         "required": {ModelCapability.LONG_FORM_TEXT},
         "preferred": {ModelCapability.HIGH_QUALITY},
         "min_context_tokens": 8192,
     },
-
     # Knowledge operations (M19)
     # NOTE: Avoid reasoning models (DeepSeek R1, QwQ) - they output thinking tokens that break JSON
     ActionType.KNOWLEDGE_EXTRACTION: {
         "required": {ModelCapability.STRUCTURED_JSON, ModelCapability.INSTRUCTION_FOLLOWING},
-        "preferred": {ModelCapability.HIGH_QUALITY, ModelCapability.LARGE_CONTEXT, ModelCapability.DIALOG_GENERATION},
+        "preferred": {
+            ModelCapability.HIGH_QUALITY,
+            ModelCapability.LARGE_CONTEXT,
+            ModelCapability.DIALOG_GENERATION,
+        },
         "min_context_tokens": 16384,  # Need context for causal graph + dialog
     },
-
     # Portal mode operations (M17)
     # PORTAL_BACKWARD_REASONING: Generates multiple diverse antecedent candidates
     # - Needs LARGE output tokens (complex structured JSON with multiple antecedents)
     # - Base: 3000 tokens, scales with candidate count
     ActionType.PORTAL_BACKWARD_REASONING: {
-        "required": {ModelCapability.STRUCTURED_JSON, ModelCapability.CAUSAL_REASONING, ModelCapability.TEMPORAL_REASONING},
-        "preferred": {ModelCapability.HIGH_QUALITY, ModelCapability.LARGE_CONTEXT, ModelCapability.LOGICAL_REASONING},
+        "required": {
+            ModelCapability.STRUCTURED_JSON,
+            ModelCapability.CAUSAL_REASONING,
+            ModelCapability.TEMPORAL_REASONING,
+        },
+        "preferred": {
+            ModelCapability.HIGH_QUALITY,
+            ModelCapability.LARGE_CONTEXT,
+            ModelCapability.LOGICAL_REASONING,
+        },
         "min_context_tokens": 32768,
         "min_output_tokens": 3000,  # Base for 3 antecedents
-        "tokens_per_unit": 800,     # Additional tokens per antecedent
+        "tokens_per_unit": 800,  # Additional tokens per antecedent
         "output_scaling_factor": "candidate_count",  # Scale output by this context key
     },
-
     # PORTAL_PATH_SCORING: Judge LLM evaluates path realism
     # - Moderate output (structured evaluation)
     # - Input can be large (multiple simulation narratives)
@@ -635,7 +616,6 @@ ACTION_REQUIREMENTS: Dict[ActionType, Dict[str, Any]] = {
         "min_context_tokens": 65536,  # Large context for multiple simulations
         "min_output_tokens": 1000,
     },
-
     # PORTAL_FORWARD_SIMULATION: Generate next state in mini-simulation
     # - Compact output (single state description)
     ActionType.PORTAL_FORWARD_SIMULATION: {
@@ -644,21 +624,23 @@ ACTION_REQUIREMENTS: Dict[ActionType, Dict[str, Any]] = {
         "min_context_tokens": 8192,
         "min_output_tokens": 500,
     },
-
     # Branching mode operations (M12)
     # BRANCHING_CONSEQUENT_GENERATION: Generate multiple consequent states from a branch point
     # - Needs moderate output for structured JSON with multiple consequents
     # - Each consequent has description, key_events, outcome_type, causal_link
     # - Base: 2000 tokens, scales with number of consequents requested
     ActionType.BRANCHING_CONSEQUENT_GENERATION: {
-        "required": {ModelCapability.STRUCTURED_JSON, ModelCapability.CAUSAL_REASONING, ModelCapability.TEMPORAL_REASONING},
+        "required": {
+            ModelCapability.STRUCTURED_JSON,
+            ModelCapability.CAUSAL_REASONING,
+            ModelCapability.TEMPORAL_REASONING,
+        },
         "preferred": {ModelCapability.HIGH_QUALITY, ModelCapability.LOGICAL_REASONING},
-        "min_context_tokens": 32768,   # Increased for scenario anchor + accumulated state
-        "min_output_tokens": 3000,     # Increased for resource_updates + richer descriptions
-        "tokens_per_unit": 800,        # Increased for richer consequent descriptions
+        "min_context_tokens": 32768,  # Increased for scenario anchor + accumulated state
+        "min_output_tokens": 3000,  # Increased for resource_updates + richer descriptions
+        "tokens_per_unit": 800,  # Increased for richer consequent descriptions
         "output_scaling_factor": "num_consequents",  # Scale output by this context key
     },
-
     # Directorial mode operations (M17)
     # DIRECTORIAL_NARRATIVE_PLANNING: Plan five-act narrative structure with character arcs
     ActionType.DIRECTORIAL_NARRATIVE_PLANNING: {
@@ -667,24 +649,29 @@ ACTION_REQUIREMENTS: Dict[ActionType, Dict[str, Any]] = {
         "min_context_tokens": 16384,
         "min_output_tokens": 2000,
     },
-
     # DIRECTORIAL_SCENE_GENERATION: Generate directed scenes with POV and framing
     ActionType.DIRECTORIAL_SCENE_GENERATION: {
-        "required": {ModelCapability.STRUCTURED_JSON, ModelCapability.LONG_FORM_TEXT, ModelCapability.DIALOG_GENERATION},
+        "required": {
+            ModelCapability.STRUCTURED_JSON,
+            ModelCapability.LONG_FORM_TEXT,
+            ModelCapability.DIALOG_GENERATION,
+        },
         "preferred": {ModelCapability.HIGH_QUALITY, ModelCapability.TEMPORAL_REASONING},
         "min_context_tokens": 16384,
         "min_output_tokens": 1000,
     },
-
     # Cyclical mode operations (M17)
     # CYCLICAL_SEMANTICS_INTERPRETATION: Determine cycle type and variation mode
     ActionType.CYCLICAL_SEMANTICS_INTERPRETATION: {
-        "required": {ModelCapability.STRUCTURED_JSON, ModelCapability.LOGICAL_REASONING, ModelCapability.TEMPORAL_REASONING},
+        "required": {
+            ModelCapability.STRUCTURED_JSON,
+            ModelCapability.LOGICAL_REASONING,
+            ModelCapability.TEMPORAL_REASONING,
+        },
         "preferred": {ModelCapability.HIGH_QUALITY, ModelCapability.CAUSAL_REASONING},
         "min_context_tokens": 8192,
         "min_output_tokens": 1000,
     },
-
     # CYCLICAL_VARIATION_GENERATION: Generate cycle states with escalation and prophecy
     ActionType.CYCLICAL_VARIATION_GENERATION: {
         "required": {ModelCapability.STRUCTURED_JSON, ModelCapability.TEMPORAL_REASONING},
@@ -724,8 +711,8 @@ class ModelSelector:
 
     def __init__(
         self,
-        registry: Optional[Dict[str, ModelProfile]] = None,
-        default_model: str = "meta-llama/llama-3.1-70b-instruct"
+        registry: dict[str, ModelProfile] | None = None,
+        default_model: str = "meta-llama/llama-3.1-70b-instruct",
     ):
         """
         Initialize model selector.
@@ -738,7 +725,7 @@ class ModelSelector:
         self.default_model = default_model
 
         # Build capability index for fast lookup
-        self._capability_index: Dict[ModelCapability, Set[str]] = {}
+        self._capability_index: dict[ModelCapability, set[str]] = {}
         for model_id, profile in self.registry.items():
             for cap in profile.capabilities:
                 if cap not in self._capability_index:
@@ -748,9 +735,9 @@ class ModelSelector:
         # Restricted model prefixes - these may cause issues with synthetic data
         # or have API-specific behaviors (like extended thinking) that aren't supported
         self._restricted_prefixes = [
-            "anthropic/",   # Claude models - extended thinking blocks can cause API errors
-            "openai/",      # OpenAI - TOS prohibits synthetic data generation
-            "google/",      # Google - TOS prohibits synthetic data generation
+            "anthropic/",  # Claude models - extended thinking blocks can cause API errors
+            "openai/",  # OpenAI - TOS prohibits synthetic data generation
+            "google/",  # Google - TOS prohibits synthetic data generation
         ]
 
     def _check_restricted_model(self, model_id: str) -> bool:
@@ -794,11 +781,11 @@ class ModelSelector:
     def select_model(
         self,
         action: ActionType,
-        requirements: Optional[Dict[str, Any]] = None,
+        requirements: dict[str, Any] | None = None,
         prefer_quality: bool = False,
         prefer_speed: bool = False,
         prefer_cost: bool = False,
-        exclude_models: Optional[Set[str]] = None,
+        exclude_models: set[str] | None = None,
         for_training_data: bool = False,
     ) -> str:
         """
@@ -828,8 +815,7 @@ class ModelSelector:
         required_caps = action_reqs.get("required", set())
         preferred_caps = action_reqs.get("preferred", set())
         min_context = max(
-            action_reqs.get("min_context_tokens", 0),
-            requirements.get("min_context_tokens", 0)
+            action_reqs.get("min_context_tokens", 0), requirements.get("min_context_tokens", 0)
         )
 
         # Filter models by required capabilities and context
@@ -887,9 +873,9 @@ class ModelSelector:
         self,
         action: ActionType,
         chain_length: int = 3,
-        requirements: Optional[Dict[str, Any]] = None,
+        requirements: dict[str, Any] | None = None,
         for_training_data: bool = False,
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Get a chain of models for retry fallback.
 
@@ -911,8 +897,11 @@ class ModelSelector:
 
         # First: quality-preferred model
         model = self.select_model(
-            action, requirements, prefer_quality=True, exclude_models=excluded,
-            for_training_data=for_training_data
+            action,
+            requirements,
+            prefer_quality=True,
+            exclude_models=excluded,
+            for_training_data=for_training_data,
         )
         chain.append(model)
         excluded.add(model)
@@ -922,8 +911,7 @@ class ModelSelector:
 
         # Second: balanced model (different provider if possible)
         model = self.select_model(
-            action, requirements, exclude_models=excluded,
-            for_training_data=for_training_data
+            action, requirements, exclude_models=excluded, for_training_data=for_training_data
         )
         chain.append(model)
         excluded.add(model)
@@ -933,14 +921,17 @@ class ModelSelector:
 
         # Third: cost-efficient model as final fallback
         model = self.select_model(
-            action, requirements, prefer_cost=True, exclude_models=excluded,
-            for_training_data=for_training_data
+            action,
+            requirements,
+            prefer_cost=True,
+            exclude_models=excluded,
+            for_training_data=for_training_data,
         )
         chain.append(model)
 
         return chain[:chain_length]
 
-    def get_training_safe_models(self) -> List[str]:
+    def get_training_safe_models(self) -> list[str]:
         """
         List models whose outputs can freely train ANY model.
 
@@ -952,13 +943,14 @@ class ModelSelector:
             List of model IDs with unrestricted training data licenses
         """
         return [
-            model_id for model_id, profile in self.registry.items()
+            model_id
+            for model_id, profile in self.registry.items()
             if profile.training_data_unrestricted
             and profile.allows_commercial
             and profile.allows_synthetic_data
         ]
 
-    def get_model_profile(self, model_id: str) -> Optional[ModelProfile]:
+    def get_model_profile(self, model_id: str) -> ModelProfile | None:
         """Get profile for a specific model."""
         return self.registry.get(model_id)
 
@@ -980,19 +972,12 @@ class ModelSelector:
             return profile.max_output_tokens
         return 4096
 
-    def list_models_with_capability(
-        self,
-        capability: ModelCapability
-    ) -> List[str]:
+    def list_models_with_capability(self, capability: ModelCapability) -> list[str]:
         """List all models with a specific capability."""
         return list(self._capability_index.get(capability, set()))
 
     @lru_cache(maxsize=128)
-    def get_recommended_model(
-        self,
-        action: ActionType,
-        context_hint: str = "balanced"
-    ) -> str:
+    def get_recommended_model(self, action: ActionType, context_hint: str = "balanced") -> str:
         """
         Get recommended model with caching.
 
@@ -1011,7 +996,7 @@ class ModelSelector:
             action,
             prefer_quality=prefer_quality,
             prefer_speed=prefer_speed,
-            prefer_cost=prefer_cost
+            prefer_cost=prefer_cost,
         )
 
 
@@ -1019,7 +1004,7 @@ class ModelSelector:
 # CONVENIENCE FUNCTIONS
 # =============================================================================
 
-_default_selector: Optional[ModelSelector] = None
+_default_selector: ModelSelector | None = None
 
 
 def get_default_selector() -> ModelSelector:
@@ -1030,10 +1015,7 @@ def get_default_selector() -> ModelSelector:
     return _default_selector
 
 
-def select_model_for_action(
-    action: ActionType,
-    **kwargs
-) -> str:
+def select_model_for_action(action: ActionType, **kwargs) -> str:
     """
     Convenience function to select model for an action.
 
@@ -1047,10 +1029,7 @@ def select_model_for_action(
     return get_default_selector().select_model(action, **kwargs)
 
 
-def get_fallback_models(
-    action: ActionType,
-    chain_length: int = 3
-) -> List[str]:
+def get_fallback_models(action: ActionType, chain_length: int = 3) -> list[str]:
     """
     Convenience function to get fallback chain.
 
@@ -1092,15 +1071,17 @@ def check_model_restrictions(model_id: str) -> bool:
 # TOKEN BUDGET ESTIMATOR - Intelligent output token allocation
 # =============================================================================
 
+
 @dataclass
 class TokenBudgetEstimate:
     """Result of token budget estimation"""
-    recommended_tokens: int        # Recommended max_tokens for this call
-    min_tokens: int               # Absolute minimum needed
-    max_tokens: int               # Maximum useful tokens
-    scaling_factor: float         # Applied scaling multiplier
-    reasoning: str                # Explanation of calculation
-    retry_multiplier: float = 1.5 # Multiplier for retry on truncation
+
+    recommended_tokens: int  # Recommended max_tokens for this call
+    min_tokens: int  # Absolute minimum needed
+    max_tokens: int  # Maximum useful tokens
+    scaling_factor: float  # Applied scaling multiplier
+    reasoning: str  # Explanation of calculation
+    retry_multiplier: float = 1.5  # Multiplier for retry on truncation
 
 
 class TokenBudgetEstimator:
@@ -1131,26 +1112,26 @@ class TokenBudgetEstimator:
 
     # Default token budgets by action type category
     DEFAULT_BUDGETS = {
-        "structured_simple": 1000,    # Simple JSON output
-        "structured_complex": 3000,   # Complex multi-object JSON
-        "narrative": 2000,            # Text generation
-        "dialog": 1500,               # Conversation turns
-        "scoring": 800,               # Numeric scoring with reasoning
+        "structured_simple": 1000,  # Simple JSON output
+        "structured_complex": 3000,  # Complex multi-object JSON
+        "narrative": 2000,  # Text generation
+        "dialog": 1500,  # Conversation turns
+        "scoring": 800,  # Numeric scoring with reasoning
     }
 
     # Token estimation per common output units
     TOKENS_PER_UNIT = {
-        "antecedent": 800,            # Per antecedent in portal mode
-        "entity": 200,                # Per entity description
-        "dialog_turn": 100,           # Per dialog turn
-        "knowledge_item": 150,        # Per knowledge item
+        "antecedent": 800,  # Per antecedent in portal mode
+        "entity": 200,  # Per entity description
+        "dialog_turn": 100,  # Per dialog turn
+        "knowledge_item": 150,  # Per knowledge item
         "score_with_reasoning": 200,  # Per scored item with explanation
     }
 
     def __init__(
         self,
-        action_requirements: Optional[Dict] = None,
-        model_registry: Optional[Dict[str, ModelProfile]] = None
+        action_requirements: dict | None = None,
+        model_registry: dict[str, ModelProfile] | None = None,
     ):
         """
         Initialize estimator.
@@ -1165,10 +1146,10 @@ class TokenBudgetEstimator:
     def estimate(
         self,
         action: ActionType,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         prompt_length: int = 0,
         safety_margin: float = 1.3,
-        model_id: Optional[str] = None
+        model_id: str | None = None,
     ) -> TokenBudgetEstimate:
         """
         Estimate appropriate token budget for an action.
@@ -1187,7 +1168,9 @@ class TokenBudgetEstimator:
 
         # Get base requirements from action type
         action_reqs = self.action_requirements.get(action, {})
-        base_tokens = action_reqs.get("min_output_tokens", self.DEFAULT_BUDGETS["structured_simple"])
+        base_tokens = action_reqs.get(
+            "min_output_tokens", self.DEFAULT_BUDGETS["structured_simple"]
+        )
         tokens_per_unit = action_reqs.get("tokens_per_unit", 0)
         scaling_key = action_reqs.get("output_scaling_factor", None)
 
@@ -1241,14 +1224,14 @@ class TokenBudgetEstimator:
             min_tokens=min_tokens,
             max_tokens=max_tokens,
             scaling_factor=scaling_factor,
-            reasoning=" | ".join(reasoning_parts)
+            reasoning=" | ".join(reasoning_parts),
         )
 
     def get_retry_budget(
         self,
         previous_estimate: TokenBudgetEstimate,
         retry_count: int = 1,
-        model_id: Optional[str] = None
+        model_id: str | None = None,
     ) -> int:
         """
         Get increased token budget for retry after truncation.
@@ -1262,7 +1245,7 @@ class TokenBudgetEstimator:
             Increased token count for retry (capped at model limit if provided)
         """
         # Exponential backoff on tokens: 1.5x, 2.25x, 3.375x...
-        multiplier = previous_estimate.retry_multiplier ** retry_count
+        multiplier = previous_estimate.retry_multiplier**retry_count
         retry_tokens = int(previous_estimate.recommended_tokens * multiplier)
 
         # Cap at max_tokens * 2 to prevent runaway
@@ -1325,7 +1308,7 @@ class TokenBudgetEstimator:
 
 
 # Singleton estimator instance
-_default_estimator: Optional[TokenBudgetEstimator] = None
+_default_estimator: TokenBudgetEstimator | None = None
 
 
 def get_token_estimator() -> TokenBudgetEstimator:
@@ -1337,10 +1320,7 @@ def get_token_estimator() -> TokenBudgetEstimator:
 
 
 def estimate_tokens_for_action(
-    action: ActionType,
-    context: Optional[Dict[str, Any]] = None,
-    model_id: Optional[str] = None,
-    **kwargs
+    action: ActionType, context: dict[str, Any] | None = None, model_id: str | None = None, **kwargs
 ) -> TokenBudgetEstimate:
     """
     Convenience function to estimate tokens for an action.

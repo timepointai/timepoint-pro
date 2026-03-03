@@ -9,19 +9,17 @@ Phase 6: Public API - Usage Quotas
 
 import os
 from dataclasses import dataclass, field
-from typing import Optional, Dict, Any
 
-from fastapi import Request, HTTPException, status
+from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 
-from ..auth import get_api_key
-from ..usage_storage import get_usage_database, UsageRecord
+from ..usage_storage import get_usage_database
 from .rate_limit import get_user_tier
-
 
 # ============================================================================
 # Quota Configuration
 # ============================================================================
+
 
 @dataclass
 class TierQuota:
@@ -37,38 +35,46 @@ class TierQuota:
 class QuotaConfig:
     """Quota configuration for all tiers."""
 
-    free: TierQuota = field(default_factory=lambda: TierQuota(
-        monthly_api_calls=int(os.getenv("QUOTA_FREE_API_CALLS", "1000")),
-        monthly_simulations=int(os.getenv("QUOTA_FREE_SIMULATIONS", "10")),
-        monthly_cost_usd=float(os.getenv("QUOTA_FREE_COST_USD", "1.00")),
-        max_batch_size=int(os.getenv("QUOTA_FREE_BATCH_SIZE", "5")),
-    ))
+    free: TierQuota = field(
+        default_factory=lambda: TierQuota(
+            monthly_api_calls=int(os.getenv("QUOTA_FREE_API_CALLS", "1000")),
+            monthly_simulations=int(os.getenv("QUOTA_FREE_SIMULATIONS", "10")),
+            monthly_cost_usd=float(os.getenv("QUOTA_FREE_COST_USD", "1.00")),
+            max_batch_size=int(os.getenv("QUOTA_FREE_BATCH_SIZE", "5")),
+        )
+    )
 
-    basic: TierQuota = field(default_factory=lambda: TierQuota(
-        monthly_api_calls=int(os.getenv("QUOTA_BASIC_API_CALLS", "10000")),
-        monthly_simulations=int(os.getenv("QUOTA_BASIC_SIMULATIONS", "100")),
-        monthly_cost_usd=float(os.getenv("QUOTA_BASIC_COST_USD", "10.00")),
-        max_batch_size=int(os.getenv("QUOTA_BASIC_BATCH_SIZE", "20")),
-    ))
+    basic: TierQuota = field(
+        default_factory=lambda: TierQuota(
+            monthly_api_calls=int(os.getenv("QUOTA_BASIC_API_CALLS", "10000")),
+            monthly_simulations=int(os.getenv("QUOTA_BASIC_SIMULATIONS", "100")),
+            monthly_cost_usd=float(os.getenv("QUOTA_BASIC_COST_USD", "10.00")),
+            max_batch_size=int(os.getenv("QUOTA_BASIC_BATCH_SIZE", "20")),
+        )
+    )
 
-    pro: TierQuota = field(default_factory=lambda: TierQuota(
-        monthly_api_calls=int(os.getenv("QUOTA_PRO_API_CALLS", "100000")),
-        monthly_simulations=int(os.getenv("QUOTA_PRO_SIMULATIONS", "1000")),
-        monthly_cost_usd=float(os.getenv("QUOTA_PRO_COST_USD", "100.00")),
-        max_batch_size=int(os.getenv("QUOTA_PRO_BATCH_SIZE", "50")),
-    ))
+    pro: TierQuota = field(
+        default_factory=lambda: TierQuota(
+            monthly_api_calls=int(os.getenv("QUOTA_PRO_API_CALLS", "100000")),
+            monthly_simulations=int(os.getenv("QUOTA_PRO_SIMULATIONS", "1000")),
+            monthly_cost_usd=float(os.getenv("QUOTA_PRO_COST_USD", "100.00")),
+            max_batch_size=int(os.getenv("QUOTA_PRO_BATCH_SIZE", "50")),
+        )
+    )
 
-    enterprise: TierQuota = field(default_factory=lambda: TierQuota(
-        monthly_api_calls=-1,  # Unlimited
-        monthly_simulations=-1,
-        monthly_cost_usd=-1,
-        max_batch_size=100,
-    ))
+    enterprise: TierQuota = field(
+        default_factory=lambda: TierQuota(
+            monthly_api_calls=-1,  # Unlimited
+            monthly_simulations=-1,
+            monthly_cost_usd=-1,
+            max_batch_size=100,
+        )
+    )
 
     # Enable/disable quota enforcement
-    enabled: bool = field(default_factory=lambda: os.getenv(
-        "USAGE_QUOTA_ENABLED", "true"
-    ).lower() == "true")
+    enabled: bool = field(
+        default_factory=lambda: os.getenv("USAGE_QUOTA_ENABLED", "true").lower() == "true"
+    )
 
     def get_quota_for_tier(self, tier: str) -> TierQuota:
         """Get quota for a tier."""
@@ -81,7 +87,7 @@ class QuotaConfig:
 
 
 # Global config instance
-_config: Optional[QuotaConfig] = None
+_config: QuotaConfig | None = None
 
 
 def get_quota_config() -> QuotaConfig:
@@ -101,6 +107,7 @@ def reset_quota_config() -> None:
 # ============================================================================
 # Quota Checking
 # ============================================================================
+
 
 @dataclass
 class QuotaStatus:
@@ -130,7 +137,7 @@ class QuotaStatus:
 
     # Status
     is_quota_exceeded: bool
-    exceeded_reason: Optional[str] = None
+    exceeded_reason: str | None = None
 
 
 def get_quota_status(user_id: str) -> QuotaStatus:
@@ -155,16 +162,15 @@ def get_quota_status(user_id: str) -> QuotaStatus:
 
     # Calculate remaining
     api_remaining = (
-        -1 if quota.monthly_api_calls == -1
-        else max(0, quota.monthly_api_calls - usage.api_calls)
+        -1 if quota.monthly_api_calls == -1 else max(0, quota.monthly_api_calls - usage.api_calls)
     )
     sim_remaining = (
-        -1 if quota.monthly_simulations == -1
+        -1
+        if quota.monthly_simulations == -1
         else max(0, quota.monthly_simulations - usage.simulations_run)
     )
     cost_remaining = (
-        -1 if quota.monthly_cost_usd == -1
-        else max(0, quota.monthly_cost_usd - usage.cost_usd)
+        -1 if quota.monthly_cost_usd == -1 else max(0, quota.monthly_cost_usd - usage.cost_usd)
     )
 
     # Check if exceeded
@@ -293,6 +299,7 @@ def check_cost_quota(user_id: str, estimated_cost: float) -> bool:
 # Usage Recording
 # ============================================================================
 
+
 def record_api_call(user_id: str) -> None:
     """
     Record an API call for quota tracking.
@@ -319,11 +326,7 @@ def record_simulation_start(user_id: str, job_id: str) -> None:
 
 
 def record_simulation_complete(
-    user_id: str,
-    job_id: str,
-    success: bool,
-    cost_usd: float = 0.0,
-    tokens: int = 0
+    user_id: str, job_id: str, success: bool, cost_usd: float = 0.0, tokens: int = 0
 ) -> None:
     """
     Record a simulation completion.
@@ -345,12 +348,16 @@ def record_simulation_complete(
     if cost_usd > 0 or tokens > 0:
         db.add_cost(user_id, cost_usd, tokens)
 
-    db.log_event(user_id, "simulation_complete", {
-        "job_id": job_id,
-        "success": success,
-        "cost_usd": cost_usd,
-        "tokens": tokens,
-    })
+    db.log_event(
+        user_id,
+        "simulation_complete",
+        {
+            "job_id": job_id,
+            "success": success,
+            "cost_usd": cost_usd,
+            "tokens": tokens,
+        },
+    )
 
 
 def record_batch_start(user_id: str, batch_id: str, job_count: int) -> None:
@@ -363,20 +370,22 @@ def record_batch_start(user_id: str, batch_id: str, job_count: int) -> None:
         job_count: Number of jobs in batch
     """
     db = get_usage_database()
-    db.log_event(user_id, "batch_start", {
-        "batch_id": batch_id,
-        "job_count": job_count,
-    })
+    db.log_event(
+        user_id,
+        "batch_start",
+        {
+            "batch_id": batch_id,
+            "job_count": job_count,
+        },
+    )
 
 
 # ============================================================================
 # Quota Enforcement Middleware
 # ============================================================================
 
-async def quota_exceeded_response(
-    user_id: str,
-    status: QuotaStatus
-) -> JSONResponse:
+
+async def quota_exceeded_response(user_id: str, status: QuotaStatus) -> JSONResponse:
     """
     Create quota exceeded response.
 
@@ -407,13 +416,14 @@ async def quota_exceeded_response(
             },
             "upgrade_info": (
                 "Contact support to upgrade your tier for higher limits."
-                if status.tier == "free" else None
+                if status.tier == "free"
+                else None
             ),
         },
         headers={
             "X-Quota-Tier": status.tier,
             "X-Quota-Period": status.period,
-        }
+        },
     )
 
 
@@ -440,7 +450,7 @@ def enforce_api_quota(user_id: str) -> None:
                 "message": status.exceeded_reason or "Monthly quota exceeded",
                 "tier": status.tier,
                 "period": status.period,
-            }
+            },
         )
 
 
@@ -469,7 +479,7 @@ def enforce_simulation_quota(user_id: str, count: int = 1) -> None:
                 "tier": status.tier,
                 "simulations_used": status.simulations_used,
                 "simulations_limit": status.simulations_limit,
-            }
+            },
         )
 
 
@@ -496,7 +506,7 @@ def enforce_batch_size(user_id: str, batch_size: int) -> None:
                 "message": f"Batch size {batch_size} exceeds limit of {quota.max_batch_size} for {tier} tier",
                 "tier": tier,
                 "max_batch_size": quota.max_batch_size,
-            }
+            },
         )
 
 
@@ -525,5 +535,5 @@ def enforce_cost_quota(user_id: str, estimated_cost: float) -> None:
                 "tier": status.tier,
                 "cost_used_usd": status.cost_used_usd,
                 "cost_limit_usd": status.cost_limit_usd,
-            }
+            },
         )

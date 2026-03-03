@@ -4,17 +4,19 @@ Error Handling - Retry logic, backoff strategies, and failsoft responses
 Handles transient failures, rate limiting, and graceful degradation.
 """
 
-from typing import Callable, TypeVar, Optional, Any
-from dataclasses import dataclass
-import time
 import logging
+import time
+from collections.abc import Callable
+from dataclasses import dataclass
 from enum import Enum
+from typing import Any, TypeVar
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class ErrorType(str, Enum):
     """Categories of errors for different handling strategies"""
+
     RATE_LIMIT = "rate_limit"
     TIMEOUT = "timeout"
     INVALID_JSON = "invalid_json"
@@ -25,7 +27,9 @@ class ErrorType(str, Enum):
     SSL_ERROR = "ssl_error"  # TLS/SSL handshake or verification error
     VALIDATION_ERROR = "validation_error"
     INSUFFICIENT_CREDITS = "insufficient_credits"  # 402 error - non-retryable
-    THINKING_BLOCKS_ERROR = "thinking_blocks"  # Anthropic extended thinking state error - non-retryable
+    THINKING_BLOCKS_ERROR = (
+        "thinking_blocks"  # Anthropic extended thinking state error - non-retryable
+    )
     SERVER_OVERLOAD = "server_overload"  # 503/502 server errors
     UNKNOWN = "unknown"
 
@@ -33,6 +37,7 @@ class ErrorType(str, Enum):
 @dataclass
 class RetryConfig:
     """Configuration for retry behavior"""
+
     max_retries: int = 3
     backoff_base: float = 1.0
     backoff_multiplier: float = 2.0
@@ -71,7 +76,7 @@ class ErrorHandler:
     - Logging and monitoring
     """
 
-    def __init__(self, config: RetryConfig, logger: Optional[logging.Logger] = None):
+    def __init__(self, config: RetryConfig, logger: logging.Logger | None = None):
         self.config = config
         self.logger = logger or logging.getLogger(__name__)
         self.retry_counts: dict[ErrorType, int] = {}
@@ -80,7 +85,7 @@ class ErrorHandler:
         self,
         func: Callable[[], T],
         operation_name: str = "operation",
-        failsoft_value: Optional[T] = None,
+        failsoft_value: T | None = None,
     ) -> T:
         """
         Execute function with retry logic and exponential backoff.
@@ -104,9 +109,7 @@ class ErrorHandler:
                 result = func()
                 # Success - log if this wasn't first attempt
                 if attempt > 0:
-                    self.logger.info(
-                        f"✅ {operation_name} succeeded on attempt {attempt + 1}"
-                    )
+                    self.logger.info(f"✅ {operation_name} succeeded on attempt {attempt + 1}")
                 return result
 
             except Exception as e:
@@ -168,61 +171,97 @@ class ErrorHandler:
 
         # Anthropic thinking blocks error (non-retryable - session state issue)
         # This happens when extended thinking is enabled and conversation accumulates thinking blocks
-        if any(term in error_str for term in ['thinking', 'redacted_thinking', 'thinking blocks']):
+        if any(term in error_str for term in ["thinking", "redacted_thinking", "thinking blocks"]):
             return ErrorType.THINKING_BLOCKS_ERROR
 
         # Insufficient credits (non-retryable - payment issue)
-        if any(term in error_str for term in ['insufficient credits', '402', 'payment required']):
+        if any(term in error_str for term in ["insufficient credits", "402", "payment required"]):
             return ErrorType.INSUFFICIENT_CREDITS
 
         # Rate limiting - check first as it's most common in high-throughput scenarios
-        if any(term in error_str for term in ['rate limit', '429', 'too many requests', 'throttl']):
+        if any(term in error_str for term in ["rate limit", "429", "too many requests", "throttl"]):
             return ErrorType.RATE_LIMIT
 
         # Server overload (502/503/504) - retryable with longer backoff
-        if any(term in error_str for term in ['502', '503', '504', 'bad gateway', 'service unavailable', 'gateway timeout', 'overload']):
+        if any(
+            term in error_str
+            for term in [
+                "502",
+                "503",
+                "504",
+                "bad gateway",
+                "service unavailable",
+                "gateway timeout",
+                "overload",
+            ]
+        ):
             return ErrorType.SERVER_OVERLOAD
 
         # Connection reset - happens when connection drops mid-request (common in long LLM calls)
-        if any(term in error_str for term in ['connection reset', 'reset by peer', 'broken pipe', 'connection aborted', 'connection closed']):
+        if any(
+            term in error_str
+            for term in [
+                "connection reset",
+                "reset by peer",
+                "broken pipe",
+                "connection aborted",
+                "connection closed",
+            ]
+        ):
             return ErrorType.CONNECTION_RESET
-        if any(term in error_type_name for term in ['connectionreset', 'brokenpipe', 'connectionaborted']):
+        if any(
+            term in error_type_name
+            for term in ["connectionreset", "brokenpipe", "connectionaborted"]
+        ):
             return ErrorType.CONNECTION_RESET
 
         # DNS errors - network name resolution issues
-        if any(term in error_str for term in ['dns', 'name resolution', 'getaddrinfo', 'nodename', 'hostname']):
+        if any(
+            term in error_str
+            for term in ["dns", "name resolution", "getaddrinfo", "nodename", "hostname"]
+        ):
             return ErrorType.DNS_ERROR
 
         # SSL/TLS errors - certificate or handshake issues
-        if any(term in error_str for term in ['ssl', 'tls', 'certificate', 'handshake']):
+        if any(term in error_str for term in ["ssl", "tls", "certificate", "handshake"]):
             return ErrorType.SSL_ERROR
-        if any(term in error_type_name for term in ['ssl', 'tls']):
+        if any(term in error_type_name for term in ["ssl", "tls"]):
             return ErrorType.SSL_ERROR
 
         # Timeout - various timeout scenarios
-        if any(term in error_str for term in ['timeout', 'timed out', 'deadline', 'read timeout', 'connect timeout']):
+        if any(
+            term in error_str
+            for term in ["timeout", "timed out", "deadline", "read timeout", "connect timeout"]
+        ):
             return ErrorType.TIMEOUT
-        if any(term in error_type_name for term in ['timeout', 'readtimeout', 'connecttimeout']):
+        if any(term in error_type_name for term in ["timeout", "readtimeout", "connecttimeout"]):
             return ErrorType.TIMEOUT
 
         # JSON parsing - response couldn't be parsed
-        if any(term in error_type_name for term in ['json', 'parse', 'decode']):
+        if any(term in error_type_name for term in ["json", "parse", "decode"]):
             return ErrorType.INVALID_JSON
-        if any(term in error_str for term in ['json', 'expecting value', 'unterminated string']):
+        if any(term in error_str for term in ["json", "expecting value", "unterminated string"]):
             return ErrorType.INVALID_JSON
 
         # General network errors - catch-all for connection issues
-        if any(term in error_type_name for term in ['connection', 'network', 'socket', 'httpx', 'http']):
+        if any(
+            term in error_type_name for term in ["connection", "network", "socket", "httpx", "http"]
+        ):
             return ErrorType.NETWORK_ERROR
-        if any(term in error_str for term in ['connection', 'network', 'socket error', 'unreachable']):
+        if any(
+            term in error_str for term in ["connection", "network", "socket error", "unreachable"]
+        ):
             return ErrorType.NETWORK_ERROR
 
         # Validation errors
-        if any(term in error_type_name for term in ['validation', 'schema']):
+        if any(term in error_type_name for term in ["validation", "schema"]):
             return ErrorType.VALIDATION_ERROR
 
         # API errors (500 class)
-        if any(term in error_str for term in ['api error', '500', 'internal server error', 'internal error']):
+        if any(
+            term in error_str
+            for term in ["api error", "500", "internal server error", "internal error"]
+        ):
             return ErrorType.API_ERROR
 
         return ErrorType.UNKNOWN
@@ -242,7 +281,7 @@ class ErrorHandler:
             Delay in seconds
         """
         # Base exponential backoff
-        delay = self.config.backoff_base * (self.config.backoff_multiplier ** attempt)
+        delay = self.config.backoff_base * (self.config.backoff_multiplier**attempt)
 
         # Apply error-type-specific multipliers
         if error_type == ErrorType.RATE_LIMIT:
@@ -268,6 +307,7 @@ class ErrorHandler:
 
         # Add jitter to avoid thundering herd (10-20% variation)
         import random
+
         jitter_range = 0.1 + (0.1 * random.random())  # 10-20%
         jitter = random.uniform(-delay * jitter_range, delay * jitter_range)
         delay = max(0.5, delay + jitter)  # Ensure minimum 0.5s delay
@@ -352,5 +392,5 @@ class FailsoftGenerator:
             "success": False,
             "error": error_message,
             "content": None,
-            "metadata": {"failsoft": True}
+            "metadata": {"failsoft": True},
         }

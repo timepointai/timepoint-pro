@@ -4,21 +4,23 @@ Tests for World Management System (Sprint 1.1)
 Tests world creation, isolation, retrieval, and deletion.
 """
 
-import pytest
-import tempfile
 import shutil
+import tempfile
 from pathlib import Path
-from generation.world_manager import WorldManager, IsolationMode, WorldMetadata
+
+import pytest
+
 from generation.config_schema import (
-    SimulationConfig,
-    EntityConfig,
     CompanyConfig,
+    EntityConfig,
+    OutputConfig,
+    SimulationConfig,
     TemporalConfig,
     TemporalMode,
-    OutputConfig,
     VariationConfig,
 )
 from generation.templates.loader import TemplateLoader
+from generation.world_manager import IsolationMode, WorldManager
 
 _loader = TemplateLoader()
 
@@ -43,7 +45,7 @@ class TestWorldManager:
         world = manager.create_world(
             world_id="test_world_1",
             isolation_mode=IsolationMode.SEPARATE_DB,
-            description="Test world"
+            description="Test world",
         )
 
         assert world.world_id == "test_world_1"
@@ -56,7 +58,7 @@ class TestWorldManager:
         world = manager.create_world(
             world_id="test_world_2",
             isolation_mode=IsolationMode.SHARED_DB_PARTITIONED,
-            description="Shared world"
+            description="Shared world",
         )
 
         assert world.world_id == "test_world_2"
@@ -66,9 +68,7 @@ class TestWorldManager:
     def test_create_world_hybrid_demo(self, manager):
         """Test creating a demo world with hybrid isolation"""
         world = manager.create_world(
-            world_id="demo_test",
-            isolation_mode=IsolationMode.HYBRID,
-            description="Demo world"
+            world_id="demo_test", isolation_mode=IsolationMode.HYBRID, description="Demo world"
         )
 
         assert world.world_id == "demo_test"
@@ -79,7 +79,7 @@ class TestWorldManager:
         world = manager.create_world(
             world_id="production_world",
             isolation_mode=IsolationMode.HYBRID,
-            description="Production world"
+            description="Production world",
         )
 
         assert world.world_id == "production_world"
@@ -120,8 +120,7 @@ class TestWorldManager:
     def test_delete_world_separate_db(self, manager):
         """Test deleting a world with separate database"""
         world = manager.create_world(
-            world_id="test_delete",
-            isolation_mode=IsolationMode.SEPARATE_DB
+            world_id="test_delete", isolation_mode=IsolationMode.SEPARATE_DB
         )
         db_path = Path(world.db_path)
 
@@ -146,12 +145,10 @@ class TestWorldManager:
     def test_world_isolation_separate_dbs(self, manager):
         """Test that separate DB worlds are isolated"""
         world1 = manager.create_world(
-            world_id="isolated_1",
-            isolation_mode=IsolationMode.SEPARATE_DB
+            world_id="isolated_1", isolation_mode=IsolationMode.SEPARATE_DB
         )
         world2 = manager.create_world(
-            world_id="isolated_2",
-            isolation_mode=IsolationMode.SEPARATE_DB
+            world_id="isolated_2", isolation_mode=IsolationMode.SEPARATE_DB
         )
 
         # Different database files
@@ -162,12 +159,10 @@ class TestWorldManager:
     def test_world_isolation_shared_db(self, manager):
         """Test that shared DB worlds use same file"""
         world1 = manager.create_world(
-            world_id="shared_1",
-            isolation_mode=IsolationMode.SHARED_DB_PARTITIONED
+            world_id="shared_1", isolation_mode=IsolationMode.SHARED_DB_PARTITIONED
         )
         world2 = manager.create_world(
-            world_id="shared_2",
-            isolation_mode=IsolationMode.SHARED_DB_PARTITIONED
+            world_id="shared_2", isolation_mode=IsolationMode.SHARED_DB_PARTITIONED
         )
 
         # Same database file
@@ -217,13 +212,13 @@ class TestWorldManager:
         source = manager.create_world(
             world_id="clone_source",
             isolation_mode=IsolationMode.SEPARATE_DB,
-            description="Original world"
+            description="Original world",
         )
 
         cloned = manager.clone_world(
             source_world_id="clone_source",
             target_world_id="clone_target",
-            description="Cloned world"
+            description="Cloned world",
         )
 
         assert cloned.world_id == "clone_target"
@@ -252,7 +247,7 @@ class TestWorldManager:
             import_path=str(export_path),
             world_id="import_target",
             format="sqlite",
-            description="Imported world"
+            description="Imported world",
         )
 
         assert imported.world_id == "import_target"
@@ -263,9 +258,7 @@ class TestWorldManager:
         # Create manager and world
         manager1 = WorldManager(base_path=temp_dir)
         manager1.create_world(
-            world_id="persistent",
-            description="Persistent world",
-            metadata={"key": "value"}
+            world_id="persistent", description="Persistent world", metadata={"key": "value"}
         )
 
         # Create new manager instance (should load registry)
@@ -290,8 +283,7 @@ class TestWorldManager:
     def test_world_cleanup_on_delete(self, manager):
         """Test that world deletion cleans up all resources"""
         world = manager.create_world(
-            world_id="cleanup_test",
-            isolation_mode=IsolationMode.SEPARATE_DB
+            world_id="cleanup_test", isolation_mode=IsolationMode.SEPARATE_DB
         )
         db_path = Path(world.db_path)
 
@@ -318,7 +310,7 @@ class TestSimulationConfig:
         config = SimulationConfig(
             scenario_description="Test scenario",
             world_id="test_world",
-            entities=EntityConfig(count=5)
+            entities=EntityConfig(count=5),
         )
 
         assert config.scenario_description == "Test scenario"
@@ -350,15 +342,10 @@ class TestSimulationConfig:
             entities=EntityConfig(count=4, types=["human"]),
             timepoints=CompanyConfig(count=2, resolution="hour"),
             temporal=TemporalConfig(mode=TemporalMode.FORWARD),
-            outputs=OutputConfig(
-                formats=["jsonl"],
-                export_ml_dataset=True
-            ),
+            outputs=OutputConfig(formats=["jsonl"], export_ml_dataset=True),
             variations=VariationConfig(
-                enabled=True,
-                count=100,
-                strategies=["vary_personalities", "vary_outcomes"]
-            )
+                enabled=True, count=100, strategies=["vary_personalities", "vary_outcomes"]
+            ),
         )
 
         assert config.variations.enabled is True
@@ -371,7 +358,7 @@ class TestSimulationConfig:
             SimulationConfig(
                 scenario_description="Test",
                 world_id="test",
-                entities={"count": 0}  # Invalid: too low
+                entities={"count": 0},  # Invalid: too low
             )
 
     def test_config_invalid_entity_type(self):
@@ -380,7 +367,7 @@ class TestSimulationConfig:
             SimulationConfig(
                 scenario_description="Test",
                 world_id="test",
-                entities={"count": 5, "types": ["invalid_type"]}
+                entities={"count": 5, "types": ["invalid_type"]},
             )
 
     def test_config_invalid_temporal_resolution(self):
@@ -389,7 +376,7 @@ class TestSimulationConfig:
             SimulationConfig(
                 scenario_description="Test",
                 world_id="test",
-                timepoints={"count": 5, "resolution": "invalid"}
+                timepoints={"count": 5, "resolution": "invalid"},
             )
 
     def test_config_cost_estimation(self):
@@ -425,7 +412,7 @@ class TestSimulationConfig:
             scenario_description="Test",
             world_id="test",
             entities=EntityConfig(count=5),
-            variations=VariationConfig(enabled=True, count=10, strategies=["vary_personalities"])
+            variations=VariationConfig(enabled=True, count=10, strategies=["vary_personalities"]),
         )
         assert config.variations.enabled
 
@@ -435,7 +422,7 @@ class TestSimulationConfig:
                 scenario_description="Test",
                 world_id="test",
                 entities=EntityConfig(count=5),
-                variations=VariationConfig(enabled=True, count=10, strategies=[])
+                variations=VariationConfig(enabled=True, count=10, strategies=[]),
             )
 
 
@@ -455,10 +442,7 @@ class TestWorldManagerIntegration:
         manager = WorldManager(base_path=temp_dir)
 
         # Create world
-        world = manager.create_world(
-            world_id="lifecycle_test",
-            description="Test world lifecycle"
-        )
+        world = manager.create_world(world_id="lifecycle_test", description="Test world lifecycle")
         assert manager.world_exists("lifecycle_test")
 
         # Get engine and session
@@ -484,8 +468,7 @@ class TestWorldManagerIntegration:
         worlds = []
         for i in range(5):
             world = manager.create_world(
-                world_id=f"world_{i}",
-                isolation_mode=IsolationMode.SEPARATE_DB
+                world_id=f"world_{i}", isolation_mode=IsolationMode.SEPARATE_DB
             )
             worlds.append(world)
 

@@ -10,24 +10,20 @@ Key metric: WSR (Waveform Sufficiency Ratio) = fraction of (entity, timepoint)
 pairs where |predicted - actual| < epsilon.
 """
 
-import math
 import numpy as np
-import pytest
 
 from synth.adprs_fitter import ADPRSFitter, adprs_waveform
-from synth.harmonic_fitter import HarmonicFitter, harmonic_adprs_waveform
 from synth.fidelity_envelope import (
     ADPRSComposite,
-    ADPRSEnvelope,
-    FidelityBand,
     phi_to_resolution_band,
 )
+from synth.harmonic_fitter import HarmonicFitter, harmonic_adprs_waveform
 from synth.waveform_scheduler import WaveformScheduler, _evaluate_composite_at_tau
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def generate_synthetic_trajectory(
     n_points: int,
@@ -48,9 +44,13 @@ def generate_synthetic_trajectory(
     elif mode == "k3":
         activation = harmonic_adprs_waveform(
             tau,
-            params["P1"], params["c1"], params["A1"],
-            params["c2"], params["A2"],
-            params["c3"], params["A3"],
+            params["P1"],
+            params["c1"],
+            params["A1"],
+            params["c2"],
+            params["A2"],
+            params["c3"],
+            params["A3"],
             params["baseline"],
         )
     else:
@@ -131,6 +131,7 @@ def run_sufficiency_protocol(
 # Test classes
 # ---------------------------------------------------------------------------
 
+
 class TestMonotoneSufficiency:
     """Monotone decay trajectory: easy signal, high WSR expected."""
 
@@ -146,7 +147,9 @@ class TestMonotoneSufficiency:
         true_params_k1 = {"A": 0.85, "P": 1.0, "S": 0.7, "baseline": 0.15}
 
         # Run 1: clean trajectory
-        tau_fit, act_fit = generate_synthetic_trajectory(n_points, true_params_k1, noise=0.0, mode="k1")
+        tau_fit, act_fit = generate_synthetic_trajectory(
+            n_points, true_params_k1, noise=0.0, mode="k1"
+        )
 
         # Run 2: slightly noisy version
         tau_test, act_test = generate_synthetic_trajectory(
@@ -155,18 +158,25 @@ class TestMonotoneSufficiency:
 
         # K=1 sufficiency
         result_k1 = run_sufficiency_protocol(
-            tau_fit, act_fit, tau_test, act_test,
-            entity_id="mono_k1", fitter_type="k1", epsilon=0.1,
+            tau_fit,
+            act_fit,
+            tau_test,
+            act_test,
+            entity_id="mono_k1",
+            fitter_type="k1",
+            epsilon=0.1,
         )
-        assert result_k1["wsr"] > 0.85, (
-            f"K=1 monotone WSR={result_k1['wsr']:.3f}, expected >0.85"
-        )
+        assert result_k1["wsr"] > 0.85, f"K=1 monotone WSR={result_k1['wsr']:.3f}, expected >0.85"
 
         # K=3 sufficiency (harmonic should also handle monotone)
         true_params_k3 = {
-            "P1": 1.0, "c1": 0.7, "A1": 0.85,
-            "c2": 0.0, "A2": 0.5,
-            "c3": 0.0, "A3": 0.5,
+            "P1": 1.0,
+            "c1": 0.7,
+            "A1": 0.85,
+            "c2": 0.0,
+            "A2": 0.5,
+            "c3": 0.0,
+            "A3": 0.5,
             "baseline": 0.15,
         }
         tau_fit_k3, act_fit_k3 = generate_synthetic_trajectory(
@@ -177,12 +187,16 @@ class TestMonotoneSufficiency:
         )
 
         result_k3 = run_sufficiency_protocol(
-            tau_fit_k3, act_fit_k3, tau_test_k3, act_test_k3,
-            entity_id="mono_k3", fitter_type="k3", harmonics=3, epsilon=0.1,
+            tau_fit_k3,
+            act_fit_k3,
+            tau_test_k3,
+            act_test_k3,
+            entity_id="mono_k3",
+            fitter_type="k3",
+            harmonics=3,
+            epsilon=0.1,
         )
-        assert result_k3["wsr"] > 0.85, (
-            f"K=3 monotone WSR={result_k3['wsr']:.3f}, expected >0.85"
-        )
+        assert result_k3["wsr"] > 0.85, f"K=3 monotone WSR={result_k3['wsr']:.3f}, expected >0.85"
 
     def test_fit_residual_low(self):
         """Monotone decay fit residual should be very small."""
@@ -208,18 +222,23 @@ class TestOscillatorySufficiency:
 
         true_params = {"A": 0.6, "P": 3.0, "S": 0.8, "baseline": 0.1}
 
-        tau_fit, act_fit = generate_synthetic_trajectory(n_points, true_params, noise=0.0, mode="k1")
+        tau_fit, act_fit = generate_synthetic_trajectory(
+            n_points, true_params, noise=0.0, mode="k1"
+        )
         tau_test, act_test = generate_synthetic_trajectory(
             n_points, true_params, noise=0.04, rng=rng, mode="k1"
         )
 
         result = run_sufficiency_protocol(
-            tau_fit, act_fit, tau_test, act_test,
-            entity_id="osc_k1", fitter_type="k1", epsilon=0.1,
+            tau_fit,
+            act_fit,
+            tau_test,
+            act_test,
+            entity_id="osc_k1",
+            fitter_type="k1",
+            epsilon=0.1,
         )
-        assert result["wsr"] > 0.7, (
-            f"Oscillatory K=1 WSR={result['wsr']:.3f}, expected >0.7"
-        )
+        assert result["wsr"] > 0.7, f"Oscillatory K=1 WSR={result['wsr']:.3f}, expected >0.7"
 
     def test_oscillatory_harmonic_wsr(self):
         """K=3 harmonic fit on oscillatory data."""
@@ -227,24 +246,34 @@ class TestOscillatorySufficiency:
         n_points = 24
 
         true_params = {
-            "P1": 3.0, "c1": 0.6, "A1": 0.6,
-            "c2": 0.2, "A2": 0.5,
-            "c3": 0.1, "A3": 0.4,
+            "P1": 3.0,
+            "c1": 0.6,
+            "A1": 0.6,
+            "c2": 0.2,
+            "A2": 0.5,
+            "c3": 0.1,
+            "A3": 0.4,
             "baseline": 0.1,
         }
 
-        tau_fit, act_fit = generate_synthetic_trajectory(n_points, true_params, noise=0.0, mode="k3")
+        tau_fit, act_fit = generate_synthetic_trajectory(
+            n_points, true_params, noise=0.0, mode="k3"
+        )
         tau_test, act_test = generate_synthetic_trajectory(
             n_points, true_params, noise=0.04, rng=rng, mode="k3"
         )
 
         result = run_sufficiency_protocol(
-            tau_fit, act_fit, tau_test, act_test,
-            entity_id="osc_k3", fitter_type="k3", harmonics=3, epsilon=0.1,
+            tau_fit,
+            act_fit,
+            tau_test,
+            act_test,
+            entity_id="osc_k3",
+            fitter_type="k3",
+            harmonics=3,
+            epsilon=0.1,
         )
-        assert result["wsr"] > 0.7, (
-            f"Oscillatory K=3 WSR={result['wsr']:.3f}, expected >0.7"
-        )
+        assert result["wsr"] > 0.7, f"Oscillatory K=3 WSR={result['wsr']:.3f}, expected >0.7"
 
 
 class TestMultiEntitySufficiency:
@@ -274,12 +303,22 @@ class TestMultiEntitySufficiency:
         )
 
         result_calm = run_sufficiency_protocol(
-            tau_fit_calm, act_fit_calm, tau_test_calm, act_test_calm,
-            entity_id="calm", fitter_type="k1", epsilon=0.1,
+            tau_fit_calm,
+            act_fit_calm,
+            tau_test_calm,
+            act_test_calm,
+            entity_id="calm",
+            fitter_type="k1",
+            epsilon=0.1,
         )
         result_volatile = run_sufficiency_protocol(
-            tau_fit_vol, act_fit_vol, tau_test_vol, act_test_vol,
-            entity_id="volatile", fitter_type="k1", epsilon=0.1,
+            tau_fit_vol,
+            act_fit_vol,
+            tau_test_vol,
+            act_test_vol,
+            entity_id="volatile",
+            fitter_type="k1",
+            epsilon=0.1,
         )
 
         # Overall WSR across both entities
@@ -306,16 +345,22 @@ class TestMultiEntitySufficiency:
         for name, params in entities.items():
             tau_fit, act_fit = generate_synthetic_trajectory(n_points, params, noise=0.0, mode="k1")
             tau_test, act_test = generate_synthetic_trajectory(
-                n_points, params, noise=0.04, rng=np.random.default_rng(3003 + hash(name) % 1000),
+                n_points,
+                params,
+                noise=0.04,
+                rng=np.random.default_rng(3003 + hash(name) % 1000),
                 mode="k1",
             )
             result = run_sufficiency_protocol(
-                tau_fit, act_fit, tau_test, act_test,
-                entity_id=name, fitter_type="k1", epsilon=0.1,
+                tau_fit,
+                act_fit,
+                tau_test,
+                act_test,
+                entity_id=name,
+                fitter_type="k1",
+                epsilon=0.1,
             )
-            assert result["wsr"] > 0.5, (
-                f"Entity '{name}' WSR={result['wsr']:.3f}, expected >0.5"
-            )
+            assert result["wsr"] > 0.5, f"Entity '{name}' WSR={result['wsr']:.3f}, expected >0.5"
 
 
 class TestHarmonicImprovesWSR:
@@ -330,14 +375,20 @@ class TestHarmonicImprovesWSR:
         n_points = 30
 
         true_params = {
-            "P1": 2.0, "c1": 0.6, "A1": 0.7,
-            "c2": 0.3, "A2": 0.6,
-            "c3": 0.1, "A3": 0.5,
+            "P1": 2.0,
+            "c1": 0.6,
+            "A1": 0.7,
+            "c2": 0.3,
+            "A2": 0.6,
+            "c3": 0.1,
+            "A3": 0.5,
             "baseline": 0.1,
         }
 
         # Run 1: clean trajectory generated from K=3 model
-        tau_fit, act_fit = generate_synthetic_trajectory(n_points, true_params, noise=0.0, mode="k3")
+        tau_fit, act_fit = generate_synthetic_trajectory(
+            n_points, true_params, noise=0.0, mode="k3"
+        )
 
         # Run 2: slightly noisy
         tau_test, act_test = generate_synthetic_trajectory(
@@ -346,14 +397,26 @@ class TestHarmonicImprovesWSR:
 
         # K=1 fit on K=3 data (underfitting expected)
         result_k1 = run_sufficiency_protocol(
-            tau_fit, act_fit, tau_test, act_test,
-            entity_id="harmonic_k1", fitter_type="k3", harmonics=1, epsilon=0.1,
+            tau_fit,
+            act_fit,
+            tau_test,
+            act_test,
+            entity_id="harmonic_k1",
+            fitter_type="k3",
+            harmonics=1,
+            epsilon=0.1,
         )
 
         # K=3 fit on K=3 data (should capture harmonics)
         result_k3 = run_sufficiency_protocol(
-            tau_fit, act_fit, tau_test, act_test,
-            entity_id="harmonic_k3", fitter_type="k3", harmonics=3, epsilon=0.1,
+            tau_fit,
+            act_fit,
+            tau_test,
+            act_test,
+            entity_id="harmonic_k3",
+            fitter_type="k3",
+            harmonics=3,
+            epsilon=0.1,
         )
 
         assert result_k3["wsr"] >= result_k1["wsr"], (
@@ -364,9 +427,13 @@ class TestHarmonicImprovesWSR:
         """K=3 fit residual on multi-harmonic data should be <= K=1 residual."""
         n_points = 30
         true_params = {
-            "P1": 2.0, "c1": 0.6, "A1": 0.7,
-            "c2": 0.3, "A2": 0.6,
-            "c3": 0.1, "A3": 0.5,
+            "P1": 2.0,
+            "c1": 0.6,
+            "A1": 0.7,
+            "c2": 0.3,
+            "A2": 0.6,
+            "c3": 0.1,
+            "A3": 0.5,
             "baseline": 0.1,
         }
         tau, activation = generate_synthetic_trajectory(n_points, true_params, noise=0.0, mode="k3")
@@ -398,7 +465,9 @@ class TestSchedulerIntegration:
         true_params = {"A": 0.75, "P": 2.0, "S": 0.75, "baseline": 0.12}
 
         # Run 1: fit
-        tau_fit, act_fit = generate_synthetic_trajectory(n_points, true_params, noise=0.0, mode="k1")
+        tau_fit, act_fit = generate_synthetic_trajectory(
+            n_points, true_params, noise=0.0, mode="k1"
+        )
         fitter = ADPRSFitter(min_points=5, de_maxiter=300)
         fit_result = fitter.fit_entity(tau_fit, act_fit, entity_id)
 
@@ -458,7 +527,9 @@ class TestSchedulerIntegration:
 
         true_params = {"A": 0.75, "P": 2.0, "S": 0.75, "baseline": 0.12}
 
-        tau_fit, act_fit = generate_synthetic_trajectory(n_points, true_params, noise=0.0, mode="k1")
+        tau_fit, act_fit = generate_synthetic_trajectory(
+            n_points, true_params, noise=0.0, mode="k1"
+        )
         fitter = ADPRSFitter(min_points=5, de_maxiter=300)
         fit_result = fitter.fit_entity(tau_fit, act_fit, entity_id)
 
@@ -482,9 +553,7 @@ class TestSchedulerIntegration:
             scheduler.record_actual(entity_id, tau_i, float(act_test[i]))
 
         report = scheduler.sufficiency_report()
-        assert report["wsr"] > 0.7, (
-            f"Scheduler WSR={report['wsr']:.3f}, expected >0.7"
-        )
+        assert report["wsr"] > 0.7, f"Scheduler WSR={report['wsr']:.3f}, expected >0.7"
 
     def test_predict_activation_delta(self):
         """WaveformScheduler.predict_activation_delta returns correct structure."""
@@ -492,7 +561,9 @@ class TestSchedulerIntegration:
         true_params = {"A": 0.75, "P": 2.0, "S": 0.75, "baseline": 0.12}
 
         n_points = 20
-        tau_fit, act_fit = generate_synthetic_trajectory(n_points, true_params, noise=0.0, mode="k1")
+        tau_fit, act_fit = generate_synthetic_trajectory(
+            n_points, true_params, noise=0.0, mode="k1"
+        )
         fitter = ADPRSFitter(min_points=5, de_maxiter=300)
         fit_result = fitter.fit_entity(tau_fit, act_fit, entity_id)
 

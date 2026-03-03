@@ -12,45 +12,39 @@ Uses the same realistic tensor fixtures as test_tensor_integration.py.
 Phase 5: Access Control
 """
 
-import asyncio
+import uuid
+
 import numpy as np
 import pytest
-import tempfile
-import uuid
-from pathlib import Path
-from typing import List, Dict, Tuple
 
-# Phase 1 imports
-from tensor_persistence import TensorDatabase, TensorRecord
-from tensor_serialization import serialize_tensor, deserialize_tensor
-
-# Phase 3 imports
-from retrieval.tensor_rag import TensorRAG, SearchResult
+from access.audit import (
+    AuditLogger,
+)
 
 # Phase 5 imports
 from access.permissions import (
-    TensorPermission,
-    PermissionEnforcer,
     PermissionDenied,
+    PermissionEnforcer,
 )
-from access.audit import (
-    AccessAuditLog,
-    AuditLogger,
-)
+
+# Phase 3 imports
+from retrieval.tensor_rag import TensorRAG
 
 # Core imports
 from schemas import TTMTensor
 
+# Phase 1 imports
+from tensor_persistence import TensorDatabase, TensorRecord
+from tensor_serialization import serialize_tensor
 
 # ============================================================================
 # Realistic Tensor Data Generators (from test_tensor_integration.py)
 # ============================================================================
 
+
 def create_character_tensor(
-    archetype: str,
-    profession: str = None,
-    epoch: str = "modern"
-) -> Tuple[TTMTensor, Dict]:
+    archetype: str, profession: str = None, epoch: str = "modern"
+) -> tuple[TTMTensor, dict]:
     """
     Create a realistic character tensor simulating pipeline output.
     """
@@ -79,7 +73,7 @@ def create_character_tensor(
             "context": [0.7, 0.4, 0.6, 0.2, 0.6, 0.7, 0.3, 0.9],
             "biology": [0.5, 0.75, 0.95, 0.6],
             "behavior": [0.8, 0.5, 0.4, 0.6, 0.95, 0.7, 0.4, 0.3],
-        }
+        },
     }
 
     profile = archetype_profiles.get(archetype, archetype_profiles["hero"])
@@ -104,7 +98,8 @@ def create_character_tensor(
         "archetype": archetype,
         "profession": profession or archetype,
         "epoch": epoch,
-        "description": f"{epoch.capitalize()} {archetype}" + (f" ({profession})" if profession else ""),
+        "description": f"{epoch.capitalize()} {archetype}"
+        + (f" ({profession})" if profession else ""),
     }
 
     return tensor, metadata
@@ -113,6 +108,7 @@ def create_character_tensor(
 # ============================================================================
 # Fixtures
 # ============================================================================
+
 
 @pytest.fixture
 def tmp_db_path(tmp_path) -> str:
@@ -139,7 +135,7 @@ def logger(tmp_db_path) -> AuditLogger:
 
 
 @pytest.fixture
-def detective_tensor() -> Tuple[str, TTMTensor, Dict]:
+def detective_tensor() -> tuple[str, TTMTensor, dict]:
     """Create a detective tensor with ID."""
     tensor, metadata = create_character_tensor("detective", "investigator", "victorian")
     tensor_id = f"detective-{uuid.uuid4().hex[:8]}"
@@ -147,7 +143,7 @@ def detective_tensor() -> Tuple[str, TTMTensor, Dict]:
 
 
 @pytest.fixture
-def researcher_tensors() -> List[Tuple[str, TTMTensor, Dict]]:
+def researcher_tensors() -> list[tuple[str, TTMTensor, dict]]:
     """Create multiple research tensors."""
     tensors = []
     archetypes = ["detective", "scientist", "noble"]
@@ -162,13 +158,12 @@ def researcher_tensors() -> List[Tuple[str, TTMTensor, Dict]]:
 # Multi-User Access Scenarios
 # ============================================================================
 
+
 @pytest.mark.integration
 class TestMultiUserAccessScenarios:
     """Test realistic multi-user access scenarios."""
 
-    def test_researcher_creates_private_tensor(
-        self, tensor_db, enforcer, logger, detective_tensor
-    ):
+    def test_researcher_creates_private_tensor(self, tensor_db, enforcer, logger, detective_tensor):
         """Researcher creates private tensor, colleague cannot access."""
         tensor_id, tensor, metadata = detective_tensor
         researcher_id = "researcher-alice"
@@ -208,9 +203,7 @@ class TestMultiUserAccessScenarios:
         assert len(failed) == 1
         assert failed[0].user_id == colleague_id
 
-    def test_sharing_enables_collaboration(
-        self, tensor_db, enforcer, logger, detective_tensor
-    ):
+    def test_sharing_enables_collaboration(self, tensor_db, enforcer, logger, detective_tensor):
         """Owner shares tensor, collaborator gains read access."""
         tensor_id, tensor, metadata = detective_tensor
         owner_id = "researcher-alice"
@@ -246,9 +239,7 @@ class TestMultiUserAccessScenarios:
         # Collaborator can fork (create their own copy)
         assert enforcer.can_fork(collaborator_id, tensor_id) is True
 
-    def test_publish_tensor_for_community(
-        self, tensor_db, enforcer, logger, detective_tensor
-    ):
+    def test_publish_tensor_for_community(self, tensor_db, enforcer, logger, detective_tensor):
         """Make tensor public, anyone can fork."""
         tensor_id, tensor, metadata = detective_tensor
         owner_id = "researcher-alice"
@@ -287,9 +278,7 @@ class TestMultiUserAccessScenarios:
         # But they still cannot modify
         assert enforcer.can_write(community_user_1, tensor_id) is False
 
-    def test_fork_creates_owned_copy(
-        self, tensor_db, enforcer, logger, detective_tensor
-    ):
+    def test_fork_creates_owned_copy(self, tensor_db, enforcer, logger, detective_tensor):
         """Fork creates independent copy owned by forker."""
         original_id, original_tensor, metadata = detective_tensor
         original_owner = "researcher-alice"
@@ -337,9 +326,7 @@ class TestMultiUserAccessScenarios:
         # Original owner has no access to fork (private)
         assert enforcer.can_read(original_owner, fork_id) is False
 
-    def test_revoke_access_removes_ability(
-        self, tensor_db, enforcer, logger, detective_tensor
-    ):
+    def test_revoke_access_removes_ability(self, tensor_db, enforcer, logger, detective_tensor):
         """Revoking share removes access."""
         tensor_id, tensor, metadata = detective_tensor
         owner_id = "owner"
@@ -380,13 +367,12 @@ class TestMultiUserAccessScenarios:
 # Audit Trail Integration
 # ============================================================================
 
+
 @pytest.mark.integration
 class TestAuditTrailIntegration:
     """Test audit trail in realistic scenarios."""
 
-    def test_access_attempts_logged(
-        self, tensor_db, enforcer, logger, researcher_tensors
-    ):
+    def test_access_attempts_logged(self, tensor_db, enforcer, logger, researcher_tensors):
         """All access attempts should create audit entries."""
         owner = "researcher-owner"
         reader = "researcher-reader"
@@ -480,13 +466,12 @@ class TestAuditTrailIntegration:
 # Permission with RAG Integration
 # ============================================================================
 
+
 @pytest.mark.integration
 class TestPermissionWithRAG:
     """Test permission enforcement in TensorRAG."""
 
-    def test_search_returns_accessible_tensors(
-        self, tensor_db, enforcer, researcher_tensors
-    ):
+    def test_search_returns_accessible_tensors(self, tensor_db, enforcer, researcher_tensors):
         """TensorRAG search returns tensors regardless of permissions."""
         owner = "researcher-owner"
         searcher = "researcher-searcher"
@@ -530,9 +515,7 @@ class TestPermissionWithRAG:
         # Searcher can access 2: public + shared
         assert len(accessible_results) == 2
 
-    def test_composition_requires_access(
-        self, tensor_db, enforcer, researcher_tensors
-    ):
+    def test_composition_requires_access(self, tensor_db, enforcer, researcher_tensors):
         """Tensor composition should verify access to all components."""
         owner = "researcher-owner"
         composer = "researcher-composer"
@@ -560,10 +543,7 @@ class TestPermissionWithRAG:
         results = rag.search("archetype", n_results=3)
 
         # Application should filter before composition
-        composable_results = [
-            r for r in results
-            if enforcer.can_read(composer, r.tensor_id)
-        ]
+        composable_results = [r for r in results if enforcer.can_read(composer, r.tensor_id)]
 
         # Composer can only compose accessible tensors
         if len(composable_results) >= 2:
@@ -578,13 +558,12 @@ class TestPermissionWithRAG:
 # Group-Based Access Integration
 # ============================================================================
 
+
 @pytest.mark.integration
 class TestGroupBasedAccess:
     """Test group-based access in realistic scenarios."""
 
-    def test_research_team_access(
-        self, tensor_db, enforcer, logger, researcher_tensors
-    ):
+    def test_research_team_access(self, tensor_db, enforcer, logger, researcher_tensors):
         """Research team members should share access."""
         lead_researcher = "lead-alice"
         team_member_1 = "team-bob"
@@ -632,6 +611,7 @@ class TestGroupBasedAccess:
 # ============================================================================
 # Complete Workflow Integration
 # ============================================================================
+
 
 @pytest.mark.integration
 class TestCompleteWorkflow:

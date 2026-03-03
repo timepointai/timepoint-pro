@@ -12,15 +12,17 @@ To run:
     export OXEN_TEST_NAMESPACE=your_username
     pytest tests/test_e2e_oxen_upload.py -v -s
 """
-import pytest
+
 import os
 import sys
 from datetime import datetime
 
+import pytest
+
 # Skip all tests if integration testing not enabled
 pytestmark = pytest.mark.skipif(
     os.getenv("OXEN_INTEGRATION_TEST") != "true",
-    reason="Oxen integration test requires OXEN_INTEGRATION_TEST=true"
+    reason="Oxen integration test requires OXEN_INTEGRATION_TEST=true",
 )
 
 
@@ -51,8 +53,13 @@ class TestOxenUploadE2E:
         sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
         from generation.config_schema import (
-            SimulationConfig, EntityConfig, CompanyConfig,
-            TemporalConfig, TemporalMode, OutputConfig, VariationConfig,
+            CompanyConfig,
+            EntityConfig,
+            OutputConfig,
+            SimulationConfig,
+            TemporalConfig,
+            TemporalMode,
+            VariationConfig,
         )
         from generation.horizontal_generator import HorizontalGenerator
         from oxen_integration import OxenClient
@@ -66,22 +73,17 @@ class TestOxenUploadE2E:
             entities=EntityConfig(count=4, types=["human"]),
             timepoints=CompanyConfig(count=2, resolution="hour"),
             temporal=TemporalConfig(mode=TemporalMode.FORWARD),
-            outputs=OutputConfig(
-                formats=["jsonl"],
-                export_ml_dataset=True
-            ),
+            outputs=OutputConfig(formats=["jsonl"], export_ml_dataset=True),
             variations=VariationConfig(
-                enabled=True,
-                count=100,
-                strategies=["vary_personalities", "vary_outcomes"]
-            )
+                enabled=True, count=100, strategies=["vary_personalities", "vary_outcomes"]
+            ),
         )
 
         variations = generator.generate_variations(
             base_config=base_config,
             count=10,  # Small test dataset
             strategies=["vary_personalities"],
-            random_seed=42
+            random_seed=42,
         )
 
         print(f"✅ Generated {len(variations)} variations")
@@ -91,7 +93,7 @@ class TestOxenUploadE2E:
         client = OxenClient(
             namespace=test_namespace,
             repo_name=test_repo_name,
-            interactive_auth=False  # Use env var/config only
+            interactive_auth=False,  # Use env var/config only
         )
 
         print(f"✅ Client initialized for {test_namespace}/{test_repo_name}")
@@ -101,7 +103,7 @@ class TestOxenUploadE2E:
         result = generator.export_to_oxen(
             variations=variations,
             oxen_client=client,
-            commit_message="E2E test: 10 negotiation variations"
+            commit_message="E2E test: 10 negotiation variations",
         )
 
         print(f"\n{result}")
@@ -141,9 +143,8 @@ class TestOxenUploadE2E:
         # Import dependencies
         sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-        from generation.config_schema import SimulationConfig
-        from generation.vertical_generator import VerticalGenerator
         from generation.templates.loader import TemplateLoader
+        from generation.vertical_generator import VerticalGenerator
         from oxen_integration import OxenClient
 
         # Use different repo name for vertical test
@@ -155,10 +156,7 @@ class TestOxenUploadE2E:
         base_config = TemplateLoader().load_template("showcase/jefferson_dinner")
 
         expanded = generator.generate_temporal_depth(
-            base_config=base_config,
-            before_count=3,
-            after_count=3,
-            strategy="progressive_training"
+            base_config=base_config, before_count=3, after_count=3, strategy="progressive_training"
         )
 
         stats = generator.get_generation_stats()
@@ -168,9 +166,7 @@ class TestOxenUploadE2E:
         # Step 2: Initialize Oxen client
         print("\n🔐 Step 2: Initializing Oxen client...")
         client = OxenClient(
-            namespace=test_namespace,
-            repo_name=vertical_repo_name,
-            interactive_auth=False
+            namespace=test_namespace, repo_name=vertical_repo_name, interactive_auth=False
         )
 
         print(f"✅ Client initialized for {test_namespace}/{vertical_repo_name}")
@@ -180,7 +176,7 @@ class TestOxenUploadE2E:
         result = generator.export_to_oxen(
             config=expanded,
             oxen_client=client,
-            commit_message="E2E test: Temporal expansion (Jefferson dinner)"
+            commit_message="E2E test: Temporal expansion (Jefferson dinner)",
         )
 
         print(f"\n{result}")
@@ -215,10 +211,7 @@ class TestOxenUploadE2E:
         from oxen_integration import OxenClient
 
         print("\n🔐 Testing authentication...")
-        client = OxenClient(
-            namespace=test_namespace,
-            interactive_auth=False
-        )
+        client = OxenClient(namespace=test_namespace, interactive_auth=False)
 
         # Verify authentication works
         is_authenticated = client.authenticate()
