@@ -8,7 +8,9 @@ without errors. Does NOT run the simulations (saves cost).
 Usage:
     python validate_corporate_templates.py
 """
+
 import sys
+
 from generation.templates.loader import TemplateLoader
 
 
@@ -27,6 +29,7 @@ def validate_template(name: str, loader: TemplateLoader):
     except Exception as e:
         print(f"  {name:40s} - ERROR: {str(e)[:80]}")
         return False
+
 
 def main():
     print("=" * 80)
@@ -53,7 +56,7 @@ def main():
     failed = total - passed
 
     print(f"Total templates: {total}")
-    print(f"Passed: {passed} ({passed/total*100:.1f}%)")
+    print(f"Passed: {passed} ({passed / total * 100:.1f}%)")
     print(f"Failed: {failed}")
 
     if failed == 0:
@@ -68,6 +71,7 @@ def main():
         print("FAILURE: Some templates failed validation")
         print("Fix errors above before running full tests")
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

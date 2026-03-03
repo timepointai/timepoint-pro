@@ -4,18 +4,19 @@ Call Logging - Comprehensive logging of LLM calls with metadata tracking
 Handles session management, cost tracking, and debug payload logging.
 """
 
-from typing import Dict, Any, Optional
-from dataclasses import dataclass, field, asdict
-from datetime import datetime
-from pathlib import Path
 import json
 import logging
 import uuid
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
+from pathlib import Path
+from typing import Any
 
 # Import run_id tracking for integration with metadata system
 try:
     from metadata.tracking import get_current_run_id
 except ImportError:
+
     def get_current_run_id():
         return None
 
@@ -23,24 +24,25 @@ except ImportError:
 @dataclass
 class CallMetadata:
     """Metadata for an LLM call"""
+
     timestamp: str
     session_id: str
-    run_id: Optional[str]  # ADDED: Integration with e2e run tracking
+    run_id: str | None  # ADDED: Integration with e2e run tracking
     call_type: str
     model: str
-    parameters: Dict[str, Any]
-    tokens_used: Dict[str, int]  # prompt, completion, total
+    parameters: dict[str, Any]
+    tokens_used: dict[str, int]  # prompt, completion, total
     cost_usd: float
     latency_ms: float
     success: bool
     retry_count: int
-    error: Optional[str] = None
+    error: str | None = None
 
     # Debug payloads (optional, controlled by log level)
-    system_prompt: Optional[str] = None
-    user_prompt: Optional[str] = None
-    response_full: Optional[str] = None
-    response_parsed: Optional[Any] = None
+    system_prompt: str | None = None
+    user_prompt: str | None = None
+    response_full: str | None = None
+    response_parsed: Any | None = None
 
 
 class CallLogger:
@@ -86,7 +88,7 @@ class CallLogger:
         self.logger.setLevel(logging.INFO)
 
         # Session tracking
-        self.current_session: Optional[SessionContext] = None
+        self.current_session: SessionContext | None = None
         self.call_count = 0
         self.total_cost = 0.0
         self.total_tokens = 0
@@ -95,17 +97,17 @@ class CallLogger:
         self,
         call_type: str,
         model: str,
-        parameters: Dict[str, Any],
-        tokens_used: Dict[str, int],
+        parameters: dict[str, Any],
+        tokens_used: dict[str, int],
         cost_usd: float,
         latency_ms: float,
         success: bool,
         retry_count: int = 0,
-        error: Optional[str] = None,
-        system_prompt: Optional[str] = None,
-        user_prompt: Optional[str] = None,
-        response_full: Optional[str] = None,
-        response_parsed: Optional[Any] = None,
+        error: str | None = None,
+        system_prompt: str | None = None,
+        user_prompt: str | None = None,
+        response_full: str | None = None,
+        response_parsed: Any | None = None,
     ) -> None:
         """
         Log an LLM call with metadata and optional debug payloads.
@@ -168,7 +170,7 @@ class CallLogger:
         # Update statistics
         self.call_count += 1
         self.total_cost += cost_usd
-        self.total_tokens += tokens_used.get('total', 0)
+        self.total_tokens += tokens_used.get("total", 0)
 
         # Update session statistics
         if self.current_session:
@@ -187,7 +189,7 @@ class CallLogger:
         self,
         workflow: str = "unknown",
         user: str = "system",
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: dict[str, Any] | None = None,
     ) -> str:
         """
         Start a new logging session.
@@ -207,13 +209,13 @@ class CallLogger:
             workflow=workflow,
             user=user,
             started_at=datetime.now().isoformat(),
-            metadata=metadata or {}
+            metadata=metadata or {},
         )
 
         self.logger.info(f"📝 Started session {session_id} for workflow '{workflow}'")
         return session_id
 
-    def end_session(self) -> Optional[Dict[str, Any]]:
+    def end_session(self) -> dict[str, Any] | None:
         """
         End the current session and return statistics.
 
@@ -243,7 +245,7 @@ class CallLogger:
         self.current_session = None
         return summary
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get cumulative logging statistics"""
         return {
             "total_calls": self.call_count,
@@ -252,7 +254,7 @@ class CallLogger:
             "active_session": self.current_session.session_id if self.current_session else None,
         }
 
-    def _truncate(self, text: Optional[str], max_chars: int) -> Optional[str]:
+    def _truncate(self, text: str | None, max_chars: int) -> str | None:
         """Truncate text to max characters"""
         if not text or self.log_level == "full":
             return text
@@ -273,9 +275,9 @@ class CallLogger:
 
         # Convert to dict and write
         try:
-            with open(log_file, 'a') as f:
+            with open(log_file, "a") as f:
                 json_line = json.dumps(asdict(metadata), default=str)
-                f.write(json_line + '\n')
+                f.write(json_line + "\n")
         except Exception as e:
             self.logger.error(f"Failed to write log file: {e}")
 
@@ -283,10 +285,11 @@ class CallLogger:
 @dataclass
 class SessionContext:
     """Context for a logging session"""
+
     session_id: str
     workflow: str
     user: str
     started_at: str
     calls_count: int = 0
     total_cost: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)

@@ -20,19 +20,19 @@ Usage:
     python test_paid_mode_stairstep.py --mode paid --start-level 5
 """
 
+import argparse
+import concurrent.futures
+import json
 import os
 import sys
 import time
-import argparse
-import concurrent.futures
-from typing import List, Tuple
 from datetime import datetime
-import json
 from pathlib import Path
 
-from llm import LLMClient, RateLimiter
+from llm import LLMClient
 from schemas import Entity
 from tensor_initialization import _extract_json_from_response
+
 
 def create_test_entity(entity_id: str) -> Entity:
     """Create a minimal test entity for load testing."""
@@ -42,10 +42,13 @@ def create_test_entity(entity_id: str) -> Entity:
         role="test",
         description=f"Test entity {entity_id} for load testing",
         background="",
-        entity_metadata={}
+        entity_metadata={},
     )
 
-def test_llm_call(llm_client: LLMClient, entity_id: str = "test_entity_0") -> Tuple[bool, float, str]:
+
+def test_llm_call(
+    llm_client: LLMClient, entity_id: str = "test_entity_0"
+) -> tuple[bool, float, str]:
     """
     Make a single LLM call and return (success, duration, error_msg).
 
@@ -67,7 +70,7 @@ IMPORTANT: Return ONLY valid JSON, no explanation."""
             model=llm_client.default_model,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3,
-            max_tokens=200
+            max_tokens=200,
         )
 
         content = response["choices"][0]["message"]["content"]
@@ -83,21 +86,20 @@ IMPORTANT: Return ONLY valid JSON, no explanation."""
         duration = time.time() - start_time
         return (False, duration, str(e))
 
+
 def run_concurrency_level(
-    llm_client: LLMClient,
-    concurrency: int,
-    num_calls: int = 10
-) -> Tuple[int, int, float, List[float]]:
+    llm_client: LLMClient, concurrency: int, num_calls: int = 10
+) -> tuple[int, int, float, list[float]]:
     """
     Run a batch of calls at specific concurrency level.
 
     Returns:
         (successes, failures, avg_duration, durations)
     """
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Testing concurrency level: {concurrency}")
     print(f"Total calls: {num_calls}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     successes = 0
     failures = 0
@@ -119,11 +121,11 @@ def run_concurrency_level(
 
             if success:
                 successes += 1
-                print(f"  ✅ Call {i+1}/{num_calls}: {duration:.2f}s")
+                print(f"  ✅ Call {i + 1}/{num_calls}: {duration:.2f}s")
             else:
                 failures += 1
                 errors.append(error)
-                print(f"  ❌ Call {i+1}/{num_calls}: FAILED after {duration:.2f}s")
+                print(f"  ❌ Call {i + 1}/{num_calls}: FAILED after {duration:.2f}s")
                 print(f"     Error: {error[:100]}")
 
     elapsed = time.time() - start_time
@@ -131,7 +133,7 @@ def run_concurrency_level(
     avg_duration = sum(durations) / len(durations) if durations else 0
     throughput = num_calls / elapsed
 
-    print(f"\n📊 Results:")
+    print("\n📊 Results:")
     print(f"   Successes: {successes}/{num_calls} ({success_rate:.1f}%)")
     print(f"   Failures: {failures}")
     print(f"   Avg duration: {avg_duration:.2f}s")
@@ -140,12 +142,13 @@ def run_concurrency_level(
 
     if errors:
         unique_errors = set(errors)
-        print(f"\n⚠️  Error types:")
+        print("\n⚠️  Error types:")
         for error in unique_errors:
             count = errors.count(error)
             print(f"     - {error[:80]} ({count}x)")
 
     return (successes, failures, avg_duration, durations)
+
 
 def main():
     parser = argparse.ArgumentParser(description="Stairstep load testing for paid mode")
@@ -153,31 +156,20 @@ def main():
         "--mode",
         choices=["free", "paid"],
         default="paid",
-        help="Rate limit mode (free or paid, DEFAULT: paid)"
+        help="Rate limit mode (free or paid, DEFAULT: paid)",
+    )
+    parser.add_argument("--start-level", type=int, default=1, help="Starting concurrency level")
+    parser.add_argument(
+        "--max-level", type=int, default=20, help="Maximum concurrency level to test"
     )
     parser.add_argument(
-        "--start-level",
-        type=int,
-        default=1,
-        help="Starting concurrency level"
-    )
-    parser.add_argument(
-        "--max-level",
-        type=int,
-        default=20,
-        help="Maximum concurrency level to test"
-    )
-    parser.add_argument(
-        "--calls-per-level",
-        type=int,
-        default=10,
-        help="Number of calls to test at each level"
+        "--calls-per-level", type=int, default=10, help="Number of calls to test at each level"
     )
     parser.add_argument(
         "--success-threshold",
         type=float,
         default=0.95,
-        help="Success rate threshold to advance (0.95 = 95%%)"
+        help="Success rate threshold to advance (0.95 = 95%%)",
     )
 
     args = parser.parse_args()
@@ -208,10 +200,7 @@ def main():
 
     # Create LLM client with specified mode
     llm_client = LLMClient(
-        api_key=api_key,
-        mode=args.mode,
-        max_requests_per_minute=max_rpm,
-        burst_size=burst
+        api_key=api_key, mode=args.mode, max_requests_per_minute=max_rpm, burst_size=burst
     )
 
     # Track results
@@ -221,25 +210,25 @@ def main():
 
     while current_level <= args.max_level:
         successes, failures, avg_duration, durations = run_concurrency_level(
-            llm_client,
-            concurrency=current_level,
-            num_calls=args.calls_per_level
+            llm_client, concurrency=current_level, num_calls=args.calls_per_level
         )
 
         success_rate = successes / args.calls_per_level
 
-        results.append({
-            "concurrency": current_level,
-            "successes": successes,
-            "failures": failures,
-            "success_rate": success_rate,
-            "avg_duration": avg_duration,
-            "mode": args.mode
-        })
+        results.append(
+            {
+                "concurrency": current_level,
+                "successes": successes,
+                "failures": failures,
+                "success_rate": success_rate,
+                "avg_duration": avg_duration,
+                "mode": args.mode,
+            }
+        )
 
         # Decision: advance or stop
         if success_rate >= args.success_threshold:
-            print(f"\n✅ Level {current_level}: STABLE ({success_rate*100:.1f}% success)")
+            print(f"\n✅ Level {current_level}: STABLE ({success_rate * 100:.1f}% success)")
             max_stable_level = current_level
 
             # Advance to next level (increment by 1 for paid, more conservative for free)
@@ -248,7 +237,7 @@ def main():
             else:
                 current_level += 1  # Slower ramp for free
         else:
-            print(f"\n❌ Level {current_level}: UNSTABLE ({success_rate*100:.1f}% success)")
+            print(f"\n❌ Level {current_level}: UNSTABLE ({success_rate * 100:.1f}% success)")
             print(f"   Max stable level found: {max_stable_level}")
             break
 
@@ -260,30 +249,37 @@ def main():
     print(f"📈 LOAD TEST SUMMARY - {args.mode.upper()} MODE")
     print("=" * 80)
     print(f"Maximum stable concurrency: {max_stable_level}")
-    print(f"\nResults by concurrency level:")
+    print("\nResults by concurrency level:")
     for r in results:
         status = "✅" if r["success_rate"] >= args.success_threshold else "❌"
-        print(f"  {status} Level {r['concurrency']:2d}: {r['success_rate']*100:5.1f}% success, {r['avg_duration']:.2f}s avg")
+        print(
+            f"  {status} Level {r['concurrency']:2d}: {r['success_rate'] * 100:5.1f}% success, {r['avg_duration']:.2f}s avg"
+        )
 
     # Save results
     log_file = Path(f"logs/load_test_{args.mode}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
     log_file.parent.mkdir(exist_ok=True)
     with open(log_file, "w") as f:
-        json.dump({
-            "mode": args.mode,
-            "max_stable_level": max_stable_level,
-            "results": results,
-            "config": {
-                "max_rpm": max_rpm,
-                "burst": burst,
-                "success_threshold": args.success_threshold
-            }
-        }, f, indent=2)
+        json.dump(
+            {
+                "mode": args.mode,
+                "max_stable_level": max_stable_level,
+                "results": results,
+                "config": {
+                    "max_rpm": max_rpm,
+                    "burst": burst,
+                    "success_threshold": args.success_threshold,
+                },
+            },
+            f,
+            indent=2,
+        )
 
     print(f"\n📄 Results saved to: {log_file}")
     print("=" * 80)
 
     return max_stable_level
+
 
 if __name__ == "__main__":
     max_level = main()

@@ -5,23 +5,20 @@ Tests registration, evaluation, divergence calculation, report aggregation,
 and synth event emission — all without LLM/DB dependencies.
 """
 
-import pytest
-from datetime import datetime, timezone, timedelta
-from unittest.mock import patch, MagicMock
+from datetime import datetime, timedelta, timezone
+from unittest.mock import MagicMock, patch
 
 from synth.fidelity_envelope import (
-    ADPRSEnvelope,
     ADPRSComposite,
+    ADPRSEnvelope,
     FidelityBand,
 )
 from synth.shadow_evaluator import (
     ShadowEvaluator,
-    ShadowRecord,
-    ShadowEvaluationReport,
 )
 
-
 # --- Helpers ---
+
 
 def make_t0() -> datetime:
     return datetime(2025, 1, 1, tzinfo=timezone.utc)
@@ -33,8 +30,13 @@ def make_evaluator(run_id: str = "test_run") -> ShadowEvaluator:
 
 def make_simple_envelope(**overrides) -> ADPRSEnvelope:
     defaults = dict(
-        A=1.0, D=1000.0, P=1.0, R=0, S=1.0,
-        t0="2025-01-01T00:00:00+00:00", baseline=0.0,
+        A=1.0,
+        D=1000.0,
+        P=1.0,
+        R=0,
+        S=1.0,
+        t0="2025-01-01T00:00:00+00:00",
+        baseline=0.0,
     )
     defaults.update(overrides)
     return ADPRSEnvelope(**defaults)
@@ -45,6 +47,7 @@ def make_composite(*envelopes) -> ADPRSComposite:
 
 
 # --- Registration ---
+
 
 class TestRegistration:
     def test_register_entity_envelopes(self):
@@ -58,8 +61,15 @@ class TestRegistration:
         metadata = {
             "adprs_envelopes": {
                 "envelopes": [
-                    {"A": 0.7, "D": 1000.0, "P": 2.0, "R": 0, "S": 0.8,
-                     "t0": "2025-01-01T00:00:00+00:00", "baseline": 0.1}
+                    {
+                        "A": 0.7,
+                        "D": 1000.0,
+                        "P": 2.0,
+                        "R": 0,
+                        "S": 0.8,
+                        "t0": "2025-01-01T00:00:00+00:00",
+                        "baseline": 0.1,
+                    }
                 ]
             }
         }
@@ -78,6 +88,7 @@ class TestRegistration:
 
 
 # --- Evaluation ---
+
 
 class TestEvaluation:
     def test_entity_without_envelopes_returns_none(self):
@@ -138,6 +149,7 @@ class TestEvaluation:
 
 # --- Report aggregation ---
 
+
 class TestReport:
     def test_empty_report(self):
         ev = make_evaluator()
@@ -189,6 +201,7 @@ class TestReport:
 
 # --- Event emission ---
 
+
 class TestEventEmission:
     def test_emits_envelope_phase_change_on_evaluate(self):
         """Shadow evaluation should emit ENVELOPE_PHASE_CHANGE event."""
@@ -206,6 +219,7 @@ class TestEventEmission:
         mock_emitter.emit.assert_called_once()
         call_args = mock_emitter.emit.call_args
         from synth.events import SynthEvent
+
         assert call_args[0][0] == SynthEvent.ENVELOPE_PHASE_CHANGE
         event_data = call_args[0][2]
         assert event_data["shadow_mode"] is True
@@ -218,10 +232,12 @@ class TestEventEmission:
 
 # --- Report JSON persistence ---
 
+
 class TestReportPersistence:
     def test_to_json_dict(self):
         """Report should serialize to a JSON-safe dict with summary + records."""
         import json
+
         ev = make_evaluator()
         env = make_simple_envelope()
         ev.register_entity_envelopes("e1", make_composite(env))

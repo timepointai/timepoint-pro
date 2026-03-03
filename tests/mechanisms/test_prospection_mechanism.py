@@ -10,15 +10,16 @@ from pathlib import Path
 # Add the project root to the Python path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from schemas import Entity, Timepoint, ProspectiveState, Expectation
+from schemas import Entity, Expectation, ProspectiveState, Timepoint
+from validation import validate_prospection_consistency, validate_prospection_energy_impact
 from workflows import (
     compute_anxiety_from_expectations,
     estimate_energy_cost_for_preparation,
     generate_prospective_state,
     influence_behavior_from_expectations,
-    update_forecast_accuracy
+    update_forecast_accuracy,
 )
-from validation import validate_prospection_consistency, validate_prospection_energy_impact
+
 
 def test_anxiety_calculation():
     """Test anxiety calculation from expectations"""
@@ -30,14 +31,14 @@ def test_anxiety_calculation():
             predicted_event="Routine continues normally",
             subjective_probability=0.8,
             desired_outcome=True,
-            confidence=0.9
+            confidence=0.9,
         ),
         Expectation(
             predicted_event="Minor inconvenience",
             subjective_probability=0.2,
             desired_outcome=False,
-            confidence=0.7
-        )
+            confidence=0.7,
+        ),
     ]
 
     low_anxiety = compute_anxiety_from_expectations(low_risk_expectations)
@@ -49,14 +50,14 @@ def test_anxiety_calculation():
             predicted_event="Major crisis",
             subjective_probability=0.5,  # High uncertainty
             desired_outcome=False,  # Undesired outcome
-            confidence=0.3  # Low confidence
+            confidence=0.3,  # Low confidence
         ),
         Expectation(
             predicted_event="Desired outcome fails",
             subjective_probability=0.7,  # High probability of bad outcome
             desired_outcome=False,  # Undesired outcome
-            confidence=0.6
-        )
+            confidence=0.6,
+        ),
     ]
 
     high_anxiety = compute_anxiety_from_expectations(high_risk_expectations)
@@ -64,10 +65,13 @@ def test_anxiety_calculation():
 
     # Assertions
     assert low_anxiety < 0.3, f"Low-risk expectations should have low anxiety, got {low_anxiety}"
-    assert high_anxiety > 0.4, f"High-risk expectations should have high anxiety, got {high_anxiety}"
-    assert high_anxiety > low_anxiety, f"High-risk should have more anxiety than low-risk"
+    assert high_anxiety > 0.4, (
+        f"High-risk expectations should have high anxiety, got {high_anxiety}"
+    )
+    assert high_anxiety > low_anxiety, "High-risk should have more anxiety than low-risk"
 
     print("✅ Anxiety calculation tests passed!")
+
 
 def test_energy_cost_estimation():
     """Test energy cost estimation for preparation actions"""
@@ -89,15 +93,13 @@ def test_energy_cost_estimation():
 
     print("✅ Energy cost estimation tests passed!")
 
+
 def test_prospective_state_generation():
     """Test prospective state generation"""
     print("\n🧪 Testing prospective state generation...")
 
     # Create test entity and timepoint
-    entity = Entity(
-        entity_id="washington",
-        entity_type="person"
-    )
+    entity = Entity(entity_id="washington", entity_type="person")
     entity.entity_metadata = {
         "knowledge_state": ["constitution_ratified", "cabinet_formed", "inauguration_approaching"]
     }
@@ -105,7 +107,7 @@ def test_prospective_state_generation():
     timepoint = Timepoint(
         timepoint_id="test_tp",
         timestamp=datetime(1789, 4, 20),  # Just before inauguration
-        event_description="Washington preparing for inauguration ceremony"
+        event_description="Washington preparing for inauguration ceremony",
     )
 
     # Mock LLM for testing
@@ -118,15 +120,15 @@ def test_prospective_state_generation():
                     subjective_probability=0.8,
                     desired_outcome=True,
                     preparation_actions=["prepare_speech", "coordinate_ceremony"],
-                    confidence=0.9
+                    confidence=0.9,
                 ),
                 Expectation(
                     predicted_event="Public unrest",
                     subjective_probability=0.2,
                     desired_outcome=False,
                     preparation_actions=["increase_security", "prepare_contingencies"],
-                    confidence=0.6
-                )
+                    confidence=0.6,
+                ),
             ]
 
     llm = MockLLM()
@@ -140,10 +142,15 @@ def test_prospective_state_generation():
 
     # Assertions
     assert len(prospective_state.expectations) > 0, "Should generate expectations"
-    assert 0 <= prospective_state.anxiety_level <= 1, f"Anxiety should be 0-1, got {prospective_state.anxiety_level}"
-    assert prospective_state.prospective_id.startswith("prospect_washington"), f"ID should start with prospect_washington, got {prospective_state.prospective_id}"
+    assert 0 <= prospective_state.anxiety_level <= 1, (
+        f"Anxiety should be 0-1, got {prospective_state.anxiety_level}"
+    )
+    assert prospective_state.prospective_id.startswith("prospect_washington"), (
+        f"ID should start with prospect_washington, got {prospective_state.prospective_id}"
+    )
 
     print("✅ Prospective state generation tests passed!")
+
 
 def test_behavior_influence():
     """Test how expectations influence entity behavior"""
@@ -153,14 +160,9 @@ def test_behavior_influence():
     entity = Entity(
         entity_id="test_entity",
         entity_metadata={
-            "cognitive_tensor": {
-                "energy_budget": 100.0,
-                "emotional_valence": 0.5
-            },
-            "behavior_tensor": {
-                "risk_tolerance": 0.8
-            }
-        }
+            "cognitive_tensor": {"energy_budget": 100.0, "emotional_valence": 0.5},
+            "behavior_tensor": {"risk_tolerance": 0.8},
+        },
     )
 
     # Create prospective state with high anxiety and preparation actions
@@ -170,7 +172,7 @@ def test_behavior_influence():
             subjective_probability=0.6,
             desired_outcome=False,
             preparation_actions=["prepare_speech", "gather_information", "seek_allies"],
-            confidence=0.5
+            confidence=0.5,
         )
     ]
 
@@ -180,7 +182,9 @@ def test_behavior_influence():
         timepoint_id="test_tp",
         expectations=[exp.model_dump() for exp in expectations],
         anxiety_level=0.9,  # High anxiety
-        contingency_plans={"Major challenge": ["prepare_speech", "gather_information", "seek_allies"]}
+        contingency_plans={
+            "Major challenge": ["prepare_speech", "gather_information", "seek_allies"]
+        },
     )
 
     # Apply behavior influence
@@ -203,22 +207,20 @@ def test_behavior_influence():
 
     print("✅ Behavior influence tests passed!")
 
+
 def test_forecast_accuracy_update():
     """Test forecast accuracy updating"""
     print("\n🧪 Testing forecast accuracy update...")
 
     # Create entity with initial forecast confidence
-    entity = Entity(
-        entity_id="test_entity",
-        entity_metadata={"forecast_confidence": 0.8}
-    )
+    entity = Entity(entity_id="test_entity", entity_metadata={"forecast_confidence": 0.8})
 
     # Test accurate prediction (should maintain/increase confidence)
     expectation = Expectation(
         predicted_event="Good outcome",
         subjective_probability=0.7,
         desired_outcome=True,
-        confidence=0.8
+        confidence=0.8,
     )
 
     # Accurate positive prediction
@@ -232,10 +234,12 @@ def test_forecast_accuracy_update():
         predicted_event="Bad outcome",
         subjective_probability=0.8,  # High confidence in wrong prediction
         desired_outcome=True,
-        confidence=0.9
+        confidence=0.9,
     )
 
-    updated_entity2 = update_forecast_accuracy(updated_entity, expectation_bad, actual_outcome=False)
+    updated_entity2 = update_forecast_accuracy(
+        updated_entity, expectation_bad, actual_outcome=False
+    )
     updated_conf2 = updated_entity2.entity_metadata.get("forecast_confidence", 0.8)
     print(f"  Inaccurate prediction: {updated_conf:.3f} → {updated_conf2:.3f}")
 
@@ -243,6 +247,7 @@ def test_forecast_accuracy_update():
     assert updated_conf2 < updated_conf, "Inaccurate prediction should reduce confidence"
 
     print("✅ Forecast accuracy update tests passed!")
+
 
 def test_prospection_validation():
     """Test prospection validation"""
@@ -254,14 +259,14 @@ def test_prospection_validation():
             predicted_event="Normal day",
             subjective_probability=0.7,
             desired_outcome=True,
-            confidence=0.8
+            confidence=0.8,
         ),
         Expectation(
             predicted_event="Unexpected event",
             subjective_probability=0.02,  # Very low probability
             desired_outcome=False,
-            confidence=0.9  # High confidence but low probability
-        )
+            confidence=0.9,  # High confidence but low probability
+        ),
     ]
 
     prospective_state = ProspectiveState(
@@ -269,7 +274,7 @@ def test_prospection_validation():
         entity_id="test_entity",
         timepoint_id="test_tp",
         expectations=[exp.model_dump() for exp in expectations],
-        anxiety_level=0.3
+        anxiety_level=0.3,
     )
 
     # Test consistency validation
@@ -287,6 +292,7 @@ def test_prospection_validation():
     print(f"  Energy impact validation: {energy_result['message']}")
 
     print("✅ Prospection validation tests passed!")
+
 
 def main():
     """Run all prospection mechanism tests"""
@@ -312,8 +318,10 @@ def main():
     except Exception as e:
         print(f"\n❌ Test failed: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

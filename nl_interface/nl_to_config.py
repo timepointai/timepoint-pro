@@ -5,14 +5,13 @@ Uses LLM (Llama 405B via OpenRouter) to convert natural language descriptions
 into validated SimulationConfig objects with confidence scoring and error recovery.
 """
 
-from typing import Dict, Any, Optional, Tuple
 import json
+from typing import Any
+
 import httpx
-from .config_validator import ConfigValidator, SimulationConfig, ValidationResult
-from .prompts import (
-    build_config_generation_prompt,
-    build_error_recovery_prompt
-)
+
+from .config_validator import ConfigValidator, ValidationResult
+from .prompts import build_config_generation_prompt, build_error_recovery_prompt
 
 
 class NLConfigGenerator:
@@ -37,11 +36,11 @@ class NLConfigGenerator:
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
         model: str = "meta-llama/llama-3.1-405b-instruct",
         fallback_model: str = "meta-llama/llama-3.1-70b-instruct",
         temperature: float = 0.7,
-        max_retries: int = 3
+        max_retries: int = 3,
     ):
         """
         Initialize NL config generator.
@@ -64,10 +63,8 @@ class NLConfigGenerator:
         self.mock_mode = api_key is None
 
     def generate_config(
-        self,
-        description: str,
-        context: Optional[Dict[str, Any]] = None
-    ) -> Tuple[Dict[str, Any], float]:
+        self, description: str, context: dict[str, Any] | None = None
+    ) -> tuple[dict[str, Any], float]:
         """
         Generate configuration from natural language description.
 
@@ -91,7 +88,7 @@ class NLConfigGenerator:
         for attempt in range(self.max_retries):
             try:
                 # Adjust temperature on retries
-                temp = self.temperature * (0.5 ** attempt)  # 0.7 → 0.35 → 0.175
+                temp = self.temperature * (0.5**attempt)  # 0.7 → 0.35 → 0.175
 
                 # Call LLM
                 response = self._call_llm(prompt, temperature=temp)
@@ -105,22 +102,19 @@ class NLConfigGenerator:
 
                 # If validation failed, try error recovery
                 if attempt < self.max_retries - 1:
-                    prompt = self._build_recovery_prompt(
-                        description, config_dict, validation
-                    )
+                    prompt = self._build_recovery_prompt(description, config_dict, validation)
                     continue
 
             except json.JSONDecodeError:
                 if attempt < self.max_retries - 1:
-                    prompt = build_error_recovery_prompt(
-                        "invalid_json",
-                        description=description
-                    )
+                    prompt = build_error_recovery_prompt("invalid_json", description=description)
                     continue
 
             except Exception as e:
                 if attempt >= self.max_retries - 1:
-                    raise ValueError(f"Config generation failed after {self.max_retries} attempts: {e}")
+                    raise ValueError(
+                        f"Config generation failed after {self.max_retries} attempts: {e}"
+                    )
 
         # If we get here, all retries failed
         raise ValueError(
@@ -148,9 +142,7 @@ class NLConfigGenerator:
 
         payload = {
             "model": self.model,
-            "messages": [
-                {"role": "user", "content": prompt}
-            ],
+            "messages": [{"role": "user", "content": prompt}],
             "temperature": temperature,
             "max_tokens": 2000,
         }
@@ -161,7 +153,7 @@ class NLConfigGenerator:
         result = response.json()
         return result["choices"][0]["message"]["content"]
 
-    def _parse_response(self, response: str) -> Dict[str, Any]:
+    def _parse_response(self, response: str) -> dict[str, Any]:
         """
         Parse LLM response into config dictionary.
 
@@ -185,10 +177,7 @@ class NLConfigGenerator:
         return json.loads(response)
 
     def _build_recovery_prompt(
-        self,
-        description: str,
-        config_dict: Dict[str, Any],
-        validation: ValidationResult
+        self, description: str, config_dict: dict[str, Any], validation: ValidationResult
     ) -> str:
         """
         Build error recovery prompt based on validation errors.
@@ -208,35 +197,29 @@ class NLConfigGenerator:
             if "temporal_mode" in error_msg:
                 mode = config_dict.get("temporal_mode", "unknown")
                 return build_error_recovery_prompt(
-                    "invalid_temporal_mode",
-                    mode=mode,
-                    description=description
+                    "invalid_temporal_mode", mode=mode, description=description
                 )
 
             if "Entity count" in error_msg:
                 count = len(config_dict.get("entities", []))
                 return build_error_recovery_prompt(
-                    "too_many_entities",
-                    count=count,
-                    description=description
+                    "too_many_entities", count=count, description=description
                 )
 
             if "Timepoint count" in error_msg:
                 count = config_dict.get("timepoint_count", 0)
                 return build_error_recovery_prompt(
-                    "too_many_timepoints",
-                    count=count,
-                    description=description
+                    "too_many_timepoints", count=count, description=description
                 )
 
         # Generic error recovery
         return build_error_recovery_prompt(
             "missing_required_fields",
             missing_fields=", ".join(validation.errors),
-            description=description
+            description=description,
         )
 
-    def _generate_mock_config(self, description: str) -> Tuple[Dict[str, Any], float]:
+    def _generate_mock_config(self, description: str) -> tuple[dict[str, Any], float]:
         """
         Generate mock configuration (for testing without API key).
 
@@ -252,7 +235,11 @@ class NLConfigGenerator:
         entity_count = 3
 
         # Try to extract entity count from patterns like "5 executives", "10 delegates", etc.
-        entity_match = re.search(r'(\d+)\s+(?:people|entities|participants|members|delegates|astronauts|executives)', description, re.IGNORECASE)
+        entity_match = re.search(
+            r"(\d+)\s+(?:people|entities|participants|members|delegates|astronauts|executives)",
+            description,
+            re.IGNORECASE,
+        )
         if entity_match:
             entity_count = int(entity_match.group(1))
         elif "five" in description.lower():
@@ -265,7 +252,7 @@ class NLConfigGenerator:
         timepoint_count = 5
 
         # Try to extract timepoint count
-        timepoint_match = re.search(r'(\d+)\s+timepoints?', description, re.IGNORECASE)
+        timepoint_match = re.search(r"(\d+)\s+timepoints?", description, re.IGNORECASE)
         if timepoint_match:
             timepoint_count = int(timepoint_match.group(1))
         elif "ten timepoints" in description.lower():
@@ -280,18 +267,17 @@ class NLConfigGenerator:
         config = {
             "scenario": description[:50] + "..." if len(description) > 50 else description,
             "entities": [
-                {"name": f"Entity {i+1}", "role": "Participant"}
-                for i in range(entity_count)
+                {"name": f"Entity {i + 1}", "role": "Participant"} for i in range(entity_count)
             ],
             "timepoint_count": timepoint_count,
             "temporal_mode": "forward",
             "focus": focus,
-            "outputs": ["dialog", "decisions"]
+            "outputs": ["dialog", "decisions"],
         }
 
         return config, 0.8  # Mock confidence
 
-    def validate_config(self, config_dict: Dict[str, Any]) -> ValidationResult:
+    def validate_config(self, config_dict: dict[str, Any]) -> ValidationResult:
         """
         Validate configuration dictionary.
 

@@ -5,7 +5,7 @@ Contains system prompts, few-shot examples, and error recovery prompts
 for converting natural language descriptions into SimulationConfig objects.
 """
 
-from typing import Dict, Any
+from typing import Any
 
 # System prompt for config generation
 SYSTEM_PROMPT = """You are a configuration generator for the Timepoint-Pro temporal simulation system.
@@ -48,14 +48,14 @@ FEW_SHOT_EXAMPLES = [
                 {"name": "Michael Roberts", "role": "Board Chair"},
                 {"name": "Jennifer Park", "role": "VC Representative"},
                 {"name": "David Kim", "role": "Independent Director"},
-                {"name": "Lisa Anderson", "role": "Finance Director"}
+                {"name": "Lisa Anderson", "role": "Finance Director"},
             ],
             "timepoint_count": 5,
             "temporal_mode": "forward",
             "focus": ["dialog", "decision_making", "relationships"],
             "outputs": ["dialog", "decisions", "relationships"],
-            "resolution_mode": "progressive"
-        }
+            "resolution_mode": "progressive",
+        },
     },
     {
         "input": "The Constitutional Convention of 1787. 10 key delegates, focus on debate and compromise. I want to see the evolution of ideas over 15 sessions.",
@@ -71,15 +71,15 @@ FEW_SHOT_EXAMPLES = [
                 {"name": "Edmund Randolph", "role": "Virginia Delegate"},
                 {"name": "George Mason", "role": "Virginia Delegate"},
                 {"name": "William Paterson", "role": "New Jersey Delegate"},
-                {"name": "Charles Pinckney", "role": "South Carolina Delegate"}
+                {"name": "Charles Pinckney", "role": "South Carolina Delegate"},
             ],
             "timepoint_count": 15,
             "start_time": "1787-05-25T10:00:00",
             "temporal_mode": "forward",
             "focus": ["dialog", "decision_making", "knowledge_propagation"],
             "outputs": ["dialog", "decisions", "knowledge_flow"],
-            "resolution_mode": "progressive"
-        }
+            "resolution_mode": "progressive",
+        },
     },
     {
         "input": "Apollo 13 crisis. 3 astronauts and flight director Gene Kranz. Model stress and decision-making under pressure. 10 timepoints from explosion to splashdown.",
@@ -89,15 +89,15 @@ FEW_SHOT_EXAMPLES = [
                 {"name": "Jim Lovell", "role": "Commander"},
                 {"name": "Jack Swigert", "role": "Command Module Pilot"},
                 {"name": "Fred Haise", "role": "Lunar Module Pilot"},
-                {"name": "Gene Kranz", "role": "Flight Director"}
+                {"name": "Gene Kranz", "role": "Flight Director"},
             ],
             "timepoint_count": 10,
             "start_time": "1970-04-13T19:00:00",
             "temporal_mode": "forward",
             "focus": ["decision_making", "stress_responses", "dialog"],
             "outputs": ["dialog", "decisions"],
-            "resolution_mode": "progressive"
-        }
+            "resolution_mode": "progressive",
+        },
     },
     {
         "input": "Paul Revere's midnight ride. Include his horse. Focus on movement and alerts spreading.",
@@ -107,7 +107,7 @@ FEW_SHOT_EXAMPLES = [
                 {"name": "Paul Revere", "role": "Messenger"},
                 {"name": "Brown Beauty", "role": "Horse"},
                 {"name": "Samuel Adams", "role": "Patriot Leader"},
-                {"name": "John Hancock", "role": "Patriot Leader"}
+                {"name": "John Hancock", "role": "Patriot Leader"},
             ],
             "timepoint_count": 8,
             "start_time": "1775-04-18T22:00:00",
@@ -115,8 +115,8 @@ FEW_SHOT_EXAMPLES = [
             "focus": ["knowledge_propagation"],
             "outputs": ["knowledge_flow"],
             "animism_level": 2,
-            "resolution_mode": "progressive"
-        }
+            "resolution_mode": "progressive",
+        },
     },
     {
         "input": "Generate 50 variations of a job interview scenario with different personality types.",
@@ -124,7 +124,7 @@ FEW_SHOT_EXAMPLES = [
             "scenario": "Job Interview Variations",
             "entities": [
                 {"name": "Alex Morgan", "role": "Interviewer"},
-                {"name": "Jordan Smith", "role": "Candidate"}
+                {"name": "Jordan Smith", "role": "Candidate"},
             ],
             "timepoint_count": 3,
             "temporal_mode": "forward",
@@ -133,10 +133,11 @@ FEW_SHOT_EXAMPLES = [
             "generation_mode": "horizontal",
             "variation_count": 50,
             "variation_strategy": "personality",
-            "resolution_mode": "tensor_only"
-        }
-    }
+            "resolution_mode": "tensor_only",
+        },
+    },
 ]
+
 
 # Format few-shot examples as prompt text
 def format_few_shot_examples() -> str:
@@ -149,9 +150,10 @@ def format_few_shot_examples() -> str:
     return examples_text
 
 
-def format_json_for_prompt(obj: Dict[str, Any]) -> str:
+def format_json_for_prompt(obj: dict[str, Any]) -> str:
     """Format JSON object for inclusion in prompt"""
     import json
+
     return json.dumps(obj, indent=2)
 
 
@@ -178,7 +180,6 @@ ERROR_RECOVERY_PROMPTS = {
 Try again with this description: {description}
 
 Remember: Return ONLY the JSON object.""",
-
     "missing_required_fields": """The previous response was missing required fields: {missing_fields}
 
 All configurations must include:
@@ -190,7 +191,6 @@ All configurations must include:
 - outputs (list of strings)
 
 Try again with this description: {description}""",
-
     "invalid_temporal_mode": """The temporal_mode "{mode}" is invalid. Must be one of:
 - forward (standard causal, for historical realism)
 - directorial (narrative-driven, for dramatic coherence)
@@ -199,18 +199,16 @@ Try again with this description: {description}""",
 - portal (backward inference from fixed endpoint to origin)
 
 Try again with this description: {description}""",
-
     "too_many_entities": """The configuration has {count} entities, but the maximum is 100.
 
 Please reduce the entity count to a reasonable number (typically 3-20 for detailed simulations, or fewer with higher entity counts for broader scenarios).
 
 Try again with this description: {description}""",
-
     "too_many_timepoints": """The configuration has {count} timepoints, but the maximum is 100.
 
 Please reduce to a reasonable number (typically 3-20 timepoints).
 
-Try again with this description: {description}"""
+Try again with this description: {description}""",
 }
 
 
@@ -238,7 +236,7 @@ CLARIFICATION_PROMPTS = {
     "missing_focus": "What aspects should the simulation focus on? (Choose one or more: dialog, decision_making, relationships, stress_responses, knowledge_propagation)",
     "missing_time_period": "What time period is this scenario set in? (e.g., '1787', 'modern day', '1970s')",
     "ambiguous_scenario": "Can you provide more details about the scenario? (e.g., setting, goals, key conflicts)",
-    "missing_outputs": "What outputs do you want from the simulation? (Choose one or more: dialog, decisions, relationships, knowledge_flow)"
+    "missing_outputs": "What outputs do you want from the simulation? (Choose one or more: dialog, decisions, relationships, knowledge_flow)",
 }
 
 
@@ -252,4 +250,6 @@ def get_clarification_question(missing_field: str) -> str:
     Returns:
         Clarification question
     """
-    return CLARIFICATION_PROMPTS.get(missing_field, f"Please provide more information about: {missing_field}")
+    return CLARIFICATION_PROMPTS.get(
+        missing_field, f"Please provide more information about: {missing_field}"
+    )

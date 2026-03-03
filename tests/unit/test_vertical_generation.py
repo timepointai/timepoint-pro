@@ -4,20 +4,20 @@ Tests for Vertical Data Generation (Sprint 1.3)
 Tests temporal expansion strategies and vertical generation.
 """
 
-import pytest
-import tempfile
 import json
+import tempfile
 from pathlib import Path
 
-from generation.vertical_generator import VerticalGenerator
+import pytest
+
+from generation.templates.loader import TemplateLoader
 from generation.temporal_expansion import (
-    TemporalExpander,
+    CausalChainExpansion,
     NarrativeArcExpansion,
     ProgressiveTrainingExpansion,
-    CausalChainExpansion
+    TemporalExpander,
 )
-from generation.config_schema import SimulationConfig
-from generation.templates.loader import TemplateLoader
+from generation.vertical_generator import VerticalGenerator
 
 _loader = TemplateLoader()
 
@@ -128,10 +128,7 @@ class TestTemporalExpander:
         base_config = _loader.load_template("showcase/board_meeting")
 
         expanded = expander.expand_temporal_depth(
-            base_config,
-            strategy="progressive_training",
-            before_count=3,
-            after_count=2
+            base_config, strategy="progressive_training", before_count=3, after_count=2
         )
 
         assert expanded.timepoints.before_count == 3
@@ -172,11 +169,7 @@ class TestTemporalExpander:
         expander = TemporalExpander()
         base_config = _loader.load_template("showcase/board_meeting")
 
-        expanded = expander.expand_temporal_depth(
-            base_config,
-            before_count=0,
-            after_count=0
-        )
+        expanded = expander.expand_temporal_depth(base_config, before_count=0, after_count=0)
 
         assert expanded.timepoints.before_count == 0
         assert expanded.timepoints.after_count == 0
@@ -187,11 +180,7 @@ class TestTemporalExpander:
         base_config = _loader.load_template("showcase/board_meeting")
 
         with pytest.raises(ValueError, match="Unknown strategy"):
-            expander.expand_temporal_depth(
-                base_config,
-                strategy="invalid_strategy",
-                before_count=5
-            )
+            expander.expand_temporal_depth(base_config, strategy="invalid_strategy", before_count=5)
 
     def test_expander_available_strategies(self):
         """Test getting available strategies"""
@@ -212,11 +201,7 @@ class TestVerticalGenerator:
         generator = VerticalGenerator()
         base_config = _loader.load_template("showcase/jefferson_dinner")
 
-        expanded = generator.generate_temporal_depth(
-            base_config,
-            before_count=5,
-            after_count=5
-        )
+        expanded = generator.generate_temporal_depth(base_config, before_count=5, after_count=5)
 
         # Original had before_count=2, after_count=2
         # We're setting it to 5, 5
@@ -258,11 +243,7 @@ class TestVerticalGenerator:
         generator = VerticalGenerator()
         base_config = _loader.load_template("showcase/board_meeting")
 
-        generator.generate_temporal_depth(
-            base_config,
-            before_count=5,
-            after_count=3
-        )
+        generator.generate_temporal_depth(base_config, before_count=5, after_count=3)
 
         stats = generator.get_generation_stats()
         assert stats["timepoints_added_before"] == 5
@@ -276,10 +257,7 @@ class TestVerticalGenerator:
         base_config = _loader.load_template("showcase/board_meeting")
 
         generator.generate_temporal_depth(
-            base_config,
-            before_count=10,
-            after_count=10,
-            strategy="progressive_training"
+            base_config, before_count=10, after_count=10, strategy="progressive_training"
         )
 
         stats = generator.get_generation_stats()
@@ -301,10 +279,7 @@ class TestVerticalGenerator:
 
         # Expand with causal chain strategy
         expanded = generator.generate_temporal_depth(
-            base_config,
-            before_count=5,
-            after_count=3,
-            strategy="causal_chain"
+            base_config, before_count=5, after_count=3, strategy="causal_chain"
         )
 
         validation = generator.validate_causal_chain(expanded)
@@ -319,10 +294,7 @@ class TestVerticalGenerator:
         base_config = _loader.load_template("showcase/board_meeting")
 
         expanded = generator.generate_temporal_depth(
-            base_config,
-            before_count=5,
-            after_count=3,
-            strategy="progressive_training"
+            base_config, before_count=5, after_count=3, strategy="progressive_training"
         )
 
         analysis = generator.analyze_resolution_schedule(expanded)
@@ -337,11 +309,7 @@ class TestVerticalGenerator:
         generator = VerticalGenerator()
         base_config = _loader.load_template("showcase/board_meeting")
 
-        comparison = generator.compare_strategies(
-            base_config,
-            before_count=5,
-            after_count=3
-        )
+        comparison = generator.compare_strategies(base_config, before_count=5, after_count=3)
 
         assert len(comparison) == 3
         assert "narrative_arc" in comparison
@@ -358,20 +326,17 @@ class TestVerticalGenerator:
         base_config = _loader.load_template("showcase/board_meeting")
 
         expanded = generator.generate_temporal_depth(
-            base_config,
-            before_count=5,
-            after_count=3,
-            strategy="progressive_training"
+            base_config, before_count=5, after_count=3, strategy="progressive_training"
         )
 
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as f:
             temp_path = f.name
 
         try:
             generator.export_temporal_structure(expanded, temp_path, format="json")
 
             # Verify file exists and is valid JSON
-            with open(temp_path, 'r') as f:
+            with open(temp_path) as f:
                 data = json.load(f)
                 assert "total_timepoints" in data
                 assert data["total_timepoints"] == base_config.timepoints.count + 5 + 3
@@ -392,10 +357,7 @@ class TestVerticalGenerationIntegration:
 
         # Expand with progressive training
         expanded = generator.generate_temporal_depth(
-            base_config,
-            before_count=5,
-            after_count=5,
-            strategy="progressive_training"
+            base_config, before_count=5, after_count=5, strategy="progressive_training"
         )
 
         # Verify expansion
@@ -423,10 +385,7 @@ class TestVerticalGenerationIntegration:
 
         for strategy in strategies:
             expanded = generator.generate_temporal_depth(
-                base_config,
-                before_count=3,
-                after_count=2,
-                strategy=strategy
+                base_config, before_count=3, after_count=2, strategy=strategy
             )
 
             assert expanded.timepoints.before_count == 3
@@ -439,10 +398,7 @@ class TestVerticalGenerationIntegration:
         base_config = _loader.load_template("showcase/board_meeting")
 
         expanded = generator.generate_temporal_depth(
-            base_config,
-            before_count=20,
-            after_count=20,
-            strategy="progressive_training"
+            base_config, before_count=20, after_count=20, strategy="progressive_training"
         )
 
         assert expanded.timepoints.before_count == 20

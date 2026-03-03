@@ -5,27 +5,27 @@ Tests the archetype system that uses the REAL Timepoint tensor pipeline
 for generating tensors, not hardcoded values.
 """
 
-import pytest
 import tempfile
-import numpy as np
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
+
+import numpy as np
+import pytest
 
 from retrieval.archetype_seeds import (
-    ArchetypeSeed,
     ALL_ARCHETYPES,
     CORPORATE_ARCHETYPES,
     DETECTIVE_ARCHETYPES,
+    GENERIC_ARCHETYPES,
     HISTORICAL_ARCHETYPES,
     MEDICAL_ARCHETYPES,
-    GENERIC_ARCHETYPES,
-    get_archetype_by_id,
-    get_archetypes_by_category,
     archetype_to_tensor,
     create_archetype_entity,
+    get_archetype_by_id,
+    get_archetypes_by_category,
     get_best_archetype_match,
 )
-from schemas import TTMTensor, Entity
+from schemas import Entity, TTMTensor
 from tensor_persistence import TensorDatabase
 
 
@@ -35,7 +35,7 @@ class TestArchetypeSeedStructure:
     def test_all_archetypes_have_required_fields(self):
         """Test that all archetypes have required fields."""
         for archetype in ALL_ARCHETYPES:
-            assert archetype.archetype_id, f"Missing archetype_id"
+            assert archetype.archetype_id, "Missing archetype_id"
             assert archetype.name, f"Missing name for {archetype.archetype_id}"
             assert archetype.description, f"Missing description for {archetype.archetype_id}"
             assert archetype.category, f"Missing category for {archetype.archetype_id}"
@@ -96,11 +96,11 @@ class TestArchetypeCollections:
     def test_all_archetypes_aggregation(self):
         """Test that ALL_ARCHETYPES contains all collections."""
         total = (
-            len(CORPORATE_ARCHETYPES) +
-            len(DETECTIVE_ARCHETYPES) +
-            len(HISTORICAL_ARCHETYPES) +
-            len(MEDICAL_ARCHETYPES) +
-            len(GENERIC_ARCHETYPES)
+            len(CORPORATE_ARCHETYPES)
+            + len(DETECTIVE_ARCHETYPES)
+            + len(HISTORICAL_ARCHETYPES)
+            + len(MEDICAL_ARCHETYPES)
+            + len(GENERIC_ARCHETYPES)
         )
         assert len(ALL_ARCHETYPES) == total
 
@@ -206,28 +206,20 @@ class TestBestArchetypeMatch:
 
     def test_match_ceo_by_role(self):
         """Test matching CEO by role keyword."""
-        match = get_best_archetype_match(
-            role="CEO",
-            entity_type="human"
-        )
+        match = get_best_archetype_match(role="CEO", entity_type="human")
         assert match is not None
         assert "ceo" in match.archetype_id.lower() or "executive" in match.name.lower()
 
     def test_match_detective_by_role(self):
         """Test matching Detective by role keyword."""
-        match = get_best_archetype_match(
-            role="Detective",
-            entity_type="human"
-        )
+        match = get_best_archetype_match(role="Detective", entity_type="human")
         assert match is not None
         assert "detective" in match.archetype_id.lower()
 
     def test_match_by_description(self):
         """Test matching by description keywords."""
         match = get_best_archetype_match(
-            role="unknown",
-            entity_type="human",
-            description="investigator who observes and deduces"
+            role="unknown", entity_type="human", description="investigator who observes and deduces"
         )
         assert match is not None
         # Should match detective or forensic expert
@@ -235,13 +227,15 @@ class TestBestArchetypeMatch:
     def test_no_match_returns_none_or_generic(self):
         """Test that poor matches return None or generic."""
         match = get_best_archetype_match(
-            role="xyz123",
-            entity_type="object",
-            description="completely unrelated"
+            role="xyz123", entity_type="object", description="completely unrelated"
         )
         # Should either be None or a weak generic match
         if match is not None:
-            assert match.archetype_id in ["archetype_neutral", "archetype_follower", "archetype_leader"]
+            assert match.archetype_id in [
+                "archetype_neutral",
+                "archetype_follower",
+                "archetype_leader",
+            ]
 
 
 class TestArchetypeSpecifics:
@@ -270,11 +264,9 @@ class TestArchetypeSpecifics:
 class TestTensorGenerationMocked:
     """Tests for tensor generation through real pipeline (mocked)."""
 
-    @patch('tensor_initialization.populate_tensor_llm_guided')
-    @patch('tensor_initialization.create_baseline_tensor')
-    def test_generate_archetype_tensor_calls_pipeline(
-        self, mock_baseline, mock_populate
-    ):
+    @patch("tensor_initialization.populate_tensor_llm_guided")
+    @patch("tensor_initialization.create_baseline_tensor")
+    def test_generate_archetype_tensor_calls_pipeline(self, mock_baseline, mock_populate):
         """Test that generate_archetype_tensor calls the real pipeline."""
         from retrieval.archetype_seeds import generate_archetype_tensor
 
@@ -283,7 +275,7 @@ class TestTensorGenerationMocked:
         mock_tensor.to_arrays.return_value = (
             np.array([0.5] * 8),
             np.array([0.5] * 4),
-            np.array([0.5] * 8)
+            np.array([0.5] * 8),
         )
         mock_baseline.return_value = mock_tensor
         mock_populate.return_value = (mock_tensor, 0.65)
@@ -298,11 +290,9 @@ class TestTensorGenerationMocked:
         mock_baseline.assert_called_once()
         mock_populate.assert_called_once()
 
-    @patch('tensor_initialization.populate_tensor_llm_guided')
-    @patch('tensor_initialization.create_baseline_tensor')
-    def test_generate_falls_back_on_error(
-        self, mock_baseline, mock_populate
-    ):
+    @patch("tensor_initialization.populate_tensor_llm_guided")
+    @patch("tensor_initialization.create_baseline_tensor")
+    def test_generate_falls_back_on_error(self, mock_baseline, mock_populate):
         """Test that generation falls back to baseline on error."""
         from retrieval.archetype_seeds import generate_archetype_tensor
 
@@ -311,7 +301,7 @@ class TestTensorGenerationMocked:
         mock_tensor.to_arrays.return_value = (
             np.array([0.5] * 8),
             np.array([0.5] * 4),
-            np.array([0.5] * 8)
+            np.array([0.5] * 8),
         )
         mock_baseline.return_value = mock_tensor
 
@@ -331,7 +321,7 @@ class TestTensorGenerationMocked:
 class TestSeedDatabaseMocked:
     """Tests for database seeding (mocked LLM calls)."""
 
-    @patch('retrieval.archetype_seeds.generate_archetype_tensor')
+    @patch("retrieval.archetype_seeds.generate_archetype_tensor")
     def test_seed_database_creates_records(self, mock_generate):
         """Test that seeding creates tensor records in database."""
         from retrieval.archetype_seeds import seed_database_with_archetypes
@@ -341,7 +331,7 @@ class TestSeedDatabaseMocked:
         mock_tensor.to_arrays.return_value = (
             np.array([0.5] * 8, dtype=np.float32),
             np.array([0.5] * 4, dtype=np.float32),
-            np.array([0.5] * 8, dtype=np.float32)
+            np.array([0.5] * 8, dtype=np.float32),
         )
         mock_generate.return_value = (mock_tensor, 0.65)
 
@@ -357,7 +347,7 @@ class TestSeedDatabaseMocked:
                 llm_client=mock_llm,
                 archetypes=CORPORATE_ARCHETYPES[:2],
                 world_id="test_seeds",
-                verbose=False
+                verbose=False,
             )
 
             assert seeded == 2
@@ -366,7 +356,7 @@ class TestSeedDatabaseMocked:
             tensors = db.list_tensors()
             assert len(tensors) >= 2
 
-    @patch('retrieval.archetype_seeds.generate_archetype_tensor')
+    @patch("retrieval.archetype_seeds.generate_archetype_tensor")
     def test_seed_database_skips_existing(self, mock_generate):
         """Test that seeding skips existing archetypes."""
         from retrieval.archetype_seeds import seed_database_with_archetypes
@@ -376,7 +366,7 @@ class TestSeedDatabaseMocked:
         mock_tensor.to_arrays.return_value = (
             np.array([0.5] * 8, dtype=np.float32),
             np.array([0.5] * 4, dtype=np.float32),
-            np.array([0.5] * 8, dtype=np.float32)
+            np.array([0.5] * 8, dtype=np.float32),
         )
         mock_generate.return_value = (mock_tensor, 0.65)
 
@@ -392,20 +382,20 @@ class TestSeedDatabaseMocked:
                 llm_client=mock_llm,
                 archetypes=CORPORATE_ARCHETYPES[:2],
                 world_id="test_seeds",
-                verbose=False
+                verbose=False,
             )
             seeded2 = seed_database_with_archetypes(
                 tensor_db=db,
                 llm_client=mock_llm,
                 archetypes=CORPORATE_ARCHETYPES[:2],
                 world_id="test_seeds",
-                verbose=False
+                verbose=False,
             )
 
             assert seeded1 == 2
             assert seeded2 == 0  # Already exists
 
-    @patch('retrieval.archetype_seeds.generate_archetype_tensor')
+    @patch("retrieval.archetype_seeds.generate_archetype_tensor")
     def test_seed_database_regenerate_flag(self, mock_generate):
         """Test that regenerate flag forces regeneration."""
         from retrieval.archetype_seeds import seed_database_with_archetypes
@@ -415,7 +405,7 @@ class TestSeedDatabaseMocked:
         mock_tensor.to_arrays.return_value = (
             np.array([0.5] * 8, dtype=np.float32),
             np.array([0.5] * 4, dtype=np.float32),
-            np.array([0.5] * 8, dtype=np.float32)
+            np.array([0.5] * 8, dtype=np.float32),
         )
         mock_generate.return_value = (mock_tensor, 0.65)
 
@@ -431,7 +421,7 @@ class TestSeedDatabaseMocked:
                 llm_client=mock_llm,
                 archetypes=CORPORATE_ARCHETYPES[:1],
                 world_id="test_seeds",
-                verbose=False
+                verbose=False,
             )
 
             # Seed again with regenerate=True
@@ -441,7 +431,7 @@ class TestSeedDatabaseMocked:
                 archetypes=CORPORATE_ARCHETYPES[:1],
                 world_id="test_seeds",
                 regenerate=True,
-                verbose=False
+                verbose=False,
             )
 
             assert seeded1 == 1

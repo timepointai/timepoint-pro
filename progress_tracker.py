@@ -7,21 +7,25 @@ Designed for run_all_mechanism_tests.py and related simulation workflows.
 
 import threading
 import time
-from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Any
-from datetime import datetime, timedelta
 from collections import deque
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any
 
 try:
-    from colorama import Fore, Back, Style, init as colorama_init
+    from colorama import Back, Fore, Style
+    from colorama import init as colorama_init
+
     colorama_init(autoreset=True)
     COLORS_AVAILABLE = True
 except ImportError:
     COLORS_AVAILABLE = False
+
     # Fallback: empty strings if colorama not available
     class FallbackColors:
         def __getattr__(self, name):
             return ""
+
     Fore = FallbackColors()
     Back = FallbackColors()
     Style = FallbackColors()
@@ -30,24 +34,26 @@ except ImportError:
 @dataclass
 class PhaseInfo:
     """Information about a simulation phase."""
+
     name: str
     total_steps: int
     completed_steps: int = 0
-    start_time: Optional[float] = None
-    end_time: Optional[float] = None
+    start_time: float | None = None
+    end_time: float | None = None
 
 
 @dataclass
 class JobProgress:
     """Track progress of a single job/template."""
+
     name: str
     total_phases: int = 0
     completed_phases: int = 0
-    current_phase: Optional[str] = None
-    start_time: Optional[float] = None
-    end_time: Optional[float] = None
+    current_phase: str | None = None
+    start_time: float | None = None
+    end_time: float | None = None
     status: str = "pending"  # pending, running, success, failed
-    error: Optional[str] = None
+    error: str | None = None
 
 
 class ProgressTracker:
@@ -77,10 +83,10 @@ class ProgressTracker:
 
         # Thread-safe state
         self._lock = threading.Lock()
-        self._jobs: Dict[str, JobProgress] = {}
-        self._completed_jobs: List[str] = []
-        self._failed_jobs: List[str] = []
-        self._current_job: Optional[str] = None
+        self._jobs: dict[str, JobProgress] = {}
+        self._completed_jobs: list[str] = []
+        self._failed_jobs: list[str] = []
+        self._current_job: str | None = None
 
         # Timing for ETA
         self._start_time = time.time()
@@ -95,14 +101,13 @@ class ProgressTracker:
         """Mark a job as started."""
         with self._lock:
             self._jobs[name] = JobProgress(
-                name=name,
-                total_phases=total_phases,
-                start_time=time.time(),
-                status="running"
+                name=name, total_phases=total_phases, start_time=time.time(), status="running"
             )
             self._current_job = name
 
-    def update_phase(self, phase_name: str, current: int = 0, total: int = 0, job_name: Optional[str] = None):
+    def update_phase(
+        self, phase_name: str, current: int = 0, total: int = 0, job_name: str | None = None
+    ):
         """Update the current phase progress."""
         with self._lock:
             job = job_name or self._current_job
@@ -113,8 +118,14 @@ class ProgressTracker:
                 if current > 0:
                     self._jobs[job].completed_phases = current
 
-    def complete_job(self, name: str, success: bool = True, error: Optional[str] = None,
-                     cost: float = 0.0, tokens: int = 0):
+    def complete_job(
+        self,
+        name: str,
+        success: bool = True,
+        error: str | None = None,
+        cost: float = 0.0,
+        tokens: int = 0,
+    ):
         """Mark a job as completed."""
         with self._lock:
             if name in self._jobs:
@@ -145,7 +156,7 @@ class ProgressTracker:
             self._total_cost += cost
             self._total_tokens += tokens
 
-    def get_progress(self) -> Dict[str, Any]:
+    def get_progress(self) -> dict[str, Any]:
         """Get current progress state."""
         with self._lock:
             completed = len(self._completed_jobs)
@@ -269,9 +280,13 @@ class ProgressTracker:
         width = 70
         print()
         print(f"{Fore.CYAN}{'═' * width}{Style.RESET_ALL}")
-        print(f"{Fore.CYAN}║{Style.RESET_ALL} {Fore.WHITE}{Style.BRIGHT}{title.center(width-4)}{Style.RESET_ALL} {Fore.CYAN}║{Style.RESET_ALL}")
+        print(
+            f"{Fore.CYAN}║{Style.RESET_ALL} {Fore.WHITE}{Style.BRIGHT}{title.center(width - 4)}{Style.RESET_ALL} {Fore.CYAN}║{Style.RESET_ALL}"
+        )
         print(f"{Fore.CYAN}{'═' * width}{Style.RESET_ALL}")
-        print(f"{Fore.WHITE}{Style.DIM}Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Jobs: {self.total_jobs}{Style.RESET_ALL}")
+        print(
+            f"{Fore.WHITE}{Style.DIM}Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Jobs: {self.total_jobs}{Style.RESET_ALL}"
+        )
         print()
 
     def print_summary(self):
@@ -286,7 +301,9 @@ class ProgressTracker:
         width = 70
         print()
         print(f"{Fore.CYAN}{'═' * width}{Style.RESET_ALL}")
-        print(f"{Fore.CYAN}║{Style.RESET_ALL} {Fore.WHITE}{Style.BRIGHT}{'SIMULATION COMPLETE'.center(width-4)}{Style.RESET_ALL} {Fore.CYAN}║{Style.RESET_ALL}")
+        print(
+            f"{Fore.CYAN}║{Style.RESET_ALL} {Fore.WHITE}{Style.BRIGHT}{'SIMULATION COMPLETE'.center(width - 4)}{Style.RESET_ALL} {Fore.CYAN}║{Style.RESET_ALL}"
+        )
         print(f"{Fore.CYAN}{'═' * width}{Style.RESET_ALL}")
 
         # Success rate
@@ -391,7 +408,9 @@ class PhaseTracker:
         else:
             status = f"{Fore.RED}✗{Style.RESET_ALL}"
 
-        phase_display = self.current_phase.replace("_", " ").title() if self.current_phase else "Phase"
+        phase_display = (
+            self.current_phase.replace("_", " ").title() if self.current_phase else "Phase"
+        )
         print(f"  {status} {phase_display} complete {Style.DIM}({duration_str}){Style.RESET_ALL}")
 
         self.current_phase = None

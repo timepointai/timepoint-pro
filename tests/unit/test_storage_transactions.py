@@ -4,18 +4,19 @@ Tests for GraphStore transaction support.
 Verifies atomic commit/rollback behavior for database operations.
 """
 
-import pytest
 import uuid
 from datetime import datetime
 
+import pytest
+
+from schemas import Entity, ExposureEvent, ResolutionLevel, Timepoint
 from storage import GraphStore, TransactionContext
-from schemas import Entity, Timepoint, ExposureEvent, ResolutionLevel
 
 
 @pytest.fixture
 def store():
     """Create an in-memory database for testing"""
-    db_url = f"sqlite:///:memory:"
+    db_url = "sqlite:///:memory:"
     return GraphStore(db_url=db_url)
 
 
@@ -27,7 +28,7 @@ def sample_entity():
         entity_type="human",
         timepoint="t1",
         resolution_level=ResolutionLevel.SCENE,
-        entity_metadata={"name": "Test Person", "role": "tester"}
+        entity_metadata={"name": "Test Person", "role": "tester"},
     )
 
 
@@ -37,7 +38,7 @@ def sample_timepoint():
     return Timepoint(
         timepoint_id=f"test_tp_{uuid.uuid4().hex[:8]}",
         timestamp=datetime.now(),
-        event_description="Test event"
+        event_description="Test event",
     )
 
 
@@ -49,7 +50,7 @@ def sample_exposure_event(sample_entity, sample_timepoint):
         event_type="witnessed",  # Required field
         timestamp=sample_timepoint.timestamp,
         information="Test information",
-        source="test_source"
+        source="test_source",
     )
 
 
@@ -84,19 +85,17 @@ class TestTransactionContext:
             entity_type="human",
             timepoint="t1",
             resolution_level=ResolutionLevel.SCENE,
-            entity_metadata={"name": "Person 1"}
+            entity_metadata={"name": "Person 1"},
         )
         entity2 = Entity(
             entity_id=entity2_id,
             entity_type="human",
             timepoint="t1",
             resolution_level=ResolutionLevel.SCENE,
-            entity_metadata={"name": "Person 2"}
+            entity_metadata={"name": "Person 2"},
         )
         timepoint = Timepoint(
-            timepoint_id=tp_id,
-            timestamp=datetime.now(),
-            event_description="Multi-save test"
+            timepoint_id=tp_id, timestamp=datetime.now(), event_description="Multi-save test"
         )
 
         with store.transaction() as tx:
@@ -120,7 +119,7 @@ class TestTransactionRollback:
             entity_type="human",
             timepoint="t1",
             resolution_level=ResolutionLevel.SCENE,
-            entity_metadata={"name": "Should Not Exist"}
+            entity_metadata={"name": "Should Not Exist"},
         )
 
         with pytest.raises(ValueError, match="Intentional error"):
@@ -139,14 +138,14 @@ class TestTransactionRollback:
             entity_type="human",
             timepoint="t1",
             resolution_level=ResolutionLevel.SCENE,
-            entity_metadata={"name": "Partial 1"}
+            entity_metadata={"name": "Partial 1"},
         )
         entity2 = Entity(
             entity_id=f"partial2_{uuid.uuid4().hex[:8]}",
             entity_type="human",
             timepoint="t1",
             resolution_level=ResolutionLevel.SCENE,
-            entity_metadata={"name": "Partial 2"}
+            entity_metadata={"name": "Partial 2"},
         )
 
         with pytest.raises(RuntimeError, match="Oops"):
@@ -198,7 +197,7 @@ class TestTransactionSaveMethods:
                 event_type="learned",  # Required field
                 timestamp=datetime.now(),
                 information=f"Batch info {i}",
-                source="batch_test"
+                source="batch_test",
             )
             for i in range(3)
         ]
@@ -225,7 +224,7 @@ class TestMixedOperations:
             entity_type="human",
             timepoint="t2",  # Changed timepoint
             resolution_level=ResolutionLevel.DIALOG,  # Changed resolution
-            entity_metadata={"name": "Updated Person", "role": "updated"}
+            entity_metadata={"name": "Updated Person", "role": "updated"},
         )
 
         with store.transaction() as tx:

@@ -12,12 +12,10 @@ Usage:
     python3.10 mechanism_dashboard.py
 """
 
-import os
 import json
 import subprocess
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 # Mechanism definitions
 MECHANISMS = {
@@ -50,22 +48,22 @@ TEST_FILES = {
 }
 
 
-def find_track_mechanism_decorators() -> Dict[str, List[Tuple[str, int, str]]]:
+def find_track_mechanism_decorators() -> dict[str, list[tuple[str, int, str]]]:
     """Find all @track_mechanism decorator usages"""
     decorators = {}
 
     cmd = ["grep", "-rn", "@track_mechanism", "--include=*.py", "."]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, cwd=Path.cwd())
-        for line in result.stdout.strip().split('\n'):
-            if not line or 'venv' in line or '.venv' in line:
+        for line in result.stdout.strip().split("\n"):
+            if not line or "venv" in line or ".venv" in line:
                 continue
 
-            parts = line.split(':')
+            parts = line.split(":")
             if len(parts) >= 3:
                 file_path = parts[0]
                 line_num = parts[1]
-                content = ':'.join(parts[2:]).strip()
+                content = ":".join(parts[2:]).strip()
 
                 # Extract mechanism ID from decorator
                 if '"M' in content:
@@ -79,7 +77,7 @@ def find_track_mechanism_decorators() -> Dict[str, List[Tuple[str, int, str]]]:
     return decorators
 
 
-def get_test_results() -> Dict[str, Dict]:
+def get_test_results() -> dict[str, dict]:
     """Get test results from recent test execution logs"""
     test_results = {}
 
@@ -93,22 +91,26 @@ def get_test_results() -> Dict[str, Dict]:
 
             for log_file in log_dir.glob("*.json"):
                 try:
-                    with open(log_file, 'r') as f:
+                    with open(log_file) as f:
                         data = json.load(f)
-                        if 'files' in data:
-                            files_data = data.get('files', {})
+                        if "files" in data:
+                            files_data = data.get("files", {})
                             # Handle both dict (new) and list (legacy) formats
                             if isinstance(files_data, dict):
                                 for file_path, file_info in files_data.items():
                                     if test_file in file_path:
-                                        log_time = datetime.fromisoformat(file_info.get('modified', ''))
+                                        log_time = datetime.fromisoformat(
+                                            file_info.get("modified", "")
+                                        )
                                         if latest_time is None or log_time > latest_time:
                                             latest_time = log_time
                                             latest_result = file_info
                             elif isinstance(files_data, list):
                                 for file_data in files_data:
-                                    if test_file in file_data.get('filename', ''):
-                                        log_time = datetime.fromisoformat(file_data.get('modified', ''))
+                                    if test_file in file_data.get("filename", ""):
+                                        log_time = datetime.fromisoformat(
+                                            file_data.get("modified", "")
+                                        )
                                         if latest_time is None or log_time > latest_time:
                                             latest_time = log_time
                                             latest_result = file_data
@@ -147,8 +149,12 @@ def print_dashboard():
 
     print("📊 OVERALL STATUS")
     print("─" * 100)
-    print(f"  Mechanisms with @track_mechanism: {tracked_count}/{total_count} ({tracked_count/total_count*100:.1f}%)")
-    print(f"  Mechanisms with pytest tests:     {tested_count}/{total_count} ({tested_count/total_count*100:.1f}%)")
+    print(
+        f"  Mechanisms with @track_mechanism: {tracked_count}/{total_count} ({tracked_count / total_count * 100:.1f}%)"
+    )
+    print(
+        f"  Mechanisms with pytest tests:     {tested_count}/{total_count} ({tested_count / total_count * 100:.1f}%)"
+    )
     print()
 
     # Test pass rates
@@ -158,15 +164,17 @@ def print_dashboard():
         total_passed = 0
         total_tests = 0
         for mech_id, result in sorted(test_results.items()):
-            outcomes = result.get('outcomes', {})
-            passed = outcomes.get('passed', 0)
-            failed = outcomes.get('failed', 0)
+            outcomes = result.get("outcomes", {})
+            passed = outcomes.get("passed", 0)
+            failed = outcomes.get("failed", 0)
             total = passed + failed
             total_passed += passed
             total_tests += total
             pass_rate = (passed / total * 100) if total > 0 else 0
             status_icon = "✅" if pass_rate == 100 else "⚠️" if pass_rate >= 90 else "❌"
-            print(f"  {status_icon} {mech_id:4} {MECHANISMS[mech_id]['name']:45} {passed:2}/{total:2} ({pass_rate:5.1f}%)")
+            print(
+                f"  {status_icon} {mech_id:4} {MECHANISMS[mech_id]['name']:45} {passed:2}/{total:2} ({pass_rate:5.1f}%)"
+            )
 
         overall_pass_rate = (total_passed / total_tests * 100) if total_tests > 0 else 0
         print(f"\n  {'OVERALL':52} {total_passed:2}/{total_tests:2} ({overall_pass_rate:5.1f}%)")
@@ -187,9 +195,9 @@ def print_dashboard():
             # Determine overall status
             if mech_id in decorators and mech_id in test_results:
                 result = test_results[mech_id]
-                outcomes = result.get('outcomes', {})
-                passed = outcomes.get('passed', 0)
-                failed = outcomes.get('failed', 0)
+                outcomes = result.get("outcomes", {})
+                passed = outcomes.get("passed", 0)
+                failed = outcomes.get("failed", 0)
                 total = passed + failed
                 pass_rate = (passed / total * 100) if total > 0 else 0
                 if pass_rate == 100:

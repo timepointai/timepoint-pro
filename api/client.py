@@ -27,12 +27,13 @@ Usage:
     usage = client.get_usage()
 """
 
+import logging
 import os
 import time
-import logging
-from typing import Optional, List, Dict, Any, Union
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
+
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -44,31 +45,35 @@ logger = logging.getLogger(__name__)
 # Data Classes
 # ============================================================================
 
+
 @dataclass
 class SimulationRequest:
     """Request to create a single simulation."""
+
     template_id: str
     entity_count: int = 3
     timepoint_count: int = 5
-    custom_scenario: Optional[str] = None
-    custom_entities: Optional[List[Dict[str, Any]]] = None
-    parameters: Optional[Dict[str, Any]] = None
+    custom_scenario: str | None = None
+    custom_entities: list[dict[str, Any]] | None = None
+    parameters: dict[str, Any] | None = None
 
 
 @dataclass
 class BatchRequest:
     """Request to create a batch of simulations."""
-    simulations: List[SimulationRequest]
-    budget_cap_usd: Optional[float] = None
+
+    simulations: list[SimulationRequest]
+    budget_cap_usd: float | None = None
     priority: str = "normal"  # "low", "normal", "high"
     fail_fast: bool = False
     parallel_jobs: int = 4
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: dict[str, Any] | None = None
 
 
 @dataclass
 class BatchProgress:
     """Progress information for a batch."""
+
     total_jobs: int
     pending_jobs: int
     running_jobs: int
@@ -81,31 +86,33 @@ class BatchProgress:
 @dataclass
 class BatchCost:
     """Cost information for a batch."""
+
     estimated_cost_usd: float
     actual_cost_usd: float
-    budget_cap_usd: Optional[float]
-    budget_remaining_usd: Optional[float]
+    budget_cap_usd: float | None
+    budget_remaining_usd: float | None
     tokens_used: int
 
 
 @dataclass
 class BatchResponse:
     """Response from batch operations."""
+
     batch_id: str
     status: str
     created_at: datetime
-    started_at: Optional[datetime]
-    completed_at: Optional[datetime]
+    started_at: datetime | None
+    completed_at: datetime | None
     priority: str
     fail_fast: bool
     progress: BatchProgress
     cost: BatchCost
-    job_ids: List[str]
-    error_message: Optional[str]
+    job_ids: list[str]
+    error_message: str | None
     owner_id: str
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "BatchResponse":
+    def from_dict(cls, data: dict[str, Any]) -> "BatchResponse":
         """Create BatchResponse from API response dict."""
         progress = BatchProgress(**data.get("progress", {}))
         cost = BatchCost(**data.get("cost", {}))
@@ -114,8 +121,12 @@ class BatchResponse:
             batch_id=data["batch_id"],
             status=data["status"],
             created_at=datetime.fromisoformat(data["created_at"].replace("Z", "+00:00")),
-            started_at=datetime.fromisoformat(data["started_at"].replace("Z", "+00:00")) if data.get("started_at") else None,
-            completed_at=datetime.fromisoformat(data["completed_at"].replace("Z", "+00:00")) if data.get("completed_at") else None,
+            started_at=datetime.fromisoformat(data["started_at"].replace("Z", "+00:00"))
+            if data.get("started_at")
+            else None,
+            completed_at=datetime.fromisoformat(data["completed_at"].replace("Z", "+00:00"))
+            if data.get("completed_at")
+            else None,
             priority=data.get("priority", "normal"),
             fail_fast=data.get("fail_fast", False),
             progress=progress,
@@ -129,6 +140,7 @@ class BatchResponse:
 @dataclass
 class UsageStatus:
     """Current usage and quota status."""
+
     user_id: str
     tier: str
     period: str
@@ -145,10 +157,10 @@ class UsageStatus:
     simulations_remaining: int
     cost_remaining_usd: float
     is_quota_exceeded: bool
-    quota_exceeded_reason: Optional[str]
+    quota_exceeded_reason: str | None
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "UsageStatus":
+    def from_dict(cls, data: dict[str, Any]) -> "UsageStatus":
         """Create UsageStatus from API response dict."""
         return cls(
             user_id=data["user_id"],
@@ -175,9 +187,11 @@ class UsageStatus:
 # Exceptions
 # ============================================================================
 
+
 class TimePointAPIError(Exception):
     """Base exception for API errors."""
-    def __init__(self, message: str, status_code: int = None, response: Dict = None):
+
+    def __init__(self, message: str, status_code: int = None, response: dict = None):
         super().__init__(message)
         self.status_code = status_code
         self.response = response
@@ -185,32 +199,38 @@ class TimePointAPIError(Exception):
 
 class AuthenticationError(TimePointAPIError):
     """Authentication failed."""
+
     pass
 
 
 class QuotaExceededError(TimePointAPIError):
     """Usage quota exceeded."""
+
     pass
 
 
 class BatchTooLargeError(TimePointAPIError):
     """Batch size exceeds tier limit."""
+
     pass
 
 
 class BatchNotFoundError(TimePointAPIError):
     """Batch not found."""
+
     pass
 
 
 class RateLimitError(TimePointAPIError):
     """Rate limit exceeded."""
+
     pass
 
 
 # ============================================================================
 # Client
 # ============================================================================
+
 
 class TimePointClient:
     """
@@ -248,8 +268,8 @@ class TimePointClient:
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
-        base_url: Optional[str] = None,
+        api_key: str | None = None,
+        base_url: str | None = None,
         timeout: int = 30,
         max_retries: int = 3,
     ):
@@ -259,7 +279,9 @@ class TimePointClient:
                 "API key required. Provide api_key argument or set TIMEPOINT_API_KEY env var."
             )
 
-        self.base_url = (base_url or os.getenv("TIMEPOINT_API_URL") or self.DEFAULT_BASE_URL).rstrip("/")
+        self.base_url = (
+            base_url or os.getenv("TIMEPOINT_API_URL") or self.DEFAULT_BASE_URL
+        ).rstrip("/")
         self.timeout = timeout
 
         # Set up session with retry logic
@@ -275,18 +297,20 @@ class TimePointClient:
         self.session.mount("https://", adapter)
 
         # Set default headers
-        self.session.headers.update({
-            "X-API-Key": self.api_key,
-            "Content-Type": "application/json",
-        })
+        self.session.headers.update(
+            {
+                "X-API-Key": self.api_key,
+                "Content-Type": "application/json",
+            }
+        )
 
     def _request(
         self,
         method: str,
         endpoint: str,
-        json: Optional[Dict] = None,
-        params: Optional[Dict] = None,
-    ) -> Dict[str, Any]:
+        json: dict | None = None,
+        params: dict | None = None,
+    ) -> dict[str, Any]:
         """Make an API request."""
         url = f"{self.base_url}{endpoint}"
 
@@ -303,9 +327,7 @@ class TimePointClient:
                 f"Failed to connect to API at {self.base_url}. Is the server running?"
             ) from e
         except requests.exceptions.Timeout as e:
-            raise TimePointAPIError(
-                f"Request timed out after {self.timeout}s"
-            ) from e
+            raise TimePointAPIError(f"Request timed out after {self.timeout}s") from e
 
         # Handle errors
         if response.status_code == 401:
@@ -371,12 +393,12 @@ class TimePointClient:
 
     def submit_batch(
         self,
-        simulations: List[Union[Dict, SimulationRequest]],
-        budget_cap_usd: Optional[float] = None,
+        simulations: list[dict | SimulationRequest],
+        budget_cap_usd: float | None = None,
         priority: str = "normal",
         fail_fast: bool = False,
         parallel_jobs: int = 4,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> BatchResponse:
         """
         Submit a batch of simulations.
@@ -451,7 +473,7 @@ class TimePointClient:
     def cancel_batch(
         self,
         batch_id: str,
-        reason: Optional[str] = None,
+        reason: str | None = None,
         cancel_running: bool = True,
     ) -> BatchResponse:
         """
@@ -474,10 +496,10 @@ class TimePointClient:
 
     def list_batches(
         self,
-        status: Optional[str] = None,
+        status: str | None = None,
         page: int = 1,
         page_size: int = 20,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         List batches.
 
@@ -504,7 +526,7 @@ class TimePointClient:
         batch_id: str,
         timeout: int = 3600,
         poll_interval: int = 5,
-        callback: Optional[callable] = None,
+        callback: callable | None = None,
     ) -> BatchResponse:
         """
         Wait for a batch to complete.
@@ -527,9 +549,7 @@ class TimePointClient:
         while True:
             elapsed = time.time() - start_time
             if elapsed > timeout:
-                raise TimeoutError(
-                    f"Batch {batch_id} did not complete within {timeout}s"
-                )
+                raise TimeoutError(f"Batch {batch_id} did not complete within {timeout}s")
 
             batch = self.get_batch_status(batch_id)
 
@@ -555,7 +575,7 @@ class TimePointClient:
         data = self._request("GET", "/simulations/batch/usage")
         return UsageStatus.from_dict(data)
 
-    def get_usage_history(self, periods: int = 6) -> Dict[str, Any]:
+    def get_usage_history(self, periods: int = 6) -> dict[str, Any]:
         """
         Get usage history.
 
@@ -596,7 +616,7 @@ class TimePointClient:
     # Health Check
     # ========================================================================
 
-    def health_check(self) -> Dict[str, Any]:
+    def health_check(self) -> dict[str, Any]:
         """
         Check API health.
 
@@ -623,9 +643,10 @@ class TimePointClient:
 # Convenience Functions
 # ============================================================================
 
+
 def create_client(
-    api_key: Optional[str] = None,
-    base_url: Optional[str] = None,
+    api_key: str | None = None,
+    base_url: str | None = None,
 ) -> TimePointClient:
     """
     Create a TimePointClient with default configuration.
@@ -641,9 +662,9 @@ def create_client(
 
 
 def submit_batch_from_templates(
-    templates: List[str],
-    api_key: Optional[str] = None,
-    base_url: Optional[str] = None,
+    templates: list[str],
+    api_key: str | None = None,
+    base_url: str | None = None,
     entity_count: int = 3,
     timepoint_count: int = 5,
     **kwargs,

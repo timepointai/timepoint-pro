@@ -13,22 +13,19 @@ Test coverage:
 - Pivot point detection
 """
 
-import pytest
 from datetime import datetime
-import numpy as np
 
-from schemas import Entity, Timepoint, TemporalMode, ResolutionLevel
+import pytest
+
 from generation.config_schema import TemporalConfig
-from workflows.portal_strategy import (
-    PortalStrategy,
-    PortalState,
-    PortalPath,
-    ExplorationMode,
-    FailureResolution
-)
+from schemas import Entity, ResolutionLevel, TemporalMode, Timepoint
 from workflows import TemporalAgent
-from storage import GraphStore
-from llm_v2 import LLMClient
+from workflows.portal_strategy import (
+    ExplorationMode,
+    PortalPath,
+    PortalState,
+    PortalStrategy,
+)
 
 
 class TestPortalConfiguration:
@@ -40,7 +37,7 @@ class TestPortalConfiguration:
             mode=TemporalMode.PORTAL,
             portal_description="John Doe elected President in 2040",
             portal_year=2040,
-            origin_year=2025
+            origin_year=2025,
         )
 
         # Should not raise
@@ -55,11 +52,12 @@ class TestPortalConfiguration:
             mode=TemporalMode.PORTAL,
             portal_description=None,  # Missing
             portal_year=2040,
-            origin_year=2025
+            origin_year=2025,
         )
 
         # Create mock clients
         from unittest.mock import Mock
+
         llm_client = Mock()
         store = Mock()
 
@@ -72,10 +70,11 @@ class TestPortalConfiguration:
             mode=TemporalMode.PORTAL,
             portal_description="Some endpoint",
             portal_year=None,  # Missing
-            origin_year=2025
+            origin_year=2025,
         )
 
         from unittest.mock import Mock
+
         llm_client = Mock()
         store = Mock()
 
@@ -88,10 +87,11 @@ class TestPortalConfiguration:
             mode=TemporalMode.FORWARD,  # Wrong mode
             portal_description="Some endpoint",
             portal_year=2040,
-            origin_year=2025
+            origin_year=2025,
         )
 
         from unittest.mock import Mock
+
         llm_client = Mock()
         store = Mock()
 
@@ -109,7 +109,7 @@ class TestPortalState:
             description="John Doe is President",
             entities=[],
             world_state={"political_landscape": "democratic"},
-            plausibility_score=1.0
+            plausibility_score=1.0,
         )
 
         assert state.year == 2040
@@ -125,7 +125,7 @@ class TestPortalState:
             description="Portal endpoint",
             entities=[],
             world_state={},
-            plausibility_score=1.0
+            plausibility_score=1.0,
         )
 
         child = PortalState(
@@ -134,7 +134,7 @@ class TestPortalState:
             entities=[],
             world_state={},
             plausibility_score=0.8,
-            parent_state=parent
+            parent_state=parent,
         )
 
         parent.children_states.append(child)
@@ -151,7 +151,7 @@ class TestPortalPath:
         states = [
             PortalState(2025, "Origin", [], {}, 1.0),
             PortalState(2030, "Midpoint", [], {}, 0.9),
-            PortalState(2040, "Portal", [], {}, 1.0)
+            PortalState(2040, "Portal", [], {}, 1.0),
         ]
 
         path = PortalPath(
@@ -159,7 +159,7 @@ class TestPortalPath:
             states=states,
             coherence_score=0.85,
             pivot_points=[1],
-            explanation="Path from origin to portal"
+            explanation="Path from origin to portal",
         )
 
         assert path.path_id == "test_path_001"
@@ -180,10 +180,11 @@ class TestExplorationStrategies:
             origin_year=2025,
             backward_steps=5,  # Simple scenario
             exploration_mode="adaptive",
-            oscillation_complexity_threshold=10
+            oscillation_complexity_threshold=10,
         )
 
         from unittest.mock import Mock
+
         llm_client = Mock()
         store = Mock()
 
@@ -202,10 +203,11 @@ class TestExplorationStrategies:
             origin_year=2025,
             backward_steps=20,  # Complex scenario
             exploration_mode="adaptive",
-            oscillation_complexity_threshold=10
+            oscillation_complexity_threshold=10,
         )
 
         from unittest.mock import Mock
+
         llm_client = Mock()
         store = Mock()
 
@@ -222,10 +224,11 @@ class TestExplorationStrategies:
             portal_description="Endpoint",
             portal_year=2040,
             origin_year=2025,
-            exploration_mode="reverse_chronological"
+            exploration_mode="reverse_chronological",
         )
 
         from unittest.mock import Mock
+
         llm_client = Mock()
         store = Mock()
 
@@ -245,11 +248,7 @@ class TestTemporalAgentPortalIntegration:
         llm_client = Mock()
         store = Mock()
 
-        agent = TemporalAgent(
-            mode=TemporalMode.PORTAL,
-            llm_client=llm_client,
-            store=store
-        )
+        agent = TemporalAgent(mode=TemporalMode.PORTAL, llm_client=llm_client, store=store)
 
         assert agent.mode == TemporalMode.PORTAL
 
@@ -262,11 +261,7 @@ class TestTemporalAgentPortalIntegration:
         store.save_timepoint = Mock()
         store.save_exposure_event = Mock()
 
-        agent = TemporalAgent(
-            mode=TemporalMode.PORTAL,
-            llm_client=llm_client,
-            store=store
-        )
+        agent = TemporalAgent(mode=TemporalMode.PORTAL, llm_client=llm_client, store=store)
 
         # Create a consequent timepoint
         consequent = Timepoint(
@@ -274,14 +269,11 @@ class TestTemporalAgentPortalIntegration:
             timestamp=datetime(2040, 1, 1),
             event_description="John Doe is President",
             entities_present=["entity_001"],
-            resolution_level=ResolutionLevel.SCENE
+            resolution_level=ResolutionLevel.SCENE,
         )
 
         # Generate antecedent
-        antecedent = agent.generate_antecedent_timepoint(
-            consequent,
-            context={"target_year": 2039}
-        )
+        antecedent = agent.generate_antecedent_timepoint(consequent, context={"target_year": 2039})
 
         assert antecedent.timestamp.year == 2039
         assert antecedent.entities_present == ["entity_001"]
@@ -297,7 +289,7 @@ class TestTemporalAgentPortalIntegration:
         agent = TemporalAgent(
             mode=TemporalMode.FORWARD,  # Wrong mode
             llm_client=llm_client,
-            store=store
+            store=store,
         )
 
         consequent = Timepoint(
@@ -305,7 +297,7 @@ class TestTemporalAgentPortalIntegration:
             timestamp=datetime(2040, 1, 1),
             event_description="Event",
             entities_present=[],
-            resolution_level=ResolutionLevel.SCENE
+            resolution_level=ResolutionLevel.SCENE,
         )
 
         with pytest.raises(ValueError, match="generate_antecedent_timepoint.*requires mode=PORTAL"):
@@ -322,7 +314,7 @@ class TestValidation:
         entity = Entity(
             entity_id="entity_001",
             entity_type="human",
-            entity_metadata={"knowledge_state": ["knows about portal endpoint"]}
+            entity_metadata={"knowledge_state": ["knows about portal endpoint"]},
         )
 
         context = {
@@ -333,9 +325,9 @@ class TestValidation:
                 timestamp=datetime(2030, 1, 1),
                 event_description="Event",
                 entities_present=["entity_001"],
-                resolution_level=ResolutionLevel.SCENE
+                resolution_level=ResolutionLevel.SCENE,
             ),
-            "is_portal_antecedent": True
+            "is_portal_antecedent": True,
         }
 
         result = validate_temporal_consistency(entity, context)
@@ -348,11 +340,7 @@ class TestValidation:
         """Test temporal_consistency with causally necessary knowledge"""
         from validation import validate_temporal_consistency
 
-        entity = Entity(
-            entity_id="entity_001",
-            entity_type="human",
-            entity_metadata={}
-        )
+        entity = Entity(entity_id="entity_001", entity_type="human", entity_metadata={})
 
         context = {
             "mode": "portal",
@@ -362,8 +350,8 @@ class TestValidation:
                 timestamp=datetime(2030, 1, 1),
                 event_description="Event",
                 entities_present=["entity_001"],
-                resolution_level=ResolutionLevel.SCENE
-            )
+                resolution_level=ResolutionLevel.SCENE,
+            ),
         }
 
         result = validate_temporal_consistency(entity, context)
@@ -379,17 +367,13 @@ class TestPortalEventProbability:
         """Test that portal antecedents get probability boost"""
         from unittest.mock import Mock
 
-        agent = TemporalAgent(
-            mode=TemporalMode.PORTAL,
-            llm_client=Mock(),
-            store=Mock()
-        )
+        agent = TemporalAgent(mode=TemporalMode.PORTAL, llm_client=Mock(), store=Mock())
 
         event = "John Doe campaigns for Senate"
         context = {
             "base_probability": 0.5,
             "is_portal_antecedent": True,
-            "portal_config": {"causal_necessity_weight": 0.3}
+            "portal_config": {"causal_necessity_weight": 0.3},
         }
 
         modified_prob = agent.influence_event_probability(event, context)
@@ -402,17 +386,10 @@ class TestPortalEventProbability:
         """Test that non-antecedent events get slight reduction"""
         from unittest.mock import Mock
 
-        agent = TemporalAgent(
-            mode=TemporalMode.PORTAL,
-            llm_client=Mock(),
-            store=Mock()
-        )
+        agent = TemporalAgent(mode=TemporalMode.PORTAL, llm_client=Mock(), store=Mock())
 
         event = "Random unrelated event"
-        context = {
-            "base_probability": 0.5,
-            "is_portal_antecedent": False
-        }
+        context = {"base_probability": 0.5, "is_portal_antecedent": False}
 
         modified_prob = agent.influence_event_probability(event, context)
 
@@ -442,7 +419,7 @@ class TestIntegration:
             backward_steps=3,
             path_count=2,
             candidate_antecedents_per_step=2,
-            coherence_threshold=0.5
+            coherence_threshold=0.5,
         )
 
         # Create strategy
@@ -464,11 +441,7 @@ class TestIntegration:
         store.save_timepoint = Mock()
         store.save_exposure_event = Mock()
 
-        agent = TemporalAgent(
-            mode=TemporalMode.PORTAL,
-            llm_client=llm_client,
-            store=store
-        )
+        agent = TemporalAgent(mode=TemporalMode.PORTAL, llm_client=llm_client, store=store)
 
         config = TemporalConfig(
             mode=TemporalMode.PORTAL,
@@ -476,7 +449,7 @@ class TestIntegration:
             portal_year=2040,
             origin_year=2025,
             backward_steps=3,
-            path_count=1
+            path_count=1,
         )
 
         # Should not raise

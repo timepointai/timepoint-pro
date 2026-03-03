@@ -11,10 +11,9 @@ import hashlib
 import secrets
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional, Dict
+
 from fastapi import HTTPException, Security, status
 from fastapi.security import APIKeyHeader
-
 
 # ============================================================================
 # Configuration
@@ -25,17 +24,18 @@ API_KEY_HEADER = "X-API-Key"
 
 # In-memory API key store (for minimal implementation)
 # In production, this would be stored in the database
-_API_KEYS: Dict[str, "APIKeyRecord"] = {}
+_API_KEYS: dict[str, "APIKeyRecord"] = {}
 
 
 @dataclass
 class APIKeyRecord:
     """API key record."""
+
     api_key_hash: str
     user_id: str
     name: str
     created_at: datetime
-    last_used: Optional[datetime] = None
+    last_used: datetime | None = None
     is_active: bool = True
     rate_limit: int = 100
 
@@ -43,6 +43,7 @@ class APIKeyRecord:
 # ============================================================================
 # API Key Security Scheme
 # ============================================================================
+
 
 class APIKeyAuth:
     """API Key authentication handler."""
@@ -56,13 +57,13 @@ class APIKeyAuth:
                        If False, return None on invalid key.
         """
         self.api_key_header = APIKeyHeader(
-            name=API_KEY_HEADER,
-            auto_error=auto_error,
-            description="API key for authentication"
+            name=API_KEY_HEADER, auto_error=auto_error, description="API key for authentication"
         )
         self.auto_error = auto_error
 
-    async def __call__(self, api_key: str = Security(APIKeyHeader(name=API_KEY_HEADER, auto_error=False))) -> Optional[str]:
+    async def __call__(
+        self, api_key: str = Security(APIKeyHeader(name=API_KEY_HEADER, auto_error=False))
+    ) -> str | None:
         """
         Validate API key and return user_id.
 
@@ -80,7 +81,7 @@ class APIKeyAuth:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Missing API key",
-                    headers={"WWW-Authenticate": f"ApiKey header={API_KEY_HEADER}"}
+                    headers={"WWW-Authenticate": f"ApiKey header={API_KEY_HEADER}"},
                 )
             return None
 
@@ -90,7 +91,7 @@ class APIKeyAuth:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Invalid API key",
-                    headers={"WWW-Authenticate": f"ApiKey header={API_KEY_HEADER}"}
+                    headers={"WWW-Authenticate": f"ApiKey header={API_KEY_HEADER}"},
                 )
             return None
 
@@ -100,6 +101,7 @@ class APIKeyAuth:
 # ============================================================================
 # API Key Functions
 # ============================================================================
+
 
 def hash_api_key(api_key: str) -> str:
     """
@@ -149,7 +151,7 @@ def create_api_key(user_id: str, name: str = "default") -> str:
     return api_key
 
 
-def verify_api_key(api_key: str) -> Optional[str]:
+def verify_api_key(api_key: str) -> str | None:
     """
     Verify an API key and return the associated user_id.
 
@@ -174,7 +176,7 @@ def verify_api_key(api_key: str) -> Optional[str]:
     return record.user_id
 
 
-def get_api_key(api_key: str) -> Optional[APIKeyRecord]:
+def get_api_key(api_key: str) -> APIKeyRecord | None:
     """
     Get API key record.
 
@@ -234,7 +236,8 @@ def list_user_api_keys(user_id: str) -> list:
 # Test/Development Helpers
 # ============================================================================
 
-def setup_test_api_keys() -> Dict[str, str]:
+
+def setup_test_api_keys() -> dict[str, str]:
     """
     Set up test API keys for development/testing.
 
@@ -270,7 +273,7 @@ api_key_auth_optional = APIKeyAuth(auto_error=False)
 
 
 async def get_current_user(
-    api_key: str = Security(APIKeyHeader(name=API_KEY_HEADER, auto_error=True))
+    api_key: str = Security(APIKeyHeader(name=API_KEY_HEADER, auto_error=True)),
 ) -> str:
     """
     FastAPI dependency to get current user from API key.
@@ -289,14 +292,14 @@ async def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid API key",
-            headers={"WWW-Authenticate": f"ApiKey header={API_KEY_HEADER}"}
+            headers={"WWW-Authenticate": f"ApiKey header={API_KEY_HEADER}"},
         )
     return user_id
 
 
 async def get_optional_user(
-    api_key: str = Security(APIKeyHeader(name=API_KEY_HEADER, auto_error=False))
-) -> Optional[str]:
+    api_key: str = Security(APIKeyHeader(name=API_KEY_HEADER, auto_error=False)),
+) -> str | None:
     """
     FastAPI dependency to optionally get current user.
 

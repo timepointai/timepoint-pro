@@ -4,10 +4,10 @@ Enhanced Query Engine for Batch Query Execution
 Extends existing QueryInterface with batch execution and result caching.
 """
 
-from typing import List, Dict, Any, Optional
-from datetime import datetime, timedelta, timezone
 import hashlib
 import json
+from datetime import datetime, timezone
+from typing import Any
 
 
 class QueryResultCache:
@@ -19,14 +19,14 @@ class QueryResultCache:
             ttl_seconds: Time-to-live for cached results (default 5 minutes)
         """
         self.ttl_seconds = ttl_seconds
-        self._cache: Dict[str, Dict[str, Any]] = {}
+        self._cache: dict[str, dict[str, Any]] = {}
 
-    def _compute_key(self, query: str, context: Dict[str, Any]) -> str:
+    def _compute_key(self, query: str, context: dict[str, Any]) -> str:
         """Compute cache key from query and context"""
         cache_str = json.dumps({"query": query, "context": context}, sort_keys=True)
         return hashlib.md5(cache_str.encode(), usedforsecurity=False).hexdigest()
 
-    def get(self, query: str, context: Dict[str, Any]) -> Optional[Any]:
+    def get(self, query: str, context: dict[str, Any]) -> Any | None:
         """Get cached result if available and not expired"""
         key = self._compute_key(query, context)
         if key in self._cache:
@@ -38,13 +38,10 @@ class QueryResultCache:
                 del self._cache[key]
         return None
 
-    def set(self, query: str, context: Dict[str, Any], result: Any):
+    def set(self, query: str, context: dict[str, Any], result: Any):
         """Cache a query result"""
         key = self._compute_key(query, context)
-        self._cache[key] = {
-            "result": result,
-            "timestamp": datetime.now(timezone.utc)
-        }
+        self._cache[key] = {"result": result, "timestamp": datetime.now(timezone.utc)}
 
     def clear(self):
         """Clear all cached results"""
@@ -77,9 +74,9 @@ class EnhancedQueryEngine:
 
     def __init__(
         self,
-        base_query_interface: Optional[Any] = None,
+        base_query_interface: Any | None = None,
         cache_ttl: int = 300,
-        enable_cache: bool = True
+        enable_cache: bool = True,
     ):
         """
         Args:
@@ -90,18 +87,11 @@ class EnhancedQueryEngine:
         self.base_query = base_query_interface
         self.enable_cache = enable_cache
         self.cache = QueryResultCache(cache_ttl) if enable_cache else None
-        self._batch_stats = {
-            "queries_executed": 0,
-            "cache_hits": 0,
-            "cache_misses": 0
-        }
+        self._batch_stats = {"queries_executed": 0, "cache_hits": 0, "cache_misses": 0}
 
     def execute_batch(
-        self,
-        queries: List[str],
-        world_id: Optional[str] = None,
-        context: Optional[Dict[str, Any]] = None
-    ) -> List[Dict[str, Any]]:
+        self, queries: list[str], world_id: str | None = None, context: dict[str, Any] | None = None
+    ) -> list[dict[str, Any]]:
         """
         Execute multiple queries efficiently with shared context caching.
 
@@ -143,7 +133,7 @@ class EnhancedQueryEngine:
 
         return results
 
-    def _execute_single(self, query: str, context: Dict[str, Any]) -> Dict[str, Any]:
+    def _execute_single(self, query: str, context: dict[str, Any]) -> dict[str, Any]:
         """
         Execute a single query (mock implementation).
 
@@ -154,14 +144,12 @@ class EnhancedQueryEngine:
             "query": query,
             "result": f"Mock result for: {query}",
             "context": context,
-            "timestamp": datetime.now(timezone.utc).isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
     def summarize_relationships(
-        self,
-        world_id: str,
-        entity_filter: Optional[List[str]] = None
-    ) -> Dict[str, Any]:
+        self, world_id: str, entity_filter: list[str] | None = None
+    ) -> dict[str, Any]:
         """
         Generate relationship matrix summary.
 
@@ -181,20 +169,18 @@ class EnhancedQueryEngine:
             "entity_filter": entity_filter,
             "entity_pairs": [
                 {"entity1": "alice", "entity2": "bob", "type": "trust", "strength": 0.8},
-                {"entity1": "alice", "entity2": "charlie", "type": "alignment", "strength": 0.6}
+                {"entity1": "alice", "entity2": "charlie", "type": "alignment", "strength": 0.6},
             ],
             "summary_stats": {
                 "total_relationships": 2,
                 "avg_strength": 0.7,
-                "relationship_types": ["trust", "alignment"]
-            }
+                "relationship_types": ["trust", "alignment"],
+            },
         }
 
     def knowledge_flow_graph(
-        self,
-        world_id: str,
-        timepoint_range: Optional[tuple] = None
-    ) -> Dict[str, Any]:
+        self, world_id: str, timepoint_range: tuple | None = None
+    ) -> dict[str, Any]:
         """
         Generate knowledge flow graph (who learned what from whom).
 
@@ -215,20 +201,16 @@ class EnhancedQueryEngine:
             "nodes": ["alice", "bob", "charlie"],
             "edges": [
                 {"source": "alice", "target": "bob", "knowledge": "plan_details", "timepoint": 0},
-                {"source": "bob", "target": "charlie", "knowledge": "plan_details", "timepoint": 1}
+                {"source": "bob", "target": "charlie", "knowledge": "plan_details", "timepoint": 1},
             ],
             "flow_metrics": {
                 "total_transfers": 2,
                 "avg_hops": 1.5,
-                "knowledge_items": ["plan_details"]
-            }
+                "knowledge_items": ["plan_details"],
+            },
         }
 
-    def timeline_summary(
-        self,
-        world_id: str,
-        include_minor_events: bool = False
-    ) -> Dict[str, Any]:
+    def timeline_summary(self, world_id: str, include_minor_events: bool = False) -> dict[str, Any]:
         """
         Generate chronological timeline summary.
 
@@ -246,26 +228,35 @@ class EnhancedQueryEngine:
         return {
             "world_id": world_id,
             "events": [
-                {"timepoint": 0, "type": "meeting_start", "description": "Board meeting begins", "importance": 0.7},
-                {"timepoint": 1, "type": "proposal", "description": "CEO proposes acquisition", "importance": 0.9},
-                {"timepoint": 2, "type": "decision", "description": "Vote taken", "importance": 1.0}
+                {
+                    "timepoint": 0,
+                    "type": "meeting_start",
+                    "description": "Board meeting begins",
+                    "importance": 0.7,
+                },
+                {
+                    "timepoint": 1,
+                    "type": "proposal",
+                    "description": "CEO proposes acquisition",
+                    "importance": 0.9,
+                },
+                {
+                    "timepoint": 2,
+                    "type": "decision",
+                    "description": "Vote taken",
+                    "importance": 1.0,
+                },
             ],
             "key_moments": [
                 {"timepoint": 1, "description": "CEO proposes acquisition"},
-                {"timepoint": 2, "description": "Vote taken"}
+                {"timepoint": 2, "description": "Vote taken"},
             ],
-            "narrative_arc": {
-                "tension_progression": [0.3, 0.7, 1.0, 0.6],
-                "peak_moment": 2
-            }
+            "narrative_arc": {"tension_progression": [0.3, 0.7, 1.0, 0.6], "peak_moment": 2},
         }
 
     def entity_comparison(
-        self,
-        world_id: str,
-        entity_ids: List[str],
-        aspects: Optional[List[str]] = None
-    ) -> Dict[str, Any]:
+        self, world_id: str, entity_ids: list[str], aspects: list[str] | None = None
+    ) -> dict[str, Any]:
         """
         Generate side-by-side entity comparison.
 
@@ -291,19 +282,14 @@ class EnhancedQueryEngine:
             "comparison_table": {
                 "personality": {
                     "alice": {"openness": 0.8, "conscientiousness": 0.7},
-                    "bob": {"openness": 0.6, "conscientiousness": 0.9}
+                    "bob": {"openness": 0.6, "conscientiousness": 0.9},
                 },
-                "knowledge": {
-                    "alice": ["plan_details", "market_data"],
-                    "bob": ["plan_details"]
-                }
+                "knowledge": {"alice": ["plan_details", "market_data"], "bob": ["plan_details"]},
             },
-            "similarity_scores": {
-                ("alice", "bob"): 0.65
-            }
+            "similarity_scores": {("alice", "bob"): 0.65},
         }
 
-    def get_batch_stats(self) -> Dict[str, Any]:
+    def get_batch_stats(self) -> dict[str, Any]:
         """Get statistics about batch query execution"""
         stats = dict(self._batch_stats)
         total_attempts = stats["cache_hits"] + stats["cache_misses"]

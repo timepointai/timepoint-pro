@@ -4,11 +4,9 @@ Unit tests for tensor resolution integration (Phase 7).
 Tests the tensor resolution system that enables tensor reuse across runs.
 """
 
-import pytest
 import tempfile
 from pathlib import Path
-from datetime import datetime
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 from schemas import Entity
 
@@ -43,7 +41,7 @@ class TestTensorResolutionHelpers:
                 entity=entity,
                 world_id="test_world",
                 scenario_context="A board meeting scenario",
-                min_score=0.75
+                min_score=0.75,
             )
 
             assert result is None
@@ -69,7 +67,7 @@ class TestTensorResolutionHelpers:
                 entity=entity,
                 world_id="test_world",
                 scenario_context="Test scenario",
-                min_score=0.75
+                min_score=0.75,
             )
 
             # Should return None, not raise
@@ -84,11 +82,7 @@ class TestTensorResolutionMetadata:
         from schemas import Entity
 
         # Create entity
-        entity = Entity(
-            entity_id="test_entity",
-            entity_type="human",
-            entity_metadata={}
-        )
+        entity = Entity(entity_id="test_entity", entity_type="human", entity_metadata={})
 
         # Simulate resolution from cache
         entity.entity_metadata["tensor_resolved_from_cache"] = True
@@ -104,11 +98,7 @@ class TestTensorResolutionMetadata:
         from schemas import Entity
 
         # Create entity
-        entity = Entity(
-            entity_id="test_entity",
-            entity_type="human",
-            entity_metadata={}
-        )
+        entity = Entity(entity_id="test_entity", entity_type="human", entity_metadata={})
 
         # Simulate cache miss (new baseline tensor)
         entity.entity_metadata["tensor_resolved_from_cache"] = False
@@ -137,7 +127,7 @@ class TestTensorRAGIntegration:
             assert runner._tensor_rag is None
 
             # Accessing causes initialization - patch at the import location
-            with patch('retrieval.tensor_rag.TensorRAG') as mock_rag:
+            with patch("retrieval.tensor_rag.TensorRAG") as mock_rag:
                 mock_rag.return_value = Mock()
                 mock_rag.return_value.index_size = 0
                 rag = runner._get_tensor_rag()

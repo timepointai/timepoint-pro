@@ -8,19 +8,20 @@ Phase 3: Retrieval System
 Phase 5: Optional permission filtering for access control
 """
 
-import numpy as np
 from dataclasses import dataclass
-from typing import List, Optional, Union, TYPE_CHECKING
 from pathlib import Path
+from typing import TYPE_CHECKING, Optional
+
+import numpy as np
 
 if TYPE_CHECKING:
     from access.permissions import PermissionEnforcer
 
+from retrieval.composition import TensorComposer
+from retrieval.embedding_index import EmbeddingIndex
 from schemas import TTMTensor
 from tensor_persistence import TensorDatabase, TensorRecord
-from tensor_serialization import serialize_tensor, deserialize_tensor
-from retrieval.embedding_index import EmbeddingIndex
-from retrieval.composition import TensorComposer
+from tensor_serialization import deserialize_tensor, serialize_tensor
 
 
 @dataclass
@@ -33,6 +34,7 @@ class SearchResult:
         score: Similarity score (0-1)
         tensor_record: Full tensor record from database
     """
+
     tensor_id: str
     score: float
     tensor_record: TensorRecord
@@ -54,7 +56,7 @@ class TensorRAG:
         embedding_model: str = "all-MiniLM-L6-v2",
         embedding_dim: int = 384,
         auto_build_index: bool = True,
-        permission_enforcer: Optional["PermissionEnforcer"] = None
+        permission_enforcer: Optional["PermissionEnforcer"] = None,
     ):
         """
         Initialize TensorRAG.
@@ -88,6 +90,7 @@ class TensorRAG:
         if self._embedder is None:
             try:
                 from sentence_transformers import SentenceTransformer
+
                 self._embedder = SentenceTransformer(self.embedding_model_name)
             except ImportError:
                 raise ImportError(
@@ -118,9 +121,7 @@ class TensorRAG:
                 self.tensor_db.save_tensor(record)
             else:
                 # No description - skip or use entity_id
-                embedding = self.generate_embedding(
-                    f"{record.entity_id} {record.world_id or ''}"
-                )
+                embedding = self.generate_embedding(f"{record.entity_id} {record.world_id or ''}")
 
             self.index.add(record.tensor_id, embedding)
 
@@ -142,9 +143,9 @@ class TensorRAG:
         query: str,
         n_results: int = 10,
         min_maturity: float = 0.0,
-        categories: Optional[List[str]] = None,
-        user_id: Optional[str] = None
-    ) -> List[SearchResult]:
+        categories: list[str] | None = None,
+        user_id: str | None = None,
+    ) -> list[SearchResult]:
         """
         Search for tensors matching a query.
 
@@ -164,17 +165,19 @@ class TensorRAG:
             # Return all tensors if no query
             tensors = self.tensor_db.list_tensors()
             results = []
-            for record in tensors[:n_results * 3]:  # Get more for filtering
+            for record in tensors[: n_results * 3]:  # Get more for filtering
                 if record.maturity >= min_maturity:
-                    if categories is None or (record.category and any(c in record.category for c in categories)):
+                    if categories is None or (
+                        record.category and any(c in record.category for c in categories)
+                    ):
                         # Apply permission filter if enabled
                         if not self._check_read_permission(record.tensor_id, user_id):
                             continue
-                        results.append(SearchResult(
-                            tensor_id=record.tensor_id,
-                            score=1.0,
-                            tensor_record=record
-                        ))
+                        results.append(
+                            SearchResult(
+                                tensor_id=record.tensor_id, score=1.0, tensor_record=record
+                            )
+                        )
                         if len(results) >= n_results:
                             break
             return results
@@ -209,22 +212,20 @@ class TensorRAG:
             if not self._check_read_permission(tensor_id, user_id):
                 continue
 
-            results.append(SearchResult(
-                tensor_id=tensor_id,
-                score=max(0.0, min(1.0, score)),  # Clamp to [0, 1]
-                tensor_record=record
-            ))
+            results.append(
+                SearchResult(
+                    tensor_id=tensor_id,
+                    score=max(0.0, min(1.0, score)),  # Clamp to [0, 1]
+                    tensor_record=record,
+                )
+            )
 
             if len(results) >= n_results:
                 break
 
         return results
 
-    def _check_read_permission(
-        self,
-        tensor_id: str,
-        user_id: Optional[str]
-    ) -> bool:
+    def _check_read_permission(self, tensor_id: str, user_id: str | None) -> bool:
         """
         Check if user has read permission for tensor.
 
@@ -248,9 +249,9 @@ class TensorRAG:
 
     def compose(
         self,
-        results: List[SearchResult],
-        weights: Optional[List[float]] = None,
-        method: str = "weighted_blend"
+        results: list[SearchResult],
+        weights: list[float] | None = None,
+        method: str = "weighted_blend",
     ) -> TTMTensor:
         """
         Compose tensors from search results.
@@ -284,7 +285,7 @@ class TensorRAG:
         scenario_context: str,
         min_maturity: float = 0.0,
         allow_composition: bool = True,
-        composition_threshold: float = 0.7
+        composition_threshold: float = 0.7,
     ) -> TTMTensor:
         """
         Resolve the best tensor for an entity.
@@ -342,9 +343,9 @@ class TensorRAG:
         tensor: TTMTensor,
         description: str,
         maturity: float = 0.0,
-        category: Optional[str] = None,
+        category: str | None = None,
         entity_id: str = "",
-        world_id: str = ""
+        world_id: str = "",
     ) -> None:
         """
         Add a tensor to the index and database.
@@ -384,8 +385,8 @@ class TensorRAG:
         self,
         tensor_id: str,
         tensor: TTMTensor,
-        description: Optional[str] = None,
-        maturity: Optional[float] = None
+        description: str | None = None,
+        maturity: float | None = None,
     ) -> None:
         """
         Update a tensor in the index and database.
@@ -416,7 +417,7 @@ class TensorRAG:
         # Save to database
         self.tensor_db.save_tensor(record)
 
-    def save_index(self, path: Union[str, Path]) -> None:
+    def save_index(self, path: str | Path) -> None:
         """
         Save the embedding index to disk.
 
@@ -425,7 +426,7 @@ class TensorRAG:
         """
         self.index.save(Path(path))
 
-    def load_index(self, path: Union[str, Path]) -> None:
+    def load_index(self, path: str | Path) -> None:
         """
         Load the embedding index from disk.
 

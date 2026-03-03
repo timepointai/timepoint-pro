@@ -4,25 +4,23 @@ Unit tests for the simulation runner.
 Tests job creation, tracking, and management (not actual simulation execution).
 """
 
-import pytest
 from datetime import datetime
-from unittest.mock import Mock, patch
+
+import pytest
 
 from api.models_simulation import (
     SimulationCreateRequest,
     SimulationStatus,
-    TemporalModeAPI,
 )
 from api.simulation_runner import (
     SimulationJob,
-    get_job,
-    save_job,
-    list_jobs,
-    delete_job,
     clear_jobs,
-    SimulationRunner,
+    delete_job,
+    get_job,
     get_simulation_runner,
+    list_jobs,
     reset_simulation_runner,
+    save_job,
 )
 
 
@@ -107,18 +105,22 @@ class TestJobStorage:
 
     def test_list_jobs_with_owner_filter(self):
         """Test listing jobs filtered by owner."""
-        save_job(SimulationJob(
-            job_id="job_1",
-            owner_id="user1",
-            status=SimulationStatus.PENDING,
-            created_at=datetime.utcnow(),
-        ))
-        save_job(SimulationJob(
-            job_id="job_2",
-            owner_id="user2",
-            status=SimulationStatus.PENDING,
-            created_at=datetime.utcnow(),
-        ))
+        save_job(
+            SimulationJob(
+                job_id="job_1",
+                owner_id="user1",
+                status=SimulationStatus.PENDING,
+                created_at=datetime.utcnow(),
+            )
+        )
+        save_job(
+            SimulationJob(
+                job_id="job_2",
+                owner_id="user2",
+                status=SimulationStatus.PENDING,
+                created_at=datetime.utcnow(),
+            )
+        )
 
         jobs, total = list_jobs(owner_id="user1")
         assert total == 1
@@ -126,18 +128,22 @@ class TestJobStorage:
 
     def test_list_jobs_with_status_filter(self):
         """Test listing jobs filtered by status."""
-        save_job(SimulationJob(
-            job_id="job_1",
-            owner_id="user1",
-            status=SimulationStatus.PENDING,
-            created_at=datetime.utcnow(),
-        ))
-        save_job(SimulationJob(
-            job_id="job_2",
-            owner_id="user1",
-            status=SimulationStatus.COMPLETED,
-            created_at=datetime.utcnow(),
-        ))
+        save_job(
+            SimulationJob(
+                job_id="job_1",
+                owner_id="user1",
+                status=SimulationStatus.PENDING,
+                created_at=datetime.utcnow(),
+            )
+        )
+        save_job(
+            SimulationJob(
+                job_id="job_2",
+                owner_id="user1",
+                status=SimulationStatus.COMPLETED,
+                created_at=datetime.utcnow(),
+            )
+        )
 
         jobs, total = list_jobs(status=SimulationStatus.PENDING)
         assert total == 1
@@ -230,12 +236,14 @@ class TestSimulationRunner:
         runner = get_simulation_runner()
 
         # Create some jobs
-        for i, status in enumerate([
-            SimulationStatus.PENDING,
-            SimulationStatus.RUNNING,
-            SimulationStatus.COMPLETED,
-            SimulationStatus.FAILED,
-        ]):
+        for i, status in enumerate(
+            [
+                SimulationStatus.PENDING,
+                SimulationStatus.RUNNING,
+                SimulationStatus.COMPLETED,
+                SimulationStatus.FAILED,
+            ]
+        ):
             job = SimulationJob(
                 job_id=f"job_{i}",
                 owner_id="user1",
@@ -261,20 +269,24 @@ class TestSimulationRunner:
         """Test getting stats filtered by owner."""
         runner = get_simulation_runner()
 
-        save_job(SimulationJob(
-            job_id="job_1",
-            owner_id="user1",
-            status=SimulationStatus.COMPLETED,
-            created_at=datetime.utcnow(),
-            cost_usd=0.10,
-        ))
-        save_job(SimulationJob(
-            job_id="job_2",
-            owner_id="user2",
-            status=SimulationStatus.COMPLETED,
-            created_at=datetime.utcnow(),
-            cost_usd=0.20,
-        ))
+        save_job(
+            SimulationJob(
+                job_id="job_1",
+                owner_id="user1",
+                status=SimulationStatus.COMPLETED,
+                created_at=datetime.utcnow(),
+                cost_usd=0.10,
+            )
+        )
+        save_job(
+            SimulationJob(
+                job_id="job_2",
+                owner_id="user2",
+                status=SimulationStatus.COMPLETED,
+                created_at=datetime.utcnow(),
+                cost_usd=0.20,
+            )
+        )
 
         stats = runner.get_stats(owner_id="user1")
 

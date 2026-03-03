@@ -9,16 +9,17 @@ Creates comprehensive reports showing:
 - Training data generated
 """
 
-from typing import List, Dict
-from .run_tracker import RunMetadata, ALL_MECHANISMS
 import pandas as pd
-from schemas import ResolutionLevel, TemporalMode
+
+from schemas import TemporalMode
+
+from .run_tracker import ALL_MECHANISMS, RunMetadata
 
 
 class CoverageMatrix:
     """Generate coverage matrices from workflow runs"""
 
-    def generate_full_matrix(self, runs: List[RunMetadata]) -> pd.DataFrame:
+    def generate_full_matrix(self, runs: list[RunMetadata]) -> pd.DataFrame:
         """
         Generate comprehensive coverage matrix.
 
@@ -37,7 +38,7 @@ class CoverageMatrix:
         for run in runs:
             # Count mechanisms used
             mechanisms_covered = len(run.mechanisms_used)
-            mechanisms_str = f"{mechanisms_covered}/17 ({100*mechanisms_covered//17}%)"
+            mechanisms_str = f"{mechanisms_covered}/17 ({100 * mechanisms_covered // 17}%)"
 
             # Count unique resolutions assigned
             unique_resolutions = set()
@@ -52,10 +53,14 @@ class CoverageMatrix:
             cost_str = f"${run.cost_usd:.2f}"
 
             # Status indicator
-            status_icon = "✅" if run.status == "completed" else "❌" if run.status == "failed" else "🔄"
+            status_icon = (
+                "✅" if run.status == "completed" else "❌" if run.status == "failed" else "🔄"
+            )
 
             # Handle causal_mode - it might be a string or enum
-            causal_mode_str = run.causal_mode.value if hasattr(run.causal_mode, 'value') else run.causal_mode
+            causal_mode_str = (
+                run.causal_mode.value if hasattr(run.causal_mode, "value") else run.causal_mode
+            )
 
             row = {
                 "Template": run.template_id,
@@ -67,7 +72,7 @@ class CoverageMatrix:
                 "Training Examples": run.training_examples,
                 "Cost": cost_str,
                 "Duration (s)": f"{run.duration_seconds:.1f}" if run.duration_seconds else "N/A",
-                "Status": f"{status_icon} {run.status}"
+                "Status": f"{status_icon} {run.status}",
             }
 
             rows.append(row)
@@ -79,14 +84,14 @@ class CoverageMatrix:
             # Get unique causal modes (handle string or enum)
             unique_modes = set()
             for r in runs:
-                if hasattr(r.causal_mode, 'value'):
+                if hasattr(r.causal_mode, "value"):
                     unique_modes.add(r.causal_mode.value)
                 else:
                     unique_modes.add(r.causal_mode)
 
             summary = {
                 "Template": "TOTAL",
-                "M1-M17": f"Overall",
+                "M1-M17": "Overall",
                 "Causal Mode": f"{len(unique_modes)}/5 modes",
                 "Resolutions": "All levels",
                 "Timepoints": sum(r.timepoints_created for r in runs),
@@ -94,13 +99,13 @@ class CoverageMatrix:
                 "Training Examples": sum(r.training_examples for r in runs),
                 "Cost": f"${sum(r.cost_usd for r in runs):.2f}",
                 "Duration (s)": f"{sum(r.duration_seconds or 0 for r in runs):.1f}",
-                "Status": f"{sum(1 for r in runs if r.status == 'completed')}/{len(runs)}"
+                "Status": f"{sum(1 for r in runs if r.status == 'completed')}/{len(runs)}",
             }
             df = pd.concat([df, pd.DataFrame([summary])], ignore_index=True)
 
         return df
 
-    def generate_mechanism_matrix(self, runs: List[RunMetadata]) -> pd.DataFrame:
+    def generate_mechanism_matrix(self, runs: list[RunMetadata]) -> pd.DataFrame:
         """
         Generate mechanism coverage matrix.
 
@@ -141,30 +146,40 @@ class CoverageMatrix:
 
         return df
 
-    def generate_causal_mode_matrix(self, runs: List[RunMetadata]) -> pd.DataFrame:
+    def generate_causal_mode_matrix(self, runs: list[RunMetadata]) -> pd.DataFrame:
         """
         Show which causal modes are covered.
         """
-        all_modes = [TemporalMode.FORWARD, TemporalMode.DIRECTORIAL,
-                     TemporalMode.BRANCHING, TemporalMode.CYCLICAL, TemporalMode.PORTAL]
+        all_modes = [
+            TemporalMode.FORWARD,
+            TemporalMode.DIRECTORIAL,
+            TemporalMode.BRANCHING,
+            TemporalMode.CYCLICAL,
+            TemporalMode.PORTAL,
+        ]
 
         mode_coverage = {}
         for mode in all_modes:
             # Handle causal_mode - might be string or enum
-            templates = [r.template_id for r in runs
-                        if (r.causal_mode == mode or
-                            (isinstance(r.causal_mode, str) and r.causal_mode == mode.value))]
+            templates = [
+                r.template_id
+                for r in runs
+                if (
+                    r.causal_mode == mode
+                    or (isinstance(r.causal_mode, str) and r.causal_mode == mode.value)
+                )
+            ]
             mode_coverage[mode.value] = {
                 "Templates": ", ".join(templates) if templates else "None",
                 "Count": len(templates),
-                "Coverage": "✓" if templates else "❌"
+                "Coverage": "✓" if templates else "❌",
             }
 
         df = pd.DataFrame(mode_coverage).T
         df.index.name = "Causal Mode"
         return df.reset_index()
 
-    def generate_text_report(self, runs: List[RunMetadata]) -> str:
+    def generate_text_report(self, runs: list[RunMetadata]) -> str:
         """
         Generate comprehensive text report.
         """
@@ -223,13 +238,18 @@ class CoverageMatrix:
         # Causal mode completeness (handle string or enum)
         modes_used = set()
         for r in runs:
-            if hasattr(r.causal_mode, 'value'):
+            if hasattr(r.causal_mode, "value"):
                 modes_used.add(r.causal_mode.value)
             else:
                 modes_used.add(r.causal_mode)
         report.append(f"Causal Modes Covered: {len(modes_used)}/5")
-        all_modes = {TemporalMode.FORWARD, TemporalMode.DIRECTORIAL,
-                     TemporalMode.BRANCHING, TemporalMode.CYCLICAL, TemporalMode.PORTAL}
+        all_modes = {
+            TemporalMode.FORWARD,
+            TemporalMode.DIRECTORIAL,
+            TemporalMode.BRANCHING,
+            TemporalMode.CYCLICAL,
+            TemporalMode.PORTAL,
+        }
         if len(modes_used) < 5:
             # Convert modes_used to enum values for comparison
             all_mode_values = {m.value for m in all_modes}
@@ -243,7 +263,7 @@ class CoverageMatrix:
 
         return "\n".join(report)
 
-    def generate_markdown_report(self, runs: List[RunMetadata]) -> str:
+    def generate_markdown_report(self, runs: list[RunMetadata]) -> str:
         """
         Generate markdown formatted report.
         """
@@ -298,15 +318,17 @@ class CoverageMatrix:
         # Handle causal_mode - might be string or enum
         modes_used = set()
         for r in runs:
-            if hasattr(r.causal_mode, 'value'):
+            if hasattr(r.causal_mode, "value"):
                 modes_used.add(r.causal_mode.value)
             else:
                 modes_used.add(r.causal_mode)
 
         report.append("## Coverage Completeness")
         report.append("")
-        report.append(f"- **Mechanisms**: {len(all_mechanisms_used)}/17 ({100*len(all_mechanisms_used)//17}%)")
-        report.append(f"- **Causal Modes**: {len(modes_used)}/5 ({100*len(modes_used)//5}%)")
+        report.append(
+            f"- **Mechanisms**: {len(all_mechanisms_used)}/17 ({100 * len(all_mechanisms_used) // 17}%)"
+        )
+        report.append(f"- **Causal Modes**: {len(modes_used)}/5 ({100 * len(modes_used) // 5}%)")
         report.append("")
 
         return "\n".join(report)

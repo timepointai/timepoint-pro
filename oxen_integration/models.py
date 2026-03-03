@@ -1,8 +1,8 @@
 """
 Data models for Oxen.ai integration.
 """
+
 from dataclasses import dataclass
-from typing import Optional
 from datetime import datetime
 
 
@@ -15,10 +15,10 @@ class UploadResult:
     dataset_url: str
     finetune_url: str
     file_size_bytes: int
-    commit_id: Optional[str] = None
+    commit_id: str | None = None
     branch: str = "main"
-    timestamp: Optional[datetime] = None
-    error_message: Optional[str] = None
+    timestamp: datetime | None = None
+    error_message: str | None = None
 
     def __post_init__(self):
         """Set timestamp if not provided."""
@@ -57,7 +57,7 @@ class RepositoryInfo:
     url: str
     exists: bool
     branch: str = "main"
-    description: Optional[str] = None
+    description: str | None = None
 
     @property
     def repo_id(self) -> str:
@@ -70,11 +70,11 @@ class GenerationPipelineResult:
     """Result of generation + upload pipeline."""
 
     generation_success: bool
-    upload_result: Optional[UploadResult] = None
+    upload_result: UploadResult | None = None
     variations_generated: int = 0
     generation_time_seconds: float = 0.0
     upload_time_seconds: float = 0.0
-    error_message: Optional[str] = None
+    error_message: str | None = None
 
     @property
     def success(self) -> bool:

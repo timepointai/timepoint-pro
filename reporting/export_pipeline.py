@@ -8,12 +8,13 @@ Orchestrates the complete export workflow:
 4. Optional compression
 """
 
-from typing import Dict, Any, List, Optional, Union
-from pathlib import Path
 from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+from .export_formats import ExportFormatFactory
 from .query_engine import EnhancedQueryEngine
 from .report_generator import ReportGenerator
-from .export_formats import ExportFormatFactory, ExportFormat
 
 
 class ExportPipeline:
@@ -52,11 +53,7 @@ class ExportPipeline:
         """
         self.query_engine = query_engine
         self.report_generator = ReportGenerator(query_engine)
-        self._export_stats = {
-            "reports_generated": 0,
-            "files_exported": 0,
-            "total_size_bytes": 0
-        }
+        self._export_stats = {"reports_generated": 0, "files_exported": 0, "total_size_bytes": 0}
 
     def export_report(
         self,
@@ -64,9 +61,9 @@ class ExportPipeline:
         report_type: str,
         export_format: str,
         output_path: str,
-        compression: Optional[str] = None,
-        **report_kwargs
-    ) -> Dict[str, Any]:
+        compression: str | None = None,
+        **report_kwargs,
+    ) -> dict[str, Any]:
         """
         Export single report.
 
@@ -85,10 +82,14 @@ class ExportPipeline:
             ValueError: If report_type not supported
         """
         # Generate report
-        report_content = self._generate_report(world_id, report_type, export_format, **report_kwargs)
+        report_content = self._generate_report(
+            world_id, report_type, export_format, **report_kwargs
+        )
 
         # Normalize export format (markdown -> md)
-        normalized_format = "md" if export_format.lower() in ["markdown", "md"] else export_format.lower()
+        normalized_format = (
+            "md" if export_format.lower() in ["markdown", "md"] else export_format.lower()
+        )
 
         # Special handling for script exports (fountain, storyboard, pdf)
         if export_format.lower() in ["fountain", "storyboard", "pdf"]:
@@ -109,12 +110,14 @@ class ExportPipeline:
             if compression:
                 output_path = self._add_compression_suffix(output_path, compression)
                 # Write with compression
-                import gzip, bz2
-                open_func = gzip.open if compression == 'gzip' else bz2.open
-                with open_func(output_path, 'wt', encoding='utf-8') as f:
+                import bz2
+                import gzip
+
+                open_func = gzip.open if compression == "gzip" else bz2.open
+                with open_func(output_path, "wt", encoding="utf-8") as f:
                     f.write(report_content)
             else:
-                Path(output_path).write_text(report_content, encoding='utf-8')
+                Path(output_path).write_text(report_content, encoding="utf-8")
         else:
             # Use export format handlers
             exporter = ExportFormatFactory.create(export_format, compression=compression)
@@ -140,19 +143,21 @@ class ExportPipeline:
             "export_format": export_format,
             "compression": compression,
             "output_path": str(output_path),
-            "file_size_bytes": Path(output_path).stat().st_size if Path(output_path).exists() else 0,
-            "exported_at": datetime.now(timezone.utc).isoformat()
+            "file_size_bytes": Path(output_path).stat().st_size
+            if Path(output_path).exists()
+            else 0,
+            "exported_at": datetime.now(timezone.utc).isoformat(),
         }
 
     def export_batch(
         self,
         world_id: str,
-        report_types: List[str],
-        export_formats: List[str],
+        report_types: list[str],
+        export_formats: list[str],
         output_dir: str,
-        compression: Optional[str] = None,
-        **report_kwargs
-    ) -> List[Dict[str, Any]]:
+        compression: str | None = None,
+        **report_kwargs,
+    ) -> list[dict[str, Any]]:
         """
         Export multiple reports in multiple formats.
 
@@ -175,7 +180,9 @@ class ExportPipeline:
         for report_type in report_types:
             for export_format in export_formats:
                 # Normalize format for filename (markdown -> md)
-                file_extension = "md" if export_format.lower() in ["markdown", "md"] else export_format.lower()
+                file_extension = (
+                    "md" if export_format.lower() in ["markdown", "md"] else export_format.lower()
+                )
 
                 # Generate output filename
                 filename = f"{world_id}_{report_type}.{file_extension}"
@@ -188,7 +195,7 @@ class ExportPipeline:
                     export_format=export_format,
                     output_path=str(file_path),
                     compression=compression,
-                    **report_kwargs
+                    **report_kwargs,
                 )
                 results.append(result)
 
@@ -198,9 +205,9 @@ class ExportPipeline:
         self,
         world_id: str,
         output_dir: str,
-        formats: Optional[List[str]] = None,
-        compression: Optional[str] = None
-    ) -> Dict[str, Any]:
+        formats: list[str] | None = None,
+        compression: str | None = None,
+    ) -> dict[str, Any]:
         """
         Export complete world package with all report types.
 
@@ -223,7 +230,7 @@ class ExportPipeline:
             report_types=report_types,
             export_formats=formats,
             output_dir=output_dir,
-            compression=compression
+            compression=compression,
         )
 
         # Create package metadata
@@ -234,43 +241,32 @@ class ExportPipeline:
             "formats": formats,
             "compression": compression,
             "files": results,
-            "total_size_bytes": sum(r["file_size_bytes"] for r in results)
+            "total_size_bytes": sum(r["file_size_bytes"] for r in results),
         }
 
         # Write package metadata
         metadata_path = Path(output_dir) / f"{world_id}_package_metadata.json"
         import json
-        metadata_path.write_text(json.dumps(package_metadata, indent=2), encoding='utf-8')
+
+        metadata_path.write_text(json.dumps(package_metadata, indent=2), encoding="utf-8")
 
         return package_metadata
 
-    def _generate_report(
-        self,
-        world_id: str,
-        report_type: str,
-        format: str,
-        **kwargs
-    ) -> Any:
+    def _generate_report(self, world_id: str, report_type: str, format: str, **kwargs) -> Any:
         """Generate report content based on type"""
         report_type_lower = report_type.lower()
 
         if report_type_lower == "summary":
             return self.report_generator.generate_summary_report(
-                world_id=world_id,
-                format=format,
-                **kwargs
+                world_id=world_id, format=format, **kwargs
             )
         elif report_type_lower == "relationships":
             return self.report_generator.generate_relationship_report(
-                world_id=world_id,
-                format=format,
-                **kwargs
+                world_id=world_id, format=format, **kwargs
             )
         elif report_type_lower == "knowledge":
             return self.report_generator.generate_knowledge_report(
-                world_id=world_id,
-                format=format,
-                **kwargs
+                world_id=world_id, format=format, **kwargs
             )
         elif report_type_lower == "entity_comparison":
             # Requires entity_ids parameter
@@ -278,10 +274,7 @@ class ExportPipeline:
             if not entity_ids:
                 raise ValueError("entity_comparison report requires 'entity_ids' parameter")
             return self.report_generator.generate_entity_comparison_report(
-                world_id=world_id,
-                entity_ids=entity_ids,
-                format=format,
-                **kwargs
+                world_id=world_id, entity_ids=entity_ids, format=format, **kwargs
             )
         elif report_type_lower == "script":
             # Script/storyboard generation
@@ -292,21 +285,19 @@ class ExportPipeline:
                 f"Supported: summary, relationships, knowledge, entity_comparison, script"
             )
 
-    def _generate_script_report(
-        self,
-        world_id: str,
-        format: str,
-        **kwargs
-    ) -> Any:
+    def _generate_script_report(self, world_id: str, format: str, **kwargs) -> Any:
         """Generate script/storyboard from simulation data"""
-        from .script_generator import ScriptGenerator
         from storage import GraphStore
+
+        from .script_generator import ScriptGenerator
 
         # Get database connection from query engine
         # This is a workaround - ideally ExportPipeline would have direct access to store
-        if hasattr(self.query_engine, 'base_query') and hasattr(self.query_engine.base_query, 'store'):
+        if hasattr(self.query_engine, "base_query") and hasattr(
+            self.query_engine.base_query, "store"
+        ):
             store = self.query_engine.base_query.store
-        elif hasattr(self.query_engine, 'store'):
+        elif hasattr(self.query_engine, "store"):
             store = self.query_engine.store
         else:
             # Fallback: create new store connection
@@ -321,9 +312,7 @@ class ExportPipeline:
         temporal_mode = kwargs.get("temporal_mode", "forward")
 
         script_data = generator.generate_script_structure(
-            world_id=world_id,
-            title=title,
-            temporal_mode=temporal_mode
+            world_id=world_id, title=title, temporal_mode=temporal_mode
         )
 
         return script_data
@@ -349,13 +338,13 @@ class ExportPipeline:
 
     def _add_compression_suffix(self, path: str, compression: str) -> str:
         """Add compression suffix to path"""
-        if compression == 'gzip':
-            return path + '.gz'
-        elif compression == 'bz2':
-            return path + '.bz2'
+        if compression == "gzip":
+            return path + ".gz"
+        elif compression == "bz2":
+            return path + ".bz2"
         return path
 
-    def get_export_stats(self) -> Dict[str, Any]:
+    def get_export_stats(self) -> dict[str, Any]:
         """Get export statistics"""
         stats = dict(self._export_stats)
         if stats["files_exported"] > 0:
@@ -366,8 +355,4 @@ class ExportPipeline:
 
     def clear_stats(self):
         """Clear export statistics"""
-        self._export_stats = {
-            "reports_generated": 0,
-            "files_exported": 0,
-            "total_size_bytes": 0
-        }
+        self._export_stats = {"reports_generated": 0, "files_exported": 0, "total_size_bytes": 0}

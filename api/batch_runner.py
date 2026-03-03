@@ -9,29 +9,28 @@ Phase 6: Public API - Batch Submission
 
 import threading
 import uuid
-from datetime import datetime
-from typing import Optional, Dict, List, Any
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
-from concurrent.futures import ThreadPoolExecutor, Future
+from datetime import datetime
+from typing import Any
 
-from .models_batch import BatchStatus, BatchPriority
+from .middleware.usage_quota import (
+    record_simulation_complete,
+    record_simulation_start,
+)
+from .models_batch import BatchPriority, BatchStatus
 from .models_simulation import SimulationStatus
 from .simulation_runner import (
-    SimulationRunner,
     SimulationJob,
-    get_simulation_runner,
     get_job,
+    get_simulation_runner,
     save_job,
 )
-from .middleware.usage_quota import (
-    record_simulation_start,
-    record_simulation_complete,
-)
-
 
 # ============================================================================
 # Batch Job Storage
 # ============================================================================
+
 
 @dataclass
 class BatchJob:
@@ -46,15 +45,15 @@ class BatchJob:
     priority: BatchPriority = BatchPriority.NORMAL
     fail_fast: bool = False
     parallel_jobs: int = 4
-    budget_cap_usd: Optional[float] = None
-    metadata: Optional[Dict[str, Any]] = None
+    budget_cap_usd: float | None = None
+    metadata: dict[str, Any] | None = None
 
     # Timing
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
 
     # Job tracking
-    job_ids: List[str] = field(default_factory=list)
+    job_ids: list[str] = field(default_factory=list)
     total_jobs: int = 0
     pending_jobs: int = 0
     running_jobs: int = 0
@@ -71,17 +70,17 @@ class BatchJob:
     progress_percent: float = 0.0
 
     # Error handling
-    error_message: Optional[str] = None
+    error_message: str | None = None
     cancelled: bool = False
-    cancel_reason: Optional[str] = None
+    cancel_reason: str | None = None
 
 
 # Global batch storage
-_BATCHES: Dict[str, BatchJob] = {}
+_BATCHES: dict[str, BatchJob] = {}
 _BATCH_LOCK = threading.Lock()
 
 
-def get_batch(batch_id: str) -> Optional[BatchJob]:
+def get_batch(batch_id: str) -> BatchJob | None:
     """Get a batch by ID."""
     with _BATCH_LOCK:
         return _BATCHES.get(batch_id)
@@ -94,11 +93,11 @@ def save_batch(batch: BatchJob) -> None:
 
 
 def list_batches(
-    owner_id: Optional[str] = None,
-    status: Optional[BatchStatus] = None,
+    owner_id: str | None = None,
+    status: BatchStatus | None = None,
     limit: int = 100,
-    offset: int = 0
-) -> tuple[List[BatchJob], int]:
+    offset: int = 0,
+) -> tuple[list[BatchJob], int]:
     """List batches with optional filtering."""
     with _BATCH_LOCK:
         batches = list(_BATCHES.values())
@@ -115,7 +114,7 @@ def list_batches(
         batches.sort(key=lambda b: b.created_at, reverse=True)
 
         total = len(batches)
-        return batches[offset:offset + limit], total
+        return batches[offset : offset + limit], total
 
 
 def delete_batch(batch_id: str) -> bool:
@@ -137,6 +136,7 @@ def clear_batches() -> None:
 # Batch Runner
 # ============================================================================
 
+
 class BatchRunner:
     """
     Manages batch simulation execution.
@@ -154,14 +154,10 @@ class BatchRunner:
         """
         self.max_workers = max_workers
         self._executor = ThreadPoolExecutor(max_workers=max_workers)
-        self._running_batches: Dict[str, threading.Event] = {}
+        self._running_batches: dict[str, threading.Event] = {}
         self._sim_runner = get_simulation_runner()
 
-    def create_batch(
-        self,
-        request: "BatchCreateRequest",
-        owner_id: str
-    ) -> BatchJob:
+    def create_batch(self, request: "BatchCreateRequest", owner_id: str) -> BatchJob:
         """
         Create a new batch from request.
 
@@ -172,7 +168,6 @@ class BatchRunner:
         Returns:
             Created BatchJob
         """
-        from .models_batch import BatchCreateRequest
 
         batch_id = f"batch_{uuid.uuid4().hex[:12]}"
         total_jobs = len(request.simulations)
@@ -226,10 +221,7 @@ class BatchRunner:
         return True
 
     def cancel_batch(
-        self,
-        batch_id: str,
-        reason: Optional[str] = None,
-        cancel_running: bool = True
+        self, batch_id: str, reason: str | None = None, cancel_running: bool = True
     ) -> bool:
         """
         Cancel a batch.
@@ -271,10 +263,7 @@ class BatchRunner:
             if cancel_running:
                 for job_id in batch.job_ids:
                     job = get_job(job_id)
-                    if job and job.status in (
-                        SimulationStatus.PENDING,
-                        SimulationStatus.RUNNING
-                    ):
+                    if job and job.status in (SimulationStatus.PENDING, SimulationStatus.RUNNING):
                         self._sim_runner.cancel_job(job_id, "Batch cancelled")
 
             save_batch(batch)
@@ -282,7 +271,7 @@ class BatchRunner:
 
         return False
 
-    def get_batch_jobs(self, batch_id: str) -> List[SimulationJob]:
+    def get_batch_jobs(self, batch_id: str) -> list[SimulationJob]:
         """
         Get all jobs in a batch.
 
@@ -303,11 +292,7 @@ class BatchRunner:
                 jobs.append(job)
         return jobs
 
-    def _run_batch(
-        self,
-        batch_id: str,
-        cancel_event: threading.Event
-    ) -> None:
+    def _run_batch(self, batch_id: str, cancel_event: threading.Event) -> None:
         """
         Execute a batch.
 
@@ -325,7 +310,7 @@ class BatchRunner:
 
             # Get jobs to run
             pending_job_ids = list(batch.job_ids)
-            running_futures: Dict[str, Future] = {}
+            running_futures: dict[str, Future] = {}
 
             while pending_job_ids or running_futures:
                 # Check for cancellation
@@ -334,10 +319,7 @@ class BatchRunner:
                     return
 
                 # Start new jobs up to parallel limit
-                while (
-                    pending_job_ids
-                    and len(running_futures) < batch.parallel_jobs
-                ):
+                while pending_job_ids and len(running_futures) < batch.parallel_jobs:
                     job_id = pending_job_ids.pop(0)
 
                     # Check budget before starting
@@ -367,7 +349,7 @@ class BatchRunner:
                     if job.status in (
                         SimulationStatus.COMPLETED,
                         SimulationStatus.FAILED,
-                        SimulationStatus.CANCELLED
+                        SimulationStatus.CANCELLED,
                     ):
                         completed_jobs.append(job_id)
 
@@ -402,11 +384,7 @@ class BatchRunner:
                             batch.cancelled_jobs += 1
 
                         # Update progress
-                        finished = (
-                            batch.completed_jobs
-                            + batch.failed_jobs
-                            + batch.cancelled_jobs
-                        )
+                        finished = batch.completed_jobs + batch.failed_jobs + batch.cancelled_jobs
                         batch.progress_percent = (finished / batch.total_jobs) * 100
                         save_batch(batch)
 
@@ -422,6 +400,7 @@ class BatchRunner:
                 # Brief sleep to avoid tight loop
                 if running_futures:
                     import time
+
                     time.sleep(0.5)
 
             # All jobs finished
@@ -443,11 +422,7 @@ class BatchRunner:
         batch.completed_at = datetime.utcnow()
         save_batch(batch)
 
-    def _cancel_remaining(
-        self,
-        batch: BatchJob,
-        pending_job_ids: List[str]
-    ) -> None:
+    def _cancel_remaining(self, batch: BatchJob, pending_job_ids: list[str]) -> None:
         """Cancel remaining pending jobs in batch."""
         for job_id in pending_job_ids:
             job = get_job(job_id)
@@ -474,7 +449,7 @@ class BatchRunner:
 
         save_batch(batch)
 
-    def get_stats(self, owner_id: Optional[str] = None) -> Dict[str, Any]:
+    def get_stats(self, owner_id: str | None = None) -> dict[str, Any]:
         """
         Get batch statistics.
 
@@ -492,20 +467,12 @@ class BatchRunner:
 
             stats = {
                 "total_batches": len(batches),
-                "pending_batches": sum(
-                    1 for b in batches if b.status == BatchStatus.PENDING
-                ),
+                "pending_batches": sum(1 for b in batches if b.status == BatchStatus.PENDING),
                 "running_batches": sum(
-                    1 for b in batches if b.status in (
-                        BatchStatus.RUNNING, BatchStatus.PARTIAL
-                    )
+                    1 for b in batches if b.status in (BatchStatus.RUNNING, BatchStatus.PARTIAL)
                 ),
-                "completed_batches": sum(
-                    1 for b in batches if b.status == BatchStatus.COMPLETED
-                ),
-                "failed_batches": sum(
-                    1 for b in batches if b.status == BatchStatus.FAILED
-                ),
+                "completed_batches": sum(1 for b in batches if b.status == BatchStatus.COMPLETED),
+                "failed_batches": sum(1 for b in batches if b.status == BatchStatus.FAILED),
                 "total_jobs": sum(b.total_jobs for b in batches),
                 "total_cost_usd": sum(b.actual_cost_usd for b in batches),
             }
@@ -518,15 +485,12 @@ class BatchRunner:
 
             # Calculate average duration
             completed = [
-                b for b in batches
-                if b.status == BatchStatus.COMPLETED
-                and b.started_at and b.completed_at
+                b
+                for b in batches
+                if b.status == BatchStatus.COMPLETED and b.started_at and b.completed_at
             ]
             if completed:
-                durations = [
-                    (b.completed_at - b.started_at).total_seconds()
-                    for b in completed
-                ]
+                durations = [(b.completed_at - b.started_at).total_seconds() for b in completed]
                 stats["avg_duration_seconds"] = sum(durations) / len(durations)
             else:
                 stats["avg_duration_seconds"] = None
@@ -542,7 +506,7 @@ class BatchRunner:
 # Global Runner Instance
 # ============================================================================
 
-_batch_runner: Optional[BatchRunner] = None
+_batch_runner: BatchRunner | None = None
 
 
 def get_batch_runner() -> BatchRunner:

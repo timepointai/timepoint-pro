@@ -4,12 +4,13 @@ Test script for Phase 2.3: Scene-Level Entities (Mechanism 10)
 Tests that scene-level queries work correctly.
 """
 
-from query_interface import QueryInterface, QueryIntent
-from storage import GraphStore
-from llm_v2 import LLMClient  # Use new centralized service
-from schemas import Entity, PhysicalTensor, CognitiveTensor
 import tempfile
-import os
+
+from llm_v2 import LLMClient  # Use new centralized service
+from query_interface import QueryIntent, QueryInterface
+from schemas import CognitiveTensor, Entity, PhysicalTensor
+from storage import GraphStore
+
 
 def test_scene_query_parsing():
     """Test that scene queries are parsed correctly"""
@@ -21,7 +22,18 @@ def test_scene_query_parsing():
             query_lower = query.lower()
 
             # Scene/atmosphere queries
-            if any(word in query_lower for word in ["atmosphere", "mood", "feeling", "vibe", "environment", "crowd", "scene"]):
+            if any(
+                word in query_lower
+                for word in [
+                    "atmosphere",
+                    "mood",
+                    "feeling",
+                    "vibe",
+                    "environment",
+                    "crowd",
+                    "scene",
+                ]
+            ):
                 info_type = "atmosphere"
                 confidence = 0.8
             else:
@@ -34,7 +46,7 @@ def test_scene_query_parsing():
                 information_type=info_type,
                 context_entities=[],
                 confidence=confidence,
-                reasoning="Scene query detected"
+                reasoning="Scene query detected",
             )
 
     qi = MockQueryInterface()
@@ -51,52 +63,50 @@ def test_scene_query_parsing():
     for query, expected_type in test_cases:
         intent = qi._parse_query_simple(query)
         print(f"  Query: '{query}' -> Type: {intent.information_type}")
-        assert intent.information_type == expected_type, f"Expected {expected_type}, got {intent.information_type}"
+        assert intent.information_type == expected_type, (
+            f"Expected {expected_type}, got {intent.information_type}"
+        )
 
     print("  ✅ Scene query parsing test PASSED")
     return True
+
 
 def test_scene_aggregation():
     """Test the scene aggregation functions"""
     print("\n🏗️ Testing Scene Aggregation Functions")
 
-    from workflows import create_environment_entity, compute_scene_atmosphere, compute_crowd_dynamics
-    from schemas import Entity, PhysicalTensor, CognitiveTensor, ResolutionLevel
-    from datetime import datetime
+    from schemas import CognitiveTensor, Entity, PhysicalTensor, ResolutionLevel
+    from workflows import (
+        compute_crowd_dynamics,
+        compute_scene_atmosphere,
+        create_environment_entity,
+    )
 
     # Create test entities
     washington = Entity(
         entity_id="george_washington",
         entity_type="person",
         resolution_level=ResolutionLevel.TENSOR_ONLY,
-        entity_metadata={}
+        entity_metadata={},
     )
-    washington.physical_tensor = PhysicalTensor(
-        age=57.0,
-        pain_level=0.0,
-        fever=36.5
-    )
+    washington.physical_tensor = PhysicalTensor(age=57.0, pain_level=0.0, fever=36.5)
     washington.cognitive_tensor = CognitiveTensor(
         emotional_valence=0.3,  # Positive mood
         emotional_arousal=0.4,  # Moderate energy
-        energy_budget=90.0
+        energy_budget=90.0,
     )
 
     adams = Entity(
         entity_id="john_adams",
         entity_type="person",
         resolution_level=ResolutionLevel.TENSOR_ONLY,
-        entity_metadata={}
+        entity_metadata={},
     )
-    adams.physical_tensor = PhysicalTensor(
-        age=53.0,
-        pain_level=0.1,
-        fever=36.5
-    )
+    adams.physical_tensor = PhysicalTensor(age=53.0, pain_level=0.1, fever=36.5)
     adams.cognitive_tensor = CognitiveTensor(
         emotional_valence=-0.1,  # Slightly negative
-        emotional_arousal=0.6,   # High energy
-        energy_budget=85.0
+        emotional_arousal=0.6,  # High energy
+        energy_budget=85.0,
     )
 
     entities = [washington, adams]
@@ -108,7 +118,7 @@ def test_scene_aggregation():
         capacity=500,
         temperature=18.0,
         lighting=0.9,
-        weather="clear"
+        weather="clear",
     )
 
     assert environment.location == "Federal Hall"
@@ -124,30 +134,36 @@ def test_scene_aggregation():
     assert abs(atmosphere.emotional_valence - 0.1) < 0.01
     assert abs(atmosphere.emotional_arousal - 0.5) < 0.01
     assert atmosphere.formality_level > 0.8  # High formality for hall
-    print(f"  ✅ Atmosphere computed: valence={atmosphere.emotional_valence:.2f}, arousal={atmosphere.emotional_arousal:.2f}, formality={atmosphere.formality_level:.2f}")
+    print(
+        f"  ✅ Atmosphere computed: valence={atmosphere.emotional_valence:.2f}, arousal={atmosphere.emotional_arousal:.2f}, formality={atmosphere.formality_level:.2f}"
+    )
 
     # Test crowd computation
     crowd = compute_crowd_dynamics(entities, environment)
 
     assert crowd.size == 2
-    assert crowd.density == 2/500  # 2 people in capacity of 500
+    assert crowd.density == 2 / 500  # 2 people in capacity of 500
     assert crowd.movement_pattern == "static"  # Low density
-    print(f"  ✅ Crowd computed: size={crowd.size}, density={crowd.density:.4f}, movement={crowd.movement_pattern}")
+    print(
+        f"  ✅ Crowd computed: size={crowd.size}, density={crowd.density:.4f}, movement={crowd.movement_pattern}"
+    )
 
     print("  ✅ Scene aggregation test PASSED")
     return True
+
 
 def test_scene_query_integration():
     """Test full scene query integration"""
     print("\n🎭 Testing Scene Query Integration")
 
     # Create temporary database for testing
-    with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as f:
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
         test_db = f.name
 
     try:
         # Initialize components
         import os
+
         store = GraphStore(f"sqlite:///{test_db}")
         # Use real API key from environment (required - no mock mode)
         api_key = os.getenv("OPENROUTER_API_KEY", "dummy_key_will_fail")
@@ -155,15 +171,16 @@ def test_scene_query_integration():
         query_interface = QueryInterface(store, llm_client)
 
         # Create a test timepoint
-        from schemas import Timepoint, ResolutionLevel
         from datetime import datetime
+
+        from schemas import ResolutionLevel, Timepoint
 
         timepoint = Timepoint(
             timepoint_id="founding_fathers_1789_t0",
             timestamp=datetime(1789, 4, 30, 12, 0),
             event_description="Inauguration ceremony at Federal Hall",
             entities_present=["george_washington", "john_adams", "thomas_jefferson"],
-            resolution_level=ResolutionLevel.SCENE
+            resolution_level=ResolutionLevel.SCENE,
         )
         store.save_timepoint(timepoint)
 
@@ -172,14 +189,14 @@ def test_scene_query_integration():
             entity_id="george_washington",
             entity_type="person",
             resolution_level=ResolutionLevel.TENSOR_ONLY,
-            entity_metadata={"role": "president", "age": 57}
+            entity_metadata={"role": "president", "age": 57},
         )
         washington.physical_tensor = PhysicalTensor(age=57.0, pain_level=0.0, fever=36.5)
         washington.cognitive_tensor = CognitiveTensor(
             emotional_valence=0.4,
             emotional_arousal=0.5,
             energy_budget=95.0,
-            knowledge_state=["knowledge1", "knowledge2"]  # Must be list, not set
+            knowledge_state=["knowledge1", "knowledge2"],  # Must be list, not set
         )
         store.save_entity(washington)
 
@@ -209,6 +226,7 @@ def test_scene_query_integration():
         if os.path.exists(test_db):
             os.unlink(test_db)
 
+
 if __name__ == "__main__":
     print("🧪 Running Scene-Level Entities Tests (Phase 2.3)")
     print("=" * 60)
@@ -223,5 +241,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n❌ Test FAILED: {e}")
         import traceback
+
         traceback.print_exc()
         raise

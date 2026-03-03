@@ -2,9 +2,11 @@
 Tests for Export Pipeline (Sprint 2.3)
 """
 
-import pytest
 import json
 from pathlib import Path
+
+import pytest
+
 from reporting.export_pipeline import ExportPipeline
 from reporting.query_engine import EnhancedQueryEngine
 
@@ -40,7 +42,7 @@ class TestSingleReportExport:
             world_id="test_world",
             report_type="summary",
             export_format="json",
-            output_path=str(output_path)
+            output_path=str(output_path),
         )
 
         assert result["world_id"] == "test_world"
@@ -62,7 +64,7 @@ class TestSingleReportExport:
             world_id="test_world",
             report_type="summary",
             export_format="markdown",
-            output_path=str(output_path)
+            output_path=str(output_path),
         )
 
         assert Path(result["output_path"]).exists()
@@ -79,7 +81,7 @@ class TestSingleReportExport:
             world_id="test_world",
             report_type="relationships",
             export_format="json",
-            output_path=str(output_path)
+            output_path=str(output_path),
         )
 
         content = Path(result["output_path"]).read_text()
@@ -94,7 +96,7 @@ class TestSingleReportExport:
             world_id="test_world",
             report_type="knowledge",
             export_format="json",
-            output_path=str(output_path)
+            output_path=str(output_path),
         )
 
         content = Path(result["output_path"]).read_text()
@@ -110,7 +112,7 @@ class TestSingleReportExport:
             report_type="summary",
             export_format="json",
             output_path=str(output_path),
-            compression="gzip"
+            compression="gzip",
         )
 
         # Should create .gz file
@@ -126,7 +128,7 @@ class TestSingleReportExport:
             world_id="test_world",
             report_type="summary",
             export_format="json",
-            output_path=str(output_path)
+            output_path=str(output_path),
         )
 
         assert "world_id" in result
@@ -147,7 +149,7 @@ class TestBatchReportExport:
             world_id="test_world",
             report_types=["summary", "relationships"],
             export_formats=["json"],
-            output_dir=str(temp_export_dir)
+            output_dir=str(temp_export_dir),
         )
 
         assert len(results) == 2
@@ -164,7 +166,7 @@ class TestBatchReportExport:
             world_id="test_world",
             report_types=["summary"],
             export_formats=["json", "markdown"],
-            output_dir=str(temp_export_dir)
+            output_dir=str(temp_export_dir),
         )
 
         assert len(results) == 2
@@ -180,7 +182,7 @@ class TestBatchReportExport:
             world_id="test_world",
             report_types=["summary"],
             export_formats=["json"],
-            output_dir=str(output_dir)
+            output_dir=str(output_dir),
         )
 
         assert output_dir.exists()
@@ -193,7 +195,7 @@ class TestBatchReportExport:
             report_types=["summary", "relationships"],
             export_formats=["json"],
             output_dir=str(temp_export_dir),
-            compression="gzip"
+            compression="gzip",
         )
 
         assert all(r["compression"] == "gzip" for r in results)
@@ -206,8 +208,7 @@ class TestWorldPackageExport:
     def test_export_world_package(self, export_pipeline, temp_export_dir):
         """Test exporting complete world package"""
         package = export_pipeline.export_world_package(
-            world_id="test_world",
-            output_dir=str(temp_export_dir)
+            world_id="test_world", output_dir=str(temp_export_dir)
         )
 
         assert package["world_id"] == "test_world"
@@ -223,8 +224,7 @@ class TestWorldPackageExport:
     def test_export_world_package_default_formats(self, export_pipeline, temp_export_dir):
         """Test world package uses default formats"""
         package = export_pipeline.export_world_package(
-            world_id="test_world",
-            output_dir=str(temp_export_dir)
+            world_id="test_world", output_dir=str(temp_export_dir)
         )
 
         assert "json" in package["formats"]
@@ -236,9 +236,7 @@ class TestWorldPackageExport:
     def test_export_world_package_custom_formats(self, export_pipeline, temp_export_dir):
         """Test world package with custom formats"""
         package = export_pipeline.export_world_package(
-            world_id="test_world",
-            output_dir=str(temp_export_dir),
-            formats=["json"]
+            world_id="test_world", output_dir=str(temp_export_dir), formats=["json"]
         )
 
         assert package["formats"] == ["json"]
@@ -248,9 +246,7 @@ class TestWorldPackageExport:
     def test_export_world_package_with_compression(self, export_pipeline, temp_export_dir):
         """Test world package with compression"""
         package = export_pipeline.export_world_package(
-            world_id="test_world",
-            output_dir=str(temp_export_dir),
-            compression="gzip"
+            world_id="test_world", output_dir=str(temp_export_dir), compression="gzip"
         )
 
         assert package["compression"] == "gzip"
@@ -259,8 +255,7 @@ class TestWorldPackageExport:
     def test_export_world_package_includes_size(self, export_pipeline, temp_export_dir):
         """Test world package includes total size"""
         package = export_pipeline.export_world_package(
-            world_id="test_world",
-            output_dir=str(temp_export_dir)
+            world_id="test_world", output_dir=str(temp_export_dir)
         )
 
         assert "total_size_bytes" in package
@@ -279,7 +274,7 @@ class TestExportStatistics:
             world_id="test_world",
             report_type="summary",
             export_format="json",
-            output_path=str(temp_export_dir / "summary.json")
+            output_path=str(temp_export_dir / "summary.json"),
         )
 
         stats = export_pipeline.get_export_stats()
@@ -295,7 +290,7 @@ class TestExportStatistics:
             world_id="test_world",
             report_types=["summary", "relationships"],
             export_formats=["json"],
-            output_dir=str(temp_export_dir)
+            output_dir=str(temp_export_dir),
         )
 
         stats = export_pipeline.get_export_stats()
@@ -310,7 +305,7 @@ class TestExportStatistics:
             world_id="test_world",
             report_types=["summary", "relationships"],
             export_formats=["json"],
-            output_dir=str(temp_export_dir)
+            output_dir=str(temp_export_dir),
         )
 
         stats = export_pipeline.get_export_stats()
@@ -323,7 +318,7 @@ class TestExportStatistics:
             world_id="test_world",
             report_type="summary",
             export_format="json",
-            output_path=str(temp_export_dir / "summary.json")
+            output_path=str(temp_export_dir / "summary.json"),
         )
 
         export_pipeline.clear_stats()
@@ -344,17 +339,19 @@ class TestErrorHandling:
                 world_id="test_world",
                 report_type="invalid_type",
                 export_format="json",
-                output_path=str(temp_export_dir / "output.json")
+                output_path=str(temp_export_dir / "output.json"),
             )
         assert "Unsupported report type" in str(exc_info.value)
 
-    def test_entity_comparison_without_entities_raises_error(self, export_pipeline, temp_export_dir):
+    def test_entity_comparison_without_entities_raises_error(
+        self, export_pipeline, temp_export_dir
+    ):
         """Test entity_comparison without entity_ids raises ValueError"""
         with pytest.raises(ValueError) as exc_info:
             export_pipeline.export_report(
                 world_id="test_world",
                 report_type="entity_comparison",
                 export_format="json",
-                output_path=str(temp_export_dir / "output.json")
+                output_path=str(temp_export_dir / "output.json"),
             )
         assert "entity_comparison report requires 'entity_ids'" in str(exc_info.value)

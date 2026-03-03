@@ -4,47 +4,40 @@ Unit tests for usage quota system.
 Tests usage tracking, quota enforcement, and storage.
 """
 
-import pytest
-import tempfile
 import os
-from datetime import datetime
-from pathlib import Path
 
-# Usage storage imports
-from api.usage_storage import (
-    UsageDatabase,
-    UsageRecord,
-    get_usage_database,
-    reset_usage_database,
+import pytest
+
+# Rate limit imports (for tier management)
+from api.middleware.rate_limit import (
+    clear_user_tiers,
+    set_user_tier,
 )
 
 # Quota middleware imports
 from api.middleware.usage_quota import (
     QuotaConfig,
-    TierQuota,
-    QuotaStatus,
-    get_quota_config,
-    reset_quota_config,
-    get_quota_status,
     check_api_call_quota,
-    check_simulation_quota,
     check_batch_size,
     check_cost_quota,
+    check_simulation_quota,
+    get_quota_status,
     record_api_call,
-    record_simulation_start,
     record_simulation_complete,
+    record_simulation_start,
+    reset_quota_config,
 )
 
-# Rate limit imports (for tier management)
-from api.middleware.rate_limit import (
-    set_user_tier,
-    clear_user_tiers,
+# Usage storage imports
+from api.usage_storage import (
+    UsageDatabase,
+    reset_usage_database,
 )
-
 
 # ============================================================================
 # Fixtures
 # ============================================================================
+
 
 @pytest.fixture(autouse=True)
 def reset_state():
@@ -79,6 +72,7 @@ def test_user_id() -> str:
 # ============================================================================
 # Usage Database Tests
 # ============================================================================
+
 
 class TestUsageDatabase:
     """Tests for UsageDatabase."""
@@ -152,11 +146,7 @@ class TestUsageDatabase:
 
     def test_log_event(self, usage_db, test_user_id):
         """Logging events works."""
-        event_id = usage_db.log_event(
-            test_user_id,
-            "test_event",
-            {"key": "value"}
-        )
+        event_id = usage_db.log_event(test_user_id, "test_event", {"key": "value"})
 
         assert event_id is not None
         assert len(event_id) == 36  # UUID format
@@ -187,6 +177,7 @@ class TestUsageDatabase:
 # ============================================================================
 # Quota Config Tests
 # ============================================================================
+
 
 class TestQuotaConfig:
     """Tests for QuotaConfig."""
@@ -230,6 +221,7 @@ class TestQuotaConfig:
 # ============================================================================
 # Quota Status Tests
 # ============================================================================
+
 
 class TestQuotaStatus:
     """Tests for quota status checking."""
@@ -319,6 +311,7 @@ class TestQuotaStatus:
 # Quota Check Tests
 # ============================================================================
 
+
 class TestQuotaChecks:
     """Tests for quota check functions."""
 
@@ -407,6 +400,7 @@ class TestQuotaChecks:
 # Usage Recording Tests
 # ============================================================================
 
+
 class TestUsageRecording:
     """Tests for usage recording functions."""
 
@@ -439,11 +433,7 @@ class TestUsageRecording:
 
         record_simulation_start(test_user_id, "job-123")
         record_simulation_complete(
-            test_user_id,
-            "job-123",
-            success=True,
-            cost_usd=0.05,
-            tokens=1000
+            test_user_id, "job-123", success=True, cost_usd=0.05, tokens=1000
         )
 
         db = UsageDatabase(tmp_db_path)
@@ -458,11 +448,7 @@ class TestUsageRecording:
         os.environ["USAGE_DB_PATH"] = tmp_db_path
 
         record_simulation_start(test_user_id, "job-123")
-        record_simulation_complete(
-            test_user_id,
-            "job-123",
-            success=False
-        )
+        record_simulation_complete(test_user_id, "job-123", success=False)
 
         db = UsageDatabase(tmp_db_path)
         usage = db.get_usage(test_user_id)

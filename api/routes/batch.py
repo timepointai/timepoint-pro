@@ -6,39 +6,37 @@ Provides endpoints for creating and managing batch simulation jobs.
 Phase 6: Public API - Batch Submission
 """
 
-from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from ..auth import get_current_user
-from ..models_batch import (
-    BatchCreateRequest,
-    BatchCancelRequest,
-    BatchJobResponse,
-    BatchDetailResponse,
-    BatchListResponse,
-    BatchStatsResponse,
-    BatchStatus,
-    BatchProgress,
-    BatchCostSummary,
-    UsageResponse,
-    UsageHistoryResponse,
-)
 from ..batch_runner import (
-    get_batch_runner,
-    get_batch,
-    list_batches,
     BatchJob,
+    get_batch,
+    get_batch_runner,
+    list_batches,
 )
 from ..middleware.rate_limit import get_limiter
 from ..middleware.usage_quota import (
-    get_quota_status,
-    enforce_simulation_quota,
     enforce_batch_size,
     enforce_cost_quota,
+    enforce_simulation_quota,
+    get_quota_status,
     record_batch_start,
 )
+from ..models_batch import (
+    BatchCancelRequest,
+    BatchCostSummary,
+    BatchCreateRequest,
+    BatchDetailResponse,
+    BatchJobResponse,
+    BatchListResponse,
+    BatchProgress,
+    BatchStatsResponse,
+    BatchStatus,
+    UsageHistoryResponse,
+    UsageResponse,
+)
 from ..usage_storage import get_usage_database
-
 
 router = APIRouter(prefix="/simulations/batch", tags=["batch"])
 limiter = get_limiter()
@@ -47,6 +45,7 @@ limiter = get_limiter()
 # ============================================================================
 # Helper Functions
 # ============================================================================
+
 
 def batch_to_response(batch: BatchJob) -> BatchJobResponse:
     """Convert internal batch to API response."""
@@ -73,8 +72,7 @@ def batch_to_response(batch: BatchJob) -> BatchJobResponse:
             actual_cost_usd=batch.actual_cost_usd,
             budget_cap_usd=batch.budget_cap_usd,
             budget_remaining_usd=(
-                batch.budget_cap_usd - batch.actual_cost_usd
-                if batch.budget_cap_usd else None
+                batch.budget_cap_usd - batch.actual_cost_usd if batch.budget_cap_usd else None
             ),
             tokens_used=batch.tokens_used,
         ),
@@ -88,6 +86,7 @@ def batch_to_response(batch: BatchJob) -> BatchJobResponse:
 # ============================================================================
 # Batch Endpoints
 # ============================================================================
+
 
 @router.post(
     "",
@@ -153,7 +152,7 @@ async def create_batch(
 @limiter.limit("30/minute")
 async def list_batch_jobs(
     request: Request,
-    status_filter: Optional[BatchStatus] = None,
+    status_filter: BatchStatus | None = None,
     page: int = 1,
     page_size: int = 20,
     user_id: str = Depends(get_current_user),
@@ -201,6 +200,7 @@ async def get_batch_stats(
 # ============================================================================
 # Usage Endpoints (must be before /{batch_id} to avoid route conflict)
 # ============================================================================
+
 
 @router.get(
     "/usage",
@@ -301,6 +301,7 @@ async def get_usage_history(
 # Batch Detail Endpoints
 # ============================================================================
 
+
 @router.get(
     "/{batch_id}",
     response_model=BatchJobResponse,
@@ -366,6 +367,7 @@ async def get_batch_with_jobs(
 
     # Convert to response format
     from .simulations import job_to_response
+
     job_responses = [job_to_response(j) for j in jobs]
 
     return BatchDetailResponse(
@@ -384,7 +386,7 @@ async def get_batch_with_jobs(
 async def cancel_batch(
     request: Request,
     batch_id: str,
-    body: Optional[BatchCancelRequest] = None,
+    body: BatchCancelRequest | None = None,
     user_id: str = Depends(get_current_user),
 ):
     """Cancel a batch job."""

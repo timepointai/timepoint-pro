@@ -15,11 +15,11 @@ with structured, layer-separated context that gives the LLM explicit instruction
 about what shapes voice vs. what shapes content.
 """
 
-from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional, Set
-from datetime import datetime
 import json
 import logging
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -28,30 +28,33 @@ logger = logging.getLogger(__name__)
 # Data classes
 # ============================================================================
 
+
 @dataclass
 class BackLayerContext:
     """Visible to LLM, NOT expressed in dialog. Shapes HOW character speaks."""
-    context_vector_summary: Dict[str, float] = field(default_factory=dict)
-    behavior_vector_summary: Dict[str, float] = field(default_factory=dict)
+
+    context_vector_summary: dict[str, float] = field(default_factory=dict)
+    behavior_vector_summary: dict[str, float] = field(default_factory=dict)
     adprs_band: str = "unknown"
     adprs_phi: float = 0.5
     causal_chain_position: str = ""
-    withheld_knowledge: List[Dict[str, str]] = field(default_factory=list)
-    suppressed_impulses: List[str] = field(default_factory=list)
-    steering_directives: List[str] = field(default_factory=list)
-    true_emotional_state: Dict[str, float] = field(default_factory=dict)
+    withheld_knowledge: list[dict[str, str]] = field(default_factory=list)
+    suppressed_impulses: list[str] = field(default_factory=list)
+    steering_directives: list[str] = field(default_factory=list)
+    true_emotional_state: dict[str, float] = field(default_factory=dict)
     anxiety_level: float = 0.0
     # Phase 2: Character arc summary
     character_arc_summary: str = ""
     # Phase 4: Rhetorical profile from archetype
-    rhetorical_profile: Dict[str, str] = field(default_factory=dict)
+    rhetorical_profile: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
 class FrontLayerContext:
     """What the character 'knows'. Dialog drawn from here."""
-    knowledge_items: List[Dict[str, Any]] = field(default_factory=list)
-    relationship_descriptions: Dict[str, str] = field(default_factory=dict)
+
+    knowledge_items: list[dict[str, Any]] = field(default_factory=list)
+    relationship_descriptions: dict[str, str] = field(default_factory=dict)
     presented_emotional_state: str = "composed"
     physical_state_description: str = ""
     scene_context: str = ""
@@ -61,20 +64,24 @@ class FrontLayerContext:
 @dataclass
 class FourthWallContext:
     """Complete two-layer context for one character in dialog."""
+
     entity_id: str
     back_layer: BackLayerContext
     front_layer: FrontLayerContext
     persona_params: Any = None  # PersonaParams (avoid circular import)
-    speaking_style: Dict[str, str] = field(default_factory=dict)
-    voice_examples: List[str] = field(default_factory=list)
-    dialog_behavior: Dict[str, str] = field(default_factory=dict)
+    speaking_style: dict[str, str] = field(default_factory=dict)
+    voice_examples: list[str] = field(default_factory=list)
+    dialog_behavior: dict[str, str] = field(default_factory=dict)
 
 
 # ============================================================================
 # PORTAL Knowledge Stripping (Component 5)
 # ============================================================================
 
-def _build_causal_ancestry(timepoint: 'Timepoint', store: Optional['GraphStore'] = None) -> Set[str]:
+
+def _build_causal_ancestry(
+    timepoint: "Timepoint", store: Optional["GraphStore"] = None
+) -> set[str]:
     """
     Walk causal_parent chain to build set of ancestor timepoint_ids.
 
@@ -105,11 +112,11 @@ def _build_causal_ancestry(timepoint: 'Timepoint', store: Optional['GraphStore']
 
 
 def filter_knowledge_by_causal_time(
-    knowledge_items: List[Dict[str, Any]],
-    current_timepoint: 'Timepoint',
-    entity: 'Entity',
-    store: Optional['GraphStore'] = None,
-) -> List[Dict[str, Any]]:
+    knowledge_items: list[dict[str, Any]],
+    current_timepoint: "Timepoint",
+    entity: "Entity",
+    store: Optional["GraphStore"] = None,
+) -> list[dict[str, Any]]:
     """
     Filter knowledge by causal ancestry.
 
@@ -158,9 +165,9 @@ def filter_knowledge_by_causal_time(
 
 
 def strip_backwards_emotions(
-    knowledge_items: List[Dict[str, Any]],
+    knowledge_items: list[dict[str, Any]],
     current_timestamp: datetime,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Remove items referencing future events emotionally.
 
@@ -179,8 +186,13 @@ def strip_backwards_emotions(
                     # Future item — check if it's emotional
                     content = item.get("content", "").lower()
                     emotional_markers = [
-                        "fear", "dread", "worry about", "anxious about",
-                        "hope for", "looking forward to", "anticipate",
+                        "fear",
+                        "dread",
+                        "worry about",
+                        "anxious about",
+                        "hope for",
+                        "looking forward to",
+                        "anticipate",
                     ]
                     if any(marker in content for marker in emotional_markers):
                         continue  # Skip future emotional references
@@ -196,17 +208,18 @@ def strip_backwards_emotions(
 # Context Helper Functions
 # ============================================================================
 
-def _scale_knowledge_limit(entity: 'Entity', base_limit: int = 20) -> int:
+
+def _scale_knowledge_limit(entity: "Entity", base_limit: int = 20) -> int:
     """
     Scale knowledge count by entity resolution level.
 
     Higher-resolution entities get more knowledge context to work with.
     """
-    resolution = getattr(entity, 'resolution_level', None)
+    resolution = getattr(entity, "resolution_level", None)
     if resolution is None:
         return base_limit
 
-    resolution_str = resolution.value if hasattr(resolution, 'value') else str(resolution)
+    resolution_str = resolution.value if hasattr(resolution, "value") else str(resolution)
 
     limits = {
         "tensor_only": 5,
@@ -266,10 +279,10 @@ def _translate_emotional_state_to_language(
 
 
 def _describe_relationships_naturally(
-    entity: 'Entity',
-    others: List['Entity'],
-    store: Optional['GraphStore'] = None,
-) -> Dict[str, str]:
+    entity: "Entity",
+    others: list["Entity"],
+    store: Optional["GraphStore"] = None,
+) -> dict[str, str]:
     """
     Convert relationship metrics to natural language prose.
 
@@ -289,11 +302,10 @@ def _describe_relationships_naturally(
 
         if store:
             try:
-                trajectory = store.get_relationship_trajectory(
-                    entity.entity_id, other.entity_id
-                )
+                trajectory = store.get_relationship_trajectory(entity.entity_id, other.entity_id)
                 if trajectory and trajectory.states:
                     import json as _json
+
                     states = trajectory.states
                     if isinstance(states, str):
                         states = _json.loads(states)
@@ -336,12 +348,14 @@ def _describe_relationships_naturally(
         elif interactions == 0:
             parts.append("barely knows")
 
-        descriptions[other.entity_id] = " — ".join(parts) if parts else "no established relationship"
+        descriptions[other.entity_id] = (
+            " — ".join(parts) if parts else "no established relationship"
+        )
 
     return descriptions
 
 
-def _describe_physical_state(physical: 'PhysicalTensor') -> str:
+def _describe_physical_state(physical: "PhysicalTensor") -> str:
     """Convert physical tensor to natural language."""
     parts = []
 
@@ -375,9 +389,10 @@ def _describe_physical_state(physical: 'PhysicalTensor') -> str:
 # Information Asymmetry (Phase 3)
 # ============================================================================
 
+
 def _compute_information_asymmetry(
-    fourth_wall_contexts: Dict[str, 'FourthWallContext'],
-) -> Dict[str, List[str]]:
+    fourth_wall_contexts: dict[str, "FourthWallContext"],
+) -> dict[str, list[str]]:
     """
     Compare withheld_knowledge across entities to find exclusive items.
 
@@ -389,16 +404,15 @@ def _compute_information_asymmetry(
     # Build per-entity withheld knowledge sets
     entity_withheld = {}
     for eid, ctx in fourth_wall_contexts.items():
-        withheld = ctx.back_layer.withheld_knowledge if hasattr(ctx, 'back_layer') else []
+        withheld = ctx.back_layer.withheld_knowledge if hasattr(ctx, "back_layer") else []
         entity_withheld[eid] = [
-            w.get("content", str(w)) if isinstance(w, dict) else str(w)
-            for w in withheld
+            w.get("content", str(w)) if isinstance(w, dict) else str(w) for w in withheld
         ]
 
     # Build per-entity known content (from front layer knowledge items)
     entity_known = {}
     for eid, ctx in fourth_wall_contexts.items():
-        known = ctx.front_layer.knowledge_items if hasattr(ctx, 'front_layer') else []
+        known = ctx.front_layer.knowledge_items if hasattr(ctx, "front_layer") else []
         entity_known[eid] = set(
             k.get("content", "")[:60].lower() for k in known if isinstance(k, dict)
         )
@@ -427,16 +441,17 @@ def _compute_information_asymmetry(
 # Main Builder
 # ============================================================================
 
+
 def build_fourth_wall_context(
-    entity: 'Entity',
-    coupled_cognitive: 'CognitiveTensor',
-    physical: 'PhysicalTensor',
-    timepoint: 'Timepoint',
-    timeline: List[Dict],
-    other_entities: List['Entity'],
-    store: Optional['GraphStore'] = None,
-    proception_state: Optional['ProspectiveState'] = None,
-    adprs_envelope: Optional['ADPRSEnvelope'] = None,
+    entity: "Entity",
+    coupled_cognitive: "CognitiveTensor",
+    physical: "PhysicalTensor",
+    timepoint: "Timepoint",
+    timeline: list[dict],
+    other_entities: list["Entity"],
+    store: Optional["GraphStore"] = None,
+    proception_state: Optional["ProspectiveState"] = None,
+    adprs_envelope: Optional["ADPRSEnvelope"] = None,
     knowledge_limit: int = 20,
 ) -> FourthWallContext:
     """
@@ -459,9 +474,9 @@ def build_fourth_wall_context(
     """
     from workflows.dialog_synthesis import (
         _build_knowledge_from_exposures,
+        _derive_dialog_params_from_persona,
         _derive_speaking_style,
         _generate_voice_examples,
-        _derive_dialog_params_from_persona,
         _infer_personality_from_role,
     )
 
@@ -472,23 +487,17 @@ def build_fourth_wall_context(
     knowledge_items = _build_knowledge_from_exposures(entity, store=store, limit=scaled_limit)
 
     # --- PORTAL knowledge stripping (Component 5) ---
-    knowledge_items = filter_knowledge_by_causal_time(
-        knowledge_items, timepoint, entity, store
-    )
-    knowledge_items = strip_backwards_emotions(
-        knowledge_items, timepoint.timestamp
-    )
+    knowledge_items = filter_knowledge_by_causal_time(knowledge_items, timepoint, entity, store)
+    knowledge_items = strip_backwards_emotions(knowledge_items, timepoint.timestamp)
 
     # --- Personality traits (three-tier fallback) ---
-    personality_traits = (
-        entity.entity_metadata.get("personality_traits")
-        or _infer_personality_from_role(entity.entity_metadata.get("role", ""))
-    )
+    personality_traits = entity.entity_metadata.get(
+        "personality_traits"
+    ) or _infer_personality_from_role(entity.entity_metadata.get("role", ""))
 
     # --- Speaking style ---
     speaking_style = _derive_speaking_style(
-        personality_traits,
-        entity.entity_metadata.get("archetype_id", "")
+        personality_traits, entity.entity_metadata.get("archetype_id", "")
     )
 
     # --- Voice examples ---
@@ -516,16 +525,16 @@ def build_fourth_wall_context(
     try:
         if entity.tensor:
             import base64
+
             import msgspec
             import numpy as np
+
             tensor_dict = json.loads(entity.tensor)
             bv_raw = tensor_dict.get("behavior_vector", "")
             if isinstance(bv_raw, str) and bv_raw:
                 bv_bytes = base64.b64decode(bv_raw)
                 bv = np.array(msgspec.msgpack.decode(bv_bytes))
-                behavior_summary = {
-                    f"dim_{i}": round(float(v), 3) for i, v in enumerate(bv[:8])
-                }
+                behavior_summary = {f"dim_{i}": round(float(v), 3) for i, v in enumerate(bv[:8])}
     except Exception:
         pass
 
@@ -541,6 +550,7 @@ def build_fourth_wall_context(
 
     # Causal chain position
     from workflows.dialog_synthesis import get_timepoint_position
+
     causal_position = get_timepoint_position(timeline, timepoint)
 
     # Withheld knowledge from proception
@@ -578,6 +588,7 @@ def build_fourth_wall_context(
     character_arc_summary = ""
     try:
         from workflows.dialog_synthesis import _get_character_arc_for_context
+
         character_arc_summary = _get_character_arc_for_context(entity)
     except (ImportError, Exception):
         pass
@@ -586,6 +597,7 @@ def build_fourth_wall_context(
     rhetorical_profile = {}
     try:
         from workflows.dialog_archetypes import ARCHETYPE_RHETORICAL_PROFILES
+
         archetype_id = entity.entity_metadata.get("archetype_id", "")
         if archetype_id and archetype_id in ARCHETYPE_RHETORICAL_PROFILES:
             rhetorical_profile = ARCHETYPE_RHETORICAL_PROFILES[archetype_id]
@@ -618,17 +630,14 @@ def build_fourth_wall_context(
         coupled_cognitive.energy_budget,
     )
 
-    relationship_descriptions = _describe_relationships_naturally(
-        entity, other_entities, store
-    )
+    relationship_descriptions = _describe_relationships_naturally(entity, other_entities, store)
 
     physical_desc = _describe_physical_state(physical)
 
     scene_ctx = f"{timepoint.event_description} at {timepoint.timestamp.strftime('%I:%M %p')}"
 
     time_awareness = (
-        f"Position in timeline: {causal_position}. "
-        f"Current event: {timepoint.event_description}"
+        f"Position in timeline: {causal_position}. Current event: {timepoint.event_description}"
     )
 
     front_layer = FrontLayerContext(
@@ -671,32 +680,34 @@ def format_context_for_prompt(
         parts.append("")
         parts.append("--- BACK LAYER (shapes voice and behavior; DO NOT express in dialog) ---")
         parts.append(f"ADPRS fidelity: band={bl.adprs_band}, phi={bl.adprs_phi:.2f}")
-        parts.append(f"True emotional state: valence={bl.true_emotional_state.get('valence', 0):.2f}, "
-                     f"arousal={bl.true_emotional_state.get('arousal', 0):.2f}, "
-                     f"energy={bl.true_emotional_state.get('energy', 50):.0f}")
+        parts.append(
+            f"True emotional state: valence={bl.true_emotional_state.get('valence', 0):.2f}, "
+            f"arousal={bl.true_emotional_state.get('arousal', 0):.2f}, "
+            f"energy={bl.true_emotional_state.get('energy', 50):.0f}"
+        )
         parts.append(f"Anxiety level: {bl.anxiety_level:.2f}")
         parts.append(f"Timeline position: {bl.causal_chain_position}")
 
         if bl.withheld_knowledge:
-            parts.append(f"Withheld knowledge (character knows but won't say):")
+            parts.append("Withheld knowledge (character knows but won't say):")
             for wk in bl.withheld_knowledge[:3]:
                 content = wk.get("content", str(wk))
                 reason = wk.get("reason", "unspecified")
                 parts.append(f"  - {content} (reason: {reason})")
 
         if bl.suppressed_impulses:
-            parts.append(f"Suppressed impulses (character wants to but holds back):")
+            parts.append("Suppressed impulses (character wants to but holds back):")
             for si in bl.suppressed_impulses[:3]:
                 parts.append(f"  - {si}")
 
         if bl.steering_directives:
-            parts.append(f"Steering directives:")
+            parts.append("Steering directives:")
             for sd in bl.steering_directives:
                 parts.append(f"  - {sd}")
 
         # Phase 2: Character arc
         if bl.character_arc_summary:
-            parts.append(f"Character arc (informs how you approach this conversation):")
+            parts.append("Character arc (informs how you approach this conversation):")
             parts.append(f"  {bl.character_arc_summary}")
 
         # Phase 4: Rhetorical profile
@@ -706,13 +717,17 @@ def format_context_for_prompt(
                 if key == "never_does":
                     parts.append(f"  NEVER: {', '.join(val) if isinstance(val, list) else val}")
                 elif key == "signature_moves":
-                    parts.append(f"  Signature moves: {', '.join(val) if isinstance(val, list) else val}")
+                    parts.append(
+                        f"  Signature moves: {', '.join(val) if isinstance(val, list) else val}"
+                    )
                 else:
                     parts.append(f"  {key}: {val}")
 
     fl = fourth_wall.front_layer
     parts.append("")
-    parts.append("--- FRONT LAYER (character's actual knowledge; dialog content drawn from here) ---")
+    parts.append(
+        "--- FRONT LAYER (character's actual knowledge; dialog content drawn from here) ---"
+    )
     parts.append(f"Emotional presentation: {fl.presented_emotional_state}")
     parts.append(f"Physical state: {fl.physical_state_description}")
     parts.append(f"Scene: {fl.scene_context}")
@@ -733,11 +748,13 @@ def format_context_for_prompt(
     # Voice guide
     parts.append("")
     style = fourth_wall.speaking_style
-    parts.append(f"Speaking style: {style.get('verbosity', 'moderate')} / "
-                f"{style.get('formality', 'neutral')} / "
-                f"{style.get('tone', 'neutral')} / "
-                f"{style.get('vocabulary', 'general')} / "
-                f"{style.get('speech_pattern', 'direct')}")
+    parts.append(
+        f"Speaking style: {style.get('verbosity', 'moderate')} / "
+        f"{style.get('formality', 'neutral')} / "
+        f"{style.get('tone', 'neutral')} / "
+        f"{style.get('vocabulary', 'general')} / "
+        f"{style.get('speech_pattern', 'direct')}"
+    )
 
     if fourth_wall.voice_examples:
         parts.append("Voice examples:")

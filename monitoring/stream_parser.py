@@ -6,21 +6,21 @@ Extracts key events and state from subprocess stdout/stderr.
 
 import re
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
 class ParsedEvent:
     """An event extracted from the log stream"""
+
     event_type: str  # "template_start", "run_started", "progress", "success", "failure", etc.
-    template_name: Optional[str] = None
-    run_id: Optional[str] = None
-    progress: Optional[tuple[int, int]] = None  # (current, total)
-    cost: Optional[float] = None
-    entities: Optional[int] = None
-    timepoints: Optional[int] = None
-    mechanisms: Optional[list[str]] = None
-    error_message: Optional[str] = None
+    template_name: str | None = None
+    run_id: str | None = None
+    progress: tuple[int, int] | None = None  # (current, total)
+    cost: float | None = None
+    entities: int | None = None
+    timepoints: int | None = None
+    mechanisms: list[str] | None = None
+    error_message: str | None = None
     raw_line: str = ""
 
 
@@ -33,45 +33,35 @@ class StreamParser:
     PATTERNS = {
         # [1/15] template_name
         "progress": re.compile(r"\[(\d+)/(\d+)\]\s+(\S+)"),
-
         # Running: template_name
         "template_start": re.compile(r"^Running:\s+(\S+)"),
-
         # Run ID: run_20251101_143500_abc123
         "run_id": re.compile(r"Run ID:\s+(run_\w+)"),
-
         # Entities: 6, Timepoints: 12
         "stats": re.compile(r"Entities:\s+(\d+).*Timepoints:\s+(\d+)"),
-
         # Mechanisms: M1, M2, M3
         "mechanisms": re.compile(r"Mechanisms:\s+([\w\s,]+)"),
-
         # Cost: $0.08 or Estimated Cost: $15.23
         "cost": re.compile(r"(?:Cost|Estimated Cost):\s+\$([0-9.]+)"),
-
         # ✅ Success: template_name
         "success": re.compile(r"✅\s+(?:Success|PASSED):?\s+(\S+)"),
-
         # ❌ Failed: template_name
         "failure": re.compile(r"❌\s+(?:Failed|FAILED):?\s+(\S+)"),
-
         # Error: some error message
         "error": re.compile(r"(?:Error|ERROR):\s+(.+)"),
-
         # PHASE 1: Pre-Programmed Templates (15 templates)
         "total_templates": re.compile(r"PHASE 1:.*\((\d+)\s+templates\)"),
-
         # EXPENSIVE RUN CONFIRMATION REQUIRED
         "confirmation_prompt": re.compile(r"EXPENSIVE RUN CONFIRMATION REQUIRED"),
     }
 
     def __init__(self):
-        self.current_template: Optional[str] = None
-        self.current_run_id: Optional[str] = None
-        self.templates_total: Optional[int] = None
+        self.current_template: str | None = None
+        self.current_run_id: str | None = None
+        self.templates_total: int | None = None
         self.templates_completed: int = 0
 
-    def parse_line(self, line: str) -> Optional[ParsedEvent]:
+    def parse_line(self, line: str) -> ParsedEvent | None:
         """
         Parse a single line of output.
 
@@ -89,9 +79,7 @@ class StreamParser:
         if match:
             self.current_template = match.group(1)
             event = ParsedEvent(
-                event_type="template_start",
-                template_name=self.current_template,
-                raw_line=line
+                event_type="template_start", template_name=self.current_template, raw_line=line
             )
 
         # Check for progress
@@ -105,7 +93,7 @@ class StreamParser:
                 event_type="progress",
                 template_name=template,
                 progress=(current, total),
-                raw_line=line
+                raw_line=line,
             )
 
         # Check for total templates
@@ -113,9 +101,7 @@ class StreamParser:
         if match and not event:
             self.templates_total = int(match.group(1))
             event = ParsedEvent(
-                event_type="total_templates",
-                progress=(0, self.templates_total),
-                raw_line=line
+                event_type="total_templates", progress=(0, self.templates_total), raw_line=line
             )
 
         # Check for run ID
@@ -126,7 +112,7 @@ class StreamParser:
                 event_type="run_started",
                 run_id=self.current_run_id,
                 template_name=self.current_template,
-                raw_line=line
+                raw_line=line,
             )
 
         # Check for stats (entities/timepoints)
@@ -140,7 +126,7 @@ class StreamParser:
                 timepoints=timepoints,
                 template_name=self.current_template,
                 run_id=self.current_run_id,
-                raw_line=line
+                raw_line=line,
             )
 
         # Check for mechanisms
@@ -153,7 +139,7 @@ class StreamParser:
                 mechanisms=mechanisms,
                 template_name=self.current_template,
                 run_id=self.current_run_id,
-                raw_line=line
+                raw_line=line,
             )
 
         # Check for cost
@@ -165,7 +151,7 @@ class StreamParser:
                 cost=cost,
                 template_name=self.current_template,
                 run_id=self.current_run_id,
-                raw_line=line
+                raw_line=line,
             )
 
         # Check for success
@@ -177,7 +163,7 @@ class StreamParser:
                 event_type="success",
                 template_name=template,
                 run_id=self.current_run_id,
-                raw_line=line
+                raw_line=line,
             )
 
         # Check for failure
@@ -189,7 +175,7 @@ class StreamParser:
                 event_type="failure",
                 template_name=template,
                 run_id=self.current_run_id,
-                raw_line=line
+                raw_line=line,
             )
 
         # Check for error
@@ -201,19 +187,16 @@ class StreamParser:
                 error_message=error_msg,
                 template_name=self.current_template,
                 run_id=self.current_run_id,
-                raw_line=line
+                raw_line=line,
             )
 
         # Check for confirmation prompt
         match = self.PATTERNS["confirmation_prompt"].search(line)
         if match and not event:
-            event = ParsedEvent(
-                event_type="confirmation_prompt",
-                raw_line=line
-            )
+            event = ParsedEvent(event_type="confirmation_prompt", raw_line=line)
 
         return event
 
-    def get_progress(self) -> tuple[int, Optional[int]]:
+    def get_progress(self) -> tuple[int, int | None]:
         """Get current progress (completed, total)"""
         return (self.templates_completed, self.templates_total)

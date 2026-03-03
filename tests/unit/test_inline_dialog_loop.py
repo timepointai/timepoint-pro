@@ -2,19 +2,20 @@
 Tests for Phase 1: Inline Dialog in FORWARD Loop — DialogOutcomeContext,
 _extract_dialog_outcome, and tensor seeding.
 """
+
 import json
-import pytest
 from datetime import datetime
-from schemas import Entity, Dialog, Timepoint, PhysicalTensor, CognitiveTensor
+
+from schemas import CognitiveTensor, Dialog, Entity, PhysicalTensor, Timepoint
 from workflows.dialog_synthesis import (
     DialogOutcomeContext,
     _extract_dialog_outcome,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_entity(entity_id: str, **extra_metadata) -> Entity:
     return Entity(
@@ -24,7 +25,9 @@ def _make_entity(entity_id: str, **extra_metadata) -> Entity:
     )
 
 
-def _make_timepoint(tp_id: str = "tp_1", desc: str = "Test event", entities: list = None) -> Timepoint:
+def _make_timepoint(
+    tp_id: str = "tp_1", desc: str = "Test event", entities: list = None
+) -> Timepoint:
     return Timepoint(
         timepoint_id=tp_id,
         timestamp=datetime(2025, 3, 15),
@@ -41,9 +44,21 @@ def _make_dialog(
 ) -> Dialog:
     if turns is None:
         turns = [
-            {"speaker": "entity_a", "content": "We need to discuss the pressure readings from yesterday.", "emotional_tone": "concerned"},
-            {"speaker": "entity_b", "content": "I agree, the numbers look off.", "emotional_tone": "neutral"},
-            {"speaker": "entity_a", "content": "The gauge showed 150 psi which is above tolerance.", "emotional_tone": "worried"},
+            {
+                "speaker": "entity_a",
+                "content": "We need to discuss the pressure readings from yesterday.",
+                "emotional_tone": "concerned",
+            },
+            {
+                "speaker": "entity_b",
+                "content": "I agree, the numbers look off.",
+                "emotional_tone": "neutral",
+            },
+            {
+                "speaker": "entity_a",
+                "content": "The gauge showed 150 psi which is above tolerance.",
+                "emotional_tone": "worried",
+            },
         ]
     return Dialog(
         dialog_id=dialog_id,
@@ -58,8 +73,8 @@ def _make_dialog(
 # DialogOutcomeContext
 # ---------------------------------------------------------------------------
 
-class TestDialogOutcomeContext:
 
+class TestDialogOutcomeContext:
     def test_default_construction(self):
         ctx = DialogOutcomeContext()
         assert ctx.dialog_id == ""
@@ -95,8 +110,8 @@ class TestDialogOutcomeContext:
 # _extract_dialog_outcome
 # ---------------------------------------------------------------------------
 
-class TestExtractDialogOutcome:
 
+class TestExtractDialogOutcome:
     def test_extracts_topics_from_turns(self):
         dialog = _make_dialog()
         entities = [_make_entity("entity_a"), _make_entity("entity_b")]
@@ -160,7 +175,10 @@ class TestExtractDialogOutcome:
     def test_topics_capped_at_10(self):
         # Create 15 turns with distinct long content
         turns = [
-            {"speaker": f"entity_{'a' if i % 2 == 0 else 'b'}", "content": f"Topic number {i}: " + "x" * 20}
+            {
+                "speaker": f"entity_{'a' if i % 2 == 0 else 'b'}",
+                "content": f"Topic number {i}: " + "x" * 20,
+            }
             for i in range(15)
         ]
         dialog = _make_dialog(turns=turns)
@@ -174,21 +192,28 @@ class TestExtractDialogOutcome:
 # Tensor Seeding (test the pattern used by _seed_entity_tensors)
 # ---------------------------------------------------------------------------
 
-class TestTensorSeeding:
 
+class TestTensorSeeding:
     def test_entity_without_tensors_can_be_seeded(self):
         entity = _make_entity("Chen")
         assert entity.entity_metadata.get("physical_tensor") is None
 
         # Replicate seeding logic
         physical = PhysicalTensor(
-            age=35.0, health_status=1.0, pain_level=0.0,
-            fever=36.5, mobility=1.0, stamina=1.0,
+            age=35.0,
+            health_status=1.0,
+            pain_level=0.0,
+            fever=36.5,
+            mobility=1.0,
+            stamina=1.0,
             sensory_acuity={"vision": 1.0, "hearing": 1.0},
         )
         cognitive = CognitiveTensor(
-            knowledge_state=[], emotional_valence=0.0, emotional_arousal=0.2,
-            energy_budget=100.0, decision_confidence=0.8,
+            knowledge_state=[],
+            emotional_valence=0.0,
+            emotional_arousal=0.2,
+            energy_budget=100.0,
+            decision_confidence=0.8,
         )
         entity.entity_metadata["physical_tensor"] = physical.model_dump()
         entity.entity_metadata["cognitive_tensor"] = cognitive.model_dump()
@@ -202,8 +227,12 @@ class TestTensorSeeding:
     def test_seeding_does_not_overwrite_existing(self):
         entity = _make_entity("Chen")
         entity.entity_metadata["physical_tensor"] = PhysicalTensor(
-            age=60.0, health_status=0.7, pain_level=0.2,
-            fever=37.0, mobility=0.8, stamina=0.6,
+            age=60.0,
+            health_status=0.7,
+            pain_level=0.2,
+            fever=37.0,
+            mobility=0.8,
+            stamina=0.6,
             sensory_acuity={"vision": 0.8},
         ).model_dump()
 

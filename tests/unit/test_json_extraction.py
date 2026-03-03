@@ -9,9 +9,12 @@ Tests the robust _extract_json_from_response() function that handles:
 - JSON with both preambles and fences
 - Nested objects and arrays
 """
-import pytest
-from tensor_initialization import _extract_json_from_response
+
 import json
+
+import pytest
+
+from tensor_initialization import _extract_json_from_response
 
 
 def test_plain_json():
@@ -27,11 +30,11 @@ def test_plain_json():
 
 def test_json_with_preamble():
     """Test extraction when LLM adds explanatory text before JSON"""
-    content = '''Here is the suggested fix:
+    content = """Here is the suggested fix:
 
 {"fixes": {"context": [0.1], "biology": [], "behavior": []}}
 
-Explanation: I set context[0] to 0.1 as a reasonable baseline.'''
+Explanation: I set context[0] to 0.1 as a reasonable baseline."""
     result = _extract_json_from_response(content)
     # Should extract just the JSON part
     parsed = json.loads(result)
@@ -41,7 +44,7 @@ Explanation: I set context[0] to 0.1 as a reasonable baseline.'''
 
 def test_json_with_markdown_fences():
     """Test extraction from markdown code blocks"""
-    content = '''```json
+    content = """```json
 {
   "fixes": {
     "context": [0.05, 0.5, 0.3, 1.0],
@@ -49,7 +52,7 @@ def test_json_with_markdown_fences():
     "behavior": []
   }
 }
-```'''
+```"""
     result = _extract_json_from_response(content)
     parsed = json.loads(result)
     assert parsed["fixes"]["context"] == [0.05, 0.5, 0.3, 1.0]
@@ -57,13 +60,13 @@ def test_json_with_markdown_fences():
 
 def test_json_with_preamble_and_fences():
     """Test extraction with both preamble and markdown fences"""
-    content = '''Based on the provided information, I'll suggest non-zero values:
+    content = """Based on the provided information, I'll suggest non-zero values:
 
 ```json
 {"fixes": {"context": [0.1], "biology": [], "behavior": []}}
 ```
 
-This sets a reasonable baseline.'''
+This sets a reasonable baseline."""
     result = _extract_json_from_response(content)
     parsed = json.loads(result)
     assert "fixes" in parsed
@@ -71,9 +74,9 @@ This sets a reasonable baseline.'''
 
 def test_nested_json_objects():
     """Test extraction of deeply nested JSON structures"""
-    content = '''Here's the analysis:
+    content = """Here's the analysis:
 
-{"context_adjustments": [0.5, 0.6, 0.7], "metadata": {"nested": {"deeply": {"key": "value"}}}}'''
+{"context_adjustments": [0.5, 0.6, 0.7], "metadata": {"nested": {"deeply": {"key": "value"}}}}"""
     result = _extract_json_from_response(content)
     parsed = json.loads(result)
     assert parsed["metadata"]["nested"]["deeply"]["key"] == "value"
@@ -81,7 +84,7 @@ def test_nested_json_objects():
 
 def test_json_array():
     """Test extraction of JSON arrays"""
-    content = '''The refinements are: [0.1, 0.2, 0.3, 0.4, 0.5]'''
+    content = """The refinements are: [0.1, 0.2, 0.3, 0.4, 0.5]"""
     result = _extract_json_from_response(content)
     parsed = json.loads(result)
     assert parsed == [0.1, 0.2, 0.3, 0.4, 0.5]
@@ -89,7 +92,7 @@ def test_json_array():
 
 def test_json_with_escaped_quotes():
     """Test extraction of JSON with escaped quotes in strings"""
-    content = '''{"message": "He said \\"hello\\"", "value": 42}'''
+    content = """{"message": "He said \\"hello\\"", "value": 42}"""
     result = _extract_json_from_response(content)
     parsed = json.loads(result)
     assert parsed["message"] == 'He said "hello"'
@@ -97,11 +100,11 @@ def test_json_with_escaped_quotes():
 
 def test_actual_log_sample_1():
     """Test with actual response from logs (line 7)"""
-    content = '''Here is the suggested fix:
+    content = """Here is the suggested fix:
 
 {"fixes": {"context": [0.1], "biology": [], "behavior": []}}
 
-Explanation: context[0] represents knowledge count, setting to 0.1 provides a minimal baseline.'''
+Explanation: context[0] represents knowledge count, setting to 0.1 provides a minimal baseline."""
     result = _extract_json_from_response(content)
     parsed = json.loads(result)
     assert parsed["fixes"]["context"] == [0.1]
@@ -109,7 +112,7 @@ Explanation: context[0] represents knowledge count, setting to 0.1 provides a mi
 
 def test_actual_log_sample_2():
     """Test with actual response from logs (line 8)"""
-    content = '''Here is the JSON output with suggested non-zero values for the zero indices:
+    content = """Here is the JSON output with suggested non-zero values for the zero indices:
 
 ```
 {
@@ -119,7 +122,7 @@ def test_actual_log_sample_2():
     "behavior": []
   }
 }
-```'''
+```"""
     result = _extract_json_from_response(content)
     parsed = json.loads(result)
     assert len(parsed["fixes"]["context"]) == 8
@@ -127,7 +130,7 @@ def test_actual_log_sample_2():
 
 def test_actual_log_sample_3():
     """Test with actual response from logs (line 9)"""
-    content = '''Here is the suggested fix in JSON format:
+    content = """Here is the suggested fix in JSON format:
 
 ```json
 {
@@ -139,7 +142,7 @@ def test_actual_log_sample_3():
 }
 ```
 
-Explanation: The suggested values maintain the structure while filling zeros with reasonable defaults.'''
+Explanation: The suggested values maintain the structure while filling zeros with reasonable defaults."""
     result = _extract_json_from_response(content)
     parsed = json.loads(result)
     assert parsed["fixes"]["context"][0] == 0.05

@@ -4,35 +4,29 @@ Integration test for ANDOS E2E workflow.
 Tests the ANDOS integration in e2e_runner.py with a simple 3-entity scenario.
 """
 
-import pytest
 import sys
 from pathlib import Path
+
+import pytest
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from e2e_workflows.e2e_runner import _infer_interaction_graph
 from andos.layer_computer import compute_andos_layers, validate_andos_layers
+from e2e_workflows.e2e_runner import _infer_interaction_graph
 from schemas import Entity
 
 
 def make_entity(entity_id: str, entity_type: str = "human") -> Entity:
     """Helper to create test entity"""
     return Entity(
-        entity_id=entity_id,
-        entity_type=entity_type,
-        resolution_level="scene",
-        entity_metadata={}
+        entity_id=entity_id, entity_type=entity_type, resolution_level="scene", entity_metadata={}
     )
 
 
 def test_infer_interaction_graph_simple():
     """Test _infer_interaction_graph with 3 entities"""
-    entities = [
-        make_entity("alice"),
-        make_entity("bob"),
-        make_entity("charlie")
-    ]
+    entities = [make_entity("alice"), make_entity("bob"), make_entity("charlie")]
 
     graph = _infer_interaction_graph(entities)
 
@@ -59,11 +53,7 @@ def test_infer_interaction_graph_single():
 
 def test_andos_with_inferred_graph():
     """Test ANDOS with inferred interaction graph"""
-    entities = [
-        make_entity("alice"),
-        make_entity("bob"),
-        make_entity("charlie")
-    ]
+    entities = [make_entity("alice"), make_entity("bob"), make_entity("charlie")]
 
     # Infer graph
     graph = _infer_interaction_graph(entities)
@@ -90,7 +80,7 @@ def test_andos_with_5_entities():
         make_entity("b"),
         make_entity("c"),
         make_entity("d"),
-        make_entity("e")
+        make_entity("e"),
     ]
 
     # Infer graph

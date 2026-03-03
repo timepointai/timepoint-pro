@@ -28,14 +28,14 @@ Key concepts:
   roles, critical entities, event ordering) derived from graph structure
 """
 
-from collections import Counter
-from dataclasses import dataclass, field
-from typing import List, Set, Tuple, Dict, Optional, Any
-from datetime import datetime
-from itertools import combinations
 import hashlib
 import json
 import logging
+from collections import Counter
+from dataclasses import dataclass, field
+from datetime import datetime
+from itertools import combinations
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -56,17 +56,18 @@ def normalize_timepoint_id(timepoint_id: str, run_id: str) -> str:
     """
     prefix = f"{run_id}_"
     if timepoint_id.startswith(prefix):
-        return timepoint_id[len(prefix):]
+        return timepoint_id[len(prefix) :]
     return timepoint_id
 
 
 @dataclass
 class CausalEdge:
     """A single causal link in the graph."""
+
     source: str  # Entity or timepoint ID
     target: str  # Entity or timepoint ID
     edge_type: str  # "temporal" (timepoint chain) or "knowledge" (exposure event)
-    label: Optional[str] = None  # Additional context (e.g., information transferred)
+    label: str | None = None  # Additional context (e.g., information transferred)
 
     def __hash__(self):
         return hash((self.source, self.target, self.edge_type))
@@ -74,10 +75,13 @@ class CausalEdge:
     def __eq__(self, other):
         if not isinstance(other, CausalEdge):
             return False
-        return (self.source == other.source and self.target == other.target and
-                self.edge_type == other.edge_type)
+        return (
+            self.source == other.source
+            and self.target == other.target
+            and self.edge_type == other.edge_type
+        )
 
-    def to_tuple(self) -> Tuple[str, str, str]:
+    def to_tuple(self) -> tuple[str, str, str]:
         """Convert to hashable tuple for set operations."""
         return (self.source, self.target, self.edge_type)
 
@@ -91,16 +95,17 @@ class CausalGraph:
     1. Temporal edges: timepoint → timepoint (causal chain)
     2. Knowledge edges: entity → entity (information flow via exposure events)
     """
+
     run_id: str
-    template_id: Optional[str] = None
-    temporal_edges: Set[Tuple[str, str]] = field(default_factory=set)
-    knowledge_edges: Set[Tuple[str, str]] = field(default_factory=set)
-    entities: Set[str] = field(default_factory=set)
-    timepoints: Set[str] = field(default_factory=set)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    template_id: str | None = None
+    temporal_edges: set[tuple[str, str]] = field(default_factory=set)
+    knowledge_edges: set[tuple[str, str]] = field(default_factory=set)
+    entities: set[str] = field(default_factory=set)
+    timepoints: set[str] = field(default_factory=set)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
-    def all_edges(self) -> Set[Tuple[str, str, str]]:
+    def all_edges(self) -> set[tuple[str, str, str]]:
         """All edges as (source, target, type) tuples."""
         temporal = {(s, t, "temporal") for s, t in self.temporal_edges}
         knowledge = {(s, t, "knowledge") for s, t in self.knowledge_edges}
@@ -111,7 +116,7 @@ class CausalGraph:
         """Total number of causal edges."""
         return len(self.temporal_edges) + len(self.knowledge_edges)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary for storage/export."""
         return {
             "run_id": self.run_id,
@@ -124,7 +129,7 @@ class CausalGraph:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "CausalGraph":
+    def from_dict(cls, data: dict[str, Any]) -> "CausalGraph":
         """Deserialize from dictionary."""
         return cls(
             run_id=data["run_id"],
@@ -140,9 +145,10 @@ class CausalGraph:
 @dataclass
 class DivergencePoint:
     """A specific causal link where runs disagree."""
-    edge: Tuple[str, str, str]  # (source, target, type)
-    present_in_runs: List[str]  # run_ids that have this edge
-    absent_in_runs: List[str]  # run_ids that don't have this edge
+
+    edge: tuple[str, str, str]  # (source, target, type)
+    present_in_runs: list[str]  # run_ids that have this edge
+    absent_in_runs: list[str]  # run_ids that don't have this edge
     agreement_ratio: float  # fraction of runs with this edge
 
 
@@ -154,8 +160,9 @@ class ConvergenceResult:
     High convergence (>0.8) indicates robust causal mechanisms.
     Low convergence (<0.5) indicates high sensitivity to model/seed choice.
     """
-    run_ids: List[str]
-    template_id: Optional[str]
+
+    run_ids: list[str]
+    template_id: str | None
 
     # Core metrics
     mean_similarity: float  # Average pairwise graph similarity
@@ -163,9 +170,9 @@ class ConvergenceResult:
     max_similarity: float  # Best-case similarity
 
     # Divergence analysis
-    divergence_points: List[DivergencePoint]
-    consensus_edges: Set[Tuple[str, str, str]]  # Edges present in all runs
-    contested_edges: Set[Tuple[str, str, str]]  # Edges present in some runs
+    divergence_points: list[DivergencePoint]
+    consensus_edges: set[tuple[str, str, str]]  # Edges present in all runs
+    contested_edges: set[tuple[str, str, str]]  # Edges present in some runs
 
     # Metadata
     computed_at: datetime = field(default_factory=datetime.utcnow)
@@ -193,7 +200,7 @@ class ConvergenceResult:
         else:
             return "F"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize for storage/export."""
         return {
             "run_ids": self.run_ids,
@@ -222,7 +229,7 @@ class ConvergenceResult:
 def extract_causal_graph(
     run_id: str,
     db_path: str = "metadata/runs.db",
-    template_id: Optional[str] = None,
+    template_id: str | None = None,
 ) -> CausalGraph:
     """
     Extract causal graph from a completed simulation run.
@@ -239,25 +246,26 @@ def extract_causal_graph(
     Returns:
         CausalGraph with extracted causal structure for the specific run
     """
-    from storage import GraphStore
     from sqlmodel import Session, select
-    from schemas import Timepoint, ExposureEvent, Entity
+
+    from schemas import ExposureEvent, Timepoint
+    from storage import GraphStore
 
     # Initialize store
     store = GraphStore(f"sqlite:///{db_path}")
 
-    temporal_edges: Set[Tuple[str, str]] = set()
-    knowledge_edges: Set[Tuple[str, str]] = set()
-    entities: Set[str] = set()
-    timepoints: Set[str] = set()
+    temporal_edges: set[tuple[str, str]] = set()
+    knowledge_edges: set[tuple[str, str]] = set()
+    entities: set[str] = set()
+    timepoints: set[str] = set()
 
     with Session(store.engine) as session:
         # Extract temporal chain from timepoints - FILTER BY RUN_ID
-        run_timepoints = session.exec(
-            select(Timepoint).where(Timepoint.run_id == run_id)
-        ).all()
+        run_timepoints = session.exec(select(Timepoint).where(Timepoint.run_id == run_id)).all()
 
-        logger.debug(f"Extracting causal graph for run {run_id}: found {len(run_timepoints)} timepoints")
+        logger.debug(
+            f"Extracting causal graph for run {run_id}: found {len(run_timepoints)} timepoints"
+        )
 
         for tp in run_timepoints:
             # Normalize timepoint IDs by stripping run_id prefix for convergence comparison
@@ -272,9 +280,7 @@ def extract_causal_graph(
                     entities.add(eid)
 
         # Extract knowledge flow from exposure events - FILTER BY RUN_ID
-        run_events = session.exec(
-            select(ExposureEvent).where(ExposureEvent.run_id == run_id)
-        ).all()
+        run_events = session.exec(select(ExposureEvent).where(ExposureEvent.run_id == run_id)).all()
 
         logger.debug(f"Found {len(run_events)} exposure events for run {run_id}")
 
@@ -298,7 +304,7 @@ def extract_causal_graph(
             "timepoint_count": len(timepoints),
             "temporal_edge_count": len(temporal_edges),
             "knowledge_edge_count": len(knowledge_edges),
-        }
+        },
     )
 
 
@@ -331,7 +337,7 @@ def graph_similarity(g1: CausalGraph, g2: CausalGraph) -> float:
     return len(intersection) / len(union) if union else 0.0
 
 
-def find_divergence_points(graphs: List[CausalGraph]) -> List[DivergencePoint]:
+def find_divergence_points(graphs: list[CausalGraph]) -> list[DivergencePoint]:
     """
     Identify specific causal links where graphs diverge.
 
@@ -348,8 +354,8 @@ def find_divergence_points(graphs: List[CausalGraph]) -> List[DivergencePoint]:
         return []
 
     # Collect all edges across all graphs
-    all_edges: Set[Tuple[str, str, str]] = set()
-    edge_to_runs: Dict[Tuple[str, str, str], List[str]] = {}
+    all_edges: set[tuple[str, str, str]] = set()
+    edge_to_runs: dict[tuple[str, str, str], list[str]] = {}
 
     for g in graphs:
         for edge in g.all_edges:
@@ -369,12 +375,14 @@ def find_divergence_points(graphs: List[CausalGraph]) -> List[DivergencePoint]:
             absent_runs = [rid for rid in run_ids if rid not in present_runs]
             agreement_ratio = len(present_runs) / n_runs
 
-            divergence_points.append(DivergencePoint(
-                edge=edge,
-                present_in_runs=present_runs,
-                absent_in_runs=absent_runs,
-                agreement_ratio=agreement_ratio,
-            ))
+            divergence_points.append(
+                DivergencePoint(
+                    edge=edge,
+                    present_in_runs=present_runs,
+                    absent_in_runs=absent_runs,
+                    agreement_ratio=agreement_ratio,
+                )
+            )
 
     # Sort by agreement ratio (most contested first)
     divergence_points.sort(key=lambda dp: dp.agreement_ratio)
@@ -383,9 +391,9 @@ def find_divergence_points(graphs: List[CausalGraph]) -> List[DivergencePoint]:
 
 
 def compute_convergence(
-    run_ids: List[str],
+    run_ids: list[str],
     db_path: str = "metadata/runs.db",
-    template_id: Optional[str] = None,
+    template_id: str | None = None,
 ) -> ConvergenceResult:
     """
     Compute convergence across multiple runs of the same scenario.
@@ -422,8 +430,8 @@ def compute_convergence(
         similarities.append(sim)
 
     # Find consensus and contested edges
-    all_edges: Set[Tuple[str, str, str]] = set()
-    edge_counts: Dict[Tuple[str, str, str], int] = {}
+    all_edges: set[tuple[str, str, str]] = set()
+    edge_counts: dict[tuple[str, str, str], int] = {}
 
     for g in graphs:
         for edge in g.all_edges:
@@ -449,7 +457,7 @@ def compute_convergence(
     )
 
 
-def compute_convergence_from_graphs(graphs: List[CausalGraph]) -> ConvergenceResult:
+def compute_convergence_from_graphs(graphs: list[CausalGraph]) -> ConvergenceResult:
     """
     Compute convergence from pre-extracted graphs.
 
@@ -475,8 +483,8 @@ def compute_convergence_from_graphs(graphs: List[CausalGraph]) -> ConvergenceRes
         similarities.append(sim)
 
     # Find consensus and contested edges
-    all_edges: Set[Tuple[str, str, str]] = set()
-    edge_counts: Dict[Tuple[str, str, str], int] = {}
+    all_edges: set[tuple[str, str, str]] = set()
+    edge_counts: dict[tuple[str, str, str], int] = {}
 
     for g in graphs:
         for edge in g.all_edges:
@@ -535,9 +543,9 @@ def _classify_entity_role(in_degree: int, out_degree: int) -> str:
 
 
 def _betweenness_from_knowledge_edges(
-    entities: Set[str],
-    knowledge_edges: Set[Tuple[str, str]],
-) -> Dict[str, float]:
+    entities: set[str],
+    knowledge_edges: set[tuple[str, str]],
+) -> dict[str, float]:
     """Approximate betweenness centrality for entities on the knowledge graph.
 
     Uses Brandes-style BFS from every source node.  The graph is treated as
@@ -548,22 +556,22 @@ def _betweenness_from_knowledge_edges(
     Returns a dict mapping entity_id -> betweenness score (unnormalised).
     """
     # Build adjacency list
-    adjacency: Dict[str, List[str]] = {e: [] for e in entities}
+    adjacency: dict[str, list[str]] = {e: [] for e in entities}
     for src, tgt in knowledge_edges:
         if src in adjacency:
             adjacency[src].append(tgt)
 
-    betweenness: Dict[str, float] = {e: 0.0 for e in entities}
+    betweenness: dict[str, float] = dict.fromkeys(entities, 0.0)
 
     for source in entities:
         # BFS from source
-        stack: List[str] = []
-        predecessors: Dict[str, List[str]] = {e: [] for e in entities}
-        sigma: Dict[str, int] = {e: 0 for e in entities}
+        stack: list[str] = []
+        predecessors: dict[str, list[str]] = {e: [] for e in entities}
+        sigma: dict[str, int] = dict.fromkeys(entities, 0)
         sigma[source] = 1
-        dist: Dict[str, int] = {e: -1 for e in entities}
+        dist: dict[str, int] = dict.fromkeys(entities, -1)
         dist[source] = 0
-        queue: List[str] = [source]
+        queue: list[str] = [source]
 
         while queue:
             v = queue.pop(0)
@@ -579,7 +587,7 @@ def _betweenness_from_knowledge_edges(
                     predecessors[w].append(v)
 
         # Back-propagation of dependencies
-        delta: Dict[str, float] = {e: 0.0 for e in entities}
+        delta: dict[str, float] = dict.fromkeys(entities, 0.0)
         while stack:
             w = stack.pop()
             for v in predecessors[w]:
@@ -591,7 +599,7 @@ def _betweenness_from_knowledge_edges(
     return betweenness
 
 
-def extract_outcome_summary(graph: CausalGraph) -> Dict[str, Any]:
+def extract_outcome_summary(graph: CausalGraph) -> dict[str, Any]:
     """Extract high-level outcome characteristics from a causal graph.
 
     Rather than comparing individual edges, this function distills the graph
@@ -619,7 +627,7 @@ def extract_outcome_summary(graph: CausalGraph) -> Dict[str, Any]:
     # being transferred.  We treat the frozenset {source, target} as the
     # canonical name for that information item so that direction does not
     # matter when comparing across runs.
-    knowledge_discovered: Set[frozenset] = set()
+    knowledge_discovered: set[frozenset] = set()
     for src, tgt in graph.knowledge_edges:
         knowledge_discovered.add(frozenset({src, tgt}))
 
@@ -630,7 +638,7 @@ def extract_outcome_summary(graph: CausalGraph) -> Dict[str, Any]:
         out_degree[src] += 1
         in_degree[tgt] += 1
 
-    entity_roles: Dict[str, str] = {}
+    entity_roles: dict[str, str] = {}
     for entity in graph.entities:
         entity_roles[entity] = _classify_entity_role(
             in_degree.get(entity, 0),
@@ -639,7 +647,8 @@ def extract_outcome_summary(graph: CausalGraph) -> Dict[str, Any]:
 
     # -- critical_entities ---------------------------------------------------
     betweenness = _betweenness_from_knowledge_edges(
-        graph.entities, graph.knowledge_edges,
+        graph.entities,
+        graph.knowledge_edges,
     )
     if betweenness:
         max_score = max(betweenness.values())
@@ -647,7 +656,7 @@ def extract_outcome_summary(graph: CausalGraph) -> Dict[str, Any]:
         # When max_score is 0 (no paths), nothing is critical.
         if max_score > 0:
             threshold = max_score * 0.8
-            critical_entities: Set[str] = {
+            critical_entities: set[str] = {
                 e for e, score in betweenness.items() if score >= threshold
             }
         else:
@@ -671,7 +680,7 @@ def extract_outcome_summary(graph: CausalGraph) -> Dict[str, Any]:
     }
 
 
-def outcome_similarity(o1: Dict[str, Any], o2: Dict[str, Any]) -> float:
+def outcome_similarity(o1: dict[str, Any], o2: dict[str, Any]) -> float:
     """Compute weighted similarity between two outcome summaries.
 
     The similarity is a weighted combination of four components:
@@ -702,8 +711,7 @@ def outcome_similarity(o1: Dict[str, Any], o2: Dict[str, Any]) -> float:
     all_entities = set(o1["entity_roles"].keys()) | set(o2["entity_roles"].keys())
     if all_entities:
         matches = sum(
-            1 for e in all_entities
-            if o1["entity_roles"].get(e) == o2["entity_roles"].get(e)
+            1 for e in all_entities if o1["entity_roles"].get(e) == o2["entity_roles"].get(e)
         )
         role_sim = matches / len(all_entities)
     else:
@@ -712,17 +720,12 @@ def outcome_similarity(o1: Dict[str, Any], o2: Dict[str, Any]) -> float:
     # 4. Sequence similarity (0.1)
     sequence_sim = 1.0 if o1["event_sequence_hash"] == o2["event_sequence_hash"] else 0.0
 
-    return (
-        0.4 * knowledge_sim
-        + 0.3 * critical_sim
-        + 0.2 * role_sim
-        + 0.1 * sequence_sim
-    )
+    return 0.4 * knowledge_sim + 0.3 * critical_sim + 0.2 * role_sim + 0.1 * sequence_sim
 
 
 def compute_outcome_convergence(
-    graphs: List[CausalGraph],
-) -> Dict[str, Any]:
+    graphs: list[CausalGraph],
+) -> dict[str, Any]:
     """Compute outcome-level convergence across multiple simulation runs.
 
     This complements :func:`compute_convergence_from_graphs` (which measures
@@ -753,22 +756,20 @@ def compute_outcome_convergence(
     summaries = [extract_outcome_summary(g) for g in graphs]
 
     # -- outcome_mean_similarity ---------------------------------------------
-    outcome_sims: List[float] = []
+    outcome_sims: list[float] = []
     for s1, s2 in combinations(summaries, 2):
         outcome_sims.append(outcome_similarity(s1, s2))
     outcome_mean = sum(outcome_sims) / len(outcome_sims) if outcome_sims else 0.0
 
     # -- structural_mean_similarity ------------------------------------------
-    structural_sims: List[float] = []
+    structural_sims: list[float] = []
     for g1, g2 in combinations(graphs, 2):
         structural_sims.append(graph_similarity(g1, g2))
-    structural_mean = (
-        sum(structural_sims) / len(structural_sims) if structural_sims else 0.0
-    )
+    structural_mean = sum(structural_sims) / len(structural_sims) if structural_sims else 0.0
 
     # -- knowledge_convergence -----------------------------------------------
     # Fraction of distinct knowledge items that appear in ALL runs.
-    all_knowledge: Set[frozenset] = set()
+    all_knowledge: set[frozenset] = set()
     knowledge_counts: Counter = Counter()
     for s in summaries:
         for item in s["knowledge_discovered"]:
@@ -776,9 +777,7 @@ def compute_outcome_convergence(
             knowledge_counts[item] += 1
     n_runs = len(graphs)
     if all_knowledge:
-        universal_knowledge = sum(
-            1 for item in all_knowledge if knowledge_counts[item] == n_runs
-        )
+        universal_knowledge = sum(1 for item in all_knowledge if knowledge_counts[item] == n_runs)
         knowledge_convergence = universal_knowledge / len(all_knowledge)
     else:
         knowledge_convergence = 1.0  # No knowledge in any run -- vacuously converged
@@ -786,7 +785,7 @@ def compute_outcome_convergence(
     # -- role_stability ------------------------------------------------------
     # For each entity that appears in at least one run, check whether it has
     # the same role in every run where it appears.
-    entity_role_sets: Dict[str, Set[str]] = {}
+    entity_role_sets: dict[str, set[str]] = {}
     for s in summaries:
         for entity, role in s["entity_roles"].items():
             if entity not in entity_role_sets:
@@ -794,9 +793,7 @@ def compute_outcome_convergence(
             entity_role_sets[entity].add(role)
 
     if entity_role_sets:
-        stable_count = sum(
-            1 for roles in entity_role_sets.values() if len(roles) == 1
-        )
+        stable_count = sum(1 for roles in entity_role_sets.values() if len(roles) == 1)
         role_stability = stable_count / len(entity_role_sets)
     else:
         role_stability = 1.0  # No entities -- vacuously stable

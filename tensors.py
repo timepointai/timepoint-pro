@@ -1,36 +1,42 @@
 # ============================================================================
 # tensors.py - Tensor operations with plugin registry
 # ============================================================================
+import warnings
+from collections.abc import Callable
+
+import networkx as nx
 import numpy as np
 from scipy.linalg import svd
-from sklearn.decomposition import PCA, NMF
-from typing import Callable, Dict, List, Optional
-import warnings
-import networkx as nx
+from sklearn.decomposition import NMF, PCA
 
-from schemas import Entity
 from metadata.tracking import track_mechanism
+from schemas import Entity
+
+
 class TensorCompressor:
     """Plugin registry for tensor compression algorithms"""
+
     _compressors = {}
-    
+
     @classmethod
     def register(cls, name: str):
         def decorator(func: Callable):
             cls._compressors[name] = func
             return func
+
         return decorator
-    
+
     @classmethod
     @track_mechanism("M6", "ttm_tensor_compression")
     def compress(cls, tensor: np.ndarray, method: str, **kwargs) -> np.ndarray:
         if method not in cls._compressors:
             raise ValueError(f"Unknown compression method: {method}")
         return cls._compressors[method](tensor, **kwargs)
-    
+
     @classmethod
-    def run_all(cls, tensor: np.ndarray, **kwargs) -> Dict[str, np.ndarray]:
+    def run_all(cls, tensor: np.ndarray, **kwargs) -> dict[str, np.ndarray]:
         return {name: func(tensor, **kwargs) for name, func in cls._compressors.items()}
+
 
 @TensorCompressor.register("pca")
 def pca_compress(tensor: np.ndarray, n_components: int = 8) -> np.ndarray:
@@ -73,6 +79,7 @@ def pca_compress(tensor: np.ndarray, n_components: int = 8) -> np.ndarray:
     except Exception as e:
         raise ValueError(f"PCA compression failed: {e}")
 
+
 @TensorCompressor.register("svd")
 def svd_compress(tensor: np.ndarray, n_components: int = 8) -> np.ndarray:
     if len(tensor.shape) == 1:
@@ -82,6 +89,7 @@ def svd_compress(tensor: np.ndarray, n_components: int = 8) -> np.ndarray:
     k = max(1, k)  # Ensure at least 1 component
     return (U[:, :k] @ np.diag(S[:k]) @ Vt[:k, :]).flatten()
 
+
 @TensorCompressor.register("nmf")
 def nmf_compress(tensor: np.ndarray, n_components: int = 8) -> np.ndarray:
     if len(tensor.shape) == 1:
@@ -89,11 +97,12 @@ def nmf_compress(tensor: np.ndarray, n_components: int = 8) -> np.ndarray:
     tensor = np.abs(tensor)  # NMF requires non-negative
     n_components = min(n_components, tensor.shape[0], tensor.shape[1])
     n_components = max(1, n_components)  # Ensure at least 1 component
-    nmf = NMF(n_components=n_components, init='random', random_state=42)
+    nmf = NMF(n_components=n_components, init="random", random_state=42)
     return nmf.fit_transform(tensor).flatten()
 
+
 @TensorCompressor.register("decompress")
-def decompress_tensor(compressed_data: Dict[str, List[float]], method: str = "pca") -> np.ndarray:
+def decompress_tensor(compressed_data: dict[str, list[float]], method: str = "pca") -> np.ndarray:
     """Decompress tensor using inverse transformation"""
     # Look for keys that contain the method name
     matching_keys = [k for k in compressed_data.keys() if method in k]
@@ -114,7 +123,8 @@ def decompress_tensor(compressed_data: Dict[str, List[float]], method: str = "pc
     else:
         return compressed_array
 
-def load_compressed_entity_data(entity: Entity, tensor_type: str = "context") -> Optional[np.ndarray]:
+
+def load_compressed_entity_data(entity: Entity, tensor_type: str = "context") -> np.ndarray | None:
     """Load and decompress entity tensor data from compressed storage"""
     if "compressed" not in entity.entity_metadata:
         return None
@@ -128,11 +138,11 @@ def load_compressed_entity_data(entity: Entity, tensor_type: str = "context") ->
     # For higher resolution entities, look for tensor-specific compression
     # Try different key patterns for the tensor type
     possible_keys = [
-        f"{tensor_type}_pca",    # Specific tensor type with method
+        f"{tensor_type}_pca",  # Specific tensor type with method
         f"{tensor_type}_svd",
         f"{tensor_type}_nmf",
-        tensor_type,             # Just the tensor type
-        f"{tensor_type}_compressed"  # Legacy format
+        tensor_type,  # Just the tensor type
+        f"{tensor_type}_compressed",  # Legacy format
     ]
 
     for key in possible_keys:
@@ -147,14 +157,15 @@ def load_compressed_entity_data(entity: Entity, tensor_type: str = "context") ->
 
     return None
 
-def compute_ttm_metrics(entity: Entity, graph: nx.Graph) -> Dict[str, float]:
+
+def compute_ttm_metrics(entity: Entity, graph: nx.Graph) -> dict[str, float]:
     """Compute Timepoint Tensor Model metrics"""
     if entity.entity_id not in graph:
         return {}
 
     # Suppress RuntimeWarning for small graphs
     with warnings.catch_warnings():
-        warnings.filterwarnings('ignore', category=RuntimeWarning)
+        warnings.filterwarnings("ignore", category=RuntimeWarning)
         metrics = {
             "eigenvector_centrality": nx.eigenvector_centrality(graph).get(entity.entity_id, 0.0),
             "betweenness": nx.betweenness_centrality(graph).get(entity.entity_id, 0.0),
@@ -163,7 +174,7 @@ def compute_ttm_metrics(entity: Entity, graph: nx.Graph) -> Dict[str, float]:
     return metrics
 
 
-def generate_ttm_tensor(entity: Entity) -> Optional[str]:
+def generate_ttm_tensor(entity: Entity) -> str | None:
     """
     Generate TTM tensor from entity metadata and return serialized JSON.
 
@@ -176,9 +187,9 @@ def generate_ttm_tensor(entity: Entity) -> Optional[str]:
     Returns:
         JSON string containing serialized TTMTensor, or None if insufficient data
     """
-    from schemas import TTMTensor
     import json
-    import msgspec
+
+    from schemas import TTMTensor
 
     metadata = entity.entity_metadata
 
@@ -196,10 +207,14 @@ def generate_ttm_tensor(entity: Entity) -> Optional[str]:
             physical_data.get("fever", 36.5) / 45.0,  # Normalize fever ~36-42°C
             physical_data.get("mobility", 1.0),
             physical_data.get("stamina", 1.0),
-            physical_data.get("sensory_acuity", {}).get("vision", 1.0) if isinstance(physical_data.get("sensory_acuity"), dict) else 1.0,
-            physical_data.get("sensory_acuity", {}).get("hearing", 1.0) if isinstance(physical_data.get("sensory_acuity"), dict) else 1.0,
+            physical_data.get("sensory_acuity", {}).get("vision", 1.0)
+            if isinstance(physical_data.get("sensory_acuity"), dict)
+            else 1.0,
+            physical_data.get("sensory_acuity", {}).get("hearing", 1.0)
+            if isinstance(physical_data.get("sensory_acuity"), dict)
+            else 1.0,
             0.0,  # Reserved
-            0.0   # Reserved
+            0.0,  # Reserved
         ]
         biology_array = np.array(biology_features[:10])
 
@@ -219,7 +234,7 @@ def generate_ttm_tensor(entity: Entity) -> Optional[str]:
             cognitive_data.get("decision_confidence", 0.8),
             cognitive_data.get("patience_threshold", 50.0) / 100.0,
             cognitive_data.get("risk_tolerance", 0.5),
-            cognitive_data.get("social_engagement", 0.8)
+            cognitive_data.get("social_engagement", 0.8),
         ]
         context_array = np.array(context_features[:8])
 
@@ -241,10 +256,11 @@ def generate_ttm_tensor(entity: Entity) -> Optional[str]:
     # Serialize the TTMTensor object to JSON for storage in entity.tensor
     # Use model_dump() to get dict, then convert bytes to base64 for JSON compatibility
     import base64
+
     tensor_dict = {
-        "context_vector": base64.b64encode(ttm.context_vector).decode('utf-8'),
-        "biology_vector": base64.b64encode(ttm.biology_vector).decode('utf-8'),
-        "behavior_vector": base64.b64encode(ttm.behavior_vector).decode('utf-8')
+        "context_vector": base64.b64encode(ttm.context_vector).decode("utf-8"),
+        "biology_vector": base64.b64encode(ttm.biology_vector).decode("utf-8"),
+        "behavior_vector": base64.b64encode(ttm.behavior_vector).decode("utf-8"),
     }
 
     return json.dumps(tensor_dict)

@@ -5,22 +5,20 @@ Tests that entity population runs in parallel using asyncio within LangGraph wor
 """
 
 import os
-import asyncio
 import time
-import pytest
-from workflows import create_entity_training_workflow, WorkflowState
-from llm_v2 import LLMClient
-from storage import GraphStore
-from schemas import ResolutionLevel
+
 import networkx as nx
+import pytest
+
+from llm_v2 import LLMClient
+from schemas import ResolutionLevel
+from storage import GraphStore
+from workflows import WorkflowState, create_entity_training_workflow
 
 
 @pytest.mark.integration
 @pytest.mark.llm
-@pytest.mark.skipif(
-    not os.getenv("OPENROUTER_API_KEY"),
-    reason="OPENROUTER_API_KEY not set"
-)
+@pytest.mark.skipif(not os.getenv("OPENROUTER_API_KEY"), reason="OPENROUTER_API_KEY not set")
 def test_parallel_execution():
     """Test that the parallel execution workflow works correctly"""
     print("🧪 Testing Mechanism 1.3: LangGraph Parallel Execution")
@@ -44,7 +42,7 @@ def test_parallel_execution():
         "resolution": ResolutionLevel.GRAPH,
         "violations": [],
         "results": {},
-        "entity_populations": {}
+        "entity_populations": {},
     }
 
     print(f"📊 Test graph has {len(test_graph.nodes())} entities: {list(test_graph.nodes())}")
@@ -80,6 +78,7 @@ def test_parallel_execution():
     except Exception as e:
         print(f"❌ Test failed with error: {e}")
         import traceback
+
         traceback.print_exc()
         raise
 

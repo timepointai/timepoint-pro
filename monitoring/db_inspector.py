@@ -8,7 +8,7 @@ import json
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Dict, List, Any
+from typing import Any
 
 
 @dataclass
@@ -16,25 +16,25 @@ class SimulationSnapshot:
     """Snapshot of simulation state from database and narrative files"""
 
     # Metadata from runs.db
-    run_id: Optional[str] = None
-    template_id: Optional[str] = None
-    causal_mode: Optional[str] = None
+    run_id: str | None = None
+    template_id: str | None = None
+    causal_mode: str | None = None
     entities_created: int = 0
     timepoints_created: int = 0
-    mechanisms_used: List[str] = None
+    mechanisms_used: list[str] = None
     cost_usd: float = 0.0
     status: str = "unknown"
 
     # M1+M17: Fidelity metrics (Database v2)
-    fidelity_distribution: Optional[Dict[str, int]] = None
-    token_budget_compliance: Optional[float] = None
-    fidelity_efficiency_score: Optional[float] = None
-    actual_tokens_used: Optional[float] = None
+    fidelity_distribution: dict[str, int] | None = None
+    token_budget_compliance: float | None = None
+    fidelity_efficiency_score: float | None = None
+    actual_tokens_used: float | None = None
 
     # Narrative data from JSON
-    characters: List[Dict[str, Any]] = None
-    timeline: List[Dict[str, Any]] = None
-    latest_event: Optional[str] = None
+    characters: list[dict[str, Any]] = None
+    timeline: list[dict[str, Any]] = None
+    latest_event: str | None = None
     dialog_count: int = 0
 
     def __post_init__(self):
@@ -55,7 +55,7 @@ class DBInspector:
         self.db_path = db_path
         self.datasets_dir = datasets_dir
 
-    def get_run_snapshot(self, run_id: str) -> Optional[SimulationSnapshot]:
+    def get_run_snapshot(self, run_id: str) -> SimulationSnapshot | None:
         """
         Get complete snapshot of a simulation run.
 
@@ -98,12 +98,14 @@ class DBInspector:
                     snapshot.fidelity_efficiency_score = row[27]
 
             # Get mechanisms
-            cursor.execute("SELECT DISTINCT mechanism FROM mechanism_usage WHERE run_id = ?", (run_id,))
+            cursor.execute(
+                "SELECT DISTINCT mechanism FROM mechanism_usage WHERE run_id = ?", (run_id,)
+            )
             snapshot.mechanisms_used = [row[0] for row in cursor.fetchall()]
 
             conn.close()
 
-        except Exception as e:
+        except Exception:
             # Database might not exist yet or be locked
             pass
 
@@ -129,7 +131,7 @@ class DBInspector:
 
         return snapshot
 
-    def _find_latest_narrative(self, template_id: str) -> Optional[Path]:
+    def _find_latest_narrative(self, template_id: str) -> Path | None:
         """Find the most recent narrative JSON file for a template"""
         template_dir = self.datasets_dir / template_id
         if not template_dir.exists():
@@ -154,14 +156,18 @@ class DBInspector:
         lines.append(f"=== SIMULATION STATE: {snapshot.run_id} ===")
         lines.append(f"Template: {snapshot.template_id}")
         lines.append(f"Mode: {snapshot.causal_mode}")
-        lines.append(f"Progress: {snapshot.entities_created} entities, {snapshot.timepoints_created} timepoints")
-        lines.append(f"Mechanisms: {', '.join(snapshot.mechanisms_used) if snapshot.mechanisms_used else 'None'}")
+        lines.append(
+            f"Progress: {snapshot.entities_created} entities, {snapshot.timepoints_created} timepoints"
+        )
+        lines.append(
+            f"Mechanisms: {', '.join(snapshot.mechanisms_used) if snapshot.mechanisms_used else 'None'}"
+        )
         lines.append(f"Cost: ${snapshot.cost_usd:.3f}")
         lines.append(f"Status: {snapshot.status}")
 
         # M1+M17: Display fidelity metrics (Database v2)
         if snapshot.fidelity_distribution:
-            lines.append(f"\nFidelity Distribution (M1):")
+            lines.append("\nFidelity Distribution (M1):")
             for res_level, count in sorted(snapshot.fidelity_distribution.items()):
                 lines.append(f"  {res_level}: {count} entities")
 
@@ -171,7 +177,9 @@ class DBInspector:
             lines.append(f"Token Budget Compliance: {status} {compliance_pct:.1f}%")
 
         if snapshot.fidelity_efficiency_score is not None:
-            lines.append(f"Fidelity Efficiency: {snapshot.fidelity_efficiency_score:.6f} quality/token")
+            lines.append(
+                f"Fidelity Efficiency: {snapshot.fidelity_efficiency_score:.6f} quality/token"
+            )
 
         if snapshot.characters:
             lines.append(f"\nCharacters ({len(snapshot.characters)}):")

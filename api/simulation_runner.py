@@ -7,21 +7,19 @@ cancellation support, and result storage.
 Phase 6: Public API - Simulation Execution
 """
 
-import asyncio
 import threading
 import uuid
-from datetime import datetime
-from typing import Optional, Dict, Any, Callable
-from dataclasses import dataclass, field
 from concurrent.futures import ThreadPoolExecutor
-from enum import Enum
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any
 
-from .models_simulation import SimulationStatus, SimulationCreateRequest
-
+from .models_simulation import SimulationCreateRequest, SimulationStatus
 
 # ============================================================================
 # Job Storage (In-Memory for MVP)
 # ============================================================================
+
 
 @dataclass
 class SimulationJob:
@@ -33,40 +31,40 @@ class SimulationJob:
     created_at: datetime
 
     # Configuration
-    template_id: Optional[str] = None
-    description: Optional[str] = None
+    template_id: str | None = None
+    description: str | None = None
     entity_count: int = 4
     timepoint_count: int = 5
     temporal_mode: str = "forward"
     generate_summaries: bool = True
     export_formats: list = field(default_factory=lambda: ["json", "markdown"])
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: dict[str, Any] | None = None
 
     # Progress tracking
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
     progress_percent: float = 0.0
-    current_step: Optional[str] = None
+    current_step: str | None = None
 
     # Results
-    run_id: Optional[str] = None
-    entities_created: Optional[int] = None
-    timepoints_created: Optional[int] = None
-    cost_usd: Optional[float] = None
-    tokens_used: Optional[int] = None
+    run_id: str | None = None
+    entities_created: int | None = None
+    timepoints_created: int | None = None
+    cost_usd: float | None = None
+    tokens_used: int | None = None
 
     # Error handling
-    error_message: Optional[str] = None
+    error_message: str | None = None
     cancelled: bool = False
-    cancel_reason: Optional[str] = None
+    cancel_reason: str | None = None
 
 
 # Global job storage (in-memory for MVP, would be database in production)
-_JOBS: Dict[str, SimulationJob] = {}
+_JOBS: dict[str, SimulationJob] = {}
 _JOB_LOCK = threading.Lock()
 
 
-def get_job(job_id: str) -> Optional[SimulationJob]:
+def get_job(job_id: str) -> SimulationJob | None:
     """Get a job by ID."""
     with _JOB_LOCK:
         return _JOBS.get(job_id)
@@ -79,10 +77,10 @@ def save_job(job: SimulationJob) -> None:
 
 
 def list_jobs(
-    owner_id: Optional[str] = None,
-    status: Optional[SimulationStatus] = None,
+    owner_id: str | None = None,
+    status: SimulationStatus | None = None,
     limit: int = 100,
-    offset: int = 0
+    offset: int = 0,
 ) -> tuple[list[SimulationJob], int]:
     """List jobs with optional filtering."""
     with _JOB_LOCK:
@@ -100,7 +98,7 @@ def list_jobs(
         jobs.sort(key=lambda j: j.created_at, reverse=True)
 
         total = len(jobs)
-        return jobs[offset:offset + limit], total
+        return jobs[offset : offset + limit], total
 
 
 def delete_job(job_id: str) -> bool:
@@ -122,6 +120,7 @@ def clear_jobs() -> None:
 # Simulation Runner
 # ============================================================================
 
+
 class SimulationRunner:
     """
     Manages simulation job execution.
@@ -138,13 +137,9 @@ class SimulationRunner:
         """
         self.max_workers = max_workers
         self._executor = ThreadPoolExecutor(max_workers=max_workers)
-        self._running_jobs: Dict[str, threading.Event] = {}
+        self._running_jobs: dict[str, threading.Event] = {}
 
-    def create_job(
-        self,
-        request: SimulationCreateRequest,
-        owner_id: str
-    ) -> SimulationJob:
+    def create_job(self, request: SimulationCreateRequest, owner_id: str) -> SimulationJob:
         """
         Create a new simulation job.
 
@@ -195,7 +190,7 @@ class SimulationRunner:
         self._executor.submit(self._run_simulation, job_id, cancel_event)
         return True
 
-    def cancel_job(self, job_id: str, reason: Optional[str] = None) -> bool:
+    def cancel_job(self, job_id: str, reason: str | None = None) -> bool:
         """
         Cancel a running job.
 
@@ -231,11 +226,7 @@ class SimulationRunner:
 
         return False
 
-    def _run_simulation(
-        self,
-        job_id: str,
-        cancel_event: threading.Event
-    ) -> None:
+    def _run_simulation(self, job_id: str, cancel_event: threading.Event) -> None:
         """
         Execute a simulation job.
 
@@ -337,6 +328,7 @@ class SimulationRunner:
         else:
             # Create from description using NL interface
             from nl_interface.adapter import NLToProductionAdapter
+
             adapter = NLToProductionAdapter()
 
             config = adapter.convert_nl_to_config(
@@ -345,7 +337,7 @@ class SimulationRunner:
                     "max_entities": job.entity_count,
                     "max_timepoints": job.timepoint_count,
                     "temporal_mode": job.temporal_mode,
-                }
+                },
             )
 
         # Apply output settings
@@ -355,26 +347,22 @@ class SimulationRunner:
         return config
 
     def _execute_simulation(
-        self,
-        job: SimulationJob,
-        config: Any,
-        cancel_event: threading.Event
-    ) -> Optional[Dict[str, Any]]:
+        self, job: SimulationJob, config: Any, cancel_event: threading.Event
+    ) -> dict[str, Any] | None:
         """
         Execute the actual simulation.
 
         This wraps the E2E workflow runner.
         """
-        from metadata.run_tracker import MetadataManager
         from e2e_workflows.e2e_runner import FullE2EWorkflowRunner
+        from metadata.run_tracker import MetadataManager
 
         # Create metadata manager
         metadata_manager = MetadataManager()
 
         # Create runner
         runner = FullE2EWorkflowRunner(
-            metadata_manager=metadata_manager,
-            generate_summary=job.generate_summaries
+            metadata_manager=metadata_manager, generate_summary=job.generate_summaries
         )
 
         # Progress callback
@@ -396,12 +384,12 @@ class SimulationRunner:
                 "tokens_used": metadata.tokens_used,
             }
 
-        except Exception as e:
+        except Exception:
             if cancel_event.is_set():
                 return None
             raise
 
-    def get_stats(self, owner_id: Optional[str] = None) -> Dict[str, Any]:
+    def get_stats(self, owner_id: str | None = None) -> dict[str, Any]:
         """
         Get job statistics.
 
@@ -430,15 +418,12 @@ class SimulationRunner:
 
             # Calculate average duration
             completed = [
-                j for j in jobs
-                if j.status == SimulationStatus.COMPLETED
-                and j.started_at and j.completed_at
+                j
+                for j in jobs
+                if j.status == SimulationStatus.COMPLETED and j.started_at and j.completed_at
             ]
             if completed:
-                durations = [
-                    (j.completed_at - j.started_at).total_seconds()
-                    for j in completed
-                ]
+                durations = [(j.completed_at - j.started_at).total_seconds() for j in completed]
                 stats["avg_duration_seconds"] = sum(durations) / len(durations)
             else:
                 stats["avg_duration_seconds"] = None
@@ -454,7 +439,7 @@ class SimulationRunner:
 # Global Runner Instance
 # ============================================================================
 
-_runner: Optional[SimulationRunner] = None
+_runner: SimulationRunner | None = None
 
 
 def get_simulation_runner() -> SimulationRunner:

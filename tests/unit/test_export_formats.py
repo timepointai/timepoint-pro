@@ -2,19 +2,21 @@
 Tests for Export Formats (Sprint 2.3)
 """
 
-import pytest
-import json
+import bz2
 import csv
 import gzip
-import bz2
+import json
 import sqlite3
 from pathlib import Path
+
+import pytest
+
 from reporting.export_formats import (
-    JSONLExporter,
-    JSONExporter,
     CSVExporter,
+    ExportFormatFactory,
+    JSONExporter,
+    JSONLExporter,
     SQLiteExporter,
-    ExportFormatFactory
 )
 
 
@@ -32,7 +34,7 @@ def sample_data():
     return [
         {"id": 1, "name": "Alice", "age": 30, "city": "NYC"},
         {"id": 2, "name": "Bob", "age": 25, "city": "LA"},
-        {"id": 3, "name": "Charlie", "age": 35, "city": "Chicago"}
+        {"id": 3, "name": "Charlie", "age": 35, "city": "Chicago"},
     ]
 
 
@@ -47,7 +49,7 @@ class TestJSONLExporter:
         exporter.export(sample_data, str(output_path))
 
         assert output_path.exists()
-        lines = output_path.read_text().strip().split('\n')
+        lines = output_path.read_text().strip().split("\n")
         assert len(lines) == 3
 
         # Each line should be valid JSON
@@ -58,34 +60,34 @@ class TestJSONLExporter:
 
     def test_export_jsonl_gzip(self, temp_export_dir, sample_data):
         """Test JSONL export with gzip compression"""
-        exporter = JSONLExporter(compression='gzip')
+        exporter = JSONLExporter(compression="gzip")
         output_path = temp_export_dir / "output.jsonl"
 
         exporter.export(sample_data, str(output_path))
 
         # Should create .gz file
-        gz_path = Path(str(output_path) + '.gz')
+        gz_path = Path(str(output_path) + ".gz")
         assert gz_path.exists()
 
         # Verify content
-        with gzip.open(gz_path, 'rt', encoding='utf-8') as f:
-            lines = f.read().strip().split('\n')
+        with gzip.open(gz_path, "rt", encoding="utf-8") as f:
+            lines = f.read().strip().split("\n")
             assert len(lines) == 3
 
     def test_export_jsonl_bz2(self, temp_export_dir, sample_data):
         """Test JSONL export with bz2 compression"""
-        exporter = JSONLExporter(compression='bz2')
+        exporter = JSONLExporter(compression="bz2")
         output_path = temp_export_dir / "output.jsonl"
 
         exporter.export(sample_data, str(output_path))
 
         # Should create .bz2 file
-        bz2_path = Path(str(output_path) + '.bz2')
+        bz2_path = Path(str(output_path) + ".bz2")
         assert bz2_path.exists()
 
         # Verify content
-        with bz2.open(bz2_path, 'rt', encoding='utf-8') as f:
-            lines = f.read().strip().split('\n')
+        with bz2.open(bz2_path, "rt", encoding="utf-8") as f:
+            lines = f.read().strip().split("\n")
             assert len(lines) == 3
 
     def test_export_jsonl_empty(self, temp_export_dir):
@@ -129,15 +131,15 @@ class TestJSONExporter:
 
     def test_export_json_gzip(self, temp_export_dir, sample_data):
         """Test JSON export with gzip compression"""
-        exporter = JSONExporter(compression='gzip')
+        exporter = JSONExporter(compression="gzip")
         output_path = temp_export_dir / "output.json"
 
         exporter.export(sample_data, str(output_path))
 
-        gz_path = Path(str(output_path) + '.gz')
+        gz_path = Path(str(output_path) + ".gz")
         assert gz_path.exists()
 
-        with gzip.open(gz_path, 'rt', encoding='utf-8') as f:
+        with gzip.open(gz_path, "rt", encoding="utf-8") as f:
             parsed = json.load(f)
             assert len(parsed) == 3
 
@@ -168,7 +170,7 @@ class TestCSVExporter:
         assert output_path.exists()
 
         # Read and verify
-        with open(output_path, 'r', newline='', encoding='utf-8') as f:
+        with open(output_path, newline="", encoding="utf-8") as f:
             reader = csv.DictReader(f)
             rows = list(reader)
             assert len(rows) == 3
@@ -177,7 +179,7 @@ class TestCSVExporter:
 
     def test_export_csv_custom_delimiter(self, temp_export_dir, sample_data):
         """Test CSV export with custom delimiter"""
-        exporter = CSVExporter(delimiter='|')
+        exporter = CSVExporter(delimiter="|")
         output_path = temp_export_dir / "output.csv"
 
         exporter.export(sample_data, str(output_path))
@@ -187,15 +189,15 @@ class TestCSVExporter:
 
     def test_export_csv_gzip(self, temp_export_dir, sample_data):
         """Test CSV export with gzip compression"""
-        exporter = CSVExporter(compression='gzip')
+        exporter = CSVExporter(compression="gzip")
         output_path = temp_export_dir / "output.csv"
 
         exporter.export(sample_data, str(output_path))
 
-        gz_path = Path(str(output_path) + '.gz')
+        gz_path = Path(str(output_path) + ".gz")
         assert gz_path.exists()
 
-        with gzip.open(gz_path, 'rt', encoding='utf-8') as f:
+        with gzip.open(gz_path, "rt", encoding="utf-8") as f:
             reader = csv.DictReader(f)
             rows = list(reader)
             assert len(rows) == 3
@@ -218,11 +220,11 @@ class TestCSVExporter:
 
         data = [
             {"id": 1, "name": "Alice", "metadata": {"age": 30}},
-            {"id": 2, "name": "Bob", "metadata": {"age": 25}}
+            {"id": 2, "name": "Bob", "metadata": {"age": 25}},
         ]
         exporter.export(data, str(output_path))
 
-        with open(output_path, 'r', newline='', encoding='utf-8') as f:
+        with open(output_path, newline="", encoding="utf-8") as f:
             reader = csv.DictReader(f)
             rows = list(reader)
             # Nested dict should be JSON-encoded
@@ -266,8 +268,8 @@ class TestSQLiteExporter:
             "people": sample_data,
             "cities": [
                 {"id": 1, "name": "NYC", "population": 8000000},
-                {"id": 2, "name": "LA", "population": 4000000}
-            ]
+                {"id": 2, "name": "LA", "population": 4000000},
+            ],
         }
         exporter.export(data, str(output_path))
 
@@ -333,7 +335,7 @@ class TestSQLiteExporter:
         data = {
             "entities": [
                 {"id": 1, "name": "Alice", "metadata": {"age": 30, "city": "NYC"}},
-                {"id": 2, "name": "Bob", "metadata": {"age": 25, "city": "LA"}}
+                {"id": 2, "name": "Bob", "metadata": {"age": 25, "city": "LA"}},
             ]
         }
         exporter.export(data, str(output_path))

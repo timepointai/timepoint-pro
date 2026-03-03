@@ -17,26 +17,25 @@ Architecture:
     - Forward validation: backward-generated paths must make forward sense
 """
 
-from typing import List, Dict, Tuple, Optional, Any, Callable
-from dataclasses import dataclass, field
-from enum import Enum
-from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError, as_completed
 import threading
-import numpy as np
 import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import TimeoutError as FuturesTimeoutError
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from typing import Any, Optional
 
-from schemas import Entity, Timepoint, TemporalMode, ResolutionLevel
+import numpy as np
+
 from generation.config_schema import TemporalConfig
-from llm_service.model_selector import (
-    ActionType,
-    TokenBudgetEstimator,
-    get_token_estimator
-)
+from llm_service.model_selector import ActionType, get_token_estimator
+from schemas import Entity, ResolutionLevel, TemporalMode, Timepoint
 
 
 class ExplorationMode(str, Enum):
     """Strategies for exploring backward paths"""
+
     REVERSE_CHRONOLOGICAL = "reverse_chronological"  # 100→99→98→...→1
     OSCILLATING = "oscillating"  # 100→1→99→2→98→3→...
     RANDOM = "random"  # Random step order
@@ -46,13 +45,54 @@ class ExplorationMode(str, Enum):
 # Entity names that should be rejected (common false positives from regex extraction)
 ENTITY_BLACKLIST = {
     # Common words that get falsely extracted as entities
-    "arr", "series", "series_c", "series_a", "series_b", "revenue", "company",
-    "market", "product", "customer", "team", "meeting", "board", "investor",
-    "growth", "funding", "round", "deal", "startup", "business", "year",
-    "quarter", "month", "week", "day", "time", "we", "they", "the", "this",
-    "that", "what", "when", "where", "how", "why", "who", "i", "you",
+    "arr",
+    "series",
+    "series_c",
+    "series_a",
+    "series_b",
+    "revenue",
+    "company",
+    "market",
+    "product",
+    "customer",
+    "team",
+    "meeting",
+    "board",
+    "investor",
+    "growth",
+    "funding",
+    "round",
+    "deal",
+    "startup",
+    "business",
+    "year",
+    "quarter",
+    "month",
+    "week",
+    "day",
+    "time",
+    "we",
+    "they",
+    "the",
+    "this",
+    "that",
+    "what",
+    "when",
+    "where",
+    "how",
+    "why",
+    "who",
+    "i",
+    "you",
     # Common business abbreviations that aren't entities
-    "arr", "mrr", "saas", "b2b", "b2c", "cac", "ltv", "roi", "kpi",
+    "mrr",
+    "saas",
+    "b2b",
+    "b2c",
+    "cac",
+    "ltv",
+    "roi",
+    "kpi",
 }
 
 
@@ -91,10 +131,8 @@ def _validate_entity_id(entity_id: str) -> bool:
 
 
 def _filter_entities_by_relevance(
-    entities: List[Entity],
-    event_description: str,
-    known_entity_ids: Optional[set] = None
-) -> List[Entity]:
+    entities: list[Entity], event_description: str, known_entity_ids: set | None = None
+) -> list[Entity]:
     """
     Filter entities to only include those relevant to an event description.
 
@@ -155,6 +193,7 @@ def _filter_entities_by_relevance(
 
 class FailureResolution(str, Enum):
     """Strategies for handling incoherent paths"""
+
     PRUNE = "prune"  # Kill invalid path immediately
     BACKTRACK = "backtrack"  # Go back N steps, try different antecedent
     MARK = "mark"  # Flag but continue with path
@@ -164,15 +203,16 @@ class FailureResolution(str, Enum):
 @dataclass
 class PortalState:
     """A state at a specific point in the backward simulation"""
+
     year: int
     description: str
-    entities: List[Entity]
-    world_state: Dict[str, Any]
+    entities: list[Entity]
+    world_state: dict[str, Any]
     plausibility_score: float = 0.0
-    parent_state: Optional['PortalState'] = None  # The state this came from (T+1)
-    children_states: List['PortalState'] = field(default_factory=list)  # Possible T-1 states
+    parent_state: Optional["PortalState"] = None  # The state this came from (T+1)
+    children_states: list["PortalState"] = field(default_factory=list)  # Possible T-1 states
     month: int = 1  # Month (1-12), defaults to January for backward compatibility
-    resolution_level: 'ResolutionLevel' = None  # NEW: Fidelity level for this state
+    resolution_level: "ResolutionLevel" = None  # NEW: Fidelity level for this state
 
     def __post_init__(self):
         """Ensure children_states is a list, month is valid, resolution defaults to SCENE"""
@@ -187,16 +227,28 @@ class PortalState:
 
     def to_year_month_str(self) -> str:
         """Return human-readable year-month string"""
-        month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-        return f"{month_names[self.month-1]} {self.year}"
+        month_names = [
+            "Jan",
+            "Feb",
+            "Mar",
+            "Apr",
+            "May",
+            "Jun",
+            "Jul",
+            "Aug",
+            "Sep",
+            "Oct",
+            "Nov",
+            "Dec",
+        ]
+        return f"{month_names[self.month - 1]} {self.year}"
 
     def to_total_months(self) -> int:
         """Convert year + month to total months since year 0"""
         return self.year * 12 + self.month
 
     @classmethod
-    def from_total_months(cls, total_months: int, **kwargs) -> 'PortalState':
+    def from_total_months(cls, total_months: int, **kwargs) -> "PortalState":
         """Create PortalState from total months count"""
         year = total_months // 12
         month = total_months % 12
@@ -209,12 +261,13 @@ class PortalState:
 @dataclass
 class PortalPath:
     """Complete path from origin to portal"""
+
     path_id: str
-    states: List[PortalState]  # Ordered origin→portal
+    states: list[PortalState]  # Ordered origin→portal
     coherence_score: float
-    pivot_points: List[int] = field(default_factory=list)  # Indices of critical decision states
+    pivot_points: list[int] = field(default_factory=list)  # Indices of critical decision states
     explanation: str = ""
-    validation_details: Dict[str, Any] = field(default_factory=dict)
+    validation_details: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         """Ensure collections are initialized"""
@@ -262,11 +315,11 @@ class PortalStrategy:
         self.llm = llm_client
         self.store = store
         self.entity_roster = entity_roster or {}
-        self.paths: List[PortalPath] = []  # Top-ranked paths (backward compatible)
-        self.all_paths: List[PortalPath] = []  # ALL generated paths for exploration
+        self.paths: list[PortalPath] = []  # Top-ranked paths (backward compatible)
+        self.all_paths: list[PortalPath] = []  # ALL generated paths for exploration
 
         # Phase 5: Inline dialog at each backward step
-        portal_metadata = getattr(config, 'metadata', None) or {}
+        portal_metadata = getattr(config, "metadata", None) or {}
         if isinstance(portal_metadata, dict):
             self.enable_inline_dialog = portal_metadata.get("portal_inline_dialog", True)
         else:
@@ -279,19 +332,19 @@ class PortalStrategy:
         if not config.portal_year or not config.origin_year:
             raise ValueError("portal_year and origin_year are required for PORTAL mode")
 
-    def run(self) -> List[PortalPath]:
+    def run(self) -> list[PortalPath]:
         """
         Execute portal-anchored backward simulation.
 
         Returns:
             List of PortalPath objects, ranked by coherence score
         """
-        print(f"\n{'='*80}")
-        print(f"PORTAL MODE: Backward Simulation")
+        print(f"\n{'=' * 80}")
+        print("PORTAL MODE: Backward Simulation")
         print(f"Portal: {self.config.portal_description} ({self.config.portal_year})")
         print(f"Origin: {self.config.origin_year}")
         print(f"Steps: {self.config.backward_steps}")
-        print(f"{'='*80}\n")
+        print(f"{'=' * 80}\n")
 
         # Step 1: Generate portal state
         print("Step 1: Generating portal endpoint state...")
@@ -311,7 +364,9 @@ class PortalStrategy:
         # Step 4: Validate forward coherence
         print("\nStep 4: Validating forward coherence...")
         valid_paths = self._validate_forward_coherence(candidate_paths)
-        print(f"✓ {len(valid_paths)} paths passed coherence threshold ({self.config.coherence_threshold})")
+        print(
+            f"✓ {len(valid_paths)} paths passed coherence threshold ({self.config.coherence_threshold})"
+        )
 
         # Step 5: Rank by hybrid scoring
         print("\nStep 5: Ranking paths by plausibility...")
@@ -326,7 +381,7 @@ class PortalStrategy:
         for i, path in enumerate(ranked_paths):
             path.pivot_points = self._detect_pivot_points(path, divergence_analysis)
             if i < 5:  # Only log first 5 to avoid spam
-                print(f"  Path {i+1}: {len(path.pivot_points)} pivot points detected")
+                print(f"  Path {i + 1}: {len(path.pivot_points)} pivot points detected")
         if len(ranked_paths) > 5:
             print(f"  ... and {len(ranked_paths) - 5} more paths analyzed")
 
@@ -334,32 +389,32 @@ class PortalStrategy:
         self.all_paths = ranked_paths
 
         # Keep top N for backward compatibility
-        self.paths = ranked_paths[:self.config.path_count]
+        self.paths = ranked_paths[: self.config.path_count]
 
         # Attach divergence metadata to all paths
         for path in self.all_paths:
-            path.validation_details['divergence'] = divergence_analysis.get(path.path_id, {})
+            path.validation_details["divergence"] = divergence_analysis.get(path.path_id, {})
 
         # Determine what to return based on preserve_all_paths config
-        preserve_all = getattr(self.config, 'preserve_all_paths', True)
+        preserve_all = getattr(self.config, "preserve_all_paths", True)
         return_paths = self.all_paths if preserve_all else self.paths
 
-        print(f"\n{'='*80}")
-        print(f"PORTAL SIMULATION COMPLETE")
+        print(f"\n{'=' * 80}")
+        print("PORTAL SIMULATION COMPLETE")
         print(f"Total paths generated: {len(self.all_paths)}")
         if preserve_all:
             print(f"Returning ALL {len(return_paths)} paths (preserve_all_paths=True)")
         else:
             print(f"Returning top {len(return_paths)} paths (use .all_paths for full list)")
         if divergence_analysis:
-            key_divergences = divergence_analysis.get('key_divergence_points', [])
+            key_divergences = divergence_analysis.get("key_divergence_points", [])
             if key_divergences:
                 print(f"Key divergence points: {key_divergences[:5]}")
         # Summarize pivot points across paths
         total_pivots = sum(len(p.pivot_points) for p in return_paths)
         if total_pivots > 0:
             print(f"Total pivot points detected: {total_pivots} across {len(return_paths)} paths")
-        print(f"{'='*80}\n")
+        print(f"{'=' * 80}\n")
 
         return return_paths
 
@@ -379,8 +434,7 @@ class PortalStrategy:
         Creates an ephemeral Timepoint from the PortalState, seeds tensors,
         runs synthesize_dialog(), and extracts constraints for antecedent generation.
         """
-        from schemas import Timepoint, PhysicalTensor, CognitiveTensor
-        from datetime import datetime
+        from schemas import CognitiveTensor, PhysicalTensor
 
         # Create ephemeral Timepoint from PortalState
         tp_id = f"portal_step_{step_index}_{portal_state.year}_{portal_state.month}"
@@ -407,15 +461,22 @@ class PortalStrategy:
                     except (ValueError, TypeError):
                         age = 35.0
                 entity.entity_metadata["physical_tensor"] = PhysicalTensor(
-                    age=age, health_status=1.0, pain_level=0.0,
-                    fever=36.5, mobility=1.0, stamina=1.0,
+                    age=age,
+                    health_status=1.0,
+                    pain_level=0.0,
+                    fever=36.5,
+                    mobility=1.0,
+                    stamina=1.0,
                     sensory_acuity={"vision": 1.0, "hearing": 1.0},
                 ).model_dump()
 
             if not entity.entity_metadata.get("cognitive_tensor"):
                 entity.entity_metadata["cognitive_tensor"] = CognitiveTensor(
-                    knowledge_state=[], emotional_valence=0.0, emotional_arousal=0.2,
-                    energy_budget=100.0, decision_confidence=0.8,
+                    knowledge_state=[],
+                    emotional_valence=0.0,
+                    emotional_arousal=0.2,
+                    energy_budget=100.0,
+                    decision_confidence=0.8,
                 ).model_dump()
 
         # Run dialog
@@ -434,7 +495,9 @@ class PortalStrategy:
             if len(participants) < 2:
                 return dialog_constraints
 
-            timeline = [{"event_description": portal_state.description, "timestamp": timestamp.isoformat()}]
+            timeline = [
+                {"event_description": portal_state.description, "timestamp": timestamp.isoformat()}
+            ]
 
             dialog = synthesize_dialog(
                 entities=participants,
@@ -448,7 +511,10 @@ class PortalStrategy:
 
             # Extract dialog constraints from the result
             import json as _json
-            turns = _json.loads(dialog.turns) if isinstance(dialog.turns, str) else (dialog.turns or [])
+
+            turns = (
+                _json.loads(dialog.turns) if isinstance(dialog.turns, str) else (dialog.turns or [])
+            )
 
             # Build character positions
             for entity in participants:
@@ -459,10 +525,11 @@ class PortalStrategy:
                     dialog_constraints["character_positions"][entity.entity_id] = {
                         "stated_position": last_content[:150],
                         "information_held": [
-                            kr for t in entity_turns
-                            for kr in t.get("knowledge_references", [])
+                            kr for t in entity_turns for kr in t.get("knowledge_references", [])
                         ][:5],
-                        "trust_toward": entity.entity_metadata.get("character_arc", {}).get("trust_ledger", {}),
+                        "trust_toward": entity.entity_metadata.get("character_arc", {}).get(
+                            "trust_ledger", {}
+                        ),
                     }
 
             # Identify contested vs resolved claims
@@ -498,8 +565,10 @@ class PortalStrategy:
                 if content:
                     prior_beats.append(f"{speaker}: {content}")
 
-            print(f"    [Portal Dialog] Step {step_index}: {len(turns)} turns, "
-                  f"{len(dialog_constraints['contested_claims'])} contested claims")
+            print(
+                f"    [Portal Dialog] Step {step_index}: {len(turns)} turns, "
+                f"{len(dialog_constraints['contested_claims'])} contested claims"
+            )
 
         except Exception as e:
             print(f"    ⚠️  Portal dialog failed at step {step_index}: {e}")
@@ -521,10 +590,10 @@ class PortalStrategy:
             description=self.config.portal_description,
             entities=entities,
             world_state={"placeholder": True},
-            plausibility_score=1.0  # Portal is given, score is 1.0
+            plausibility_score=1.0,  # Portal is given, score is 1.0
         )
 
-    def _create_entities_from_roster(self, roster: Dict[str, Any]) -> List[Entity]:
+    def _create_entities_from_roster(self, roster: dict[str, Any]) -> list[Entity]:
         """
         Create Entity objects from a structured entity_roster dict.
 
@@ -542,7 +611,7 @@ class PortalStrategy:
                 "name": entity_id.replace("_", " ").title(),
                 "role": role,
                 "initial_knowledge": initial_knowledge,
-                "source": "template_entity_roster"
+                "source": "template_entity_roster",
             }
 
             # Propagate voice differentiation data from roster into entity metadata
@@ -553,14 +622,12 @@ class PortalStrategy:
             if "speech_examples" in info:
                 metadata["speech_examples"] = info["speech_examples"]
 
-            entities.append(Entity(
-                entity_id=entity_id,
-                entity_type=entity_type,
-                entity_metadata=metadata
-            ))
+            entities.append(
+                Entity(entity_id=entity_id, entity_type=entity_type, entity_metadata=metadata)
+            )
         return entities
 
-    def _infer_entities_from_description(self, description: str) -> List[Entity]:
+    def _infer_entities_from_description(self, description: str) -> list[Entity]:
         """
         Infer entities that should exist from a state description.
 
@@ -576,24 +643,29 @@ class PortalStrategy:
         if not self.llm:
             # Fallback: extract capitalized names from description
             import re
-            potential_names = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', description)
+
+            potential_names = re.findall(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b", description)
             entities = []
             seen = set()
             for name in potential_names[:10]:
-                entity_id = name.lower().replace(' ', '_')
+                entity_id = name.lower().replace(" ", "_")
                 # Validate entity ID before adding
                 if entity_id not in seen and _validate_entity_id(entity_id):
                     seen.add(entity_id)
-                    entities.append(Entity(
-                        entity_id=entity_id,
-                        entity_type="person",  # Default type
-                        entity_metadata={"name": name, "source": "inferred_from_description"}
-                    ))
+                    entities.append(
+                        Entity(
+                            entity_id=entity_id,
+                            entity_type="person",  # Default type
+                            entity_metadata={"name": name, "source": "inferred_from_description"},
+                        )
+                    )
             return entities
 
         # Use LLM to infer entities
         try:
-            system_prompt = "You are an expert at identifying key entities in narrative descriptions."
+            system_prompt = (
+                "You are an expert at identifying key entities in narrative descriptions."
+            )
             user_prompt = f"""Identify the key entities (people, organizations, places) mentioned or implied in this description.
 
 DESCRIPTION:
@@ -607,7 +679,6 @@ Return a JSON object with format:
 Include 3-10 relevant entities."""
 
             from pydantic import BaseModel
-            from typing import List as TypingList
 
             class EntityInfo(BaseModel):
                 name: str
@@ -615,47 +686,52 @@ Include 3-10 relevant entities."""
                 role: str
 
             class EntityList(BaseModel):
-                entities: TypingList[EntityInfo]
+                entities: list[EntityInfo]
 
             result = self.llm.generate_structured(
                 prompt=user_prompt,
                 response_model=EntityList,
                 system_prompt=system_prompt,
                 temperature=0.3,
-                max_tokens=500
+                max_tokens=500,
             )
 
             # Convert to Entity objects
             entities = []
             for info in result.entities[:10]:
-                entity_id = info.name.lower().replace(' ', '_').replace("'", "")
-                entities.append(Entity(
-                    entity_id=entity_id,
-                    entity_type=info.type,
-                    entity_metadata={
-                        "name": info.name,
-                        "role": info.role,
-                        "source": "inferred_from_portal"
-                    }
-                ))
+                entity_id = info.name.lower().replace(" ", "_").replace("'", "")
+                entities.append(
+                    Entity(
+                        entity_id=entity_id,
+                        entity_type=info.type,
+                        entity_metadata={
+                            "name": info.name,
+                            "role": info.role,
+                            "source": "inferred_from_portal",
+                        },
+                    )
+                )
             return entities
 
         except Exception as e:
             print(f"    ⚠️  Entity inference from description failed: {e}")
             # Fallback to regex extraction
             import re
-            potential_names = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', description)
+
+            potential_names = re.findall(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b", description)
             entities = []
             seen = set()
             for name in potential_names[:10]:
-                entity_id = name.lower().replace(' ', '_')
+                entity_id = name.lower().replace(" ", "_")
                 if entity_id not in seen and len(entity_id) > 2:
                     seen.add(entity_id)
-                    entities.append(Entity(
-                        entity_id=entity_id,
-                        entity_type="person",
-                        entity_metadata={"name": name, "source": "fallback_regex"}
-                    ))
+                    entities.append(
+                        Entity(
+                            entity_id=entity_id,
+                            entity_type="person",
+                            entity_metadata={"name": name, "source": "fallback_regex"},
+                        )
+                    )
             return entities
 
     def _select_exploration_strategy(self) -> ExplorationMode:
@@ -668,10 +744,8 @@ Include 3-10 relevant entities."""
         return ExplorationMode(self.config.exploration_mode)
 
     def _explore_backward_paths(
-        self,
-        portal: PortalState,
-        strategy: ExplorationMode
-    ) -> List[PortalPath]:
+        self, portal: PortalState, strategy: ExplorationMode
+    ) -> list[PortalPath]:
         """Explore multiple backward paths using selected strategy"""
         if strategy == ExplorationMode.REVERSE_CHRONOLOGICAL:
             return self._explore_reverse_chronological(portal)
@@ -682,14 +756,14 @@ Include 3-10 relevant entities."""
         else:
             raise ValueError(f"Unknown exploration mode: {strategy}")
 
-    def _explore_reverse_chronological(self, portal: PortalState) -> List[PortalPath]:
+    def _explore_reverse_chronological(self, portal: PortalState) -> list[PortalPath]:
         """Standard backward stepping: T_n → T_n-1 → ... → T_0
 
         Uses month-based calculation to support sub-year granularity.
         Ensures smooth temporal progression even when backward_steps > year_range.
         """
-        from workflows import TemporalAgent
         from schemas import FidelityPlanningMode
+        from workflows import TemporalAgent
 
         paths = []
         current_states = [portal]
@@ -702,13 +776,13 @@ Include 3-10 relevant entities."""
         strategy = temporal_agent.determine_fidelity_temporal_strategy(
             config=self.config,
             context={
-                'portal_state': portal,
-                'origin_year': self.config.origin_year,
-                'entities': portal.entities
-            }
+                "portal_state": portal,
+                "origin_year": self.config.origin_year,
+                "entities": portal.entities,
+            },
         )
 
-        print(f"  Fidelity-Temporal Strategy:")
+        print("  Fidelity-Temporal Strategy:")
         print(f"    Planning mode: {strategy.planning_mode}")
         print(f"    Budget mode: {strategy.budget_mode}")
         print(f"    Token budget: {strategy.token_budget}")
@@ -734,16 +808,20 @@ Include 3-10 relevant entities."""
                     target_resolution = ResolutionLevel.SCENE
             else:
                 # Query agent for adaptive decision
-                month_step, target_resolution = temporal_agent.determine_next_step_fidelity_and_time(
-                    current_state=current_states[0] if current_states else portal,
-                    strategy=strategy,
-                    step_num=step,
-                    context={
-                        'entities': current_states[0].entities if current_states else portal.entities,
-                        'importance_score': 0.5,  # TODO: compute from state
-                        'state_complexity': 0.5,  # TODO: compute from state
-                        'pivot_detected': False  # TODO: detect pivot points
-                    }
+                month_step, target_resolution = (
+                    temporal_agent.determine_next_step_fidelity_and_time(
+                        current_state=current_states[0] if current_states else portal,
+                        strategy=strategy,
+                        step_num=step,
+                        context={
+                            "entities": current_states[0].entities
+                            if current_states
+                            else portal.entities,
+                            "importance_score": 0.5,  # TODO: compute from state
+                            "state_complexity": 0.5,  # TODO: compute from state
+                            "pivot_detected": False,  # TODO: detect pivot points
+                        },
+                    )
                 )
 
             # Calculate target month count
@@ -760,32 +838,42 @@ Include 3-10 relevant entities."""
                 step_month = 12
 
             # Create temporary state for logging
-            temp_state = PortalState(year=step_year, month=step_month, description="", entities=[], world_state={})
-            print(f"  Backward step {step+1}/{strategy.timepoint_count}: {temp_state.to_year_month_str()} @ {target_resolution}")
+            temp_state = PortalState(
+                year=step_year, month=step_month, description="", entities=[], world_state={}
+            )
+            print(
+                f"  Backward step {step + 1}/{strategy.timepoint_count}: {temp_state.to_year_month_str()} @ {target_resolution}"
+            )
 
             # Get parallelization settings (max_parallel_workers acts as ceiling; 0 = no ceiling)
-            global_cap = getattr(self.config, 'max_parallel_workers', 5)
-            subsystem_cap = getattr(self.config, 'max_antecedent_workers', 3)
-            max_antecedent_workers = subsystem_cap if global_cap == 0 else min(global_cap, subsystem_cap)
+            global_cap = getattr(self.config, "max_parallel_workers", 5)
+            subsystem_cap = getattr(self.config, "max_antecedent_workers", 3)
+            max_antecedent_workers = (
+                subsystem_cap if global_cap == 0 else min(global_cap, subsystem_cap)
+            )
 
             # Process states - parallel if multiple states, sequential if just one
             if len(current_states) > 1 and max_antecedent_workers > 1:
                 # Parallel state processing
-                print(f"    Processing {len(current_states)} states in parallel ({max_antecedent_workers} workers)...")
+                print(
+                    f"    Processing {len(current_states)} states in parallel ({max_antecedent_workers} workers)..."
+                )
 
-                def process_single_state(state: PortalState) -> List[PortalState]:
+                def process_single_state(state: PortalState) -> list[PortalState]:
                     """Process a single state: generate antecedents, score, return top candidates."""
                     antecedents = self._generate_antecedents(
                         state,
                         target_year=step_year,
                         target_month=step_month,
-                        target_resolution=target_resolution
+                        target_resolution=target_resolution,
                     )
                     scored = self._score_antecedents(antecedents, state)
-                    return scored[:self.config.candidate_antecedents_per_step]
+                    return scored[: self.config.candidate_antecedents_per_step]
 
                 with ThreadPoolExecutor(max_workers=max_antecedent_workers) as executor:
-                    futures = [executor.submit(process_single_state, state) for state in current_states]
+                    futures = [
+                        executor.submit(process_single_state, state) for state in current_states
+                    ]
                     for future in as_completed(futures):
                         try:
                             top_antecedents = future.result()
@@ -800,12 +888,12 @@ Include 3-10 relevant entities."""
                         state,
                         target_year=step_year,
                         target_month=step_month,
-                        target_resolution=target_resolution
+                        target_resolution=target_resolution,
                     )
 
                     # Score and filter
                     scored = self._score_antecedents(antecedents, state)
-                    top_antecedents = scored[:self.config.candidate_antecedents_per_step]
+                    top_antecedents = scored[: self.config.candidate_antecedents_per_step]
 
                     next_states.extend(top_antecedents)
 
@@ -814,9 +902,7 @@ Include 3-10 relevant entities."""
                 try:
                     top_state = next_states[0]  # Best-scoring antecedent
                     prior_beats = []  # Fresh beats per step
-                    dialog_constraints = self._run_portal_step_dialog(
-                        top_state, step, prior_beats
-                    )
+                    dialog_constraints = self._run_portal_step_dialog(top_state, step, prior_beats)
                     top_state.world_state["dialog_constraints"] = dialog_constraints
                     self._last_dialog_constraints = dialog_constraints
                 except Exception as e:
@@ -836,14 +922,14 @@ Include 3-10 relevant entities."""
 
         return paths
 
-    def _explore_oscillating(self, portal: PortalState) -> List[PortalPath]:
+    def _explore_oscillating(self, portal: PortalState) -> list[PortalPath]:
         """Oscillating strategy: Fill from both ends inward (100→1→99→2→98→3...)"""
         # TODO: Implement oscillating exploration
         # For now, fall back to reverse chronological
         print("  (Oscillating not yet implemented, using reverse chronological)")
         return self._explore_reverse_chronological(portal)
 
-    def _explore_random_sampling(self, portal: PortalState) -> List[PortalPath]:
+    def _explore_random_sampling(self, portal: PortalState) -> list[PortalPath]:
         """Random sampling strategy: Fill steps in random order"""
         # TODO: Implement random sampling
         # For now, fall back to reverse chronological
@@ -856,8 +942,8 @@ Include 3-10 relevant entities."""
         target_year: int = None,
         target_month: int = None,
         target_resolution: ResolutionLevel = None,  # NEW
-        count: int = None
-    ) -> List[PortalState]:
+        count: int = None,
+    ) -> list[PortalState]:
         """
         Generate N plausible previous states using LLM.
 
@@ -881,14 +967,24 @@ Include 3-10 relevant entities."""
         # If no LLM client, fall back to placeholder
         if not self.llm:
             print("    ⚠️  No LLM client available, using placeholder antecedents")
-            return self._generate_placeholder_antecedents(current_state, target_year, target_month, target_resolution, count)
+            return self._generate_placeholder_antecedents(
+                current_state, target_year, target_month, target_resolution, count
+            )
 
         # Build LLM prompt for antecedent generation
-        system_prompt = "You are an expert at backward temporal reasoning and counterfactual analysis."
+        system_prompt = (
+            "You are an expert at backward temporal reasoning and counterfactual analysis."
+        )
 
         # Extract key entities with role/description context for better anchoring
-        entity_names = [e.entity_id for e in current_state.entities[:10]] if current_state.entities else []
-        entity_summary = f"{len(current_state.entities)} entities" if current_state.entities else "No entities yet"
+        entity_names = (
+            [e.entity_id for e in current_state.entities[:10]] if current_state.entities else []
+        )
+        entity_summary = (
+            f"{len(current_state.entities)} entities"
+            if current_state.entities
+            else "No entities yet"
+        )
         if current_state.entities:
             entity_details = []
             for e in current_state.entities[:10]:
@@ -907,30 +1003,53 @@ Include 3-10 relevant entities."""
                 if traits:
                     detail += f" [traits: {', '.join(str(t) for t in traits[:3])}]"
                 entity_details.append(detail)
-            entity_summary = "ENTITIES (use these specific characters in antecedent narratives):\n" + "\n".join(f"  - {d}" for d in entity_details)
+            entity_summary = (
+                "ENTITIES (use these specific characters in antecedent narratives):\n"
+                + "\n".join(f"  - {d}" for d in entity_details)
+            )
 
         # Create human-readable target time string
-        month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-        target_time_str = f"{month_names[target_month-1]} {target_year}"
+        month_names = [
+            "Jan",
+            "Feb",
+            "Mar",
+            "Apr",
+            "May",
+            "Jun",
+            "Jul",
+            "Aug",
+            "Sep",
+            "Oct",
+            "Nov",
+            "Dec",
+        ]
+        target_time_str = f"{month_names[target_month - 1]} {target_year}"
 
         # Phase 5: Build dialog constraints section if available
         dialog_constraints_text = ""
-        dialog_constraints = current_state.world_state.get("dialog_constraints") or self._last_dialog_constraints
+        dialog_constraints = (
+            current_state.world_state.get("dialog_constraints") or self._last_dialog_constraints
+        )
         if dialog_constraints and isinstance(dialog_constraints, dict):
             positions = dialog_constraints.get("character_positions", {})
             contested = dialog_constraints.get("contested_claims", [])
             resolved = dialog_constraints.get("resolved_facts", [])
 
             if positions or contested:
-                dc_lines = [f"\nDIALOG CONSTRAINTS FROM THE CONSEQUENT STEP ({current_state.to_year_month_str()}):"]
-                dc_lines.append("The following was established in conversation at the next time step:")
+                dc_lines = [
+                    f"\nDIALOG CONSTRAINTS FROM THE CONSEQUENT STEP ({current_state.to_year_month_str()}):"
+                ]
+                dc_lines.append(
+                    "The following was established in conversation at the next time step:"
+                )
                 for eid, pos in positions.items():
                     stated = pos.get("stated_position", "")[:100]
                     info_held = pos.get("information_held", [])
                     dc_lines.append(f"- {eid} argued: {stated}")
                     if info_held:
-                        dc_lines.append(f"  (held information: {', '.join(str(i)[:40] for i in info_held[:3])})")
+                        dc_lines.append(
+                            f"  (held information: {', '.join(str(i)[:40] for i in info_held[:3])})"
+                        )
                 if contested:
                     dc_lines.append(f"- Contested: {'; '.join(c[:60] for c in contested[:3])}")
                 if resolved:
@@ -938,13 +1057,23 @@ Include 3-10 relevant entities."""
 
                 dc_lines.append("")
                 dc_lines.append("CRITICAL REQUIREMENT — INDEPENDENT FAILURE MODES:")
-                dc_lines.append("Each antecedent must show a DIFFERENT organizational pressure leading to this situation.")
+                dc_lines.append(
+                    "Each antecedent must show a DIFFERENT organizational pressure leading to this situation."
+                )
                 dc_lines.append("NOT the same argument happening earlier. Instead:")
                 dc_lines.append("- One antecedent: schedule pressure from external stakeholder")
-                dc_lines.append("- Another: a different character has genuinely incomplete information")
-                dc_lines.append("- Another: political dynamics where a valid concern is traded away")
-                dc_lines.append("- Another: a character who is right about one thing is wrong about another")
-                dc_lines.append("The antecedent states MUST be consistent with characters arriving at the positions documented above.")
+                dc_lines.append(
+                    "- Another: a different character has genuinely incomplete information"
+                )
+                dc_lines.append(
+                    "- Another: political dynamics where a valid concern is traded away"
+                )
+                dc_lines.append(
+                    "- Another: a character who is right about one thing is wrong about another"
+                )
+                dc_lines.append(
+                    "The antecedent states MUST be consistent with characters arriving at the positions documented above."
+                )
 
                 dialog_constraints_text = "\n".join(dc_lines)
 
@@ -993,21 +1122,22 @@ Return as JSON with an "antecedents" array containing {count} antecedent objects
 
             class AntecedentSchema(BaseModel):
                 description: str
-                key_events: List[str]
-                entity_changes: Dict[str, Any]  # Changed from Dict[str, str] to accept nested dicts
-                world_context: Dict[str, Any]
+                key_events: list[str]
+                entity_changes: dict[str, Any]  # Changed from Dict[str, str] to accept nested dicts
+                world_context: dict[str, Any]
                 causal_link: str
 
             class AntecedentList(BaseModel):
                 """Wrapper for list of antecedents"""
-                antecedents: List[AntecedentSchema]
+
+                antecedents: list[AntecedentSchema]
 
             # Get adaptive token budget based on action type and context
             token_estimator = get_token_estimator()
             token_estimate = token_estimator.estimate(
                 ActionType.PORTAL_BACKWARD_REASONING,
                 context={"candidate_count": count},
-                prompt_length=len(user_prompt)
+                prompt_length=len(user_prompt),
             )
 
             # Retry loop for truncation handling
@@ -1023,21 +1153,27 @@ Return as JSON with an "antecedents" array containing {count} antecedent objects
                         response_model=AntecedentList,
                         system_prompt=system_prompt,
                         temperature=0.8,  # Higher temp for diversity
-                        max_tokens=current_max_tokens
+                        max_tokens=current_max_tokens,
                     )
 
                     # Check if we got enough antecedents
-                    antecedent_data = result.antecedents if hasattr(result, 'antecedents') else []
+                    antecedent_data = result.antecedents if hasattr(result, "antecedents") else []
                     if len(antecedent_data) >= count:
                         # Success - got all requested antecedents
                         if attempt > 0:
-                            print(f"    ✓ Retry {attempt} succeeded with {current_max_tokens} tokens")
+                            print(
+                                f"    ✓ Retry {attempt} succeeded with {current_max_tokens} tokens"
+                            )
                         break
 
                     # Got fewer than expected - might be truncation
                     if attempt < max_retries:
-                        current_max_tokens = token_estimator.get_retry_budget(token_estimate, attempt + 1)
-                        print(f"    ⚠️  Only got {len(antecedent_data)}/{count} antecedents, retrying with {current_max_tokens} tokens...")
+                        current_max_tokens = token_estimator.get_retry_budget(
+                            token_estimate, attempt + 1
+                        )
+                        print(
+                            f"    ⚠️  Only got {len(antecedent_data)}/{count} antecedents, retrying with {current_max_tokens} tokens..."
+                        )
                     else:
                         # Final attempt, use what we got
                         break
@@ -1045,13 +1181,19 @@ Return as JSON with an "antecedents" array containing {count} antecedent objects
                 except Exception as e:
                     if attempt < max_retries:
                         # Retry with more tokens on parse errors (likely truncation)
-                        current_max_tokens = token_estimator.get_retry_budget(token_estimate, attempt + 1)
-                        print(f"    ⚠️  LLM call failed ({e}), retrying with {current_max_tokens} tokens...")
+                        current_max_tokens = token_estimator.get_retry_budget(
+                            token_estimate, attempt + 1
+                        )
+                        print(
+                            f"    ⚠️  LLM call failed ({e}), retrying with {current_max_tokens} tokens..."
+                        )
                     else:
                         raise  # Re-raise on final attempt
 
             # Extract list from wrapper
-            antecedent_data = result.antecedents if (result and hasattr(result, 'antecedents')) else []
+            antecedent_data = (
+                result.antecedents if (result and hasattr(result, "antecedents")) else []
+            )
 
             # Convert to PortalState objects
             antecedents = []
@@ -1061,7 +1203,7 @@ Return as JSON with an "antecedents" array containing {count} antecedent objects
                 filtered_entities = _filter_entities_by_relevance(
                     current_state.entities,
                     data.description,
-                    known_entity_ids=None  # Let validation rules apply
+                    known_entity_ids=None,  # Let validation rules apply
                 )
 
                 # FALLBACK: If filtering returned empty, inherit all parent entities
@@ -1077,21 +1219,27 @@ Return as JSON with an "antecedents" array containing {count} antecedent objects
                     entities=filtered_entities,  # Use filtered entities, not blind copy
                     world_state=data.world_context,
                     plausibility_score=0.0,  # Will be scored later
-                    parent_state=current_state
+                    parent_state=current_state,
                 )
 
                 # Store metadata about this antecedent
-                state.world_state['key_events'] = data.key_events
-                state.world_state['entity_changes'] = data.entity_changes
-                state.world_state['causal_link'] = data.causal_link
+                state.world_state["key_events"] = data.key_events
+                state.world_state["entity_changes"] = data.entity_changes
+                state.world_state["causal_link"] = data.causal_link
 
                 antecedents.append(state)
 
             # If we got fewer than requested, pad with placeholders
             if len(antecedents) < count:
-                print(f"    ⚠️  LLM returned {len(antecedents)}/{count} antecedents, padding with placeholders")
+                print(
+                    f"    ⚠️  LLM returned {len(antecedents)}/{count} antecedents, padding with placeholders"
+                )
                 placeholders = self._generate_placeholder_antecedents(
-                    current_state, target_year, target_month, target_resolution, count - len(antecedents)
+                    current_state,
+                    target_year,
+                    target_month,
+                    target_resolution,
+                    count - len(antecedents),
                 )
                 antecedents.extend(placeholders)
 
@@ -1099,8 +1247,10 @@ Return as JSON with an "antecedents" array containing {count} antecedent objects
 
         except Exception as e:
             print(f"    ⚠️  LLM generation failed: {e}")
-            print(f"    Falling back to placeholder antecedents")
-            return self._generate_placeholder_antecedents(current_state, target_year, target_month, target_resolution, count)
+            print("    Falling back to placeholder antecedents")
+            return self._generate_placeholder_antecedents(
+                current_state, target_year, target_month, target_resolution, count
+            )
 
     def _generate_placeholder_antecedents(
         self,
@@ -1108,17 +1258,15 @@ Return as JSON with an "antecedents" array containing {count} antecedent objects
         target_year: int,
         target_month: int,
         target_resolution: ResolutionLevel = None,  # NEW
-        count: int = 1
-    ) -> List[PortalState]:
+        count: int = 1,
+    ) -> list[PortalState]:
         """Generate placeholder antecedents when LLM is unavailable"""
         antecedents = []
         for i in range(count):
-            placeholder_desc = f"Antecedent {i+1} for {current_state.description}"
+            placeholder_desc = f"Antecedent {i + 1} for {current_state.description}"
             # Filter entities even for placeholders to prevent hallucination propagation
             filtered_entities = _filter_entities_by_relevance(
-                current_state.entities,
-                placeholder_desc,
-                known_entity_ids=None
+                current_state.entities, placeholder_desc, known_entity_ids=None
             )
             # FALLBACK: If filtering returned empty, inherit all parent entities
             # This prevents empty entities_present warnings on backward-generated timepoints
@@ -1132,16 +1280,14 @@ Return as JSON with an "antecedents" array containing {count} antecedent objects
                 entities=filtered_entities,  # Use filtered entities
                 world_state=current_state.world_state.copy(),
                 plausibility_score=0.0,
-                parent_state=current_state
+                parent_state=current_state,
             )
             antecedents.append(antecedent)
         return antecedents
 
     def _run_mini_simulation(
-        self,
-        candidate_state: PortalState,
-        steps: int = None
-    ) -> Dict[str, Any]:
+        self, candidate_state: PortalState, steps: int = None
+    ) -> dict[str, Any]:
         """
         Run forward mini-simulation from candidate state to validate realism.
 
@@ -1172,10 +1318,10 @@ Return as JSON with an "antecedents" array containing {count} antecedent objects
         steps = steps or self.config.simulation_forward_steps
 
         # Get timeout from config (with defaults for backward compatibility)
-        simulation_timeout = getattr(self.config, 'simulation_timeout_seconds', 180)
-        step_timeout = getattr(self.config, 'simulation_step_timeout_seconds', 60)
+        simulation_timeout = getattr(self.config, "simulation_timeout_seconds", 180)
+        step_timeout = getattr(self.config, "simulation_step_timeout_seconds", 60)
 
-        def _execute_simulation() -> Dict[str, Any]:
+        def _execute_simulation() -> dict[str, Any]:
             """Inner function containing simulation logic, wrapped with timeout."""
             # Initialize simulation results
             simulated_states = [candidate_state]
@@ -1184,7 +1330,9 @@ Return as JSON with an "antecedents" array containing {count} antecedent objects
 
             # Limit entities for performance
             max_entities = self.config.simulation_max_entities
-            active_entities = candidate_state.entities[:max_entities] if candidate_state.entities else []
+            active_entities = (
+                candidate_state.entities[:max_entities] if candidate_state.entities else []
+            )
 
             # Calculate month step size based on backward_steps configuration
             portal_month_total = self.config.portal_year * 12 + 1
@@ -1206,9 +1354,22 @@ Return as JSON with an "antecedents" array containing {count} antecedent objects
                     next_month = 12
 
                 # Progress logging
-                month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-                next_time_str = f"{month_names[next_month-1]} {next_year}"
-                print(f"        Step {step+1}/{steps}: Generating state for {next_time_str}...")
+                month_names = [
+                    "Jan",
+                    "Feb",
+                    "Mar",
+                    "Apr",
+                    "May",
+                    "Jun",
+                    "Jul",
+                    "Aug",
+                    "Sep",
+                    "Oct",
+                    "Nov",
+                    "Dec",
+                ]
+                next_time_str = f"{month_names[next_month - 1]} {next_year}"
+                print(f"        Step {step + 1}/{steps}: Generating state for {next_time_str}...")
 
                 # Generate next state description using LLM with step-level timeout
                 if self.llm:
@@ -1221,13 +1382,19 @@ Return as JSON with an "antecedents" array containing {count} antecedent objects
                             try:
                                 next_state_description = future.result(timeout=step_timeout)
                             except FuturesTimeoutError:
-                                print(f"        ⚠️  Step {step+1} timed out after {step_timeout}s, using fallback")
+                                print(
+                                    f"        ⚠️  Step {step + 1} timed out after {step_timeout}s, using fallback"
+                                )
                                 next_state_description = f"{next_time_str}: Continuation of {current.description[:50]}..."
                     except Exception as e:
                         print(f"        ⚠️  Forward state generation failed: {e}")
-                        next_state_description = f"{next_time_str}: Continuation of {current.description[:50]}..."
+                        next_state_description = (
+                            f"{next_time_str}: Continuation of {current.description[:50]}..."
+                        )
                 else:
-                    next_state_description = f"{next_time_str}: Continuation of {current.description[:50]}..."
+                    next_state_description = (
+                        f"{next_time_str}: Continuation of {current.description[:50]}..."
+                    )
 
                 # Create next state
                 next_state = PortalState(
@@ -1236,7 +1403,7 @@ Return as JSON with an "antecedents" array containing {count} antecedent objects
                     description=next_state_description,
                     entities=active_entities.copy(),
                     world_state=current.world_state.copy(),
-                    plausibility_score=0.0
+                    plausibility_score=0.0,
                 )
                 simulated_states.append(next_state)
 
@@ -1247,13 +1414,17 @@ Return as JSON with an "antecedents" array containing {count} antecedent objects
                         with ThreadPoolExecutor(max_workers=1) as dialog_executor:
                             future = dialog_executor.submit(
                                 self._generate_simulation_dialog,
-                                current, next_state, active_entities[:3]
+                                current,
+                                next_state,
+                                active_entities[:3],
                             )
                             try:
                                 dialog_data = future.result(timeout=step_timeout)
                                 dialogs.append(dialog_data)
                             except FuturesTimeoutError:
-                                print(f"        ⚠️  Dialog generation timed out after {step_timeout}s")
+                                print(
+                                    f"        ⚠️  Dialog generation timed out after {step_timeout}s"
+                                )
                     except Exception as e:
                         print(f"        ⚠️  Dialog generation failed: {e}")
 
@@ -1270,7 +1441,9 @@ Return as JSON with an "antecedents" array containing {count} antecedent objects
                 "simulation_narrative": narrative,
                 "emergent_events": emergent_events,
                 "candidate_year": candidate_state.year,
-                "simulation_end_year": simulated_states[-1].year if simulated_states else candidate_state.year
+                "simulation_end_year": simulated_states[-1].year
+                if simulated_states
+                else candidate_state.year,
             }
 
         # Execute simulation with overall timeout protection
@@ -1289,18 +1462,32 @@ Return as JSON with an "antecedents" array containing {count} antecedent objects
                     "emergent_events": [],
                     "candidate_year": candidate_state.year,
                     "simulation_end_year": candidate_state.year,
-                    "timed_out": True
+                    "timed_out": True,
                 }
 
-    def _generate_forward_state(self, current_state: PortalState, next_year: int, next_month: int) -> str:
+    def _generate_forward_state(
+        self, current_state: PortalState, next_year: int, next_month: int
+    ) -> str:
         """Generate description of next state in forward simulation"""
         system_prompt = "You are an expert at forward temporal simulation and causal reasoning."
 
         # Create human-readable time strings
-        month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        month_names = [
+            "Jan",
+            "Feb",
+            "Mar",
+            "Apr",
+            "May",
+            "Jun",
+            "Jul",
+            "Aug",
+            "Sep",
+            "Oct",
+            "Nov",
+            "Dec",
+        ]
         current_time_str = current_state.to_year_month_str()
-        next_time_str = f"{month_names[next_month-1]} {next_year}"
+        next_time_str = f"{month_names[next_month - 1]} {next_year}"
 
         user_prompt = f"""Given this state, generate a plausible description of what happens at the next time point.
 
@@ -1324,18 +1511,15 @@ Return only the description text, no extra formatting."""
                 user=user_prompt,
                 temperature=0.7,
                 max_tokens=300,
-                call_type="forward_state_generation"
+                call_type="forward_state_generation",
             )
             return response.content.strip()
         except:
             return f"{next_time_str}: Natural continuation of events from {current_time_str}"
 
     def _generate_simulation_dialog(
-        self,
-        current_state: PortalState,
-        next_state: PortalState,
-        entities: List[Entity]
-    ) -> Dict[str, Any]:
+        self, current_state: PortalState, next_state: PortalState, entities: list[Entity]
+    ) -> dict[str, Any]:
         """Generate dialog for mini-simulation"""
         if not entities or len(entities) < 2:
             return {}
@@ -1349,7 +1533,7 @@ FROM ({current_state.to_year_month_str()}): {current_state.description[:200]}
 
 TO ({next_state.to_year_month_str()}): {next_state.description[:200]}
 
-Participants: {', '.join(entity_names[:3])}
+Participants: {", ".join(entity_names[:3])}
 
 Generate realistic dialog showing how entities discuss or react to this transition.
 Keep it brief (2-3 turns total) and focused on the key developments."""
@@ -1358,23 +1542,23 @@ Keep it brief (2-3 turns total) and focused on the key developments."""
             dialog_data = self.llm.generate_dialog(
                 prompt=prompt,
                 max_tokens=500,
-                model=None  # Use default
+                model=None,  # Use default
             )
             return {
                 "year": current_state.year,
-                "turns": len(dialog_data.turns) if hasattr(dialog_data, 'turns') else 0,
+                "turns": len(dialog_data.turns) if hasattr(dialog_data, "turns") else 0,
                 "participants": entity_names,
-                "summary": f"Dialog between {', '.join(entity_names[:2])} about transition to {next_state.year}"
+                "summary": f"Dialog between {', '.join(entity_names[:2])} about transition to {next_state.year}",
             }
         except:
             return {
                 "year": current_state.year,
                 "turns": 0,
                 "participants": entity_names,
-                "summary": "Dialog generation unavailable"
+                "summary": "Dialog generation unavailable",
             }
 
-    def _compute_simulation_coherence(self, states: List[PortalState]) -> Dict[str, float]:
+    def _compute_simulation_coherence(self, states: list[PortalState]) -> dict[str, float]:
         """Compute coherence metrics for simulation"""
         if len(states) < 2:
             return {"coherence": 1.0, "continuity": 1.0, "plausibility": 1.0}
@@ -1386,7 +1570,9 @@ Keep it brief (2-3 turns total) and focused on the key developments."""
         continuity = 0.8  # Placeholder
 
         # Plausibility: Are individual states realistic?
-        avg_plausibility = sum(s.plausibility_score for s in states) / len(states) if states else 0.5
+        avg_plausibility = (
+            sum(s.plausibility_score for s in states) / len(states) if states else 0.5
+        )
 
         # Overall coherence
         coherence = (continuity + avg_plausibility) / 2
@@ -1395,14 +1581,10 @@ Keep it brief (2-3 turns total) and focused on the key developments."""
             "coherence": coherence,
             "continuity": continuity,
             "plausibility": avg_plausibility,
-            "state_count": len(states)
+            "state_count": len(states),
         }
 
-    def _generate_simulation_narrative(
-        self,
-        states: List[PortalState],
-        dialogs: List[Dict]
-    ) -> str:
+    def _generate_simulation_narrative(self, states: list[PortalState], dialogs: list[dict]) -> str:
         """Generate human-readable narrative summary of simulation"""
         if not states:
             return "Empty simulation"
@@ -1412,9 +1594,7 @@ Keep it brief (2-3 turns total) and focused on the key developments."""
         dialog_count = len(dialogs)
 
         # Build narrative
-        narrative_parts = [
-            f"Simulation from {start_year} to {end_year} ({len(states)} states):"
-        ]
+        narrative_parts = [f"Simulation from {start_year} to {end_year} ({len(states)} states):"]
 
         # Add key state transitions
         for i, state in enumerate(states):
@@ -1431,10 +1611,10 @@ Keep it brief (2-3 turns total) and focused on the key developments."""
 
     def _judge_simulation_realism(
         self,
-        candidate_antecedents: List[PortalState],
-        simulation_results: List[Dict[str, Any]],
-        consequent_state: PortalState
-    ) -> List[float]:
+        candidate_antecedents: list[PortalState],
+        simulation_results: list[dict[str, Any]],
+        consequent_state: PortalState,
+    ) -> list[float]:
         """
         Use judge LLM to evaluate which simulation is most realistic.
 
@@ -1486,7 +1666,7 @@ Rate each candidate 0.0-1.0 where:
 
             # Build candidate block
             candidate_block = f"""
-CANDIDATE {i+1}:
+CANDIDATE {i + 1}:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Antecedent Time: {candidate.to_year_month_str()}
 Antecedent State: {candidate_desc[:300]}
@@ -1495,14 +1675,14 @@ Forward Simulation:
 {narrative}
 
 Coherence Metrics:
-- Overall coherence: {coherence.get('coherence', 0.0):.2f}
-- Continuity: {coherence.get('continuity', 0.0):.2f}
-- State plausibility: {coherence.get('plausibility', 0.0):.2f}
+- Overall coherence: {coherence.get("coherence", 0.0):.2f}
+- Continuity: {coherence.get("continuity", 0.0):.2f}
+- State plausibility: {coherence.get("plausibility", 0.0):.2f}
 
 Dialog Summary: {len(dialogs)} conversations generated
 {self._format_dialog_summary(dialogs)}
 
-Causal Link: {candidate.world_state.get('causal_link', 'Not specified')}
+Causal Link: {candidate.world_state.get("causal_link", "Not specified")}
 """
             candidate_descriptions.append(candidate_block)
 
@@ -1538,10 +1718,10 @@ Focus on: forward coherence, dialog realism, causal necessity, internal consiste
             from pydantic import BaseModel
 
             class JudgeResult(BaseModel):
-                scores: List[float]
+                scores: list[float]
                 reasoning: str
                 best_candidate: int
-                key_concerns: List[str]
+                key_concerns: list[str]
 
             result = self.llm.generate_structured(
                 prompt=user_prompt,
@@ -1549,11 +1729,11 @@ Focus on: forward coherence, dialog realism, causal necessity, internal consiste
                 system_prompt=system_prompt,
                 temperature=self.config.judge_temperature,
                 max_tokens=1000,
-                model=self.config.judge_model
+                model=self.config.judge_model,
             )
 
             # Validate and normalize scores
-            scores = result.scores[:len(candidate_antecedents)]  # Trim to match candidates
+            scores = result.scores[: len(candidate_antecedents)]  # Trim to match candidates
 
             # Ensure scores are in valid range
             scores = [max(0.0, min(1.0, s)) for s in scores]
@@ -1564,13 +1744,15 @@ Focus on: forward coherence, dialog realism, causal necessity, internal consiste
                 scores.extend([avg_score] * (len(candidate_antecedents) - len(scores)))
 
             # Log judge reasoning
-            print(f"      Judge: Best candidate #{result.best_candidate}, Reasoning: {result.reasoning[:100]}...")
+            print(
+                f"      Judge: Best candidate #{result.best_candidate}, Reasoning: {result.reasoning[:100]}..."
+            )
 
             return scores
 
         except Exception as e:
             print(f"      ⚠️  Judge LLM failed: {e}")
-            print(f"      Falling back to coherence-based scoring")
+            print("      Falling back to coherence-based scoring")
 
             # Fall back to coherence metrics from simulations
             scores = []
@@ -1580,7 +1762,7 @@ Focus on: forward coherence, dialog realism, causal necessity, internal consiste
 
             return scores
 
-    def _format_dialog_summary(self, dialogs: List[Dict]) -> str:
+    def _format_dialog_summary(self, dialogs: list[dict]) -> str:
         """Format dialog summary for judge prompt"""
         if not dialogs:
             return "  No dialogs generated"
@@ -1598,10 +1780,8 @@ Focus on: forward coherence, dialog realism, causal necessity, internal consiste
         return "\n".join(summaries) if summaries else "  No dialog details"
 
     def _score_antecedents(
-        self,
-        antecedents: List[PortalState],
-        consequent: PortalState
-    ) -> List[PortalState]:
+        self, antecedents: list[PortalState], consequent: PortalState
+    ) -> list[PortalState]:
         """
         Score antecedents using either simulation judging or static hybrid scoring.
 
@@ -1628,16 +1808,16 @@ Focus on: forward coherence, dialog realism, causal necessity, internal consiste
                 "historical": self._historical_precedent_score(ant, consequent),
                 "causal": self._causal_necessity_score(ant, consequent),
                 "capability": self._entity_capability_score(ant, consequent),
-                "dynamic_context": self._dynamic_context_score(ant, consequent)
+                "dynamic_context": self._dynamic_context_score(ant, consequent),
             }
 
             # Weighted average
             total_score = (
-                scores["llm"] * self.config.llm_scoring_weight +
-                scores["historical"] * self.config.historical_precedent_weight +
-                scores["causal"] * self.config.causal_necessity_weight +
-                scores["capability"] * self.config.entity_capability_weight +
-                scores["dynamic_context"] * 0.1  # Dynamic context as tiebreaker
+                scores["llm"] * self.config.llm_scoring_weight
+                + scores["historical"] * self.config.historical_precedent_weight
+                + scores["causal"] * self.config.causal_necessity_weight
+                + scores["capability"] * self.config.entity_capability_weight
+                + scores["dynamic_context"] * 0.1  # Dynamic context as tiebreaker
             )
 
             ant.plausibility_score = total_score
@@ -1647,10 +1827,8 @@ Focus on: forward coherence, dialog realism, causal necessity, internal consiste
         return sorted(scored, key=lambda s: s.plausibility_score, reverse=True)
 
     def _score_antecedents_with_simulation(
-        self,
-        antecedents: List[PortalState],
-        consequent: PortalState
-    ) -> List[PortalState]:
+        self, antecedents: list[PortalState], consequent: PortalState
+    ) -> list[PortalState]:
         """
         Score antecedents by running forward mini-simulations and using judge LLM.
 
@@ -1674,39 +1852,46 @@ Focus on: forward coherence, dialog realism, causal necessity, internal consiste
             return []
 
         # Get parallelization settings with defaults for backward compatibility
-        max_workers = getattr(self.config, 'max_simulation_workers', 4)
+        max_workers = getattr(self.config, "max_simulation_workers", 4)
 
         print(f"    🎬 SIMULATION JUDGING MODE (PARALLEL: {max_workers} workers)")
         print(f"    Running mini-simulations for {len(antecedents)} candidates...")
         print(f"    Each simulation: {self.config.simulation_forward_steps} forward steps")
         if self.config.simulation_include_dialog:
-            print(f"    Dialog generation: ENABLED")
+            print("    Dialog generation: ENABLED")
 
         # Thread-safe progress tracking
         progress_lock = threading.Lock()
         completed_count = [0]  # Using list to allow mutation in closure
 
-        def run_simulation_with_progress(idx: int, ant: PortalState) -> Tuple[int, Dict[str, Any]]:
+        def run_simulation_with_progress(idx: int, ant: PortalState) -> tuple[int, dict[str, Any]]:
             """Run a single simulation and return (index, result) for ordering."""
             try:
                 sim_result = self._run_mini_simulation(ant, self.config.simulation_forward_steps)
                 with progress_lock:
                     completed_count[0] += 1
-                    print(f"      ✓ Candidate {idx+1} complete ({completed_count[0]}/{len(antecedents)}) - year {ant.year}")
+                    print(
+                        f"      ✓ Candidate {idx + 1} complete ({completed_count[0]}/{len(antecedents)}) - year {ant.year}"
+                    )
                 return (idx, sim_result)
             except Exception as e:
                 with progress_lock:
                     completed_count[0] += 1
-                    print(f"      ⚠️  Candidate {idx+1} failed ({completed_count[0]}/{len(antecedents)}): {e}")
-                return (idx, {
-                    "states": [ant],
-                    "dialogs": [],
-                    "coherence_metrics": {"coherence": 0.3},
-                    "simulation_narrative": f"Simulation failed: {e}",
-                    "emergent_events": [],
-                    "candidate_year": ant.year,
-                    "simulation_end_year": ant.year
-                })
+                    print(
+                        f"      ⚠️  Candidate {idx + 1} failed ({completed_count[0]}/{len(antecedents)}): {e}"
+                    )
+                return (
+                    idx,
+                    {
+                        "states": [ant],
+                        "dialogs": [],
+                        "coherence_metrics": {"coherence": 0.3},
+                        "simulation_narrative": f"Simulation failed: {e}",
+                        "emergent_events": [],
+                        "candidate_year": ant.year,
+                        "simulation_end_year": ant.year,
+                    },
+                )
 
         # Run simulations in parallel
         simulation_results = [None] * len(antecedents)  # Pre-allocate for ordered results
@@ -1725,7 +1910,7 @@ Focus on: forward coherence, dialog realism, causal necessity, internal consiste
                     simulation_results[idx] = result
                 except Exception as e:
                     failed_idx = futures.get(future, -1)
-                    print(f"      ⚠️  Simulation {failed_idx+1} failed: {e}")
+                    print(f"      ⚠️  Simulation {failed_idx + 1} failed: {e}")
                     if failed_idx >= 0:
                         simulation_results[failed_idx] = {
                             "states": [antecedents[failed_idx]],
@@ -1734,7 +1919,7 @@ Focus on: forward coherence, dialog realism, causal necessity, internal consiste
                             "simulation_narrative": f"Simulation failed: {e}",
                             "emergent_events": [],
                             "candidate_year": antecedents[failed_idx].year,
-                            "simulation_end_year": antecedents[failed_idx].year
+                            "simulation_end_year": antecedents[failed_idx].year,
                         }
 
         # Fill any remaining None slots (shouldn't happen but guard against it)
@@ -1747,7 +1932,7 @@ Focus on: forward coherence, dialog realism, causal necessity, internal consiste
                     "simulation_narrative": "Simulation did not produce results",
                     "emergent_events": [],
                     "candidate_year": antecedents[i].year,
-                    "simulation_end_year": antecedents[i].year
+                    "simulation_end_year": antecedents[i].year,
                 }
 
         # Judge all simulations
@@ -1762,9 +1947,11 @@ Focus on: forward coherence, dialog realism, causal necessity, internal consiste
         sorted_antecedents = sorted(antecedents, key=lambda s: s.plausibility_score, reverse=True)
 
         # Print summary
-        print(f"    ✓ Simulation judging complete")
+        print("    ✓ Simulation judging complete")
         print(f"      Best score: {sorted_antecedents[0].plausibility_score:.3f}")
-        print(f"      Score range: {sorted_antecedents[-1].plausibility_score:.3f} - {sorted_antecedents[0].plausibility_score:.3f}")
+        print(
+            f"      Score range: {sorted_antecedents[-1].plausibility_score:.3f} - {sorted_antecedents[0].plausibility_score:.3f}"
+        )
 
         return sorted_antecedents
 
@@ -1793,7 +1980,7 @@ Consider: Are the causal connections logical? Is the timeline realistic?"""
                 response_model=PlausibilityScore,
                 system_prompt="You are an expert at evaluating causal plausibility between historical states.",
                 temperature=0.3,
-                max_tokens=300
+                max_tokens=300,
             )
             return max(0.0, min(1.0, result.score))
         except Exception as e:
@@ -1804,11 +1991,10 @@ Consider: Are the causal connections logical? Is the timeline realistic?"""
         """Check if similar transitions have historical precedent"""
         try:
             from pydantic import BaseModel
-            from typing import List as TypingList
 
             class PrecedentScore(BaseModel):
                 score: float
-                historical_examples: TypingList[str]
+                historical_examples: list[str]
 
             prompt = f"""Has a transition like the following occurred in real history?
 
@@ -1823,7 +2009,7 @@ Cite up to 3 brief historical examples if any exist."""
                 response_model=PrecedentScore,
                 system_prompt="You are a historian evaluating whether state transitions have real-world precedent.",
                 temperature=0.3,
-                max_tokens=400
+                max_tokens=400,
             )
             return max(0.0, min(1.0, result.score))
         except Exception as e:
@@ -1834,12 +2020,11 @@ Cite up to 3 brief historical examples if any exist."""
         """Score how logically REQUIRED the antecedent is for the consequent"""
         try:
             from pydantic import BaseModel
-            from typing import List as TypingList
 
             class NecessityScore(BaseModel):
                 score: float
                 reasoning: str
-                alternatives: TypingList[str]
+                alternatives: list[str]
 
             prompt = f"""Is the earlier state logically REQUIRED for the later state to occur?
 
@@ -1854,7 +2039,7 @@ List up to 3 alternative paths that could also lead to the later state."""
                 response_model=NecessityScore,
                 system_prompt="You are an expert in causal reasoning and counterfactual analysis.",
                 temperature=0.3,
-                max_tokens=400
+                max_tokens=400,
             )
             return max(0.0, min(1.0, result.score))
         except Exception as e:
@@ -1868,11 +2053,19 @@ List up to 3 alternative paths that could also lead to the later state."""
 
             class CapabilityScore(BaseModel):
                 score: float
-                entity_assessments: Dict[str, str]
+                entity_assessments: dict[str, str]
 
             # Build entity context
-            ant_entities = ", ".join(e.entity_id for e in ant.entities[:8]) if ant.entities else "unknown entities"
-            cons_entities = ", ".join(e.entity_id for e in cons.entities[:8]) if cons.entities else "unknown entities"
+            ant_entities = (
+                ", ".join(e.entity_id for e in ant.entities[:8])
+                if ant.entities
+                else "unknown entities"
+            )
+            cons_entities = (
+                ", ".join(e.entity_id for e in cons.entities[:8])
+                if cons.entities
+                else "unknown entities"
+            )
 
             prompt = f"""Can the entities in the earlier state plausibly achieve what the later state describes?
 
@@ -1890,7 +2083,7 @@ Assess key entities briefly."""
                 response_model=CapabilityScore,
                 system_prompt="You are an expert at assessing whether actors have the skills, resources, and relationships to achieve outcomes.",
                 temperature=0.3,
-                max_tokens=400
+                max_tokens=400,
             )
             return max(0.0, min(1.0, result.score))
         except Exception as e:
@@ -1904,7 +2097,7 @@ Assess key entities briefly."""
 
             class ContextScore(BaseModel):
                 score: float
-                context_factors: Dict[str, str]
+                context_factors: dict[str, str]
 
             prompt = f"""Is this transition plausible given the broader world context of the time period?
 
@@ -1919,17 +2112,17 @@ Rate contextual plausibility from 0.0 (anachronistic/impossible for the era) to 
                 response_model=ContextScore,
                 system_prompt="You are a historian specializing in contextual analysis of events within their time periods.",
                 temperature=0.3,
-                max_tokens=400
+                max_tokens=400,
             )
             return max(0.0, min(1.0, result.score))
         except Exception as e:
             print(f"    ⚠️  Dynamic context scoring failed: {e}")
             return 0.7
 
-    def _prune_low_scoring_paths(self, states: List[PortalState]) -> List[PortalState]:
+    def _prune_low_scoring_paths(self, states: list[PortalState]) -> list[PortalState]:
         """Prune states below threshold to manage path explosion"""
         sorted_states = sorted(states, key=lambda s: s.plausibility_score, reverse=True)
-        return sorted_states[:self.config.path_count * 2]
+        return sorted_states[: self.config.path_count * 2]
 
     def _reconstruct_path(self, leaf_state: PortalState) -> PortalPath:
         """Reconstruct complete path from leaf state to portal"""
@@ -1949,10 +2142,10 @@ Rate contextual plausibility from 0.0 (anachronistic/impossible for the era) to 
             states=states,
             coherence_score=0.0,  # Will be computed in validation
             pivot_points=[],
-            explanation=""
+            explanation="",
         )
 
-    def _validate_forward_coherence(self, paths: List[PortalPath]) -> List[PortalPath]:
+    def _validate_forward_coherence(self, paths: list[PortalPath]) -> list[PortalPath]:
         """Check if backward-generated paths make sense forward"""
         valid_paths = []
 
@@ -2001,20 +2194,18 @@ Rate contextual plausibility from 0.0 (anachronistic/impossible for the era) to 
         else:
             return FailureResolution.PRUNE
 
-    def _attempt_backtrack_fix(self, path: PortalPath) -> Optional[PortalPath]:
+    def _attempt_backtrack_fix(self, path: PortalPath) -> PortalPath | None:
         """Try to fix path by backtracking and retrying"""
         # TODO: Implement backtracking
         return None  # Placeholder
 
-    def _rank_paths(self, paths: List[PortalPath]) -> List[PortalPath]:
+    def _rank_paths(self, paths: list[PortalPath]) -> list[PortalPath]:
         """Final ranking by coherence score"""
         return sorted(paths, key=lambda p: p.coherence_score, reverse=True)
 
     def _detect_pivot_points(
-        self,
-        path: PortalPath,
-        divergence_analysis: Dict[str, Any] = None
-    ) -> List[int]:
+        self, path: PortalPath, divergence_analysis: dict[str, Any] = None
+    ) -> list[int]:
         """
         Identify critical decision moments (pivot points) in a path.
 
@@ -2036,16 +2227,16 @@ Rate contextual plausibility from 0.0 (anachronistic/impossible for the era) to 
         # --- Strategy 1: Divergence-based detection ---
         # Use key_divergence_points if available (steps where >50% of paths have unique narratives)
         if divergence_analysis:
-            key_divergence_steps = divergence_analysis.get('key_divergence_points', [])
+            key_divergence_steps = divergence_analysis.get("key_divergence_points", [])
             for step_idx in key_divergence_steps:
                 if step_idx < len(path.states):
                     pivot_points.add(step_idx)
 
             # Also check per-step divergence scores for high divergence
-            divergence_by_step = divergence_analysis.get('divergence_by_step', [])
+            divergence_by_step = divergence_analysis.get("divergence_by_step", [])
             for step_data in divergence_by_step:
-                step_idx = step_data.get('step', -1)
-                divergence = step_data.get('divergence', 0)
+                step_idx = step_data.get("step", -1)
+                divergence = step_data.get("divergence", 0)
                 # Lower threshold: flag steps with >30% unique narratives as potential pivots
                 if divergence > 0.3 and step_idx < len(path.states):
                     pivot_points.add(step_idx)
@@ -2054,16 +2245,44 @@ Rate contextual plausibility from 0.0 (anachronistic/impossible for the era) to 
         # Look for pivot-related language in state descriptions
         pivot_keywords = {
             # Decision language
-            'decision', 'decided', 'chose', 'choose', 'choice', 'pivotal', 'pivot',
-            'turning point', 'inflection', 'crossroads', 'fork',
+            "decision",
+            "decided",
+            "chose",
+            "choose",
+            "choice",
+            "pivotal",
+            "pivot",
+            "turning point",
+            "inflection",
+            "crossroads",
+            "fork",
             # Strategic actions
-            'launched', 'founded', 'acquired', 'merged', 'raised', 'funding', 'series a',
-            'series b', 'ipo', 'went public', 'exit',
+            "launched",
+            "founded",
+            "acquired",
+            "merged",
+            "raised",
+            "funding",
+            "series a",
+            "series b",
+            "ipo",
+            "went public",
+            "exit",
             # Major changes
-            'breakthrough', 'breakthrough', 'transformed', 'revolutionized', 'disrupted',
-            'scaled', 'expanded', 'pivoted', 'repositioned',
+            "breakthrough",
+            "transformed",
+            "revolutionized",
+            "disrupted",
+            "scaled",
+            "expanded",
+            "pivoted",
+            "repositioned",
             # Challenges
-            'crisis', 'failed', 'survived', 'recovered', 'overcame',
+            "crisis",
+            "failed",
+            "survived",
+            "recovered",
+            "overcame",
         }
 
         for i, state in enumerate(path.states):
@@ -2078,19 +2297,32 @@ Rate contextual plausibility from 0.0 (anachronistic/impossible for the era) to 
         # --- Strategy 3: Event-based detection ---
         # Look for key_events in world_state that indicate inflection points
         for i, state in enumerate(path.states):
-            key_events = state.world_state.get('key_events', [])
+            key_events = state.world_state.get("key_events", [])
             if key_events:
                 # Check if any key event sounds like a pivot
                 for event in key_events:
                     event_lower = str(event).lower() if event else ""
                     # Major event indicators
-                    if any(kw in event_lower for kw in ['launch', 'fund', 'acquire', 'hire', 'scale', 'pivot', 'decision']):
+                    if any(
+                        kw in event_lower
+                        for kw in [
+                            "launch",
+                            "fund",
+                            "acquire",
+                            "hire",
+                            "scale",
+                            "pivot",
+                            "decision",
+                        ]
+                    ):
                         pivot_points.add(i)
                         break
 
             # Check entity_changes for significant shifts
-            entity_changes = state.world_state.get('entity_changes', {})
-            if entity_changes and len(entity_changes) > 2:  # Multiple entity changes = potential pivot
+            entity_changes = state.world_state.get("entity_changes", {})
+            if (
+                entity_changes and len(entity_changes) > 2
+            ):  # Multiple entity changes = potential pivot
                 pivot_points.add(i)
 
         # --- Strategy 4: Score variance detection ---
@@ -2117,7 +2349,7 @@ Rate contextual plausibility from 0.0 (anachronistic/impossible for the era) to 
         # Convert to sorted list
         return sorted(list(pivot_points))
 
-    def _compute_path_divergence(self, paths: List[PortalPath]) -> Dict[str, Any]:
+    def _compute_path_divergence(self, paths: list[PortalPath]) -> dict[str, Any]:
         """
         Compute divergence analysis between all paths.
 
@@ -2133,7 +2365,7 @@ Rate contextual plausibility from 0.0 (anachronistic/impossible for the era) to 
             Dict with divergence analysis metadata
         """
         if len(paths) < 2:
-            return {'key_divergence_points': [], 'path_clusters': [], 'total_paths': len(paths)}
+            return {"key_divergence_points": [], "path_clusters": [], "total_paths": len(paths)}
 
         # Find divergence points by comparing state descriptions at each timepoint
         divergence_scores = []
@@ -2148,17 +2380,20 @@ Rate contextual plausibility from 0.0 (anachronistic/impossible for the era) to 
             # Simple divergence: count unique descriptions
             unique_count = len(set(descriptions_at_step))
             divergence_ratio = unique_count / max(len(descriptions_at_step), 1)
-            divergence_scores.append({
-                'step': step_idx,
-                'divergence': divergence_ratio,
-                'unique_narratives': unique_count,
-                'total_paths': len(descriptions_at_step)
-            })
+            divergence_scores.append(
+                {
+                    "step": step_idx,
+                    "divergence": divergence_ratio,
+                    "unique_narratives": unique_count,
+                    "total_paths": len(descriptions_at_step),
+                }
+            )
 
         # Find key divergence points (high divergence ratio)
         key_divergence_points = [
-            d['step'] for d in divergence_scores
-            if d['divergence'] > 0.5  # More than 50% unique narratives = key divergence
+            d["step"]
+            for d in divergence_scores
+            if d["divergence"] > 0.5  # More than 50% unique narratives = key divergence
         ]
 
         # Simple path clustering by coherence score ranges
@@ -2168,32 +2403,32 @@ Rate contextual plausibility from 0.0 (anachronistic/impossible for the era) to 
 
         path_clusters = []
         if high_coherence:
-            path_clusters.append({'label': 'high_coherence', 'paths': high_coherence})
+            path_clusters.append({"label": "high_coherence", "paths": high_coherence})
         if medium_coherence:
-            path_clusters.append({'label': 'medium_coherence', 'paths': medium_coherence})
+            path_clusters.append({"label": "medium_coherence", "paths": medium_coherence})
         if low_coherence:
-            path_clusters.append({'label': 'low_coherence', 'paths': low_coherence})
+            path_clusters.append({"label": "low_coherence", "paths": low_coherence})
 
         # Build per-path divergence info
         per_path_divergence = {}
         for path in paths:
             per_path_divergence[path.path_id] = {
-                'rank': paths.index(path) + 1,
-                'coherence': path.coherence_score,
-                'pivot_count': len(path.pivot_points),
-                'state_count': len(path.states)
+                "rank": paths.index(path) + 1,
+                "coherence": path.coherence_score,
+                "pivot_count": len(path.pivot_points),
+                "state_count": len(path.states),
             }
 
         result = {
-            'key_divergence_points': key_divergence_points,
-            'path_clusters': path_clusters,
-            'total_paths': len(paths),
-            'divergence_by_step': divergence_scores,
-            'best_path_id': paths[0].path_id if paths else None,
-            'score_range': {
-                'min': paths[-1].coherence_score if paths else 0,
-                'max': paths[0].coherence_score if paths else 0
-            }
+            "key_divergence_points": key_divergence_points,
+            "path_clusters": path_clusters,
+            "total_paths": len(paths),
+            "divergence_by_step": divergence_scores,
+            "best_path_id": paths[0].path_id if paths else None,
+            "score_range": {
+                "min": paths[-1].coherence_score if paths else 0,
+                "max": paths[0].coherence_score if paths else 0,
+            },
         }
 
         # Merge per-path info

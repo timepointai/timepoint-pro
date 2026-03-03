@@ -34,10 +34,8 @@ Usage:
     print(f"Simulations: {usage.simulations_used}/{usage.simulations_limit}")
 """
 
-import os
 import logging
-from typing import Optional
-from datetime import datetime
+import os
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -46,6 +44,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class UsageSnapshot:
     """Current usage snapshot."""
+
     user_id: str
     tier: str
     period: str
@@ -57,7 +56,7 @@ class UsageSnapshot:
     simulations_limit: int
     cost_limit_usd: float
     is_quota_exceeded: bool
-    quota_exceeded_reason: Optional[str]
+    quota_exceeded_reason: str | None
 
 
 class UsageBridge:
@@ -74,7 +73,7 @@ class UsageBridge:
 
     def __init__(
         self,
-        user_id: Optional[str] = None,
+        user_id: str | None = None,
         tier: str = "basic",
         enabled: bool = True,
     ):
@@ -97,6 +96,7 @@ class UsageBridge:
         if self._db is None:
             try:
                 from api.usage_storage import get_usage_database
+
                 self._db = get_usage_database()
             except ImportError:
                 logger.warning("Could not import usage_storage - usage tracking disabled")
@@ -108,6 +108,7 @@ class UsageBridge:
         if self._quota_config is None:
             try:
                 from api.middleware.usage_quota import get_quota_config
+
                 self._quota_config = get_quota_config()
             except ImportError:
                 logger.warning("Could not import usage_quota - using defaults")
@@ -117,7 +118,7 @@ class UsageBridge:
     def _get_tier_limits(self):
         """Get limits for current tier."""
         config = self._get_quota_config()
-        if config and hasattr(config, 'tier_limits'):
+        if config and hasattr(config, "tier_limits"):
             return config.tier_limits.get(self.tier, config.tier_limits.get("basic", {}))
         # Default limits
         return {
@@ -151,16 +152,22 @@ class UsageBridge:
         current = db.get_usage(self.user_id)
 
         # Check simulation limit - UsageRecord uses 'simulations_run' field
-        simulations_used = getattr(current, 'simulations_run', 0) or getattr(current, 'simulations_used', 0)
+        simulations_used = getattr(current, "simulations_run", 0) or getattr(
+            current, "simulations_used", 0
+        )
         if simulations_used + simulation_count > limits.get("simulations_limit", 100):
-            logger.warning(f"Simulation quota exceeded: {simulations_used} + {simulation_count} > {limits['simulations_limit']}")
+            logger.warning(
+                f"Simulation quota exceeded: {simulations_used} + {simulation_count} > {limits['simulations_limit']}"
+            )
             return False
 
         # Check cost limit - UsageRecord uses 'cost_usd' field
-        cost_used = getattr(current, 'cost_usd', 0.0) or getattr(current, 'cost_used_usd', 0.0)
+        cost_used = getattr(current, "cost_usd", 0.0) or getattr(current, "cost_used_usd", 0.0)
         if estimated_cost > 0:
             if cost_used + estimated_cost > limits.get("cost_limit_usd", 50.0):
-                logger.warning(f"Cost quota exceeded: ${cost_used} + ${estimated_cost} > ${limits['cost_limit_usd']}")
+                logger.warning(
+                    f"Cost quota exceeded: ${cost_used} + ${estimated_cost} > ${limits['cost_limit_usd']}"
+                )
                 return False
 
         return True
@@ -177,6 +184,7 @@ class UsageBridge:
 
         try:
             from api.middleware.usage_quota import record_simulation_start
+
             record_simulation_start(self.user_id, run_id)
             logger.debug(f"Recorded simulation start: {run_id}")
         except ImportError:
@@ -190,7 +198,7 @@ class UsageBridge:
         success: bool,
         cost_usd: float = 0.0,
         tokens: int = 0,
-        duration_seconds: Optional[float] = None,
+        duration_seconds: float | None = None,
     ) -> None:
         """
         Record completion of a simulation.
@@ -207,6 +215,7 @@ class UsageBridge:
 
         try:
             from api.middleware.usage_quota import record_simulation_complete
+
             record_simulation_complete(
                 user_id=self.user_id,
                 job_id=run_id,
@@ -214,7 +223,9 @@ class UsageBridge:
                 cost_usd=cost_usd,
                 tokens=tokens,
             )
-            logger.debug(f"Recorded simulation complete: {run_id} (success={success}, cost=${cost_usd:.2f})")
+            logger.debug(
+                f"Recorded simulation complete: {run_id} (success={success}, cost=${cost_usd:.2f})"
+            )
         except ImportError:
             # Fall back to direct database recording
             db = self._get_db()
@@ -238,13 +249,14 @@ class UsageBridge:
 
         try:
             from api.middleware.usage_quota import record_api_call
+
             record_api_call(self.user_id)
         except ImportError:
             pass
         except Exception as e:
             logger.debug(f"Failed to record API call: {e}")
 
-    def get_usage(self) -> Optional[UsageSnapshot]:
+    def get_usage(self) -> UsageSnapshot | None:
         """
         Get current usage snapshot.
 
@@ -263,10 +275,14 @@ class UsageBridge:
             limits = self._get_tier_limits()
 
             # Extract values with compatibility for different field names
-            simulations_used = getattr(current, 'simulations_run', 0) or getattr(current, 'simulations_used', 0)
-            cost_used = getattr(current, 'cost_usd', 0.0) or getattr(current, 'cost_used_usd', 0.0)
-            api_calls_used = getattr(current, 'api_calls', 0) or getattr(current, 'api_calls_used', 0)
-            tokens_used = getattr(current, 'tokens_used', 0)
+            simulations_used = getattr(current, "simulations_run", 0) or getattr(
+                current, "simulations_used", 0
+            )
+            cost_used = getattr(current, "cost_usd", 0.0) or getattr(current, "cost_used_usd", 0.0)
+            api_calls_used = getattr(current, "api_calls", 0) or getattr(
+                current, "api_calls_used", 0
+            )
+            tokens_used = getattr(current, "tokens_used", 0)
 
             # Determine if quota is exceeded
             is_exceeded = False
@@ -331,12 +347,12 @@ class UsageBridge:
 # Global Bridge Instance
 # ============================================================================
 
-_bridge: Optional[UsageBridge] = None
+_bridge: UsageBridge | None = None
 
 
 def get_usage_bridge(
-    user_id: Optional[str] = None,
-    tier: Optional[str] = None,
+    user_id: str | None = None,
+    tier: str | None = None,
 ) -> UsageBridge:
     """
     Get or create the global usage bridge.
@@ -363,6 +379,7 @@ def reset_usage_bridge() -> None:
 # ============================================================================
 # Convenience Functions
 # ============================================================================
+
 
 def check_cli_quota(simulation_count: int = 1) -> bool:
     """

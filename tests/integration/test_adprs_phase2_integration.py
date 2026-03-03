@@ -11,18 +11,18 @@ This validates that the Phase 1→2 handoff works end-to-end.
 """
 
 import math
-import numpy as np
-import pytest
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
-from synth.trajectory_tracker import TrajectoryTracker, CognitiveSnapshot
-from synth.adprs_fitter import ADPRSFitter, FitResult, adprs_waveform
-from synth.fidelity_envelope import ADPRSEnvelope, ADPRSComposite
-from synth.shadow_evaluator import ShadowEvaluator
+import numpy as np
 
+from synth.adprs_fitter import ADPRSFitter, adprs_waveform
+from synth.fidelity_envelope import ADPRSComposite, ADPRSEnvelope
+from synth.shadow_evaluator import ShadowEvaluator
+from synth.trajectory_tracker import TrajectoryTracker
 
 # --- Helpers ---
+
 
 def make_evolving_entity(entity_id, valence_trajectory, arousal_trajectory, energy_trajectory):
     """
@@ -147,7 +147,9 @@ class TestPhase2FullPipeline:
 
         # Oscillatory pattern: valence and arousal swing
         valence = [0.3 * math.sin(2 * math.pi * 2 * i / (n_points - 1)) for i in range(n_points)]
-        arousal = [0.5 + 0.4 * abs(math.sin(2 * math.pi * 2 * i / (n_points - 1))) for i in range(n_points)]
+        arousal = [
+            0.5 + 0.4 * abs(math.sin(2 * math.pi * 2 * i / (n_points - 1))) for i in range(n_points)
+        ]
         energy = [60.0 + 20.0 * math.cos(2 * math.pi * i / (n_points - 1)) for i in range(n_points)]
 
         states = make_evolving_entity("entity_osc", valence, arousal, energy)
@@ -320,7 +322,6 @@ class TestPhase2FullPipeline:
         assert len(ec.adprs_envelopes) == 1
 
         # Simulate what _initialize_shadow_evaluator does with template envelopes
-        from synth.fidelity_envelope import ADPRSEnvelope, ADPRSComposite
 
         composite = ADPRSComposite(
             envelopes=[ADPRSEnvelope.from_metadata_dict(e) for e in ec.adprs_envelopes]

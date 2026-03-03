@@ -17,15 +17,12 @@ Usage:
     result = client.populate_entity(...)
 """
 
-from typing import List, Dict, Optional, Any
-from pydantic import BaseModel
-import numpy as np
 from datetime import datetime
-import os
+from typing import Any
 
 # Import new service
 from llm_service import LLMService, LLMServiceConfig
-from llm_service.config import ServiceMode, DefaultParametersConfig, APIKeyConfig
+from llm_service.config import APIKeyConfig, DefaultParametersConfig, ServiceMode
 
 # Import schemas (canonical location - breaks circular dependency)
 from schemas import EntityPopulation, ValidationResult
@@ -46,10 +43,10 @@ class LLMClient:
         self,
         api_key: str,
         base_url: str = "https://openrouter.ai/api/v1",
-        default_model: Optional[str] = None,
+        default_model: str | None = None,
         model_cache_ttl_hours: int = 24,
         use_centralized_service: bool = True,  # Enable new service by default
-        service_config: Optional[LLMServiceConfig] = None,
+        service_config: LLMServiceConfig | None = None,
     ):
         """
         Initialize LLM client.
@@ -94,7 +91,7 @@ class LLMClient:
                 self.service = LLMService(config)
         else:
             # Use legacy implementation
-            from llm import OpenRouterClient, ModelManager
+            from llm import ModelManager, OpenRouterClient
 
             self._client = OpenRouterClient(api_key=api_key, base_url=base_url)
             self.model_manager = ModelManager(api_key, model_cache_ttl_hours)
@@ -123,10 +120,10 @@ class LLMClient:
 
     def populate_entity(
         self,
-        entity_schema: Dict,
-        context: Dict,
-        previous_knowledge: List[str] = None,
-        model: Optional[str] = None
+        entity_schema: dict,
+        context: dict,
+        previous_knowledge: list[str] = None,
+        model: str | None = None,
     ) -> EntityPopulation:
         """
         Populate entity with structured output.
@@ -148,20 +145,20 @@ class LLMClient:
 
     def _populate_entity_v2(
         self,
-        entity_schema: Dict,
-        context: Dict,
-        previous_knowledge: List[str] = None,
-        model: Optional[str] = None
+        entity_schema: dict,
+        context: dict,
+        previous_knowledge: list[str] = None,
+        model: str | None = None,
     ) -> EntityPopulation:
         """Implementation using centralized service"""
 
         # Handle both Dict and Entity object
-        if hasattr(entity_schema, 'entity_id'):
+        if hasattr(entity_schema, "entity_id"):
             # It's an Entity object
             entity_id = entity_schema.entity_id
         else:
             # It's a dict
-            entity_id = entity_schema['entity_id']
+            entity_id = entity_schema["entity_id"]
 
         # Build prompts
         previous_context = ""
@@ -219,7 +216,7 @@ Return ONLY valid JSON with ALL fields populated, no other text."""
         models_to_try = [
             model or self.default_model,
             "meta-llama/llama-3.1-405b-instruct",  # Fallback to larger model
-            "qwen/qwen-2.5-72b-instruct"  # Final fallback to different open-source provider
+            "qwen/qwen-2.5-72b-instruct",  # Final fallback to different open-source provider
         ]
 
         for attempt in range(max_retries):
@@ -247,26 +244,30 @@ Return ONLY valid JSON with ALL fields populated, no other text."""
                 # Check if knowledge_state is empty and retry if needed
                 if len(result.knowledge_state) > 0:
                     if attempt > 0:
-                        print(f"✅ LLM succeeded on attempt {attempt + 1} with temp={temperature}, model={current_model}")
+                        print(
+                            f"✅ LLM succeeded on attempt {attempt + 1} with temp={temperature}, model={current_model}"
+                        )
                     break
 
                 # If empty and not last attempt, retry with different strategy
                 if attempt < max_retries - 1:
-                    print(f"⚠️  LLM returned empty knowledge_state (attempt {attempt+1}/{max_retries})")
+                    print(
+                        f"⚠️  LLM returned empty knowledge_state (attempt {attempt + 1}/{max_retries})"
+                    )
                     print(f"   Retrying with temp={temperature}, model={current_model}")
 
             except Exception as e:
-                print(f"⚠️  LLM call failed on attempt {attempt+1}: {e}")
+                print(f"⚠️  LLM call failed on attempt {attempt + 1}: {e}")
                 if attempt == max_retries - 1:
                     raise
 
         # Fallback: If knowledge_state is still empty, generate defaults
         if len(result.knowledge_state) == 0:
-            print(f"⚠️  LLM consistently returns empty knowledge_state, using fallback defaults")
+            print("⚠️  LLM consistently returns empty knowledge_state, using fallback defaults")
             result.knowledge_state = [
                 f"Entity {entity_id} exists in this context",
                 f"Present at timepoint: {context.get('timepoint', 'unknown')}",
-                f"Role: {context.get('role', 'participant')}"
+                f"Role: {context.get('role', 'participant')}",
             ]
 
         # Update statistics
@@ -278,22 +279,20 @@ Return ONLY valid JSON with ALL fields populated, no other text."""
 
     def _populate_entity_legacy(
         self,
-        entity_schema: Dict,
-        context: Dict,
-        previous_knowledge: List[str] = None,
-        model: Optional[str] = None
+        entity_schema: dict,
+        context: dict,
+        previous_knowledge: list[str] = None,
+        model: str | None = None,
     ) -> EntityPopulation:
         """Legacy implementation for fallback (real LLM calls only)"""
         # Use original implementation from llm.py
         from llm import LLMClient as LegacyClient
+
         legacy = LegacyClient(self.api_key, self.base_url)
         return legacy.populate_entity(entity_schema, context, previous_knowledge, model)
 
     def validate_consistency(
-        self,
-        entities: List[Dict],
-        timepoint: datetime,
-        model: Optional[str] = None
+        self, entities: list[dict], timepoint: datetime, model: str | None = None
     ) -> ValidationResult:
         """
         Validate temporal consistency.
@@ -312,14 +311,13 @@ Return ONLY valid JSON with ALL fields populated, no other text."""
             return self._validate_consistency_legacy(entities, timepoint, model)
 
     def _validate_consistency_v2(
-        self,
-        entities: List[Dict],
-        timepoint: datetime,
-        model: Optional[str] = None
+        self, entities: list[dict], timepoint: datetime, model: str | None = None
     ) -> ValidationResult:
         """Implementation using centralized service"""
 
-        system_prompt = "You are an expert at validating temporal consistency in historical simulations."
+        system_prompt = (
+            "You are an expert at validating temporal consistency in historical simulations."
+        )
         user_prompt = f"""Validate temporal consistency of entities at {timepoint}.
 Entities: {entities}
 Check for: anachronisms, biological impossibilities, knowledge contradictions.
@@ -350,17 +348,15 @@ Return only valid JSON, no other text."""
         return result
 
     def _validate_consistency_legacy(
-        self,
-        entities: List[Dict],
-        timepoint: datetime,
-        model: Optional[str] = None
+        self, entities: list[dict], timepoint: datetime, model: str | None = None
     ) -> ValidationResult:
         """Legacy implementation (real LLM calls only)"""
         from llm import LLMClient as LegacyClient
+
         legacy = LegacyClient(self.api_key, self.base_url)
         return legacy.validate_consistency(entities, timepoint, model)
 
-    def score_relevance(self, query: str, knowledge_item: str, model: Optional[str] = None) -> float:
+    def score_relevance(self, query: str, knowledge_item: str, model: str | None = None) -> float:
         """
         Score how relevant a knowledge item is to a query.
 
@@ -377,7 +373,9 @@ Return only valid JSON, no other text."""
         else:
             return self._score_relevance_legacy(query, knowledge_item, model)
 
-    def _score_relevance_v2(self, query: str, knowledge_item: str, model: Optional[str] = None) -> float:
+    def _score_relevance_v2(
+        self, query: str, knowledge_item: str, model: str | None = None
+    ) -> float:
         """Implementation using centralized service"""
 
         user_prompt = f"""Rate how relevant this knowledge item is to the query on a scale of 0.0 to 1.0.
@@ -413,13 +411,18 @@ Relevance score:"""
         except ValueError:
             return self._heuristic_relevance_score(query, knowledge_item)
 
-    def _score_relevance_legacy(self, query: str, knowledge_item: str, model: Optional[str] = None) -> float:
+    def _score_relevance_legacy(
+        self, query: str, knowledge_item: str, model: str | None = None
+    ) -> float:
         """Legacy implementation (real LLM calls only)"""
         from llm import LLMClient as LegacyClient
+
         legacy = LegacyClient(self.api_key, self.base_url)
         return legacy.score_relevance(query, knowledge_item, model)
 
-    def generate_structured(self, prompt: str, response_model: type, model: Optional[str] = None, **kwargs):
+    def generate_structured(
+        self, prompt: str, response_model: type, model: str | None = None, **kwargs
+    ):
         """
         Generate structured output using Pydantic schema.
 
@@ -437,9 +440,13 @@ Relevance score:"""
         else:
             return self._generate_structured_legacy(prompt, response_model, model, **kwargs)
 
-    def _generate_structured_v2(self, prompt: str, response_model: type, model: Optional[str] = None, **kwargs):
+    def _generate_structured_v2(
+        self, prompt: str, response_model: type, model: str | None = None, **kwargs
+    ):
         """Implementation using centralized service"""
-        system_prompt = kwargs.pop("system_prompt", "You are a helpful assistant that generates structured data.")
+        system_prompt = kwargs.pop(
+            "system_prompt", "You are a helpful assistant that generates structured data."
+        )
 
         result = self.service.structured_call(
             system=system_prompt,
@@ -458,17 +465,21 @@ Relevance score:"""
 
         return result
 
-    def _generate_structured_legacy(self, prompt: str, response_model: type, model: Optional[str] = None, **kwargs):
+    def _generate_structured_legacy(
+        self, prompt: str, response_model: type, model: str | None = None, **kwargs
+    ):
         """Legacy implementation - fallback to mock"""
         # For legacy mode, return a mock instance
-        if hasattr(response_model, '__origin__') and response_model.__origin__ is list:
+        if hasattr(response_model, "__origin__") and response_model.__origin__ is list:
             # Handle List[SomeModel]
             return []
         else:
             # Return a basic instance
             return response_model()
 
-    def generate_expectations(self, entity_context: dict, timepoint_context: dict, model: Optional[str] = None):
+    def generate_expectations(
+        self, entity_context: dict, timepoint_context: dict, model: str | None = None
+    ):
         """
         Generate expectations for prospection mechanism.
 
@@ -485,24 +496,26 @@ Relevance score:"""
         else:
             return self._generate_expectations_legacy(entity_context, timepoint_context, model)
 
-    def _generate_expectations_v2(self, entity_context: dict, timepoint_context: dict, model: Optional[str] = None):
+    def _generate_expectations_v2(
+        self, entity_context: dict, timepoint_context: dict, model: str | None = None
+    ):
         """Implementation using centralized service"""
-        from schemas import ProspectiveState, Expectation
-        from typing import List
 
-        forecast_horizon = entity_context.get('forecast_horizon_days', 30)
-        max_expectations = entity_context.get('max_expectations', 5)
+        from schemas import Expectation
+
+        forecast_horizon = entity_context.get("forecast_horizon_days", 30)
+        max_expectations = entity_context.get("max_expectations", 5)
 
         system_prompt = "You are an expert at predicting how historical figures think about and anticipate future events based on their knowledge and context."
 
-        user_prompt = f"""Generate realistic expectations for {entity_context.get('entity_id')} about the future.
+        user_prompt = f"""Generate realistic expectations for {entity_context.get("entity_id")} about the future.
 
 Context:
-- Current situation: {timepoint_context.get('current_timepoint', 'unknown')}
-- Time: {timepoint_context.get('current_timestamp', 'unknown')}
-- Entity type: {entity_context.get('entity_type', 'person')}
-- Recent knowledge: {', '.join(entity_context.get('knowledge_sample', [])[:5])}
-- Personality traits: {entity_context.get('personality', {})}
+- Current situation: {timepoint_context.get("current_timepoint", "unknown")}
+- Time: {timepoint_context.get("current_timestamp", "unknown")}
+- Entity type: {entity_context.get("entity_type", "person")}
+- Recent knowledge: {", ".join(entity_context.get("knowledge_sample", [])[:5])}
+- Personality traits: {entity_context.get("personality", {})}
 
 Generate {max_expectations} expectations about events that might happen in the next {forecast_horizon} days.
 Each expectation should include:
@@ -518,7 +531,7 @@ Return as JSON array of expectation objects."""
         expectations = self.service.structured_call(
             system=system_prompt,
             user=user_prompt,
-            schema=List[Expectation],
+            schema=list[Expectation],
             temperature=0.7,
             max_tokens=1500,
             model=model,
@@ -532,7 +545,9 @@ Return as JSON array of expectation objects."""
 
         return expectations if isinstance(expectations, list) else []
 
-    def _generate_expectations_legacy(self, entity_context: dict, timepoint_context: dict, model: Optional[str] = None):
+    def _generate_expectations_legacy(
+        self, entity_context: dict, timepoint_context: dict, model: str | None = None
+    ):
         """Legacy implementation - return mock expectations"""
         from schemas import Expectation
 
@@ -542,11 +557,18 @@ Return as JSON array of expectation objects."""
                 subjective_probability=0.7,
                 desired_outcome=True,
                 preparation_actions=["maintain_current_course"],
-                confidence=0.8
+                confidence=0.8,
             )
         ]
 
-    def enrich_animistic_entity(self, entity_id: str, entity_type: str, base_metadata: dict, context: dict, model: Optional[str] = None):
+    def enrich_animistic_entity(
+        self,
+        entity_id: str,
+        entity_type: str,
+        base_metadata: dict,
+        context: dict,
+        model: str | None = None,
+    ):
         """
         Enrich animistic entity with LLM-generated background and characteristics.
 
@@ -561,11 +583,22 @@ Return as JSON array of expectation objects."""
             Enriched metadata dict with narrative background
         """
         if self.use_centralized_service:
-            return self._enrich_animistic_entity_v2(entity_id, entity_type, base_metadata, context, model)
+            return self._enrich_animistic_entity_v2(
+                entity_id, entity_type, base_metadata, context, model
+            )
         else:
-            return self._enrich_animistic_entity_legacy(entity_id, entity_type, base_metadata, context, model)
+            return self._enrich_animistic_entity_legacy(
+                entity_id, entity_type, base_metadata, context, model
+            )
 
-    def _enrich_animistic_entity_v2(self, entity_id: str, entity_type: str, base_metadata: dict, context: dict, model: Optional[str] = None):
+    def _enrich_animistic_entity_v2(
+        self,
+        entity_id: str,
+        entity_type: str,
+        base_metadata: dict,
+        context: dict,
+        model: str | None = None,
+    ):
         """Implementation using centralized service"""
 
         system_prompt = "You are an expert at creating rich, historically accurate backgrounds for entities in narrative simulations."
@@ -575,9 +608,9 @@ Return as JSON array of expectation objects."""
             user_prompt = f"""Create a rich background for an animal entity in a historical simulation.
 
 Entity ID: {entity_id}
-Species: {base_metadata.get('species', 'unknown')}
-Context: {context.get('timepoint_context', 'historical setting')}
-Current state: {base_metadata.get('biological_state', {})}
+Species: {base_metadata.get("species", "unknown")}
+Context: {context.get("timepoint_context", "historical setting")}
+Current state: {base_metadata.get("biological_state", {})}
 
 Generate a narrative background that includes:
 - A brief history of this animal (2-3 sentences)
@@ -595,9 +628,9 @@ Return a JSON object with:
             user_prompt = f"""Create a rich background for a building entity in a historical simulation.
 
 Entity ID: {entity_id}
-Context: {context.get('timepoint_context', 'historical setting')}
-Age: {base_metadata.get('age', 'unknown')} years
-Condition: {base_metadata.get('structural_integrity', 'unknown')}
+Context: {context.get("timepoint_context", "historical setting")}
+Age: {base_metadata.get("age", "unknown")} years
+Condition: {base_metadata.get("structural_integrity", "unknown")}
 
 Generate a narrative background that includes:
 - Construction history and purpose
@@ -615,7 +648,7 @@ Return a JSON object with:
             user_prompt = f"""Create a rich background for an abstract concept entity in a historical simulation.
 
 Entity ID: {entity_id}
-Context: {context.get('timepoint_context', 'historical setting')}
+Context: {context.get("timepoint_context", "historical setting")}
 
 Generate a narrative background that includes:
 - Origin and evolution of this concept
@@ -633,7 +666,7 @@ Return a JSON object with:
             # Generic enrichment
             user_prompt = f"""Create a rich background for entity '{entity_id}' of type '{entity_type}'.
 
-Context: {context.get('timepoint_context', 'historical setting')}
+Context: {context.get("timepoint_context", "historical setting")}
 Base metadata: {base_metadata}
 
 Return a JSON object with:
@@ -652,11 +685,12 @@ Return a JSON object with:
 
             # Parse JSON response
             import json
+
             enrichment = json.loads(response.content)
 
             # Merge with base metadata
             enriched = {**base_metadata}
-            enriched['llm_enrichment'] = enrichment
+            enriched["llm_enrichment"] = enrichment
 
             # Update statistics
             stats = self.service.get_statistics()
@@ -665,15 +699,29 @@ Return a JSON object with:
 
             return enriched
 
-        except Exception as e:
+        except Exception:
             # Fallback to base metadata if enrichment fails
             return base_metadata
 
-    def _enrich_animistic_entity_legacy(self, entity_id: str, entity_type: str, base_metadata: dict, context: dict, model: Optional[str] = None):
+    def _enrich_animistic_entity_legacy(
+        self,
+        entity_id: str,
+        entity_type: str,
+        base_metadata: dict,
+        context: dict,
+        model: str | None = None,
+    ):
         """Legacy implementation - return base metadata unchanged"""
         return base_metadata
 
-    def generate_scene_atmosphere(self, timepoint: dict, entities: list, environment: dict, atmosphere_data: dict, model: Optional[str] = None):
+    def generate_scene_atmosphere(
+        self,
+        timepoint: dict,
+        entities: list,
+        environment: dict,
+        atmosphere_data: dict,
+        model: str | None = None,
+    ):
         """
         Generate rich narrative description of scene atmosphere.
 
@@ -688,37 +736,52 @@ Return a JSON object with:
             Dict with narrative description and mood details
         """
         if self.use_centralized_service:
-            return self._generate_scene_atmosphere_v2(timepoint, entities, environment, atmosphere_data, model)
+            return self._generate_scene_atmosphere_v2(
+                timepoint, entities, environment, atmosphere_data, model
+            )
         else:
-            return self._generate_scene_atmosphere_legacy(timepoint, entities, environment, atmosphere_data, model)
+            return self._generate_scene_atmosphere_legacy(
+                timepoint, entities, environment, atmosphere_data, model
+            )
 
-    def _generate_scene_atmosphere_v2(self, timepoint: dict, entities: list, environment: dict, atmosphere_data: dict, model: Optional[str] = None):
+    def _generate_scene_atmosphere_v2(
+        self,
+        timepoint: dict,
+        entities: list,
+        environment: dict,
+        atmosphere_data: dict,
+        model: str | None = None,
+    ):
         """Implementation using centralized service"""
 
         system_prompt = "You are an expert at creating vivid, historically accurate scene descriptions that capture atmosphere and mood."
 
         # Build entity list
-        entity_names = [e.get('entity_id', 'unknown') for e in entities[:10]]  # Limit for prompt size
-        entity_summary = f"{len(entities)} entities present" + (f" including {', '.join(entity_names[:5])}" if entity_names else "")
+        entity_names = [
+            e.get("entity_id", "unknown") for e in entities[:10]
+        ]  # Limit for prompt size
+        entity_summary = f"{len(entities)} entities present" + (
+            f" including {', '.join(entity_names[:5])}" if entity_names else ""
+        )
 
         user_prompt = f"""Create a rich atmospheric description of this historical scene.
 
-Timepoint: {timepoint.get('event_description', 'Historical event')}
-Time: {timepoint.get('timestamp', 'Unknown time')}
-Location: {environment.get('location', 'Unknown location')}
+Timepoint: {timepoint.get("event_description", "Historical event")}
+Time: {timepoint.get("timestamp", "Unknown time")}
+Location: {environment.get("location", "Unknown location")}
 
 Environment:
-- Temperature: {environment.get('ambient_temperature', 20)}°C
-- Lighting: {environment.get('lighting_level', 0.5) * 100}%
-- Weather: {environment.get('weather', 'clear')}
-- Architecture: {environment.get('architectural_style', 'unknown style')}
+- Temperature: {environment.get("ambient_temperature", 20)}°C
+- Lighting: {environment.get("lighting_level", 0.5) * 100}%
+- Weather: {environment.get("weather", "clear")}
+- Architecture: {environment.get("architectural_style", "unknown style")}
 
 Atmosphere Metrics:
-- Tension: {atmosphere_data.get('tension_level', 0.5):.2f} (0=calm, 1=tense)
-- Formality: {atmosphere_data.get('formality_level', 0.5):.2f} (0=casual, 1=formal)
-- Emotional valence: {atmosphere_data.get('emotional_valence', 0.0):.2f} (-1=negative, 1=positive)
-- Energy level: {atmosphere_data.get('energy_level', 0.5):.2f} (0=low, 1=high)
-- Social cohesion: {atmosphere_data.get('social_cohesion', 0.5):.2f} (0=fragmented, 1=unified)
+- Tension: {atmosphere_data.get("tension_level", 0.5):.2f} (0=calm, 1=tense)
+- Formality: {atmosphere_data.get("formality_level", 0.5):.2f} (0=casual, 1=formal)
+- Emotional valence: {atmosphere_data.get("emotional_valence", 0.0):.2f} (-1=negative, 1=positive)
+- Energy level: {atmosphere_data.get("energy_level", 0.5):.2f} (0=low, 1=high)
+- Social cohesion: {atmosphere_data.get("social_cohesion", 0.5):.2f} (0=fragmented, 1=unified)
 
 Entities: {entity_summary}
 
@@ -747,6 +810,7 @@ Return a JSON object with:
 
             # Parse JSON response
             import json
+
             atmosphere_description = json.loads(response.content)
 
             # Update statistics
@@ -756,27 +820,40 @@ Return a JSON object with:
 
             return atmosphere_description
 
-        except Exception as e:
+        except Exception:
             # Fallback to basic description
             return {
                 "atmospheric_narrative": f"The scene at {environment.get('location', 'this location')} unfolds with {atmosphere_data.get('tension_level', 0.5) > 0.6 and 'palpable tension' or 'calm composure'}.",
                 "dominant_mood": "neutral",
                 "sensory_details": ["ambient lighting", "period architecture"],
                 "social_dynamics": "formal interactions",
-                "historical_context": "period-appropriate setting"
+                "historical_context": "period-appropriate setting",
             }
 
-    def _generate_scene_atmosphere_legacy(self, timepoint: dict, entities: list, environment: dict, atmosphere_data: dict, model: Optional[str] = None):
+    def _generate_scene_atmosphere_legacy(
+        self,
+        timepoint: dict,
+        entities: list,
+        environment: dict,
+        atmosphere_data: dict,
+        model: str | None = None,
+    ):
         """Legacy implementation - return basic description"""
         return {
             "atmospheric_narrative": "The scene unfolds with historical authenticity.",
             "dominant_mood": "neutral",
             "sensory_details": [],
             "social_dynamics": "interactions occur",
-            "historical_context": "period setting"
+            "historical_context": "period setting",
         }
 
-    def predict_counterfactual_outcome(self, baseline_timeline: dict, intervention: dict, affected_entities: list, model: Optional[str] = None):
+    def predict_counterfactual_outcome(
+        self,
+        baseline_timeline: dict,
+        intervention: dict,
+        affected_entities: list,
+        model: str | None = None,
+    ):
         """
         Predict outcomes of counterfactual interventions using LLM.
 
@@ -790,31 +867,41 @@ Return a JSON object with:
             Dict with predicted outcomes and narrative
         """
         if self.use_centralized_service:
-            return self._predict_counterfactual_outcome_v2(baseline_timeline, intervention, affected_entities, model)
+            return self._predict_counterfactual_outcome_v2(
+                baseline_timeline, intervention, affected_entities, model
+            )
         else:
-            return self._predict_counterfactual_outcome_legacy(baseline_timeline, intervention, affected_entities, model)
+            return self._predict_counterfactual_outcome_legacy(
+                baseline_timeline, intervention, affected_entities, model
+            )
 
-    def _predict_counterfactual_outcome_v2(self, baseline_timeline: dict, intervention: dict, affected_entities: list, model: Optional[str] = None):
+    def _predict_counterfactual_outcome_v2(
+        self,
+        baseline_timeline: dict,
+        intervention: dict,
+        affected_entities: list,
+        model: str | None = None,
+    ):
         """Implementation using centralized service"""
 
         system_prompt = "You are an expert at analyzing historical causality and predicting counterfactual outcomes based on interventions in historical timelines."
 
         # Build entity summary
-        entity_summary = ', '.join([e.get('entity_id', 'unknown') for e in affected_entities[:10]])
+        entity_summary = ", ".join([e.get("entity_id", "unknown") for e in affected_entities[:10]])
 
         user_prompt = f"""Analyze the counterfactual outcome of this intervention in a historical timeline.
 
 Baseline Timeline:
-- Timeline ID: {baseline_timeline.get('timeline_id', 'unknown')}
-- Current events: {baseline_timeline.get('event_summary', 'historical events')}
-- Key entities: {baseline_timeline.get('key_entities', [])}
+- Timeline ID: {baseline_timeline.get("timeline_id", "unknown")}
+- Current events: {baseline_timeline.get("event_summary", "historical events")}
+- Key entities: {baseline_timeline.get("key_entities", [])}
 
 Intervention:
-- Type: {intervention.get('type', 'unknown')}
-- Target: {intervention.get('target', 'unknown')}
-- Description: {intervention.get('description', 'intervention applied')}
-- Intervention point: {intervention.get('intervention_point', 'unknown timepoint')}
-- Parameters: {intervention.get('parameters', {})}
+- Type: {intervention.get("type", "unknown")}
+- Target: {intervention.get("target", "unknown")}
+- Description: {intervention.get("description", "intervention applied")}
+- Intervention point: {intervention.get("intervention_point", "unknown timepoint")}
+- Parameters: {intervention.get("parameters", {})}
 
 Affected Entities: {entity_summary}
 
@@ -846,6 +933,7 @@ Return a JSON object with:
 
             # Parse JSON response
             import json
+
             prediction = json.loads(response.content)
 
             # Update statistics
@@ -855,19 +943,29 @@ Return a JSON object with:
 
             return prediction
 
-        except Exception as e:
+        except Exception:
             # Fallback to basic prediction
             return {
-                "immediate_effects": [f"Intervention {intervention.get('type')} applied to {intervention.get('target')}"],
+                "immediate_effects": [
+                    f"Intervention {intervention.get('type')} applied to {intervention.get('target')}"
+                ],
                 "ripple_effects": ["Cascading changes through causal network"],
                 "entity_state_changes": {},
                 "divergence_significance": 0.5,
                 "timeline_narrative": f"The intervention causes the timeline to diverge at {intervention.get('intervention_point')}.",
                 "probability_assessment": 0.5,
-                "key_turning_points": [intervention.get('intervention_point', 'intervention point')]
+                "key_turning_points": [
+                    intervention.get("intervention_point", "intervention point")
+                ],
             }
 
-    def _predict_counterfactual_outcome_legacy(self, baseline_timeline: dict, intervention: dict, affected_entities: list, model: Optional[str] = None):
+    def _predict_counterfactual_outcome_legacy(
+        self,
+        baseline_timeline: dict,
+        intervention: dict,
+        affected_entities: list,
+        model: str | None = None,
+    ):
         """Legacy implementation - return basic prediction"""
         return {
             "immediate_effects": ["Intervention applied"],
@@ -876,10 +974,10 @@ Return a JSON object with:
             "divergence_significance": 0.5,
             "timeline_narrative": "The timeline diverges from baseline.",
             "probability_assessment": 0.5,
-            "key_turning_points": []
+            "key_turning_points": [],
         }
 
-    def generate_dialog(self, prompt: str, max_tokens: int = 2000, model: Optional[str] = None):
+    def generate_dialog(self, prompt: str, max_tokens: int = 2000, model: str | None = None):
         """
         Generate dialog with structured output.
 
@@ -896,7 +994,7 @@ Return a JSON object with:
         else:
             return self._generate_dialog_legacy(prompt, max_tokens, model)
 
-    def _generate_dialog_v2(self, prompt: str, max_tokens: int = 2000, model: Optional[str] = None):
+    def _generate_dialog_v2(self, prompt: str, max_tokens: int = 2000, model: str | None = None):
         """Implementation using centralized service"""
         from schemas import DialogData
 
@@ -943,9 +1041,12 @@ Return ONLY a single valid JSON object. Do NOT add markdown formatting or multip
 
         return result
 
-    def _generate_dialog_legacy(self, prompt: str, max_tokens: int = 2000, model: Optional[str] = None):
+    def _generate_dialog_legacy(
+        self, prompt: str, max_tokens: int = 2000, model: str | None = None
+    ):
         """Legacy implementation (real LLM calls only)"""
         from llm import LLMClient as LegacyClient
+
         legacy = LegacyClient(self.api_key, self.base_url)
         return legacy.generate_dialog(prompt, max_tokens, model)
 
@@ -953,9 +1054,9 @@ Return ONLY a single valid JSON object. Do NOT add markdown formatting or multip
         self,
         system_prompt: str,
         user_prompt: str,
-        persona_params: 'PersonaParams',
-        model: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        persona_params: "PersonaParams",
+        model: str | None = None,
+    ) -> dict[str, Any]:
         """
         Generate ONE dialog turn with persona-derived generation parameters.
 
@@ -1028,8 +1129,6 @@ Return ONLY a single valid JSON object. Do NOT add markdown formatting or multip
         total_words = len(query_words.union(knowledge_words))
         return min(1.0, overlap / max(1, total_words / 2))
 
-
-
     @classmethod
     def from_hydra_config(cls, cfg: Any, use_centralized_service: bool = True) -> "LLMClient":
         """
@@ -1042,7 +1141,7 @@ Return ONLY a single valid JSON object. Do NOT add markdown formatting or multip
         Returns:
             Configured LLMClient instance
         """
-        if use_centralized_service and hasattr(cfg, 'llm_service'):
+        if use_centralized_service and hasattr(cfg, "llm_service"):
             # Use new service config
             service_config = LLMServiceConfig.from_hydra_config(cfg)
             return cls(

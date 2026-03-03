@@ -18,21 +18,22 @@ Usage:
     python run_all_mechanism_tests.py           # Run quick mode (safe templates)
     python run_all_mechanism_tests.py --full    # Run all templates (expensive!)
 """
-import os
-import sys
-import subprocess
+
 import argparse
-import time
 import json
+import os
 import signal
+import subprocess
+import sys
 import threading
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Set, Optional, List, Tuple
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Optional
 
 # Colorful progress tracking
-from progress_tracker import ProgressTracker, print_success, print_error, print_info
+from progress_tracker import ProgressTracker
 
 
 # ============================================================================
@@ -135,9 +136,10 @@ def load_env():
         with open(env_file) as f:
             for line in f:
                 line = line.strip()
-                if line and not line.startswith('#') and '=' in line:
-                    key, value = line.split('=', 1)
+                if line and not line.startswith("#") and "=" in line:
+                    key, value = line.split("=", 1)
                     os.environ[key] = value
+
 
 load_env()
 
@@ -150,15 +152,17 @@ if os.getenv("OXEN_API_KEY") and not os.getenv("OXEN_API_TOKEN"):
 # SynthasAIzer Template Loading (Unified TemplateLoader Pattern)
 # ============================================================================
 
+
 def get_template_loader():
     """Get cached TemplateLoader instance."""
-    if not hasattr(get_template_loader, '_loader'):
+    if not hasattr(get_template_loader, "_loader"):
         from generation.templates.loader import TemplateLoader
+
         get_template_loader._loader = TemplateLoader()
     return get_template_loader._loader
 
 
-def load_template_by_name(name: str) -> Tuple[Optional['SimulationConfig'], Set[str]]:
+def load_template_by_name(name: str) -> tuple[Optional["SimulationConfig"], set[str]]:
     """
     Load a template by name using TemplateLoader.
 
@@ -170,7 +174,6 @@ def load_template_by_name(name: str) -> Tuple[Optional['SimulationConfig'], Set[
     Returns:
         Tuple of (SimulationConfig, mechanism_set) or (None, set()) if not found
     """
-    from generation.config_schema import SimulationConfig
 
     loader = get_template_loader()
     catalog = loader.get_catalog()
@@ -180,7 +183,7 @@ def load_template_by_name(name: str) -> Tuple[Optional['SimulationConfig'], Set[
 
     # Try with common prefixes
     if not template_info:
-        for prefix in ['showcase/', 'core/', 'portal/', 'stress/', 'convergence/']:
+        for prefix in ["showcase/", "core/", "portal/", "stress/", "convergence/"]:
             full_id = f"{prefix}{name}"
             template_info = catalog.templates.get(full_id)
             if template_info:
@@ -200,13 +203,13 @@ def load_template_by_name(name: str) -> Tuple[Optional['SimulationConfig'], Set[
         return None, set()
 
 
-def list_available_templates() -> List[str]:
+def list_available_templates() -> list[str]:
     """List all available template IDs from TemplateLoader."""
     loader = get_template_loader()
     return [t.id for t in loader.list_templates()]
 
 
-def get_templates_by_category(category: str) -> List[Tuple[str, Set[str]]]:
+def get_templates_by_category(category: str) -> list[tuple[str, set[str]]]:
     """
     Get all templates in a category.
 
@@ -233,9 +236,7 @@ def get_templates_by_category(category: str) -> List[Tuple[str, Set[str]]]:
 
 
 def run_convergence_analysis(
-    run_count: int = 3,
-    template_filter: Optional[str] = None,
-    verbose: bool = False
+    run_count: int = 3, template_filter: str | None = None, verbose: bool = False
 ) -> bool:
     """
     Run convergence analysis on recent runs from the database.
@@ -251,10 +252,11 @@ def run_convergence_analysis(
     Returns:
         True if analysis succeeded, False otherwise
     """
-    from metadata.run_tracker import MetadataManager
-    from storage import GraphStore
-    from schemas import ConvergenceSet
     import uuid
+
+    from metadata.run_tracker import MetadataManager
+    from schemas import ConvergenceSet
+    from storage import GraphStore
 
     print("\n" + "=" * 80)
     print("CONVERGENCE ANALYSIS")
@@ -271,7 +273,11 @@ def run_convergence_analysis(
 
         # Filter by template if specified
         if template_filter:
-            all_runs = [r for r in all_runs if hasattr(r, 'template_id') and r.template_id == template_filter]
+            all_runs = [
+                r
+                for r in all_runs
+                if hasattr(r, "template_id") and r.template_id == template_filter
+            ]
             if not all_runs:
                 print(f"  No runs found for template: {template_filter}")
                 return False
@@ -300,7 +306,7 @@ def run_convergence_analysis(
             # Create graph from run metadata
             graph = CausalGraph(
                 run_id=run.run_id,
-                template_id=run.template_id if hasattr(run, 'template_id') else None,
+                template_id=run.template_id if hasattr(run, "template_id") else None,
             )
 
             # Extract mechanisms as proxy for causal structure
@@ -309,24 +315,24 @@ def run_convergence_analysis(
                 # Create edges from mechanism co-occurrence
                 mechanisms = list(run.mechanisms_used)
                 for i, m1 in enumerate(mechanisms):
-                    for m2 in mechanisms[i+1:]:
+                    for m2 in mechanisms[i + 1 :]:
                         graph.temporal_edges.add((m1, m2))
 
             if run.entities_created and run.entities_created > 0:
                 # Add entity count as metadata
-                graph.metadata['entity_count'] = run.entities_created
+                graph.metadata["entity_count"] = run.entities_created
 
             graphs.append(graph)
 
         if len(graphs) < 2:
-            print(f"  Could not build enough graphs for analysis")
+            print("  Could not build enough graphs for analysis")
             return False
 
         # Compute convergence
         result = compute_convergence_from_graphs(graphs)
 
         # Display results
-        print(f"\n  📊 Convergence Results:")
+        print("\n  📊 Convergence Results:")
         print(f"  ├─ Score: {result.convergence_score:.2%}")
         print(f"  ├─ Grade: {result.robustness_grade}")
         print(f"  ├─ Min Similarity: {result.min_similarity:.2%}")
@@ -340,21 +346,25 @@ def run_convergence_analysis(
             "B": "Good - Causal mechanisms are reasonably stable",
             "C": "Fair - Some variability in causal structure",
             "D": "Poor - Significant causal divergence",
-            "F": "Fail - Causal mechanisms are highly sensitive to conditions"
+            "F": "Fail - Causal mechanisms are highly sensitive to conditions",
         }
         print(f"\n  💡 {grade_meanings.get(result.robustness_grade, 'Unknown grade')}")
 
         # Show divergence points if any
         if result.divergence_points:
             print(f"\n  🔀 Divergence Points ({len(result.divergence_points)} total):")
-            show_count = len(result.divergence_points) if verbose else min(3, len(result.divergence_points))
+            show_count = (
+                len(result.divergence_points) if verbose else min(3, len(result.divergence_points))
+            )
             for dp in result.divergence_points[:show_count]:
                 print(f"     - {dp.edge}: {dp.agreement_ratio:.0%} agreement")
                 if verbose:
                     print(f"       Present in: {', '.join(dp.present_in_runs)}")
                     print(f"       Absent in: {', '.join(dp.absent_in_runs)}")
             if not verbose and len(result.divergence_points) > 3:
-                print(f"     ... and {len(result.divergence_points) - 3} more (use --convergence-verbose for details)")
+                print(
+                    f"     ... and {len(result.divergence_points) - 3} more (use --convergence-verbose for details)"
+                )
 
         # Store result in database
         store = GraphStore("sqlite:///metadata/runs.db")
@@ -369,10 +379,12 @@ def run_convergence_analysis(
             robustness_grade=result.robustness_grade,
             consensus_edge_count=len(result.consensus_edges),
             contested_edge_count=len(result.contested_edges),
-            divergence_points=json.dumps([
-                {"edge": dp.edge, "ratio": dp.agreement_ratio}
-                for dp in result.divergence_points[:10]
-            ])
+            divergence_points=json.dumps(
+                [
+                    {"edge": dp.edge, "ratio": dp.agreement_ratio}
+                    for dp in result.divergence_points[:10]
+                ]
+            ),
         )
         store.save_convergence_set(convergence_set)
         print(f"\n  ✅ Results saved: {convergence_set.set_id}")
@@ -381,11 +393,12 @@ def run_convergence_analysis(
 
     except ImportError as e:
         print(f"  ❌ Import error: {e}")
-        print(f"     Make sure evaluation/ module is available")
+        print("     Make sure evaluation/ module is available")
         return False
     except Exception as e:
         print(f"  ❌ Error during convergence analysis: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -395,7 +408,7 @@ def run_convergence_e2e(
     run_count: int = 3,
     skip_summaries: bool = False,
     verbose: bool = False,
-    model_override: Optional[str] = None
+    model_override: str | None = None,
 ) -> bool:
     """
     Run a template N times consecutively, then compute convergence across those runs.
@@ -419,13 +432,16 @@ def run_convergence_e2e(
     Example:
         python run_all_mechanism_tests.py --convergence-e2e --template board_meeting --runs 3 --model meta-llama/llama-3.1-405b-instruct
     """
-    from generation.config_schema import SimulationConfig
+    import uuid
+
+    from evaluation.convergence import (
+        compute_convergence_from_graphs,
+        extract_causal_graph,
+    )
     from generation.resilience_orchestrator import ResilientE2EWorkflowRunner
     from metadata.run_tracker import MetadataManager
-    from evaluation.convergence import CausalGraph, compute_convergence_from_graphs, extract_causal_graph
-    from storage import GraphStore
     from schemas import ConvergenceSet
-    import uuid
+    from storage import GraphStore
 
     print("\n" + "=" * 80)
     print("CONVERGENCE E2E TEST")
@@ -437,7 +453,7 @@ def run_convergence_e2e(
         # Set environment variable for downstream LLM client initialization
         os.environ["TIMEPOINT_MODEL_OVERRIDE"] = model_override
     else:
-        print(f"Model: default (meta-llama/llama-3.1-70b-instruct)")
+        print("Model: default (meta-llama/llama-3.1-70b-instruct)")
     print(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 80)
     print()
@@ -445,6 +461,7 @@ def run_convergence_e2e(
     # Get the template configuration
     try:
         from generation.templates.loader import TemplateLoader
+
         loader = TemplateLoader()
         try:
             config = loader.load_template(template_name)
@@ -477,13 +494,13 @@ def run_convergence_e2e(
     run_ids = []
     total_cost = 0.0
 
-    print(f"{'='*80}")
+    print(f"{'=' * 80}")
     print(f"PHASE 1: Running {template_name} x{run_count}")
-    print(f"{'='*80}")
+    print(f"{'=' * 80}")
     print()
 
     for i in range(run_count):
-        print(f"\n[Run {i+1}/{run_count}] Starting...")
+        print(f"\n[Run {i + 1}/{run_count}] Starting...")
         print("-" * 40)
 
         try:
@@ -491,37 +508,35 @@ def run_convergence_e2e(
             run_ids.append(result.run_id)
             mechanisms = set(result.mechanisms_used) if result.mechanisms_used else set()
 
-            run_results.append({
-                'success': True,
-                'run_id': result.run_id,
-                'mechanisms': mechanisms,
-                'entities': result.entities_created,
-                'timepoints': result.timepoints_created,
-                'cost': result.cost_usd or 0.0
-            })
+            run_results.append(
+                {
+                    "success": True,
+                    "run_id": result.run_id,
+                    "mechanisms": mechanisms,
+                    "entities": result.entities_created,
+                    "timepoints": result.timepoints_created,
+                    "cost": result.cost_usd or 0.0,
+                }
+            )
 
             total_cost += result.cost_usd or 0.0
-            print(f"✅ Run {i+1} complete: {result.run_id}")
+            print(f"✅ Run {i + 1} complete: {result.run_id}")
             print(f"   Mechanisms: {', '.join(sorted(mechanisms))}")
             print(f"   Cost: ${result.cost_usd:.2f}")
 
         except Exception as e:
-            print(f"❌ Run {i+1} failed: {e}")
-            run_results.append({
-                'success': False,
-                'error': str(e),
-                'mechanisms': set()
-            })
+            print(f"❌ Run {i + 1} failed: {e}")
+            run_results.append({"success": False, "error": str(e), "mechanisms": set()})
 
     # Check if we have enough successful runs
-    successful_runs = [r for r in run_results if r['success']]
+    successful_runs = [r for r in run_results if r["success"]]
     if len(successful_runs) < 2:
         print(f"\n❌ Not enough successful runs for convergence ({len(successful_runs)}/2 minimum)")
         return False
 
-    print(f"\n{'='*80}")
-    print(f"PHASE 2: Side-by-Side Comparison")
-    print(f"{'='*80}")
+    print(f"\n{'=' * 80}")
+    print("PHASE 2: Side-by-Side Comparison")
+    print(f"{'=' * 80}")
     print()
 
     # Display side-by-side comparison
@@ -531,26 +546,26 @@ def run_convergence_e2e(
     # Header
     header = "  {:12s}".format("Metric")
     for i, run in enumerate(successful_runs):
-        header += " | {:20s}".format(f"Run {i+1}")
+        header += " | {:20s}".format(f"Run {i + 1}")
     print(header)
     print("-" * 80)
 
     # Run IDs
     row = "  {:12s}".format("Run ID")
     for run in successful_runs:
-        row += " | {:20s}".format(run['run_id'][:18] + "..")
+        row += " | {:20s}".format(run["run_id"][:18] + "..")
     print(row)
 
     # Entities
     row = "  {:12s}".format("Entities")
     for run in successful_runs:
-        row += " | {:20s}".format(str(run.get('entities', 'N/A')))
+        row += " | {:20s}".format(str(run.get("entities", "N/A")))
     print(row)
 
     # Timepoints
     row = "  {:12s}".format("Timepoints")
     for run in successful_runs:
-        row += " | {:20s}".format(str(run.get('timepoints', 'N/A')))
+        row += " | {:20s}".format(str(run.get("timepoints", "N/A")))
     print(row)
 
     # Cost
@@ -567,12 +582,12 @@ def run_convergence_e2e(
 
     all_mechanisms = set()
     for run in successful_runs:
-        all_mechanisms.update(run['mechanisms'])
+        all_mechanisms.update(run["mechanisms"])
 
     for mech in sorted(all_mechanisms):
         row = f"  {mech:12s}"
         for run in successful_runs:
-            if mech in run['mechanisms']:
+            if mech in run["mechanisms"]:
                 row += " | {:20s}".format("✓")
             else:
                 row += " | {:20s}".format("✗")
@@ -581,9 +596,9 @@ def run_convergence_e2e(
     print("-" * 80)
 
     # Compute convergence
-    print(f"\n{'='*80}")
-    print(f"PHASE 3: Convergence Analysis")
-    print(f"{'='*80}")
+    print(f"\n{'=' * 80}")
+    print("PHASE 3: Convergence Analysis")
+    print(f"{'=' * 80}")
     print()
 
     # Extract real causal graphs from database
@@ -592,26 +607,28 @@ def run_convergence_e2e(
     for run in successful_runs:
         try:
             graph = extract_causal_graph(
-                run_id=run['run_id'],
-                db_path="metadata/runs.db",
-                template_id=template_name
+                run_id=run["run_id"], db_path="metadata/runs.db", template_id=template_name
             )
             graphs.append(graph)
-            print(f"  ├─ Run {run['run_id'][:20]}...: {graph.edge_count} edges ({len(graph.temporal_edges)} temporal, {len(graph.knowledge_edges)} knowledge)")
+            print(
+                f"  ├─ Run {run['run_id'][:20]}...: {graph.edge_count} edges ({len(graph.temporal_edges)} temporal, {len(graph.knowledge_edges)} knowledge)"
+            )
         except Exception as e:
             print(f"  ⚠️ Could not extract graph for run {run['run_id']}: {e}")
 
     # Check minimum graph count
     if len(graphs) < 2:
         print(f"\n❌ Not enough graphs extracted for convergence ({len(graphs)}/2 minimum)")
-        print("   This may indicate the runs didn't persist timepoints/events to the shared database.")
+        print(
+            "   This may indicate the runs didn't persist timepoints/events to the shared database."
+        )
         return False
 
     # Compute convergence
     result = compute_convergence_from_graphs(graphs)
 
     # Display convergence results
-    print(f"📊 CONVERGENCE RESULTS:")
+    print("📊 CONVERGENCE RESULTS:")
     print("-" * 80)
     print(f"  ├─ Score: {result.convergence_score:.2%}")
     print(f"  ├─ Grade: {result.robustness_grade}")
@@ -626,13 +643,13 @@ def run_convergence_e2e(
         "B": "Good - Causal mechanisms are reasonably stable",
         "C": "Fair - Some variability in causal structure",
         "D": "Poor - Significant causal divergence",
-        "F": "Fail - Causal mechanisms are highly sensitive to conditions"
+        "F": "Fail - Causal mechanisms are highly sensitive to conditions",
     }
     print(f"\n  💡 {grade_meanings.get(result.robustness_grade, 'Unknown grade')}")
 
     # Consensus edges
     if result.consensus_edges:
-        print(f"\n  ✓ CONSENSUS EDGES (present in ALL runs):")
+        print("\n  ✓ CONSENSUS EDGES (present in ALL runs):")
         for edge in sorted(result.consensus_edges)[:10]:
             print(f"     {edge}")
         if len(result.consensus_edges) > 10:
@@ -640,7 +657,7 @@ def run_convergence_e2e(
 
     # Contested edges
     if result.contested_edges:
-        print(f"\n  ⚠ CONTESTED EDGES (present in SOME runs):")
+        print("\n  ⚠ CONTESTED EDGES (present in SOME runs):")
         for edge in sorted(result.contested_edges)[:10]:
             print(f"     {edge}")
         if len(result.contested_edges) > 10:
@@ -649,14 +666,18 @@ def run_convergence_e2e(
     # Divergence points
     if result.divergence_points:
         print(f"\n  🔀 DIVERGENCE POINTS ({len(result.divergence_points)} total):")
-        show_count = len(result.divergence_points) if verbose else min(5, len(result.divergence_points))
+        show_count = (
+            len(result.divergence_points) if verbose else min(5, len(result.divergence_points))
+        )
         for dp in result.divergence_points[:show_count]:
             print(f"     - {dp.edge}: {dp.agreement_ratio:.0%} agreement")
             if verbose:
                 print(f"       Present in: {', '.join(dp.present_in_runs)}")
                 print(f"       Absent in: {', '.join(dp.absent_in_runs)}")
         if not verbose and len(result.divergence_points) > 5:
-            print(f"     ... and {len(result.divergence_points) - 5} more (use --convergence-verbose)")
+            print(
+                f"     ... and {len(result.divergence_points) - 5} more (use --convergence-verbose)"
+            )
 
     # Store result in database
     store = GraphStore("sqlite:///metadata/runs.db")
@@ -671,15 +692,14 @@ def run_convergence_e2e(
         robustness_grade=result.robustness_grade,
         consensus_edge_count=len(result.consensus_edges),
         contested_edge_count=len(result.contested_edges),
-        divergence_points=json.dumps([
-            {"edge": dp.edge, "ratio": dp.agreement_ratio}
-            for dp in result.divergence_points[:10]
-        ])
+        divergence_points=json.dumps(
+            [{"edge": dp.edge, "ratio": dp.agreement_ratio} for dp in result.divergence_points[:10]]
+        ),
     )
     store.save_convergence_set(convergence_set)
 
     # Final summary
-    print(f"\n{'='*80}")
+    print(f"\n{'=' * 80}")
     print("CONVERGENCE E2E TEST COMPLETE")
     print("=" * 80)
     print(f"  Template: {template_name}")
@@ -716,36 +736,38 @@ def _print_narrative_excerpt(run_id: str, world_id: str):
             return
 
         # Print first and last timepoint summaries
-        print(f"\n   📖 Narrative Excerpt:")
+        print("\n   📖 Narrative Excerpt:")
 
         # First timepoint
         first_tp = timepoints[0]
         print(f"   ├─ T0: {first_tp.get('timestamp', 'N/A')} - {first_tp.get('title', 'Untitled')}")
-        if first_tp.get('scene'):
-            scene_text = first_tp['scene'][:150].replace('\n', ' ')
+        if first_tp.get("scene"):
+            scene_text = first_tp["scene"][:150].replace("\n", " ")
             print(f"   │  Scene: {scene_text}...")
 
         # Last timepoint (if different)
         if len(timepoints) > 1:
             last_tp = timepoints[-1]
-            print(f"   └─ T{len(timepoints)-1}: {last_tp.get('timestamp', 'N/A')} - {last_tp.get('title', 'Untitled')}")
-            if last_tp.get('scene'):
-                scene_text = last_tp['scene'][:150].replace('\n', ' ')
+            print(
+                f"   └─ T{len(timepoints) - 1}: {last_tp.get('timestamp', 'N/A')} - {last_tp.get('title', 'Untitled')}"
+            )
+            if last_tp.get("scene"):
+                scene_text = last_tp["scene"][:150].replace("\n", " ")
                 print(f"      Scene: {scene_text}...")
 
         # Sample dialog if available
         for tp in timepoints[:2]:  # Check first 2 timepoints
-            dialogs = tp.get('dialogs', [])
+            dialogs = tp.get("dialogs", [])
             if dialogs:
                 first_dialog = dialogs[0]
-                speaker = first_dialog.get('speaker', 'Unknown')
-                text = first_dialog.get('text', '')[:100].replace('\n', ' ')
-                print(f"   💬 Sample Dialog ({speaker}): \"{text}...\"")
+                speaker = first_dialog.get("speaker", "Unknown")
+                text = first_dialog.get("text", "")[:100].replace("\n", " ")
+                print(f'   💬 Sample Dialog ({speaker}): "{text}..."')
                 break
 
         print()  # Empty line for readability
 
-    except Exception as e:
+    except Exception:
         # Silently fail - narrative excerpt is nice-to-have, not critical
         pass
 
@@ -763,9 +785,9 @@ def confirm_expensive_run(mode: str, min_cost: float, max_cost: float, runtime_m
     Returns:
         True if user confirms, False otherwise
     """
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("⚠️  EXPENSIVE RUN CONFIRMATION REQUIRED")
-    print("="*80)
+    print("=" * 80)
     print(f"Mode: {mode}")
     print(f"Estimated Cost: ${min_cost:.2f}-${max_cost:.2f}")
     print(f"Estimated Runtime: {runtime_min} minutes")
@@ -785,7 +807,7 @@ def confirm_expensive_run(mode: str, min_cost: float, max_cost: float, runtime_m
     finally:
         enable_graceful_interrupt()
 
-    if response in ['y', 'yes']:
+    if response in ["y", "yes"]:
         print("✓ Confirmed. Starting test run...")
         return True
     else:
@@ -795,9 +817,9 @@ def confirm_expensive_run(mode: str, min_cost: float, max_cost: float, runtime_m
 
 def list_modes():
     """Display all available simulation modes with template counts and cost estimates"""
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("AVAILABLE SIMULATION MODES")
-    print("="*80)
+    print("=" * 80)
 
     print("\n📚 QUICK MODE (DEFAULT)")
     print("  Templates: 7 | Cost: $0.15-$0.30 | Runtime: 8-15 min")
@@ -849,41 +871,43 @@ def list_modes():
     print("    Templates: 20 | Cost: $2.00-$3.50 | Runtime: 60-100 min")
     print("    ALL portal Timepoint variants (standard + quick + standard + thorough)")
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("🚀 ULTRA MODE (--ultra-all)")
     print("  Templates: 64 | Cost: $4.00-$8.00 | Runtime: 120-180 min")
     print("  Run EVERYTHING: quick + full + timepoint corporate + all portal modes")
     print("  Complete system validation across all 17 mechanisms")
-    print("="*80)
+    print("=" * 80)
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("🗣️  NATURAL LANGUAGE MODE (--nl)")
     print("  Run any simulation from plain English description")
-    print("  Example: --nl \"Emergency board meeting where CFO reveals bankruptcy\"")
+    print('  Example: --nl "Emergency board meeting where CFO reveals bankruptcy"')
     print("  Options: --nl-entities N, --nl-timepoints N to override defaults")
-    print("="*80)
+    print("=" * 80)
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("📊 CONVERGENCE ANALYSIS")
     print("  --convergence:           Run convergence after simulations")
     print("  --convergence-only:      Run ONLY convergence (no simulations)")
     print("  --convergence-runs N:    Number of runs to compare (default: 3)")
     print("  --convergence-template:  Filter to specific template")
     print("  --convergence-verbose:   Show detailed divergence points")
-    print("  Example: --convergence-only --convergence-template hospital_crisis --convergence-runs 5")
-    print("="*80)
+    print(
+        "  Example: --convergence-only --convergence-template hospital_crisis --convergence-runs 5"
+    )
+    print("=" * 80)
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("🔬 CONVERGENCE E2E MODE (--convergence-e2e)")
     print("  Run a template N times consecutively, then compute convergence")
     print("  Includes side-by-side comparison of runs and divergence analysis")
     print("  Example: --convergence-e2e --template board_meeting --convergence-runs 3")
     print("  Cost: ~$0.08-$0.15 for 3 runs of board_meeting")
-    print("="*80)
+    print("=" * 80)
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("🆓 FREE MODEL OPTIONS ($0 cost)")
-    print("="*80)
+    print("=" * 80)
     print("  --free:              Use best available free model (quality-focused)")
     print("                       Prefers: Qwen 235B, Llama 3.3 70B, Gemini Flash")
     print("  --free-fast:         Use fastest free model (speed-focused)")
@@ -895,11 +919,11 @@ def list_modes():
     print()
     print("  Example: python run_all_mechanism_tests.py --free --template board_meeting")
     print("  Example: python run_all_mechanism_tests.py --free-fast --parallel 4")
-    print("="*80)
+    print("=" * 80)
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("🌐 API MODE (--api)")
-    print("="*80)
+    print("=" * 80)
     print("  Submit simulations via REST API instead of direct execution")
     print("  Enables usage quota tracking and batch submission")
     print()
@@ -914,32 +938,32 @@ def list_modes():
     print("  Example: python run_all_mechanism_tests.py --api --api-wait")
     print("  Example: python run_all_mechanism_tests.py --api --api-budget 1.00 --full")
     print("  Example: python run_all_mechanism_tests.py --api-usage")
-    print("="*80)
+    print("=" * 80)
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("💡 TIPS")
-    print("="*80)
+    print("=" * 80)
     print("  --skip-summaries:  Reduce cost slightly by skipping LLM summaries")
     print("  --parallel N:      Run N templates in parallel (recommended: 4-6)")
     print("  --model MODEL_ID:  Use specific model (e.g., meta-llama/llama-3.1-405b-instruct)")
-    print("="*80)
+    print("=" * 80)
     print()
 
 
-def run_template(runner, config, name: str, expected_mechanisms: Set[str]) -> Dict:
+def run_template(runner, config, name: str, expected_mechanisms: set[str]) -> dict:
     """Run a single template and return results"""
-    print(f"\n{'='*80}")
+    print(f"\n{'=' * 80}")
     print(f"Running: {name}")
     print(f"Expected mechanisms: {', '.join(expected_mechanisms)}")
-    print(f"{'='*80}\n")
+    print(f"{'=' * 80}\n")
 
     try:
         result = runner.run(config)
         mechanisms = set(result.mechanisms_used) if result.mechanisms_used else set()
 
         # Track Oxen URLs and PDF locations
-        oxen_repo_url = result.oxen_repo_url if hasattr(result, 'oxen_repo_url') else None
-        oxen_dataset_url = result.oxen_dataset_url if hasattr(result, 'oxen_dataset_url') else None
+        oxen_repo_url = result.oxen_repo_url if hasattr(result, "oxen_repo_url") else None
+        oxen_dataset_url = result.oxen_dataset_url if hasattr(result, "oxen_dataset_url") else None
 
         # Find PDF files in datasets/{world_id}/
         pdf_paths = []
@@ -948,17 +972,17 @@ def run_template(runner, config, name: str, expected_mechanisms: Set[str]) -> Di
             pdf_paths = [str(p) for p in template_dataset_dir.glob("*.pdf")]
 
         success = {
-            'success': True,
-            'run_id': result.run_id,
-            'entities': result.entities_created,
-            'timepoints': result.timepoints_created,
-            'mechanisms': mechanisms,
-            'expected': expected_mechanisms,
-            'cost': result.cost_usd or 0.0,
-            'summary': result.summary if hasattr(result, 'summary') else None,
-            'oxen_repo_url': oxen_repo_url,
-            'oxen_dataset_url': oxen_dataset_url,
-            'pdf_paths': pdf_paths
+            "success": True,
+            "run_id": result.run_id,
+            "entities": result.entities_created,
+            "timepoints": result.timepoints_created,
+            "mechanisms": mechanisms,
+            "expected": expected_mechanisms,
+            "cost": result.cost_usd or 0.0,
+            "summary": result.summary if hasattr(result, "summary") else None,
+            "oxen_repo_url": oxen_repo_url,
+            "oxen_dataset_url": oxen_dataset_url,
+            "pdf_paths": pdf_paths,
         }
 
         print(f"\n✅ Success: {name}")
@@ -980,22 +1004,22 @@ def run_template(runner, config, name: str, expected_mechanisms: Set[str]) -> Di
         print(f"\n❌ Failed: {name}")
         print(f"   Error: {str(e)[:200]}")
         return {
-            'success': False,
-            'error': str(e),
-            'mechanisms': set(),
-            'expected': expected_mechanisms,
-            'cost': 0.0,
-            'summary': None
+            "success": False,
+            "error": str(e),
+            "mechanisms": set(),
+            "expected": expected_mechanisms,
+            "cost": 0.0,
+            "summary": None,
         }
 
 
-def run_andos_script(script: str, name: str, expected_mechanisms: Set[str]) -> Dict:
+def run_andos_script(script: str, name: str, expected_mechanisms: set[str]) -> dict:
     """Run a standalone ANDOS test script"""
-    print(f"\n{'='*80}")
+    print(f"\n{'=' * 80}")
     print(f"Running ANDOS Script: {name}")
     print(f"Script: {script}")
     print(f"Expected mechanisms: {', '.join(expected_mechanisms)}")
-    print(f"{'='*80}\n")
+    print(f"{'=' * 80}\n")
 
     try:
         result = subprocess.run(
@@ -1003,7 +1027,7 @@ def run_andos_script(script: str, name: str, expected_mechanisms: Set[str]) -> D
             capture_output=True,
             text=True,
             timeout=600,  # 10 minute timeout
-            env={**os.environ, "OPENROUTER_API_KEY": os.getenv("OPENROUTER_API_KEY")}
+            env={**os.environ, "OPENROUTER_API_KEY": os.getenv("OPENROUTER_API_KEY")},
         )
 
         success = result.returncode == 0
@@ -1011,10 +1035,10 @@ def run_andos_script(script: str, name: str, expected_mechanisms: Set[str]) -> D
         if success:
             # Parse run_id from output
             run_id = None
-            for line in result.stdout.split('\n'):
-                if 'Run ID:' in line or 'run_id:' in line:
+            for line in result.stdout.split("\n"):
+                if "Run ID:" in line or "run_id:" in line:
                     # Extract run_id from lines like "Run ID: run_20251026_220100_2487a596"
-                    parts = line.split(':')
+                    parts = line.split(":")
                     if len(parts) >= 2:
                         run_id = parts[-1].strip()
                         break
@@ -1025,15 +1049,15 @@ def run_andos_script(script: str, name: str, expected_mechanisms: Set[str]) -> D
                 print(f"   Run ID: {run_id}")
 
             # Print last few lines
-            output_lines = result.stdout.strip().split('\n')
+            output_lines = result.stdout.strip().split("\n")
             for line in output_lines[-3:]:
                 print(f"   {line}")
 
             return {
-                'success': True,
-                'run_id': run_id,
-                'expected': expected_mechanisms,
-                'exit_code': result.returncode
+                "success": True,
+                "run_id": run_id,
+                "expected": expected_mechanisms,
+                "exit_code": result.returncode,
             }
         else:
             print(f"❌ Failed: {name}")
@@ -1042,33 +1066,25 @@ def run_andos_script(script: str, name: str, expected_mechanisms: Set[str]) -> D
                 print(f"   Error: {result.stderr[:200]}")
 
             return {
-                'success': False,
-                'error': f"Exit code {result.returncode}",
-                'expected': expected_mechanisms
+                "success": False,
+                "error": f"Exit code {result.returncode}",
+                "expected": expected_mechanisms,
             }
 
     except subprocess.TimeoutExpired:
         print(f"❌ Timeout: {name}")
-        return {
-            'success': False,
-            'error': "Timeout (>10 minutes)",
-            'expected': expected_mechanisms
-        }
+        return {"success": False, "error": "Timeout (>10 minutes)", "expected": expected_mechanisms}
     except Exception as e:
         print(f"❌ Exception: {name}")
         print(f"   Error: {str(e)[:100]}")
-        return {
-            'success': False,
-            'error': str(e),
-            'expected': expected_mechanisms
-        }
+        return {"success": False, "error": str(e), "expected": expected_mechanisms}
 
 
 def run_nl_simulation(
     nl_input: str,
     skip_summaries: bool = False,
-    entities: Optional[int] = None,
-    timepoints: Optional[int] = None
+    entities: int | None = None,
+    timepoints: int | None = None,
 ) -> bool:
     """
     Run a simulation from natural language input.
@@ -1100,7 +1116,7 @@ def run_nl_simulation(
     print(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 80)
     print()
-    print(f"Input: \"{nl_input}\"")
+    print(f'Input: "{nl_input}"')
     print()
 
     # Check for API key
@@ -1125,10 +1141,12 @@ def run_nl_simulation(
 
     # Apply overrides if provided
     if entities is not None:
-        nl_config['entities'] = [{'name': f'Entity{i}', 'role': 'participant'} for i in range(entities)]
+        nl_config["entities"] = [
+            {"name": f"Entity{i}", "role": "participant"} for i in range(entities)
+        ]
         print(f"  (Entity count overridden to {entities})")
     if timepoints is not None:
-        nl_config['timepoint_count'] = timepoints
+        nl_config["timepoint_count"] = timepoints
         print(f"  (Timepoint count overridden to {timepoints})")
 
     # Step 2: Convert to production config
@@ -1149,10 +1167,7 @@ def run_nl_simulation(
     print("Step 3: Running simulation...")
     try:
         metadata_manager = MetadataManager(db_path="metadata/runs.db")
-        runner = ResilientE2EWorkflowRunner(
-            metadata_manager,
-            generate_summary=not skip_summaries
-        )
+        runner = ResilientE2EWorkflowRunner(metadata_manager, generate_summary=not skip_summaries)
         result = runner.run(production_config)
 
         print()
@@ -1165,7 +1180,7 @@ def run_nl_simulation(
         print(f"  Mechanisms Used: {', '.join(sorted(result.mechanisms_used or []))}")
         print(f"  Cost: ${result.cost_usd:.2f}")
 
-        if hasattr(result, 'summary') and result.summary:
+        if hasattr(result, "summary") and result.summary:
             print()
             print("Summary:")
             print(f"  {result.summary}")
@@ -1180,7 +1195,9 @@ def run_nl_simulation(
         return False
 
 
-def run_single_template(template_name: str, skip_summaries: bool = False, portal_quick: bool = False) -> bool:
+def run_single_template(
+    template_name: str, skip_summaries: bool = False, portal_quick: bool = False
+) -> bool:
     """Run a single template by name.
 
     Args:
@@ -1190,8 +1207,8 @@ def run_single_template(template_name: str, skip_summaries: bool = False, portal
     Returns:
         True if successful, False otherwise
     """
-    from generation.templates.loader import TemplateLoader
     from generation.resilience_orchestrator import ResilientE2EWorkflowRunner
+    from generation.templates.loader import TemplateLoader
     from metadata.run_tracker import MetadataManager
 
     # Normalize template name
@@ -1233,7 +1250,8 @@ def run_single_template(template_name: str, skip_summaries: bool = False, portal
     # Apply portal-quick mode: reduce backward_steps to 5 for fast demo
     if portal_quick:
         from generation.config_schema import TemporalMode
-        if hasattr(config, 'temporal') and config.temporal.mode == TemporalMode.PORTAL:
+
+        if hasattr(config, "temporal") and config.temporal.mode == TemporalMode.PORTAL:
             original_steps = config.temporal.backward_steps
             config.temporal.backward_steps = 5
             print(f"⚡ PORTAL QUICK MODE: backward_steps {original_steps} → 5")
@@ -1263,7 +1281,7 @@ def run_single_template(template_name: str, skip_summaries: bool = False, portal
         print(f"  Mechanisms Used: {', '.join(sorted(result.mechanisms_used or []))}")
         print(f"  Cost: ${result.cost_usd:.2f}")
 
-        if hasattr(result, 'summary') and result.summary:
+        if hasattr(result, "summary") and result.summary:
             print()
             print("Summary:")
             print(f"  {result.summary}")
@@ -1275,7 +1293,7 @@ def run_single_template(template_name: str, skip_summaries: bool = False, portal
         return False
 
 
-def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, parallel_workers: int = 1):
+def run_all_templates(mode: str = "quick", skip_summaries: bool = False, parallel_workers: int = 1):
     """Run all mechanism test templates
 
     Args:
@@ -1283,7 +1301,6 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, paralle
         skip_summaries: Skip LLM-powered summaries
         parallel_workers: Number of parallel workers (1 = sequential)
     """
-    from generation.config_schema import SimulationConfig
     from generation.resilience_orchestrator import ResilientE2EWorkflowRunner
     from metadata.run_tracker import MetadataManager
 
@@ -1314,6 +1331,7 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, paralle
 
     # Load templates from catalog via TemplateLoader
     from generation.templates.loader import TemplateLoader
+
     loader = TemplateLoader()
 
     def _load_templates(category=None, tier=None):
@@ -1355,12 +1373,12 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, paralle
 
     # Select templates based on mode
     templates_to_run = quick_templates
-    if mode == 'full':
+    if mode == "full":
         templates_to_run = quick_templates + full_templates
         print("🔬 FULL MODE: Running comprehensive templates")
         print("   Estimated cost: $0.30-$0.80, Runtime: 30-60 minutes")
         print()
-    elif mode == 'portal':
+    elif mode == "portal":
         templates_to_run = portal_templates
         print("🌀 PORTAL MODE: Backward Temporal Reasoning (Standard)")
         print("   Running 4 PORTAL mode templates (M17 - Modal Temporal Causality):")
@@ -1371,7 +1389,7 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, paralle
         print("   Estimated cost: $0.15-$0.30, Runtime: 10-15 minutes")
         print("   Each template generates multiple backward paths with coherence scoring")
         print()
-    elif mode == 'portal_simjudged_quick':
+    elif mode == "portal_simjudged_quick":
         templates_to_run = portal_templates_simjudged_quick
         print("🎬 PORTAL MODE: Simulation-Judged QUICK (Enhanced Quality)")
         print("   Running 4 PORTAL templates with lightweight simulation judging:")
@@ -1381,7 +1399,7 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, paralle
         print("   Estimated cost: $0.25-$0.50 (~2x standard), Runtime: 20-30 minutes")
         print("   Quality: Good - captures basic emergent behaviors")
         print()
-    elif mode == 'portal_simjudged':
+    elif mode == "portal_simjudged":
         templates_to_run = portal_templates_simjudged
         print("🎬 PORTAL MODE: Simulation-Judged STANDARD (High Quality)")
         print("   Running 4 PORTAL templates with standard simulation judging:")
@@ -1391,7 +1409,7 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, paralle
         print("   Estimated cost: $0.40-$0.80 (~3x standard), Runtime: 30-45 minutes")
         print("   Quality: High - captures dialog realism and emergent patterns")
         print()
-    elif mode == 'portal_simjudged_thorough':
+    elif mode == "portal_simjudged_thorough":
         templates_to_run = portal_templates_simjudged_thorough
         print("🎬 PORTAL MODE: Simulation-Judged THOROUGH (Maximum Quality)")
         print("   Running 4 PORTAL templates with thorough simulation judging:")
@@ -1402,8 +1420,13 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, paralle
         print("   Estimated cost: $0.50-$1.00 (~4-5x standard), Runtime: 45-60 minutes")
         print("   Quality: Maximum - research-grade path generation")
         print()
-    elif mode == 'portal_all':
-        templates_to_run = portal_templates + portal_templates_simjudged_quick + portal_templates_simjudged + portal_templates_simjudged_thorough
+    elif mode == "portal_all":
+        templates_to_run = (
+            portal_templates
+            + portal_templates_simjudged_quick
+            + portal_templates_simjudged
+            + portal_templates_simjudged_thorough
+        )
         print("🎬🌀 PORTAL MODE: ALL VARIANTS (Comprehensive)")
         print("   Running ALL 16 PORTAL templates:")
         print("   - 4 standard PORTAL templates")
@@ -1413,52 +1436,70 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, paralle
         print("   Estimated cost: $1.30-$2.50, Runtime: 60-90 minutes")
         print("   Use this for comprehensive quality comparison across all approaches")
         print()
-    elif mode == 'timepoint_corporate':
+    elif mode == "timepoint_corporate":
         templates_to_run = timepoint_corporate_templates
         print("🏢 TIMEPOINT CORPORATE ANALYSIS MODE")
         print("   Running 15 Timepoint-specific corporate templates:")
-        print("   - 6 formation analysis templates (IPO, acquisition, cofounder configs, equity, decisions, success/failure)")
+        print(
+            "   - 6 formation analysis templates (IPO, acquisition, cofounder configs, equity, decisions, success/failure)"
+        )
         print("   - 2 emergent growth templates (marketing campaigns, staffing & growth)")
-        print("   - 3 personality × governance templates (archetypes, charismatic founder, demanding genius)")
-        print("   - 4 AI marketplace dynamics templates (pricing war, capability leapfrog, business model evolution, regulatory divergence)")
+        print(
+            "   - 3 personality × governance templates (archetypes, charismatic founder, demanding genius)"
+        )
+        print(
+            "   - 4 AI marketplace dynamics templates (pricing war, capability leapfrog, business model evolution, regulatory divergence)"
+        )
         print("   Estimated cost: $0.50-$1.00, Runtime: 30-60 minutes")
         print()
-    elif mode == 'portal_timepoint':
+    elif mode == "portal_timepoint":
         templates_to_run = portal_timepoint_templates
         print("🌀 PORTAL TIMEPOINT MODE: Real Founder Stories (Standard)")
         print("   Running 5 PORTAL templates with real Timepoint founder profiles:")
         print("   - portal_timepoint_unicorn: $1.2B Series C (March 2030 → October 2024)")
-        print("   - portal_timepoint_series_a_success: $50M Series A (December 2026 → February 2025)")
+        print(
+            "   - portal_timepoint_series_a_success: $50M Series A (December 2026 → February 2025)"
+        )
         print("   - portal_timepoint_product_market_fit: $5M ARR + PMF (June 2026 → October 2024)")
-        print("   - portal_timepoint_enterprise_adoption: 25 F500 customers (March 2027 → November 2024)")
-        print("   - portal_timepoint_founder_transition: Founder departure (September 2027 → October 2024)")
+        print(
+            "   - portal_timepoint_enterprise_adoption: 25 F500 customers (March 2027 → November 2024)"
+        )
+        print(
+            "   - portal_timepoint_founder_transition: Founder departure (September 2027 → October 2024)"
+        )
         print("   Estimated cost: $0.20-$0.40, Runtime: 12-18 minutes")
         print("   Each template traces backward from success/failure to founding decisions")
         print()
-    elif mode == 'portal_timepoint_simjudged_quick':
+    elif mode == "portal_timepoint_simjudged_quick":
         templates_to_run = portal_timepoint_templates_simjudged_quick
         print("🎬 PORTAL TIMEPOINT MODE: Simulation-Judged QUICK (Real Founders)")
-        print("   Running 5 PORTAL templates with real Timepoint founders + lightweight simulation judging:")
+        print(
+            "   Running 5 PORTAL templates with real Timepoint founders + lightweight simulation judging:"
+        )
         print("   - 1 forward step per candidate antecedent")
         print("   - No dialog generation (faster)")
         print("   - Judge LLM: Llama 3.1 70B")
         print("   Estimated cost: $0.40-$0.80 (~2x standard), Runtime: 24-36 minutes")
         print("   Quality: Good - captures basic emergent behaviors with real founder dynamics")
         print()
-    elif mode == 'portal_timepoint_simjudged':
+    elif mode == "portal_timepoint_simjudged":
         templates_to_run = portal_timepoint_templates_simjudged
         print("🎬 PORTAL TIMEPOINT MODE: Simulation-Judged STANDARD (Real Founders)")
-        print("   Running 5 PORTAL templates with real Timepoint founders + standard simulation judging:")
+        print(
+            "   Running 5 PORTAL templates with real Timepoint founders + standard simulation judging:"
+        )
         print("   - 2 forward steps per candidate antecedent")
         print("   - Dialog generation enabled")
         print("   - Judge LLM: Llama 3.1 405B")
         print("   Estimated cost: $0.60-$1.20 (~3x standard), Runtime: 36-54 minutes")
         print("   Quality: High - captures dialog realism and founder partnership dynamics")
         print()
-    elif mode == 'portal_timepoint_simjudged_thorough':
+    elif mode == "portal_timepoint_simjudged_thorough":
         templates_to_run = portal_timepoint_templates_simjudged_thorough
         print("🎬 PORTAL TIMEPOINT MODE: Simulation-Judged THOROUGH (Real Founders)")
-        print("   Running 5 PORTAL templates with real Timepoint founders + thorough simulation judging:")
+        print(
+            "   Running 5 PORTAL templates with real Timepoint founders + thorough simulation judging:"
+        )
         print("   - 3 forward steps per candidate antecedent")
         print("   - Dialog generation + extra analysis")
         print("   - Judge LLM: Llama 3.1 405B (low temperature)")
@@ -1466,8 +1507,13 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, paralle
         print("   Estimated cost: $0.80-$1.50 (~4-5x standard), Runtime: 54-75 minutes")
         print("   Quality: Maximum - research-grade founder journey analysis")
         print()
-    elif mode == 'portal_timepoint_all':
-        templates_to_run = portal_timepoint_templates + portal_timepoint_templates_simjudged_quick + portal_timepoint_templates_simjudged + portal_timepoint_templates_simjudged_thorough
+    elif mode == "portal_timepoint_all":
+        templates_to_run = (
+            portal_timepoint_templates
+            + portal_timepoint_templates_simjudged_quick
+            + portal_timepoint_templates_simjudged
+            + portal_timepoint_templates_simjudged_thorough
+        )
         print("🎬🌀 PORTAL TIMEPOINT MODE: ALL VARIANTS (Real Founders - Comprehensive)")
         print("   Running ALL 20 PORTAL Timepoint templates with real founder profiles:")
         print("   - 5 standard PORTAL Timepoint templates")
@@ -1475,10 +1521,18 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, paralle
         print("   - 5 simulation-judged STANDARD variants")
         print("   - 5 simulation-judged THOROUGH variants")
         print("   Estimated cost: $2.00-$3.50, Runtime: 60-100 minutes")
-        print("   Use this for comprehensive quality comparison across all approaches with real founder data")
+        print(
+            "   Use this for comprehensive quality comparison across all approaches with real founder data"
+        )
         print()
-    elif mode == 'timepoint_all':
-        templates_to_run = timepoint_corporate_templates + portal_timepoint_templates + portal_timepoint_templates_simjudged_quick + portal_timepoint_templates_simjudged + portal_timepoint_templates_simjudged_thorough
+    elif mode == "timepoint_all":
+        templates_to_run = (
+            timepoint_corporate_templates
+            + portal_timepoint_templates
+            + portal_timepoint_templates_simjudged_quick
+            + portal_timepoint_templates_simjudged
+            + portal_timepoint_templates_simjudged_thorough
+        )
         print("🏢🌀 TIMEPOINT CORPORATE: ALL MODES (Complete Timepoint Suite)")
         print("   Running ALL 35 Timepoint corporate templates:")
         print("   - 15 forward-mode templates (formation, growth, personalities, AI marketplace)")
@@ -1487,13 +1541,24 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, paralle
         print("   - 5 simulation-judged STANDARD variants")
         print("   - 5 simulation-judged THOROUGH variants")
         print("   Estimated cost: $2.50-$4.50, Runtime: 60-120 minutes")
-        print("   Complete Timepoint corporate analysis: forward causality + backward portal reasoning")
+        print(
+            "   Complete Timepoint corporate analysis: forward causality + backward portal reasoning"
+        )
         print()
-    elif mode == 'ultra_all':
-        templates_to_run = (quick_templates + full_templates +
-                           timepoint_corporate_templates +
-                           portal_templates + portal_templates_simjudged_quick + portal_templates_simjudged + portal_templates_simjudged_thorough +
-                           portal_timepoint_templates + portal_timepoint_templates_simjudged_quick + portal_timepoint_templates_simjudged + portal_timepoint_templates_simjudged_thorough)
+    elif mode == "ultra_all":
+        templates_to_run = (
+            quick_templates
+            + full_templates
+            + timepoint_corporate_templates
+            + portal_templates
+            + portal_templates_simjudged_quick
+            + portal_templates_simjudged
+            + portal_templates_simjudged_thorough
+            + portal_timepoint_templates
+            + portal_timepoint_templates_simjudged_quick
+            + portal_timepoint_templates_simjudged
+            + portal_timepoint_templates_simjudged_thorough
+        )
         print("🚀 ULTRA MODE: COMPLETE SYSTEM VALIDATION")
         print("   Running ALL 64 templates across ALL categories:")
         print("   - 7 quick templates (basic coverage)")
@@ -1510,15 +1575,18 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, paralle
     # Apply portal-quick mode: reduce backward_steps to 5 for fast demo
     if args.portal_quick:
         from generation.config_schema import TemporalMode
+
         portal_count = 0
         for name, config, expected in templates_to_run:
-            if hasattr(config, 'temporal') and config.temporal.mode == TemporalMode.PORTAL:
+            if hasattr(config, "temporal") and config.temporal.mode == TemporalMode.PORTAL:
                 original_steps = config.temporal.backward_steps
                 config.temporal.backward_steps = 5
                 portal_count += 1
                 print(f"  ⚡ {name}: backward_steps {original_steps} → 5")
         if portal_count > 0:
-            print(f"\n🚀 PORTAL QUICK MODE: Reduced {portal_count} templates to 5 backward steps (~2 min each)\n")
+            print(
+                f"\n🚀 PORTAL QUICK MODE: Reduced {portal_count} templates to 5 backward steps (~2 min each)\n"
+            )
         else:
             print("\n⚠️  No PORTAL templates found in selected mode\n")
 
@@ -1536,12 +1604,11 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, paralle
         # 'portal_timepoint_simjudged': (0.60, 1.20, 45),  # ~$0.90 avg
         # 'portal_timepoint_simjudged_thorough': (0.80, 1.50, 65),  # ~$1.15 avg
         # 'timepoint_corporate': (0.50, 1.00, 60),  # ~$0.75 avg
-
         # Only confirm for runs estimated >$2.00 (still cheap but worth a heads-up)
-        'portal_all': (1.30, 2.50, 90),  # 16 templates
-        'portal_timepoint_all': (2.00, 3.50, 100),  # 20 templates
-        'timepoint_all': (2.50, 4.50, 120),  # 35 templates
-        'ultra_all': (4.00, 8.00, 180)  # 64 templates - largest run
+        "portal_all": (1.30, 2.50, 90),  # 16 templates
+        "portal_timepoint_all": (2.00, 3.50, 100),  # 20 templates
+        "timepoint_all": (2.50, 4.50, 120),  # 35 templates
+        "ultra_all": (4.00, 8.00, 180),  # 64 templates - largest run
     }
 
     if mode in expensive_modes:
@@ -1556,17 +1623,18 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, paralle
     tracker.print_header(f"TIMEPOINT SIMULATION RUNNER - {mode.upper()}")
 
     # Run pre-programmed templates
-    print(f"\n{'='*80}")
+    print(f"\n{'=' * 80}")
     print(f"PHASE 1: Pre-Programmed Templates ({len(templates_to_run)} templates)")
     if parallel_workers > 1:
         print(f"Execution: PARALLEL ({parallel_workers} workers)")
     else:
         print("Execution: SEQUENTIAL")
-    print(f"{'='*80}\n")
+    print(f"{'=' * 80}\n")
 
     if parallel_workers > 1:
         # Parallel execution with ThreadPoolExecutor
         import threading
+
         results_lock = threading.Lock()
 
         def run_template_parallel(args):
@@ -1575,13 +1643,14 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, paralle
             # Each thread needs its own runner for isolation
             thread_metadata_manager = MetadataManager(db_path="metadata/runs.db")
             thread_runner = ResilientE2EWorkflowRunner(
-                thread_metadata_manager,
-                generate_summary=not skip_sums
+                thread_metadata_manager, generate_summary=not skip_sums
             )
             return name, run_template(thread_runner, config, name, expected)
 
         # Prepare jobs
-        jobs = [(name, config, expected, skip_summaries) for name, config, expected in templates_to_run]
+        jobs = [
+            (name, config, expected, skip_summaries) for name, config, expected in templates_to_run
+        ]
         completed = 0
 
         print(f"Starting {len(jobs)} templates with {parallel_workers} parallel workers...")
@@ -1600,22 +1669,22 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, paralle
                 template_name = future_to_name[future]
                 try:
                     name, result = future.result()
-                    job_cost = result.get('cost', 0.0)
+                    job_cost = result.get("cost", 0.0)
                     with results_lock:
                         results[name] = result
                         total_cost += job_cost
                         completed += 1
                     # Update tracker with completion
-                    tracker.complete_job(name, success=result['success'], cost=job_cost)
+                    tracker.complete_job(name, success=result["success"], cost=job_cost)
                     tracker.print_status()
                 except Exception as e:
                     with results_lock:
                         results[template_name] = {
-                            'success': False,
-                            'error': str(e),
-                            'mechanisms': set(),
-                            'expected': set(),
-                            'cost': 0.0
+                            "success": False,
+                            "error": str(e),
+                            "mechanisms": set(),
+                            "expected": set(),
+                            "cost": 0.0,
                         }
                         completed += 1
                     tracker.complete_job(template_name, success=False, error=str(e))
@@ -1629,19 +1698,19 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, paralle
             print(f"[{idx}/{len(templates_to_run)}] {name}")
             result = run_template(runner, config, name, expected)
             results[name] = result
-            job_cost = result.get('cost', 0.0)
+            job_cost = result.get("cost", 0.0)
             total_cost += job_cost
-            tracker.complete_job(name, success=result['success'], cost=job_cost)
+            tracker.complete_job(name, success=result["success"], cost=job_cost)
             tracker.print_status()
 
             # No delay needed in paid mode (1000 req/min = 16.67 req/sec)
 
     # Run ANDOS test scripts
-    print(f"\n{'='*80}")
+    print(f"\n{'=' * 80}")
     print(f"PHASE 2: ANDOS Test Scripts ({len(andos_scripts)} scripts)")
-    print(f"{'='*80}")
-    print(f"\n📝 Note: All ANDOS scripts now include explicit mechanism tracking")
-    print(f"   M5, M9, M10, M12, M13, M14 will be recorded in metadata/runs.db")
+    print(f"{'=' * 80}")
+    print("\n📝 Note: All ANDOS scripts now include explicit mechanism tracking")
+    print("   M5, M9, M10, M12, M13, M14 will be recorded in metadata/runs.db")
 
     # No delay needed between phases in paid mode
     print()
@@ -1651,7 +1720,7 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, paralle
         print(f"[{idx}/{len(andos_scripts)}] {name}")
         result = run_andos_script(script, name, expected)
         results[name] = result
-        tracker.complete_job(name, success=result['success'], cost=result.get('cost', 0.0))
+        tracker.complete_job(name, success=result["success"], cost=result.get("cost", 0.0))
         tracker.print_status()
 
         # No delay needed between ANDOS scripts in paid mode
@@ -1666,21 +1735,21 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, paralle
     passed = 0
     failed = 0
     for name, result in results.items():
-        if result['success']:
+        if result["success"]:
             status = "✅ PASSED"
             passed += 1
-            if 'run_id' in result:
+            if "run_id" in result:
                 print(f"  {status:12s} {name:30s} (Run: {result['run_id'][:16]}...)")
             else:
                 print(f"  {status:12s} {name:30s}")
         else:
             status = "❌ FAILED"
             failed += 1
-            error = result.get('error', 'Unknown')[:40]
+            error = result.get("error", "Unknown")[:40]
             print(f"  {status:12s} {name:30s} ({error})")
 
     print(f"\n  Total: {passed + failed} templates")
-    print(f"  Passed: {passed} ({passed/(passed+failed)*100:.1f}%)")
+    print(f"  Passed: {passed} ({passed / (passed + failed) * 100:.1f}%)")
     print(f"  Failed: {failed}")
     print(f"  Estimated Cost: ${total_cost:.2f}")
 
@@ -1696,7 +1765,9 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, paralle
             if run.mechanisms_used:
                 historical_mechanisms.update(run.mechanisms_used)
 
-        print(f"\nTotal Coverage: {len(historical_mechanisms)}/19 ({len(historical_mechanisms)/19*100:.1f}%)")
+        print(
+            f"\nTotal Coverage: {len(historical_mechanisms)}/19 ({len(historical_mechanisms) / 19 * 100:.1f}%)"
+        )
         print(f"Tracked: {', '.join(sorted(historical_mechanisms))}")
 
         missing = set([f"M{i}" for i in range(1, 20)]) - historical_mechanisms
@@ -1728,14 +1799,14 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, paralle
         print(f"  PDF scripts: {len(pdf_files)}")
 
         if fountain_files:
-            print(f"  ✅ Fountain export working")
+            print("  ✅ Fountain export working")
         else:
-            print(f"  ⚠️  No Fountain files found")
+            print("  ⚠️  No Fountain files found")
 
         if pdf_files:
-            print(f"  ✅ PDF export working")
+            print("  ✅ PDF export working")
         else:
-            print(f"  ⚠️  No PDF files found")
+            print("  ⚠️  No PDF files found")
     else:
         print("  No datasets/ directory found")
 
@@ -1759,7 +1830,7 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, paralle
 
         summaries_shown = 0
         for name, result in results.items():
-            if result['success'] and result.get('summary'):
+            if result["success"] and result.get("summary"):
                 print(f"\n{name}:")
                 print(f"  {result['summary']}")
                 summaries_shown += 1
@@ -1779,13 +1850,13 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, paralle
     all_pdfs = []
 
     for name, result in results.items():
-        if result['success']:
-            if result.get('oxen_repo_url'):
-                oxen_repos.append((name, result['oxen_repo_url']))
-            if result.get('oxen_dataset_url'):
-                oxen_datasets.append((name, result['oxen_dataset_url']))
-            if result.get('pdf_paths'):
-                for pdf_path in result['pdf_paths']:
+        if result["success"]:
+            if result.get("oxen_repo_url"):
+                oxen_repos.append((name, result["oxen_repo_url"]))
+            if result.get("oxen_dataset_url"):
+                oxen_datasets.append((name, result["oxen_dataset_url"]))
+            if result.get("pdf_paths"):
+                for pdf_path in result["pdf_paths"]:
                     # Get file size
                     try:
                         size_bytes = Path(pdf_path).stat().st_size
@@ -1800,7 +1871,7 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, paralle
         for name, url in oxen_repos:
             print(f"  {name:30s} → {url}")
     else:
-        print(f"\n🐂 Oxen Repositories: None (OXEN_API_TOKEN may not be set)")
+        print("\n🐂 Oxen Repositories: None (OXEN_API_TOKEN may not be set)")
 
     # Oxen Datasets
     if oxen_datasets:
@@ -1814,10 +1885,10 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, paralle
         for name, pdf_path, size_kb in all_pdfs:
             print(f"  {name:30s} → {pdf_path} ({size_kb:.1f} KB)")
     else:
-        print(f"\n📄 PDF Screenplays: None generated")
+        print("\n📄 PDF Screenplays: None generated")
 
     # Summary stats
-    print(f"\n📈 Artifact Statistics:")
+    print("\n📈 Artifact Statistics:")
     print(f"  Oxen Repositories: {len(oxen_repos)}")
     print(f"  Oxen Datasets: {len(oxen_datasets)}")
     print(f"  PDF Screenplays: {len(all_pdfs)}")
@@ -1841,11 +1912,11 @@ def run_all_templates(mode: str = 'quick', skip_summaries: bool = False, paralle
 
 
 def run_templates_via_api(
-    templates: List[Tuple[str, any, Set[str]]],
+    templates: list[tuple[str, any, set[str]]],
     api_key: str,
     api_url: str = "http://localhost:8080",
     batch_size: int = 10,
-    budget_cap: Optional[float] = None,
+    budget_cap: float | None = None,
     wait_for_completion: bool = False,
     parallel_jobs: int = 4,
     fail_fast: bool = False,
@@ -1870,7 +1941,7 @@ def run_templates_via_api(
         True if all batches submitted (and optionally completed) successfully
     """
     try:
-        from api.client import TimePointClient, QuotaExceededError, BatchTooLargeError
+        from api.client import BatchTooLargeError, QuotaExceededError, TimePointClient
     except ImportError:
         print("❌ ERROR: api.client module not found")
         print("   Make sure the api/ directory is in your Python path")
@@ -1902,9 +1973,11 @@ def run_templates_via_api(
     # Check usage quota first
     try:
         usage = client.get_usage()
-        print(f"✓ Current usage:")
+        print("✓ Current usage:")
         print(f"   Tier: {usage.tier}")
-        print(f"   Simulations: {usage.simulations_used}/{usage.simulations_limit} ({usage.simulations_remaining} remaining)")
+        print(
+            f"   Simulations: {usage.simulations_used}/{usage.simulations_limit} ({usage.simulations_remaining} remaining)"
+        )
         print(f"   Cost: ${usage.cost_used_usd:.2f}/${usage.cost_limit_usd:.2f}")
 
         if usage.is_quota_exceeded:
@@ -1912,7 +1985,9 @@ def run_templates_via_api(
             return False
 
         if len(templates) > usage.simulations_remaining:
-            print(f"⚠️  WARNING: Planning to run {len(templates)} templates but only {usage.simulations_remaining} simulations remaining")
+            print(
+                f"⚠️  WARNING: Planning to run {len(templates)} templates but only {usage.simulations_remaining} simulations remaining"
+            )
             print("   Some templates may not run due to quota limits")
     except Exception as e:
         print(f"⚠️  WARNING: Could not check usage quota: {e}")
@@ -1925,12 +2000,16 @@ def run_templates_via_api(
         # Extract configuration details
         sim_request = {
             "template_id": name,
-            "entity_count": config.entities.count if hasattr(config, 'entities') and hasattr(config.entities, 'count') else 3,
-            "timepoint_count": config.timepoints.count if hasattr(config, 'timepoints') and hasattr(config.timepoints, 'count') else 5,
+            "entity_count": config.entities.count
+            if hasattr(config, "entities") and hasattr(config.entities, "count")
+            else 3,
+            "timepoint_count": config.timepoints.count
+            if hasattr(config, "timepoints") and hasattr(config.timepoints, "count")
+            else 5,
         }
 
         # Add custom scenario if available
-        if hasattr(config, 'scenario') and config.scenario:
+        if hasattr(config, "scenario") and config.scenario:
             sim_request["custom_scenario"] = config.scenario
 
         simulation_requests.append(sim_request)
@@ -1938,7 +2017,7 @@ def run_templates_via_api(
     # Split into batches
     batches = []
     for i in range(0, len(simulation_requests), batch_size):
-        batch = simulation_requests[i:i + batch_size]
+        batch = simulation_requests[i : i + batch_size]
         batches.append(batch)
 
     print(f"Prepared {len(batches)} batch(es) of up to {batch_size} simulations each")
@@ -1976,14 +2055,16 @@ def run_templates_via_api(
             break
         except BatchTooLargeError as e:
             print(f"   ❌ Batch too large: {e}")
-            print(f"   Try reducing --api-batch-size")
+            print("   Try reducing --api-batch-size")
             break
         except Exception as e:
             print(f"   ❌ Failed to submit batch: {e}")
             continue
 
     print()
-    print(f"Submitted {total_submitted}/{len(templates)} simulations in {len(submitted_batches)} batches")
+    print(
+        f"Submitted {total_submitted}/{len(templates)} simulations in {len(submitted_batches)} batches"
+    )
 
     # If not waiting, just print batch IDs and exit
     if not wait_for_completion:
@@ -2015,10 +2096,12 @@ def run_templates_via_api(
         print(f"\n[Batch {batch.batch_id}]")
 
         def progress_callback(b):
-            print(f"  Progress: {b.progress.progress_percent:.0f}% "
-                  f"({b.progress.completed_jobs} done, "
-                  f"{b.progress.failed_jobs} failed, "
-                  f"{b.progress.running_jobs} running)")
+            print(
+                f"  Progress: {b.progress.progress_percent:.0f}% "
+                f"({b.progress.completed_jobs} done, "
+                f"{b.progress.failed_jobs} failed, "
+                f"{b.progress.running_jobs} running)"
+            )
 
         try:
             final_batch = client.wait_for_batch(
@@ -2033,7 +2116,9 @@ def run_templates_via_api(
             total_failed += final_batch.progress.failed_jobs
 
             if final_batch.status == "completed":
-                print(f"  ✓ Completed: {final_batch.progress.completed_jobs} jobs, ${final_batch.cost.actual_cost_usd:.2f}")
+                print(
+                    f"  ✓ Completed: {final_batch.progress.completed_jobs} jobs, ${final_batch.cost.actual_cost_usd:.2f}"
+                )
             elif final_batch.status == "failed":
                 print(f"  ❌ Failed: {final_batch.error_message}")
                 all_completed = False
@@ -2044,7 +2129,7 @@ def run_templates_via_api(
                 print(f"  ⚠️  Status: {final_batch.status}")
 
         except TimeoutError:
-            print(f"  ⚠️  Timeout waiting for batch")
+            print("  ⚠️  Timeout waiting for batch")
             all_completed = False
         except Exception as e:
             print(f"  ❌ Error: {e}")
@@ -2095,9 +2180,15 @@ def show_api_usage(api_key: str, api_url: str = "http://localhost:8080") -> bool
         print(f"Days Remaining: {usage.days_remaining}")
         print()
         print("📊 Current Usage:")
-        print(f"  API Calls:   {usage.api_calls_used:>8,} / {usage.api_calls_limit:>8,} ({usage.api_calls_remaining:,} remaining)")
-        print(f"  Simulations: {usage.simulations_used:>8,} / {usage.simulations_limit:>8,} ({usage.simulations_remaining:,} remaining)")
-        print(f"  Cost:        ${usage.cost_used_usd:>7.2f} / ${usage.cost_limit_usd:>7.2f} (${usage.cost_remaining_usd:.2f} remaining)")
+        print(
+            f"  API Calls:   {usage.api_calls_used:>8,} / {usage.api_calls_limit:>8,} ({usage.api_calls_remaining:,} remaining)"
+        )
+        print(
+            f"  Simulations: {usage.simulations_used:>8,} / {usage.simulations_limit:>8,} ({usage.simulations_remaining:,} remaining)"
+        )
+        print(
+            f"  Cost:        ${usage.cost_used_usd:>7.2f} / ${usage.cost_limit_usd:>7.2f} (${usage.cost_remaining_usd:.2f} remaining)"
+        )
         print(f"  Tokens:      {usage.tokens_used:>8,}")
         print()
         print("📋 Limits:")
@@ -2119,7 +2210,9 @@ def show_api_usage(api_key: str, api_url: str = "http://localhost:8080") -> bool
                 print()
                 print("📈 Recent History:")
                 for period in history["history"]:
-                    print(f"  {period['period']}: {period['simulations_used']} sims, ${period['cost_used_usd']:.2f}")
+                    print(
+                        f"  {period['period']}: {period['simulations_used']} sims, ${period['cost_used_usd']:.2f}"
+                    )
         except Exception:
             pass  # History is optional
 
@@ -2135,253 +2228,253 @@ if __name__ == "__main__":
     parser.add_argument(
         "--full",
         action="store_true",
-        help="Run all templates including expensive ones (default: quick mode)"
+        help="Run all templates including expensive ones (default: quick mode)",
     )
     parser.add_argument(
         "--portal-test-only",
         action="store_true",
-        help="Run ONLY PORTAL mode backward simulation tests (4 templates)"
+        help="Run ONLY PORTAL mode backward simulation tests (4 templates)",
     )
     parser.add_argument(
         "--timepoint-corporate-analysis-only",
         action="store_true",
-        help="[DEPRECATED] Use --timepoint-forward instead. Run ONLY Timepoint corporate formation scenarios (VC pitches + formation analysis)"
+        help="[DEPRECATED] Use --timepoint-forward instead. Run ONLY Timepoint corporate formation scenarios (VC pitches + formation analysis)",
     )
     parser.add_argument(
         "--timepoint-forward",
         action="store_true",
-        help="Run ONLY forward-mode Timepoint corporate templates (15 templates: formation analysis + growth + personalities + AI marketplace)"
+        help="Run ONLY forward-mode Timepoint corporate templates (15 templates: formation analysis + growth + personalities + AI marketplace)",
     )
     parser.add_argument(
         "--timepoint-all",
         action="store_true",
-        help="Run ALL Timepoint corporate templates (35 total: 15 forward-mode + 20 portal-mode)"
+        help="Run ALL Timepoint corporate templates (35 total: 15 forward-mode + 20 portal-mode)",
     )
     parser.add_argument(
         "--list-modes",
         action="store_true",
-        help="Display all available simulation modes with template counts and exit"
+        help="Display all available simulation modes with template counts and exit",
     )
     parser.add_argument(
         "--portal-simjudged-quick-only",
         action="store_true",
-        help="Run ONLY PORTAL simulation-judged QUICK variants (1 step, ~2x cost, 4 templates)"
+        help="Run ONLY PORTAL simulation-judged QUICK variants (1 step, ~2x cost, 4 templates)",
     )
     parser.add_argument(
         "--portal-simjudged-only",
         action="store_true",
-        help="Run ONLY PORTAL simulation-judged STANDARD variants (2 steps + dialog, ~3x cost, 4 templates)"
+        help="Run ONLY PORTAL simulation-judged STANDARD variants (2 steps + dialog, ~3x cost, 4 templates)",
     )
     parser.add_argument(
         "--portal-simjudged-thorough-only",
         action="store_true",
-        help="Run ONLY PORTAL simulation-judged THOROUGH variants (3 steps + analysis, ~4-5x cost, 4 templates)"
+        help="Run ONLY PORTAL simulation-judged THOROUGH variants (3 steps + analysis, ~4-5x cost, 4 templates)",
     )
     parser.add_argument(
         "--portal-all",
         action="store_true",
-        help="Run ALL PORTAL tests (standard + all 3 simulation-judged variants = 16 templates total)"
+        help="Run ALL PORTAL tests (standard + all 3 simulation-judged variants = 16 templates total)",
     )
     parser.add_argument(
         "--portal-timepoint-only",
         action="store_true",
-        help="Run ONLY PORTAL Timepoint templates with real founder profiles (5 templates)"
+        help="Run ONLY PORTAL Timepoint templates with real founder profiles (5 templates)",
     )
     parser.add_argument(
         "--portal-timepoint-simjudged-quick-only",
         action="store_true",
-        help="Run ONLY PORTAL Timepoint simulation-judged QUICK variants (1 step, ~2x cost, 5 templates)"
+        help="Run ONLY PORTAL Timepoint simulation-judged QUICK variants (1 step, ~2x cost, 5 templates)",
     )
     parser.add_argument(
         "--portal-timepoint-simjudged-only",
         action="store_true",
-        help="Run ONLY PORTAL Timepoint simulation-judged STANDARD variants (2 steps + dialog, ~3x cost, 5 templates)"
+        help="Run ONLY PORTAL Timepoint simulation-judged STANDARD variants (2 steps + dialog, ~3x cost, 5 templates)",
     )
     parser.add_argument(
         "--portal-timepoint-simjudged-thorough-only",
         action="store_true",
-        help="Run ONLY PORTAL Timepoint simulation-judged THOROUGH variants (3 steps + analysis, ~4-5x cost, 5 templates)"
+        help="Run ONLY PORTAL Timepoint simulation-judged THOROUGH variants (3 steps + analysis, ~4-5x cost, 5 templates)",
     )
     parser.add_argument(
         "--portal-timepoint-all",
         action="store_true",
-        help="Run ALL PORTAL Timepoint tests (standard + all 3 simulation-judged variants = 20 templates total)"
+        help="Run ALL PORTAL Timepoint tests (standard + all 3 simulation-judged variants = 20 templates total)",
     )
     parser.add_argument(
         "--portal-quick",
         action="store_true",
-        help="Quick demo mode for PORTAL simulations (5 timepoints instead of 16, ~2 min runtime)"
+        help="Quick demo mode for PORTAL simulations (5 timepoints instead of 16, ~2 min runtime)",
     )
     parser.add_argument(
         "--ultra-all",
         action="store_true",
-        help="Run EVERYTHING: all 64 templates across ALL categories (quick + full + timepoint + portal + portal-timepoint = complete system validation)"
+        help="Run EVERYTHING: all 64 templates across ALL categories (quick + full + timepoint + portal + portal-timepoint = complete system validation)",
     )
     parser.add_argument(
         "--skip-summaries",
         action="store_true",
-        help="Skip LLM-powered run summaries (reduces cost slightly)"
+        help="Skip LLM-powered run summaries (reduces cost slightly)",
     )
     parser.add_argument(
         "--template",
         type=str,
-        help="Run a single template by name (e.g. portal_timepoint_product_market_fit)"
+        help="Run a single template by name (e.g. portal_timepoint_product_market_fit)",
     )
     # Natural Language Interface
     parser.add_argument(
         "--nl",
         type=str,
         metavar="DESCRIPTION",
-        help="Run simulation from natural language description (e.g. --nl \"Board meeting where CEO announces layoffs\")"
+        help='Run simulation from natural language description (e.g. --nl "Board meeting where CEO announces layoffs")',
     )
     parser.add_argument(
         "--nl-entities",
         type=int,
         metavar="N",
-        help="Override entity count for NL simulation (used with --nl)"
+        help="Override entity count for NL simulation (used with --nl)",
     )
     parser.add_argument(
         "--nl-timepoints",
         type=int,
         metavar="N",
-        help="Override timepoint count for NL simulation (used with --nl)"
+        help="Override timepoint count for NL simulation (used with --nl)",
     )
     parser.add_argument(
         "--convergence",
         action="store_true",
-        help="Run convergence analysis on recent runs (compares causal graphs across runs)"
+        help="Run convergence analysis on recent runs (compares causal graphs across runs)",
     )
     parser.add_argument(
         "--convergence-only",
         action="store_true",
-        help="Run ONLY convergence analysis (no simulation runs)"
+        help="Run ONLY convergence analysis (no simulation runs)",
     )
     parser.add_argument(
         "--convergence-runs",
         type=int,
         default=3,
-        help="Number of runs to compare for convergence (default: 3)"
+        help="Number of runs to compare for convergence (default: 3)",
     )
     parser.add_argument(
         "--convergence-template",
         type=str,
         metavar="TEMPLATE",
-        help="Filter convergence analysis to specific template (e.g. hospital_crisis)"
+        help="Filter convergence analysis to specific template (e.g. hospital_crisis)",
     )
     parser.add_argument(
         "--convergence-verbose",
         action="store_true",
-        help="Show detailed divergence points in convergence analysis"
+        help="Show detailed divergence points in convergence analysis",
     )
     parser.add_argument(
         "--convergence-e2e",
         action="store_true",
-        help="Run template N times (--convergence-runs) then compute convergence with side-by-side comparison"
+        help="Run template N times (--convergence-runs) then compute convergence with side-by-side comparison",
     )
     parser.add_argument(
         "--model",
         type=str,
         metavar="MODEL_ID",
-        help="Override default LLM model (e.g. meta-llama/llama-3.1-405b-instruct)"
+        help="Override default LLM model (e.g. meta-llama/llama-3.1-405b-instruct)",
     )
     parser.add_argument(
         "--parallel",
         type=int,
         default=1,
         metavar="N",
-        help="Run templates in parallel with N workers (default: 1 = sequential). Recommended: 4-6 for optimal rate limit usage."
+        help="Run templates in parallel with N workers (default: 1 = sequential). Recommended: 4-6 for optimal rate limit usage.",
     )
     # Free model options
     parser.add_argument(
         "--free",
         action="store_true",
-        help="Use the best available FREE model from OpenRouter (quality-focused, $0 cost)"
+        help="Use the best available FREE model from OpenRouter (quality-focused, $0 cost)",
     )
     parser.add_argument(
         "--free-fast",
         action="store_true",
-        help="Use the fastest available FREE model from OpenRouter (speed-focused, $0 cost)"
+        help="Use the fastest available FREE model from OpenRouter (speed-focused, $0 cost)",
     )
     parser.add_argument(
         "--list-free-models",
         action="store_true",
-        help="List all currently available free models on OpenRouter and exit"
+        help="List all currently available free models on OpenRouter and exit",
     )
     parser.add_argument(
         "--fast-simjudged",
         action="store_true",
-        help="Speed up simjudged templates: reduce candidates (7→3), forward steps (3→1), disable dialog (~10x faster)"
+        help="Speed up simjudged templates: reduce candidates (7→3), forward steps (3→1), disable dialog (~10x faster)",
     )
     # New unified template system flags
     parser.add_argument(
         "--tier",
         type=str,
         choices=["quick", "standard", "comprehensive", "stress"],
-        help="Run templates of a specific tier (quick=<1min, standard=1-5min, comprehensive=5-15min, stress=15min+)"
+        help="Run templates of a specific tier (quick=<1min, standard=1-5min, comprehensive=5-15min, stress=15min+)",
     )
     parser.add_argument(
         "--category",
         type=str,
         choices=["core", "showcase", "portal", "stress", "convergence"],
-        help="Run templates from a specific category"
+        help="Run templates from a specific category",
     )
     parser.add_argument(
         "--mechanism",
         type=str,
         metavar="M1-M19",
-        help="Run templates that test a specific mechanism (e.g. M7, M15, M17)"
+        help="Run templates that test a specific mechanism (e.g. M7, M15, M17)",
     )
     parser.add_argument(
         "--list-templates",
         action="store_true",
-        help="List all available templates with their tier/category/mechanisms and exit"
+        help="List all available templates with their tier/category/mechanisms and exit",
     )
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Show what would run without making LLM calls: entities, timepoints, mechanisms, and cost estimates"
+        help="Show what would run without making LLM calls: entities, timepoints, mechanisms, and cost estimates",
     )
     # API mode options (Phase 6 integration)
     parser.add_argument(
         "--api",
         action="store_true",
-        help="Submit simulations via REST API instead of direct execution (tracks usage quotas)"
+        help="Submit simulations via REST API instead of direct execution (tracks usage quotas)",
     )
     parser.add_argument(
         "--api-url",
         type=str,
         default="http://localhost:8080",
         metavar="URL",
-        help="API base URL (default: http://localhost:8080)"
+        help="API base URL (default: http://localhost:8080)",
     )
     parser.add_argument(
         "--api-key",
         type=str,
         metavar="KEY",
-        help="API key for authentication (defaults to TIMEPOINT_API_KEY env var)"
+        help="API key for authentication (defaults to TIMEPOINT_API_KEY env var)",
     )
     parser.add_argument(
         "--api-batch-size",
         type=int,
         default=10,
         metavar="N",
-        help="Number of simulations per batch when using --api (default: 10, max: 100)"
+        help="Number of simulations per batch when using --api (default: 10, max: 100)",
     )
     parser.add_argument(
         "--api-budget",
         type=float,
         metavar="USD",
-        help="Budget cap in USD for API batch submission (optional)"
+        help="Budget cap in USD for API batch submission (optional)",
     )
     parser.add_argument(
         "--api-wait",
         action="store_true",
-        help="Wait for batch completion when using --api (default: submit and exit)"
+        help="Wait for batch completion when using --api (default: submit and exit)",
     )
     parser.add_argument(
         "--api-usage",
         action="store_true",
-        help="Show current API usage and quota status, then exit"
+        help="Show current API usage and quota status, then exit",
     )
     args = parser.parse_args()
 
@@ -2393,11 +2486,10 @@ if __name__ == "__main__":
     # Handle --list-templates (doesn't require API key)
     if args.list_templates:
         from generation.templates.loader import TemplateLoader
+
         loader = TemplateLoader()
         templates = loader.list_templates(
-            tier=args.tier,
-            category=args.category,
-            mechanism=args.mechanism
+            tier=args.tier, category=args.category, mechanism=args.mechanism
         )
         print("\n" + "=" * 80)
         print("TEMPLATE CATALOG")
@@ -2417,7 +2509,7 @@ if __name__ == "__main__":
         for t in sorted(templates, key=lambda x: (x.category.value, x.tier.value, x.id)):
             mechs = ", ".join(t.mechanisms[:3])
             if len(t.mechanisms) > 3:
-                mechs += f" +{len(t.mechanisms)-3}"
+                mechs += f" +{len(t.mechanisms) - 3}"
             # Display template ID with underscores for consistency with --template flag
             display_id = t.id.replace("/", "_")
             print(f"{display_id:<40} {t.tier.value:<12} {t.category.value:<12} {mechs:<20}")
@@ -2428,8 +2520,8 @@ if __name__ == "__main__":
 
     # Handle --dry-run (show what would run without LLM calls)
     if args.dry_run:
-        from generation.templates.loader import TemplateLoader
         from generation.config_schema import SimulationConfig
+        from generation.templates.loader import TemplateLoader
 
         loader = TemplateLoader()
 
@@ -2445,7 +2537,10 @@ if __name__ == "__main__":
                 # Try finding by short name
                 found = False
                 for info in loader.list_templates():
-                    if info.id.split("/")[-1] == args.template or info.id.replace("/", "_") == args.template:
+                    if (
+                        info.id.split("/")[-1] == args.template
+                        or info.id.replace("/", "_") == args.template
+                    ):
                         config = loader.load_template(info.id)
                         templates_to_run = [info]
                         configs = {info.id: config}
@@ -2459,20 +2554,18 @@ if __name__ == "__main__":
             print("\n" + "=" * 80)
             print("DRY RUN - Natural Language Simulation")
             print("=" * 80)
-            print(f"\n📝 Prompt: \"{args.nl}\"")
-            print(f"\n🎯 Configuration:")
+            print(f'\n📝 Prompt: "{args.nl}"')
+            print("\n🎯 Configuration:")
             print(f"   Entities:    {args.nl_entities or 4} (default: 4)")
             print(f"   Timepoints:  {args.nl_timepoints or 3} (default: 3)")
-            print(f"\n💡 This will generate a custom scenario based on your prompt.")
+            print("\n💡 This will generate a custom scenario based on your prompt.")
             print("   Cost depends on the complexity of the generated scene.")
             print("\n⚠️  To run this simulation, remove --dry-run")
             sys.exit(0)
         else:
             # Filter by tier/category/mechanism
             templates_to_run = loader.list_templates(
-                tier=args.tier,
-                category=args.category,
-                mechanism=args.mechanism
+                tier=args.tier, category=args.category, mechanism=args.mechanism
             )
             configs = {}
             for info in templates_to_run:
@@ -2518,14 +2611,14 @@ if __name__ == "__main__":
             print(f"   Mechanisms: {', '.join(info.mechanisms)}")
 
             if config:
-                print(f"\n🎭 Entities:")
+                print("\n🎭 Entities:")
                 print(f"   Count: {config.entities.count}")
                 print(f"   Types: {', '.join(config.entities.types)}")
                 print(f"   Initial Resolution: {config.entities.initial_resolution}")
                 if config.entities.animism_level > 0:
                     print(f"   Animism Level: {config.entities.animism_level}")
 
-                print(f"\n⏱️  Timepoints:")
+                print("\n⏱️  Timepoints:")
                 print(f"   Count: {config.timepoints.count}")
                 print(f"   Resolution: {config.timepoints.resolution}")
                 if config.timepoints.before_count:
@@ -2533,7 +2626,7 @@ if __name__ == "__main__":
                 if config.timepoints.after_count:
                     print(f"   After Count: {config.timepoints.after_count}")
 
-                print(f"\n🔀 Temporal Mode:")
+                print("\n🔀 Temporal Mode:")
                 print(f"   Mode: {config.temporal.mode}")
                 if config.temporal.mode == "portal":
                     print(f"   Backward Steps: {config.temporal.backward_steps}")
@@ -2541,7 +2634,7 @@ if __name__ == "__main__":
                     if config.temporal.portal_description:
                         print(f"   Portal: {config.temporal.portal_description}")
 
-                print(f"\n📊 Fidelity:")
+                print("\n📊 Fidelity:")
                 print(f"   Template: {config.temporal.fidelity_template}")
                 print(f"   Token Budget: {config.temporal.token_budget:,.0f}")
 
@@ -2555,7 +2648,9 @@ if __name__ == "__main__":
             print(f"{'TEMPLATE':<35} {'ENTITIES':<10} {'TIMEPOINTS':<12} {'COST':<15}")
             print("-" * 80)
 
-            for info in sorted(templates_to_run, key=lambda x: (x.category.value, x.tier.value, x.id)):
+            for info in sorted(
+                templates_to_run, key=lambda x: (x.category.value, x.tier.value, x.id)
+            ):
                 config = configs.get(info.id)
                 display_id = info.id.replace("/", "_")[:33]
 
@@ -2574,7 +2669,8 @@ if __name__ == "__main__":
 
                 # Try to extract numeric range for totals
                 import re
-                cost_match = re.search(r'\$?([\d.]+)(?:-([\d.]+))?', cost or "")
+
+                cost_match = re.search(r"\$?([\d.]+)(?:-([\d.]+))?", cost or "")
                 if cost_match:
                     low = float(cost_match.group(1))
                     high = float(cost_match.group(2)) if cost_match.group(2) else low
@@ -2584,7 +2680,7 @@ if __name__ == "__main__":
                 print(f"{display_id:<35} {entities:<10} {timepoints:<12} {cost_str:<15}")
 
             print("-" * 80)
-            print(f"\n📊 Totals:")
+            print("\n📊 Totals:")
             print(f"   Templates:   {len(templates_to_run)}")
             print(f"   Entities:    {total_entities}")
             print(f"   Timepoints:  {total_timepoints}")
@@ -2617,7 +2713,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     if not args.api:
-        print(f"✓ API keys loaded from .env")
+        print("✓ API keys loaded from .env")
         print()
 
     # Enable double-confirm handler for Ctrl+C
@@ -2629,6 +2725,7 @@ if __name__ == "__main__":
     # Handle --list-free-models (requires API key)
     if args.list_free_models:
         from llm import FreeModelSelector
+
         selector = FreeModelSelector(api_key=os.getenv("OPENROUTER_API_KEY"))
         print(selector.list_free_models())
         sys.exit(0)
@@ -2636,6 +2733,7 @@ if __name__ == "__main__":
     # Handle --free and --free-fast model selection
     if args.free or args.free_fast:
         from llm import FreeModelSelector
+
         selector = FreeModelSelector(api_key=os.getenv("OPENROUTER_API_KEY"))
 
         if args.free and args.free_fast:
@@ -2655,8 +2753,8 @@ if __name__ == "__main__":
         args.model = free_model
         os.environ["TIMEPOINT_MODEL_OVERRIDE"] = free_model
         print(f"🆓 FREE MODE: Using {free_model}")
-        print(f"   Cost: $0.00 (free tier)")
-        print(f"   Note: Free models have more restrictive rate limits")
+        print("   Cost: $0.00 (free tier)")
+        print("   Note: Free models have more restrictive rate limits")
         print()
 
     # Handle --fast-simjudged flag
@@ -2677,7 +2775,9 @@ if __name__ == "__main__":
 
     # Handle --template mode (single template execution)
     if args.template and not args.convergence_e2e:
-        success = run_single_template(args.template, skip_summaries=args.skip_summaries, portal_quick=args.portal_quick)
+        success = run_single_template(
+            args.template, skip_summaries=args.skip_summaries, portal_quick=args.portal_quick
+        )
         sys.exit(0 if success else 1)
 
     # Handle --convergence-e2e mode (run template N times, compute convergence)
@@ -2692,7 +2792,7 @@ if __name__ == "__main__":
             run_count=args.convergence_runs,
             skip_summaries=args.skip_summaries,
             verbose=args.convergence_verbose,
-            model_override=args.model
+            model_override=args.model,
         )
         sys.exit(0 if success else 1)
 
@@ -2702,7 +2802,7 @@ if __name__ == "__main__":
             nl_input=args.nl,
             skip_summaries=args.skip_summaries,
             entities=args.nl_entities,
-            timepoints=args.nl_timepoints
+            timepoints=args.nl_timepoints,
         )
         sys.exit(0 if success else 1)
 
@@ -2715,42 +2815,42 @@ if __name__ == "__main__":
 
     # Determine mode
     if args.ultra_all:
-        mode = 'ultra_all'
+        mode = "ultra_all"
     elif args.portal_test_only:
-        mode = 'portal'
+        mode = "portal"
     elif args.portal_simjudged_quick_only:
-        mode = 'portal_simjudged_quick'
+        mode = "portal_simjudged_quick"
     elif args.portal_simjudged_only:
-        mode = 'portal_simjudged'
+        mode = "portal_simjudged"
     elif args.portal_simjudged_thorough_only:
-        mode = 'portal_simjudged_thorough'
+        mode = "portal_simjudged_thorough"
     elif args.portal_all:
-        mode = 'portal_all'
+        mode = "portal_all"
     elif args.portal_timepoint_only:
-        mode = 'portal_timepoint'
+        mode = "portal_timepoint"
     elif args.portal_timepoint_simjudged_quick_only:
-        mode = 'portal_timepoint_simjudged_quick'
+        mode = "portal_timepoint_simjudged_quick"
     elif args.portal_timepoint_simjudged_only:
-        mode = 'portal_timepoint_simjudged'
+        mode = "portal_timepoint_simjudged"
     elif args.portal_timepoint_simjudged_thorough_only:
-        mode = 'portal_timepoint_simjudged_thorough'
+        mode = "portal_timepoint_simjudged_thorough"
     elif args.portal_timepoint_all:
-        mode = 'portal_timepoint_all'
+        mode = "portal_timepoint_all"
     elif args.timepoint_forward or args.timepoint_corporate_analysis_only:
-        mode = 'timepoint_corporate'
+        mode = "timepoint_corporate"
     elif args.timepoint_all:
-        mode = 'timepoint_all'
+        mode = "timepoint_all"
     elif args.full:
-        mode = 'full'
+        mode = "full"
     else:
-        mode = 'quick'
+        mode = "quick"
 
     # Handle --convergence-only mode (no simulation runs)
     if args.convergence_only:
         convergence_success = run_convergence_analysis(
             run_count=args.convergence_runs,
             template_filter=args.convergence_template,
-            verbose=args.convergence_verbose
+            verbose=args.convergence_verbose,
         )
         sys.exit(0 if convergence_success else 1)
 
@@ -2764,6 +2864,7 @@ if __name__ == "__main__":
 
         # Build template list for the selected mode via TemplateLoader
         from generation.templates.loader import TemplateLoader
+
         loader = TemplateLoader()
 
         def _load_api_templates(category=None):
@@ -2782,16 +2883,23 @@ if __name__ == "__main__":
         portal_templates = []
 
         # Select templates based on mode
-        if mode == 'quick':
+        if mode == "quick":
             api_templates = quick_templates
-        elif mode == 'full':
+        elif mode == "full":
             api_templates = quick_templates + full_templates
-        elif mode == 'portal':
+        elif mode == "portal":
             api_templates = portal_templates
-        elif mode in ('portal_simjudged_quick', 'portal_simjudged', 'portal_simjudged_thorough', 'portal_all'):
+        elif mode in (
+            "portal_simjudged_quick",
+            "portal_simjudged",
+            "portal_simjudged_thorough",
+            "portal_all",
+        ):
             # Portal variants - use standard portal templates for API mode
             api_templates = portal_templates
-            print(f"⚠️  Note: Simjudged variants not supported in API mode, using standard portal templates")
+            print(
+                "⚠️  Note: Simjudged variants not supported in API mode, using standard portal templates"
+            )
         else:
             # Default to quick for other modes
             api_templates = quick_templates
@@ -2808,14 +2916,16 @@ if __name__ == "__main__":
         )
         sys.exit(0 if success else 1)
 
-    success = run_all_templates(mode, skip_summaries=args.skip_summaries, parallel_workers=args.parallel)
+    success = run_all_templates(
+        mode, skip_summaries=args.skip_summaries, parallel_workers=args.parallel
+    )
 
     # Run convergence analysis if requested
     if args.convergence:
         convergence_success = run_convergence_analysis(
             run_count=args.convergence_runs,
             template_filter=args.convergence_template,
-            verbose=args.convergence_verbose
+            verbose=args.convergence_verbose,
         )
         if not convergence_success:
             print("\n⚠️  Convergence analysis failed but template runs may have succeeded")

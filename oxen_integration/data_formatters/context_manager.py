@@ -20,15 +20,14 @@ Usage:
     # Use context.to_prompt_string() in training data formatter
 """
 
-from typing import Dict, List, Any, Optional
-from dataclasses import dataclass, field
-from collections import Counter
-from datetime import datetime
 import json
+from collections import Counter
+from dataclasses import dataclass, field
+from typing import Any
 
-from storage import GraphStore
 from llm_v2 import LLMClient
 from schemas import Entity, Timepoint
+from storage import GraphStore
 
 
 @dataclass
@@ -39,29 +38,30 @@ class TrainingContext:
     Each section provides PREDICTIVE information WITHOUT revealing
     the answer (entity state changes at T1).
     """
+
     # M7: Causal chain context
-    causal_history: Dict[str, Any]
+    causal_history: dict[str, Any]
 
     # M13: Relationship context
-    relationship_context: Dict[str, Any]
+    relationship_context: dict[str, Any]
 
     # M3: Knowledge provenance
-    knowledge_provenance: Dict[str, Any]
+    knowledge_provenance: dict[str, Any]
 
     # M10: Scene atmosphere
-    scene_atmosphere: Dict[str, Any]
+    scene_atmosphere: dict[str, Any]
 
     # M11: Dialog context
-    dialog_context: Dict[str, Any]
+    dialog_context: dict[str, Any]
 
     # M6: Tensor state summary
-    entity_state_summary: Dict[str, Any]
+    entity_state_summary: dict[str, Any]
 
     # M14: Circadian context
-    circadian_context: Dict[str, Any]
+    circadian_context: dict[str, Any]
 
     # Metadata
-    relevance_scores: Dict[str, float] = field(default_factory=dict)
+    relevance_scores: dict[str, float] = field(default_factory=dict)
     token_estimate: int = 0
 
     def to_prompt_string(self) -> str:
@@ -111,7 +111,7 @@ class TrainingContext:
             section += f"\n\nNarrative Context:\n{narrative}"
 
         if tensions:
-            section += f"\n\nKey Tensions:\n" + "\n".join(f"  - {t}" for t in tensions[:3])
+            section += "\n\nKey Tensions:\n" + "\n".join(f"  - {t}" for t in tensions[:3])
 
         return section
 
@@ -128,7 +128,9 @@ class TrainingContext:
 
         for rel in relationships[:5]:  # Top 5 relationships
             section += f"\n  {rel['entity']}: {rel.get('dynamic', 'neutral')} "
-            section += f"(trust: {rel.get('trust', 0.5):.2f}, alignment: {rel.get('alignment', 0.0):.2f})"
+            section += (
+                f"(trust: {rel.get('trust', 0.5):.2f}, alignment: {rel.get('alignment', 0.0):.2f})"
+            )
 
         if social_summary:
             section += f"\n\nSocial Dynamics:\n{social_summary}"
@@ -148,17 +150,21 @@ class TrainingContext:
         section += "\nHow this entity acquired current knowledge:"
 
         if sources:
-            section += "\n  Primary sources: " + ", ".join(f"{k} ({v} items)" for k, v in list(sources.items())[:3])
+            section += "\n  Primary sources: " + ", ".join(
+                f"{k} ({v} items)" for k, v in list(sources.items())[:3]
+            )
 
         if modes:
             total = sum(modes.values())
-            percentages = {k: (v/total*100) for k, v in modes.items()} if total > 0 else {}
-            section += "\n  Learning modes: " + ", ".join(f"{k} ({v:.0f}%)" for k, v in percentages.items())
+            percentages = {k: (v / total * 100) for k, v in modes.items()} if total > 0 else {}
+            section += "\n  Learning modes: " + ", ".join(
+                f"{k} ({v:.0f}%)" for k, v in percentages.items()
+            )
 
         if recent:
             section += "\n\nRecent acquisitions (last 5 items):"
             for item in recent[-5:]:
-                section += f"\n  - \"{item['info'][:60]}\" (from {item.get('source', 'unknown')}, confidence: {item.get('confidence', 0.5):.1f})"
+                section += f'\n  - "{item["info"][:60]}" (from {item.get("source", "unknown")}, confidence: {item.get("confidence", 0.5):.1f})'
 
         return section
 
@@ -179,7 +185,7 @@ class TrainingContext:
             section += f"\n  Emotional valence: {emotional.get('valence', 0.0):.2f}, Energy: {emotional.get('energy', 0.5):.2f}"
 
         if physical:
-            section += f"\n\nPhysical environment:"
+            section += "\n\nPhysical environment:"
             section += f"\n  Location: {physical.get('location', 'unknown')}"
             section += f"\n  Temperature: {physical.get('temperature', 20):.1f}°C, Lighting: {physical.get('lighting', 0.5):.1f}"
 
@@ -215,7 +221,7 @@ class TrainingContext:
 
         state = self.entity_state_summary
 
-        section = f"=== ENTITY STATE (M6) ==="
+        section = "=== ENTITY STATE (M6) ==="
         section += f"\n{state.get('entity_id', 'unknown')} at T0:"
 
         if "physical" in state:
@@ -266,7 +272,7 @@ class TrainingContextManager:
     while maximizing predictive signal.
     """
 
-    def __init__(self, store: GraphStore, llm: Optional[LLMClient] = None):
+    def __init__(self, store: GraphStore, llm: LLMClient | None = None):
         """
         Initialize context manager.
 
@@ -279,11 +285,7 @@ class TrainingContextManager:
         self.enable_llm_scoring = llm is not None
 
     def gather_context(
-        self,
-        entity: Entity,
-        t0: Timepoint,
-        t1: Timepoint,
-        simulation_result: Dict[str, Any]
+        self, entity: Entity, t0: Timepoint, t1: Timepoint, simulation_result: dict[str, Any]
     ) -> TrainingContext:
         """
         Gather comprehensive context for training data generation.
@@ -318,14 +320,22 @@ class TrainingContextManager:
                 entity_state_summary=entity_state_summary,
                 circadian_context=circadian_context,
                 t0=t0,
-                t1=t1
+                t1=t1,
             )
         else:
             # Default: include all context
-            relevance_scores = {k: 1.0 for k in [
-                "causal_history", "relationship_context", "knowledge_provenance",
-                "scene_atmosphere", "dialog_context", "entity_state_summary", "circadian_context"
-            ]}
+            relevance_scores = dict.fromkeys(
+                [
+                    "causal_history",
+                    "relationship_context",
+                    "knowledge_provenance",
+                    "scene_atmosphere",
+                    "dialog_context",
+                    "entity_state_summary",
+                    "circadian_context",
+                ],
+                1.0,
+            )
 
         return TrainingContext(
             causal_history=causal_history,
@@ -335,10 +345,10 @@ class TrainingContextManager:
             dialog_context=dialog_context,
             entity_state_summary=entity_state_summary,
             circadian_context=circadian_context,
-            relevance_scores=relevance_scores
+            relevance_scores=relevance_scores,
         )
 
-    def _extract_causal_chain(self, t0: Timepoint, t1: Timepoint) -> Dict[str, Any]:
+    def _extract_causal_chain(self, t0: Timepoint, t1: Timepoint) -> dict[str, Any]:
         """
         M7: Extract causal chain history leading to T0.
 
@@ -356,12 +366,17 @@ class TrainingContextManager:
                 if not parent:
                     break
 
-                chain.insert(0, {
-                    "timepoint": parent.timepoint_id,
-                    "event": parent.event_description,
-                    "timestamp": parent.timestamp.isoformat() if hasattr(parent.timestamp, 'isoformat') else str(parent.timestamp),
-                    "importance": getattr(parent, 'importance_score', 0.5)
-                })
+                chain.insert(
+                    0,
+                    {
+                        "timepoint": parent.timepoint_id,
+                        "event": parent.event_description,
+                        "timestamp": parent.timestamp.isoformat()
+                        if hasattr(parent.timestamp, "isoformat")
+                        else str(parent.timestamp),
+                        "importance": getattr(parent, "importance_score", 0.5),
+                    },
+                )
                 current = parent
                 depth += 1
             except Exception as e:
@@ -391,7 +406,7 @@ DO NOT predict what happens next. Only describe the situation AS OF the last eve
                     user=summary_prompt,
                     temperature=0.5,
                     max_tokens=300,
-                    call_type="causal_chain_summary"
+                    call_type="causal_chain_summary",
                 )
 
                 narrative_summary = response.content
@@ -401,7 +416,7 @@ DO NOT predict what happens next. Only describe the situation AS OF the last eve
                     key_tensions = [
                         f"Event progression: {chain[0]['event'][:40]} → ... → {chain[-1]['event'][:40]}",
                         f"Timeline depth: {len(chain)} connected events",
-                        f"Importance: {sum(e['importance'] for e in chain) / len(chain):.2f} average"
+                        f"Importance: {sum(e['importance'] for e in chain) / len(chain):.2f} average",
                     ]
 
             except Exception as e:
@@ -410,10 +425,10 @@ DO NOT predict what happens next. Only describe the situation AS OF the last eve
         return {
             "timeline": chain,
             "narrative_summary": narrative_summary,
-            "key_tensions": key_tensions
+            "key_tensions": key_tensions,
         }
 
-    def _extract_relationships(self, entity: Entity, t1: Timepoint) -> Dict[str, Any]:
+    def _extract_relationships(self, entity: Entity, t1: Timepoint) -> dict[str, Any]:
         """
         M13: Extract relationship states with entities present at T1.
 
@@ -428,21 +443,25 @@ DO NOT predict what happens next. Only describe the situation AS OF the last eve
 
                 # Get relationship trajectory
                 trajectory = self.store.get_relationship_trajectory_between(
-                    entity.entity_id,
-                    other_id
+                    entity.entity_id, other_id
                 )
 
                 if trajectory:
                     # Get most recent state before T1
-                    relationships.append({
-                        "entity": other_id,
-                        "trust": getattr(trajectory, 'trust_level', 0.5),
-                        "alignment": getattr(trajectory, 'belief_alignment', 0.0),
-                        "power_dynamic": getattr(trajectory, 'power_dynamic', 0.0),
-                        "interaction_count": getattr(trajectory, 'interaction_count', 0),
-                        "dynamic": "allied" if getattr(trajectory, 'trust_level', 0.5) > 0.7 else
-                                  "opposed" if getattr(trajectory, 'trust_level', 0.5) < 0.3 else "neutral"
-                    })
+                    relationships.append(
+                        {
+                            "entity": other_id,
+                            "trust": getattr(trajectory, "trust_level", 0.5),
+                            "alignment": getattr(trajectory, "belief_alignment", 0.0),
+                            "power_dynamic": getattr(trajectory, "power_dynamic", 0.0),
+                            "interaction_count": getattr(trajectory, "interaction_count", 0),
+                            "dynamic": "allied"
+                            if getattr(trajectory, "trust_level", 0.5) > 0.7
+                            else "opposed"
+                            if getattr(trajectory, "trust_level", 0.5) < 0.3
+                            else "neutral",
+                        }
+                    )
 
         except Exception as e:
             print(f"Warning: Failed to extract relationships: {e}")
@@ -451,20 +470,17 @@ DO NOT predict what happens next. Only describe the situation AS OF the last eve
         social_context = ""
         if relationships and self.llm:
             try:
-                allies = [r for r in relationships if r['dynamic'] == 'allied']
-                opposed = [r for r in relationships if r['dynamic'] == 'opposed']
+                allies = [r for r in relationships if r["dynamic"] == "allied"]
+                opposed = [r for r in relationships if r["dynamic"] == "opposed"]
 
                 social_context = f"{entity.entity_id} has {len(allies)} allies and {len(opposed)} opponents present."
 
             except Exception as e:
                 print(f"Warning: Failed to generate social context: {e}")
 
-        return {
-            "relationships": relationships,
-            "social_context": social_context
-        }
+        return {"relationships": relationships, "social_context": social_context}
 
-    def _extract_knowledge_provenance(self, entity: Entity, t0: Timepoint) -> Dict[str, Any]:
+    def _extract_knowledge_provenance(self, entity: Entity, t0: Timepoint) -> dict[str, Any]:
         """
         M3: Extract how entity acquired their current knowledge.
 
@@ -474,33 +490,34 @@ DO NOT predict what happens next. Only describe the situation AS OF the last eve
             exposures = self.store.get_exposure_events(entity.entity_id, limit=100)
 
             # Filter to events before T0
-            exposures = [e for e in exposures if hasattr(e, 'timepoint_id')]
+            exposures = [e for e in exposures if hasattr(e, "timepoint_id")]
 
             # Analyze patterns
-            sources = Counter(e.source for e in exposures if hasattr(e, 'source') and e.source)
-            event_types = Counter(e.event_type for e in exposures if hasattr(e, 'event_type'))
+            sources = Counter(e.source for e in exposures if hasattr(e, "source") and e.source)
+            event_types = Counter(e.event_type for e in exposures if hasattr(e, "event_type"))
 
             # Get recent acquisitions
             recent = [
                 {
                     "info": e.information,
-                    "source": e.source if hasattr(e, 'source') else "unknown",
-                    "confidence": e.confidence if hasattr(e, 'confidence') else 0.5
+                    "source": e.source if hasattr(e, "source") else "unknown",
+                    "confidence": e.confidence if hasattr(e, "confidence") else 0.5,
                 }
-                for e in exposures[-5:] if hasattr(e, 'information')
+                for e in exposures[-5:]
+                if hasattr(e, "information")
             ]
 
             return {
                 "knowledge_sources": dict(sources.most_common(5)),
                 "learning_modes": dict(event_types),
-                "recent_acquisitions": recent
+                "recent_acquisitions": recent,
             }
 
         except Exception as e:
             print(f"Warning: Failed to extract knowledge provenance: {e}")
             return {}
 
-    def _extract_scene_atmosphere(self, t1: Timepoint) -> Dict[str, Any]:
+    def _extract_scene_atmosphere(self, t1: Timepoint) -> dict[str, Any]:
         """
         M10: Extract environmental and emotional context.
 
@@ -510,20 +527,22 @@ DO NOT predict what happens next. Only describe the situation AS OF the last eve
         # Return basic context from timepoint
         return {
             "emotional_atmosphere": {
-                "tension": getattr(t1, 'tension_level', 0.5),
-                "formality": getattr(t1, 'formality_level', 0.5),
-                "valence": getattr(t1, 'emotional_valence', 0.0),
-                "energy": getattr(t1, 'energy_level', 0.5)
+                "tension": getattr(t1, "tension_level", 0.5),
+                "formality": getattr(t1, "formality_level", 0.5),
+                "valence": getattr(t1, "emotional_valence", 0.0),
+                "energy": getattr(t1, "energy_level", 0.5),
             },
             "physical_environment": {
-                "location": getattr(t1, 'location', 'unknown'),
+                "location": getattr(t1, "location", "unknown"),
                 "temperature": 20.0,  # Default
-                "lighting": 0.5  # Default
+                "lighting": 0.5,  # Default
             },
-            "atmosphere_narrative": f"Event taking place: {t1.event_description[:100]}"
+            "atmosphere_narrative": f"Event taking place: {t1.event_description[:100]}",
         }
 
-    def _extract_dialog_context(self, entity: Entity, t0: Timepoint, t1: Timepoint) -> Dict[str, Any]:
+    def _extract_dialog_context(
+        self, entity: Entity, t0: Timepoint, t1: Timepoint
+    ) -> dict[str, Any]:
         """
         M11: Extract recent dialog history.
 
@@ -536,50 +555,54 @@ DO NOT predict what happens next. Only describe the situation AS OF the last eve
             # Filter to recent dialogs
             recent_dialogs = []
             for dialog in dialogs[-5:]:
-                if hasattr(dialog, 'timepoint_id'):
-                    recent_dialogs.append({
-                        "timepoint": dialog.timepoint_id,
-                        "participants": getattr(dialog, 'participants', []),
-                        "summary": getattr(dialog, 'summary', 'Conversation occurred')[:100]
-                    })
+                if hasattr(dialog, "timepoint_id"):
+                    recent_dialogs.append(
+                        {
+                            "timepoint": dialog.timepoint_id,
+                            "participants": getattr(dialog, "participants", []),
+                            "summary": getattr(dialog, "summary", "Conversation occurred")[:100],
+                        }
+                    )
 
             return {
                 "recent_dialogs": recent_dialogs,
-                "dialog_summary": f"{len(recent_dialogs)} recent conversations involving {entity.entity_id}"
+                "dialog_summary": f"{len(recent_dialogs)} recent conversations involving {entity.entity_id}",
             }
 
         except Exception as e:
             print(f"Warning: Failed to extract dialog context: {e}")
             return {}
 
-    def _extract_entity_state(self, entity: Entity, t0: Timepoint) -> Dict[str, Any]:
+    def _extract_entity_state(self, entity: Entity, t0: Timepoint) -> dict[str, Any]:
         """
         M6: Extract compressed entity state summary.
 
         Shows current capabilities and constraints.
         """
         physical = {}
-        if hasattr(entity, 'physical_tensor') and entity.physical_tensor:
+        if hasattr(entity, "physical_tensor") and entity.physical_tensor:
             pt = entity.physical_tensor
             physical = {
-                "age": getattr(pt, 'age', 0),
-                "energy": getattr(pt, 'energy_budget', 100) if hasattr(pt, 'energy_budget') else 100
+                "age": getattr(pt, "age", 0),
+                "energy": getattr(pt, "energy_budget", 100)
+                if hasattr(pt, "energy_budget")
+                else 100,
             }
 
         cognitive = {}
-        if hasattr(entity, 'cognitive_tensor') and entity.cognitive_tensor:
+        if hasattr(entity, "cognitive_tensor") and entity.cognitive_tensor:
             ct = entity.cognitive_tensor
             cognitive = {
-                "knowledge_count": len(getattr(ct, 'knowledge_state', [])),
-                "confidence": getattr(ct, 'decision_confidence', 0.5)
+                "knowledge_count": len(getattr(ct, "knowledge_state", [])),
+                "confidence": getattr(ct, "decision_confidence", 0.5),
             }
 
         emotional = {}
-        if hasattr(entity, 'cognitive_tensor') and entity.cognitive_tensor:
+        if hasattr(entity, "cognitive_tensor") and entity.cognitive_tensor:
             ct = entity.cognitive_tensor
             emotional = {
-                "valence": getattr(ct, 'emotional_valence', 0.0),
-                "arousal": getattr(ct, 'emotional_arousal', 0.0)
+                "valence": getattr(ct, "emotional_valence", 0.0),
+                "arousal": getattr(ct, "emotional_arousal", 0.0),
             }
 
         return {
@@ -587,17 +610,17 @@ DO NOT predict what happens next. Only describe the situation AS OF the last eve
             "physical": physical,
             "cognitive": cognitive,
             "emotional": emotional,
-            "recent_activity": f"Active at timepoint {t0.timepoint_id}"
+            "recent_activity": f"Active at timepoint {t0.timepoint_id}",
         }
 
-    def _extract_circadian_context(self, t1: Timepoint) -> Dict[str, Any]:
+    def _extract_circadian_context(self, t1: Timepoint) -> dict[str, Any]:
         """
         M14: Extract time-of-day context.
 
         Shows expected activity patterns and energy levels.
         """
         try:
-            hour = t1.timestamp.hour if hasattr(t1.timestamp, 'hour') else 12
+            hour = t1.timestamp.hour if hasattr(t1.timestamp, "hour") else 12
         except:
             hour = 12
 
@@ -606,7 +629,11 @@ DO NOT predict what happens next. Only describe the situation AS OF the last eve
         activity_summary = ""
 
         if 0 <= hour < 6:
-            expected_states = {"energy": "Low (sleep hours)", "focus": "Minimal", "social": "Unlikely"}
+            expected_states = {
+                "energy": "Low (sleep hours)",
+                "focus": "Minimal",
+                "social": "Unlikely",
+            }
             activity_summary = "Early morning hours - most entities at rest"
         elif 6 <= hour < 12:
             expected_states = {"energy": "Rising", "focus": "Increasing", "social": "Moderate"}
@@ -615,16 +642,20 @@ DO NOT predict what happens next. Only describe the situation AS OF the last eve
             expected_states = {"energy": "Peak", "focus": "High", "social": "High"}
             activity_summary = "Afternoon hours - peak activity and engagement"
         else:
-            expected_states = {"energy": "Declining", "focus": "Moderate", "social": "High (social hours)"}
+            expected_states = {
+                "energy": "Declining",
+                "focus": "Moderate",
+                "social": "High (social hours)",
+            }
             activity_summary = "Evening hours - social activity, declining work focus"
 
         return {
             "hour": hour,
             "expected_states": expected_states,
-            "activity_summary": activity_summary
+            "activity_summary": activity_summary,
         }
 
-    def _score_context_relevance(self, **context_sections) -> Dict[str, float]:
+    def _score_context_relevance(self, **context_sections) -> dict[str, float]:
         """
         Use LLM to score which context sections are most relevant.
 
@@ -632,11 +663,11 @@ DO NOT predict what happens next. Only describe the situation AS OF the last eve
         """
         if not self.llm:
             # Default: include everything
-            return {k: 1.0 for k in context_sections.keys() if k not in ['t0', 't1']}
+            return {k: 1.0 for k in context_sections.keys() if k not in ["t0", "t1"]}
 
         try:
-            t0 = context_sections.pop('t0')
-            t1 = context_sections.pop('t1')
+            t0 = context_sections.pop("t0")
+            t1 = context_sections.pop("t1")
 
             scoring_prompt = f"""You are analyzing context for predicting entity state changes.
 
@@ -669,14 +700,22 @@ Return JSON with scores for each context type."""
                 user=scoring_prompt,
                 temperature=0.3,
                 max_tokens=200,
-                call_type="context_relevance_scoring"
+                call_type="context_relevance_scoring",
             )
 
             # Parse scores from response
             import re
+
             scores = {}
-            for key in ["causal_history", "relationship_context", "knowledge_provenance",
-                       "scene_atmosphere", "dialog_context", "entity_state_summary", "circadian_context"]:
+            for key in [
+                "causal_history",
+                "relationship_context",
+                "knowledge_provenance",
+                "scene_atmosphere",
+                "dialog_context",
+                "entity_state_summary",
+                "circadian_context",
+            ]:
                 # Try to extract score for this key
                 pattern = f'"{key}".*?(0\\.[0-9]+|1\\.0)'
                 match = re.search(pattern, response.content)
@@ -690,4 +729,4 @@ Return JSON with scores for each context type."""
         except Exception as e:
             print(f"Warning: Context relevance scoring failed: {e}")
             # Fallback: include all context
-            return {k: 1.0 for k in context_sections.keys() if k not in ['t0', 't1']}
+            return {k: 1.0 for k in context_sections.keys() if k not in ["t0", "t1"]}

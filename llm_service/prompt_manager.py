@@ -4,9 +4,9 @@ Prompt Management - System and user prompt assembly with templating
 Handles prompt construction, variable substitution, and context injection.
 """
 
-from typing import Dict, Any, Optional, List
-from string import Template
 import json
+from string import Template
+from typing import Any
 
 
 class PromptManager:
@@ -21,8 +21,8 @@ class PromptManager:
     """
 
     def __init__(self):
-        self.global_system_prompt: Optional[str] = None
-        self.prompt_templates: Dict[str, str] = {}
+        self.global_system_prompt: str | None = None
+        self.prompt_templates: dict[str, str] = {}
 
     def set_global_system_prompt(self, prompt: str) -> None:
         """Set a global system prompt that's prepended to all calls"""
@@ -34,10 +34,10 @@ class PromptManager:
 
     def build_prompt(
         self,
-        template_name: Optional[str] = None,
-        template_str: Optional[str] = None,
-        variables: Optional[Dict[str, Any]] = None,
-        context: Optional[Dict[str, Any]] = None,
+        template_name: str | None = None,
+        template_str: str | None = None,
+        variables: dict[str, Any] | None = None,
+        context: dict[str, Any] | None = None,
     ) -> str:
         """
         Build a prompt from template and variables.
@@ -77,9 +77,7 @@ class PromptManager:
         return prompt
 
     def build_system_prompt(
-        self,
-        specific_prompt: Optional[str] = None,
-        use_global: bool = True
+        self, specific_prompt: str | None = None, use_global: bool = True
     ) -> str:
         """
         Build system prompt with optional global prepend.
@@ -105,7 +103,7 @@ class PromptManager:
         self,
         schema: type,
         instruction: str = "Return a JSON object matching this schema",
-        include_example: bool = False
+        include_example: bool = False,
     ) -> str:
         """
         Convert a Pydantic model schema to a prompt string.
@@ -123,11 +121,11 @@ class PromptManager:
 
         # Build field descriptions
         fields = []
-        if 'properties' in schema_dict:
-            for field_name, field_info in schema_dict['properties'].items():
-                field_type = field_info.get('type', 'any')
-                field_desc = field_info.get('description', '')
-                required = field_name in schema_dict.get('required', [])
+        if "properties" in schema_dict:
+            for field_name, field_info in schema_dict["properties"].items():
+                field_type = field_info.get("type", "any")
+                field_desc = field_info.get("description", "")
+                required = field_name in schema_dict.get("required", [])
 
                 field_str = f"- {field_name}: {field_type}"
                 if required:
@@ -144,19 +142,19 @@ class PromptManager:
         if include_example:
             # Create example with default values
             example = {}
-            for field_name, field_info in schema_dict.get('properties', {}).items():
-                field_type = field_info.get('type')
-                if field_type == 'string':
+            for field_name, field_info in schema_dict.get("properties", {}).items():
+                field_type = field_info.get("type")
+                if field_type == "string":
                     example[field_name] = "example_string"
-                elif field_type == 'number':
+                elif field_type == "number":
                     example[field_name] = 0.0
-                elif field_type == 'integer':
+                elif field_type == "integer":
                     example[field_name] = 0
-                elif field_type == 'boolean':
+                elif field_type == "boolean":
                     example[field_name] = True
-                elif field_type == 'array':
+                elif field_type == "array":
                     example[field_name] = []
-                elif field_type == 'object':
+                elif field_type == "object":
                     example[field_name] = {}
 
             prompt += f"\n\nExample:\n```json\n{json.dumps(example, indent=2)}\n```"
@@ -176,27 +174,27 @@ class PromptManager:
         context_parts = []
 
         # Add entity ID
-        if hasattr(entity, 'entity_id'):
+        if hasattr(entity, "entity_id"):
             context_parts.append(f"Entity: {entity.entity_id}")
 
         # Add physical state
-        if hasattr(entity, 'physical_tensor'):
+        if hasattr(entity, "physical_tensor"):
             physical = entity.physical_tensor
             context_parts.append(f"Physical: age={physical.age}, health={physical.health:.2f}")
 
         # Add cognitive state
-        if hasattr(entity, 'cognitive_tensor'):
+        if hasattr(entity, "cognitive_tensor"):
             cognitive = entity.cognitive_tensor
             context_parts.append(f"Cognitive: energy={cognitive.energy_budget:.2f}")
 
         # Add knowledge
-        if hasattr(entity, 'knowledge_state') and entity.knowledge_state:
+        if hasattr(entity, "knowledge_state") and entity.knowledge_state:
             knowledge_preview = entity.knowledge_state[:3]  # First 3 items
             context_parts.append(f"Knowledge: {knowledge_preview}")
 
         return "\n".join(context_parts)
 
-    def _enrich_with_context(self, prompt: str, context: Dict[str, Any]) -> str:
+    def _enrich_with_context(self, prompt: str, context: dict[str, Any]) -> str:
         """
         Enrich prompt with additional context information.
 
@@ -210,16 +208,16 @@ class PromptManager:
         enrichment_parts = []
 
         # Add temporal context if available
-        if 'timepoint' in context:
+        if "timepoint" in context:
             enrichment_parts.append(f"Timepoint: {context['timepoint']}")
 
         # Add entity relationships if available
-        if 'relationships' in context:
+        if "relationships" in context:
             enrichment_parts.append(f"Relationships: {context['relationships']}")
 
         # Add any custom context fields
         for key, value in context.items():
-            if key not in ['timepoint', 'relationships'] and isinstance(value, str):
+            if key not in ["timepoint", "relationships"] and isinstance(value, str):
                 enrichment_parts.append(f"{key.title()}: {value}")
 
         if enrichment_parts:
@@ -231,8 +229,8 @@ class PromptManager:
     def filter_response_context(
         self,
         response: str,
-        remove_patterns: Optional[List[str]] = None,
-        add_disclaimers: Optional[List[str]] = None
+        remove_patterns: list[str] | None = None,
+        add_disclaimers: list[str] | None = None,
     ) -> str:
         """
         Post-process response with context filtering.
@@ -252,7 +250,7 @@ class PromptManager:
         # Remove unwanted patterns
         if remove_patterns:
             for pattern in remove_patterns:
-                filtered = re.sub(pattern, '', filtered, flags=re.IGNORECASE)
+                filtered = re.sub(pattern, "", filtered, flags=re.IGNORECASE)
 
         # Add disclaimers
         if add_disclaimers:
