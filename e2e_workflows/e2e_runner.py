@@ -3599,7 +3599,7 @@ RESPOND WITH ONLY THE EVENT DESCRIPTION, nothing else."""
 
             try:
                 oxen_client = OxenClient(
-                    namespace=os.getenv("OXEN_NAMESPACE", "timepoint-ai"),
+                    namespace=os.getenv("OXEN_NAMESPACE", "timepointai"),
                     repo_name=repo_name,
                     interactive_auth=False,
                 )

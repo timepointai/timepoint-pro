@@ -69,7 +69,7 @@ class LLMExplainer:
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={
                     "Authorization": f"Bearer {self.api_key}",
-                    "HTTP-Referer": "https://github.com/timepoint-ai/timepoint-pro",
+                    "HTTP-Referer": "https://github.com/timepointai/timepoint-pro",
                     "X-Title": "Timepoint Monitor",
                 },
                 json={
@@ -117,7 +117,7 @@ class LLMExplainer:
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={
                     "Authorization": f"Bearer {self.api_key}",
-                    "HTTP-Referer": "https://github.com/timepoint-ai/timepoint-pro",
+                    "HTTP-Referer": "https://github.com/timepointai/timepoint-pro",
                     "X-Title": "Timepoint Monitor Chat",
                 },
                 json={

@@ -469,7 +469,7 @@ All inference via OpenRouter using open-weight models.
 ### Reproduce this run
 
 ```bash
-git clone https://github.com/timepoint-ai/timepoint-pro.git
+git clone https://github.com/timepointai/timepoint-pro.git
 cd timepoint-pro
 pip install -r requirements.txt
 export OPENROUTER_API_KEY=your_key_here

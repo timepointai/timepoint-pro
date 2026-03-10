@@ -44,7 +44,7 @@ flowchart TD
 
 ## Quick Start
 ```bash
-git clone https://github.com/timepoint-ai/timepoint-pro.git
+git clone https://github.com/timepointai/timepoint-pro.git
 cd timepoint-pro
 pip install -r requirements.txt
 export OPENROUTER_API_KEY=your_key
