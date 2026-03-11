@@ -3684,7 +3684,7 @@ files = [
 
 [[package]]
 name = "timepoint-tdf"
-version = "1.1.0"
+version = "1.2.0"
 description = "Timepoint Data Format — unified data interchange for the Timepoint suite"
 optional = false
 python-versions = ">=3.10"
@@ -3697,9 +3697,9 @@ pydantic = ">=2.0"
 
 [package.source]
 type = "git"
-url = "https://github.com/timepoint-ai/timepoint-tdf.git"
+url = "https://github.com/timepointai/timepoint-tdf.git"
 reference = "main"
-resolved_reference = "b739cd6b71f7fee2794f9c8b007eedced25e0300"
+resolved_reference = "ec15c0382271a6f04103524eb7a1507e29918314"
 
 [[package]]
 name = "tokenizers"
@@ -4402,4 +4402,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.14"
-content-hash = "3e355f47f4fac07140d02e7cd86a8a1636f9d5aada1eb79153f8549ee09a5a6b"
+content-hash = "c47dd64c4429740ebc7954778f0436b954c8fe51319595a7e302c446580c8c10"
