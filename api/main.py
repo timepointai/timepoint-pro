@@ -18,9 +18,10 @@ import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
+from fastapi.responses import HTMLResponse, JSONResponse
 from slowapi.errors import RateLimitExceeded
 
 from .deps import (
@@ -135,6 +136,9 @@ See /simulations/batch/usage for current usage.
         """,
         lifespan=lifespan,
         debug=debug or settings.debug,
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
     )
 
     # Add CORS middleware
@@ -194,6 +198,21 @@ See /simulations/batch/usage for current usage.
                 request_id=str(uuid.uuid4()),
             ).model_dump(),
         )
+
+    # Auth-gated OpenAPI docs
+    from .auth import get_current_user
+
+    @application.get("/openapi.json", include_in_schema=False)
+    async def openapi_schema(_user: str = Depends(get_current_user)):
+        return JSONResponse(application.openapi())
+
+    @application.get("/docs", include_in_schema=False, response_class=HTMLResponse)
+    async def swagger_ui(_user: str = Depends(get_current_user)):
+        return get_swagger_ui_html(openapi_url="/openapi.json", title=f"{application.title} - Docs")
+
+    @application.get("/redoc", include_in_schema=False, response_class=HTMLResponse)
+    async def redoc_ui(_user: str = Depends(get_current_user)):
+        return get_redoc_html(openapi_url="/openapi.json", title=f"{application.title} - ReDoc")
 
     # Add root endpoints
     @application.get("/", include_in_schema=False)
