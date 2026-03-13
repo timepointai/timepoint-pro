@@ -164,7 +164,7 @@ For long-running simulations and persistent storage, a private hosted layer wrap
 - **Auth** --- JWT + API key with Postgres persistence (this repo's in-memory key scaffold is for local dev only)
 - **Budget enforcement** --- Pre-submission budget checks, per-run cost tracking, optional forwarding to shared Billing service
 - **Usage tracking** --- `UsageRecord` table records every run start/complete with cost and token counts
-- **Railway deployment** --- Internal networking to Billing, Auth, and Web services
+- **Cloud deployment** --- Hosted infrastructure with networking to Billing, Auth, and Web services
 
 The cloud layer includes this repo as a git submodule and adds no runtime dependencies back into it. See the engine's API for simulation data; the cloud layer gates access and adds `/api/usage` + `/api/budget` endpoints.
 
@@ -190,10 +190,10 @@ Open-source engines for temporal AI. Render the past. Simulate the future. Score
 | **SNAG Bench** | Open Source | timepoint-snag-bench | Quality Certifier — measures Causal Resolution across renderings |
 | **Proteus** | Open Source | proteus | Settlement Layer — prediction markets that validate Rendered Futures |
 | **TDF** | Open Source | timepoint-tdf | Data Format — JSON-LD interchange across all services |
-| **Web App** | Private | timepoint-web-app | Browser client at app.timepointai.com |
-| **iPhone App** | Private | timepoint-iphone-app | iOS client — Synthetic Time Travel on mobile |
-| **Billing** | Private | timepoint-billing | Payment processing — Apple IAP + Stripe |
-| **Landing** | Private | timepoint-landing | Marketing site at timepointai.com |
+| **Web App** | Private | — | Browser client at app.timepointai.com |
+| **iPhone App** | Private | — | iOS client — Synthetic Time Travel on mobile |
+| **Billing** | Private | — | Payment processing — Apple IAP + Stripe |
+| **Landing** | Private | — | Marketing site at timepointai.com |
 
 **The Timepoint Thesis** — a forthcoming paper formalizing the Rendered Past / Rendered Future framework, the mathematics of Causal Resolution, the TDF specification, and the Proof of Causal Convergence protocol. Follow [@seanmcdonaldxyz](https://x.com/seanmcdonaldxyz) for updates.
 
