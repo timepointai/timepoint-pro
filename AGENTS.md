@@ -76,5 +76,27 @@ Static analysis (Bandit + Semgrep) integrated. All HIGH findings resolved:
 - All DB queries parameterized
 - No hardcoded secrets -- environment variable patterns only
 
+**Public repo rule**: Do not reference private repo names, internal networking paths, Railway auto-domains, or env var names for secrets in this repo's code, docs, issues, or commits.
+
+## Subdomain Architecture
+
+All Timepoint services are deployed under `timepointai.com` subdomains:
+
+| Service | URL | Notes |
+|---------|-----|-------|
+| Flash | `flash.timepointai.com` | Reality Writer — token introspection endpoint for SSO |
+| Pro (cloud) | `pro.timepointai.com` | Hosted version of this engine (auth-gated) |
+| Clockchain | `clockchain.timepointai.com` | Temporal Causal Graph |
+| Proteus | `proteus.timepointai.com` | Settlement Layer |
+| API Gateway | `api.timepointai.com` | Unified routing: `/api/v1/clockchain/*`, `/api/v1/*` (default → Flash) |
+| Web App | `app.timepointai.com` | Browser client |
+| Landing | `timepointai.com` | Marketing site |
+
+The API Gateway at `api.timepointai.com` provides unified routing to backend services. Direct subdomain URLs (e.g., `flash.timepointai.com`) bypass the gateway for service-to-service communication like token introspection.
+
+## OpenAPI Documentation
+
+The cloud layer serves interactive OpenAPI docs at `/docs` (Swagger UI). Access is gated behind JWT or API key authentication. The local dashboard API also exposes OpenAPI docs at `http://localhost:8000/docs` for development.
+
 ## Commits
 `type(scope): description` - types: feat, fix, refactor, test, docs, chore
