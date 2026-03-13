@@ -151,22 +151,13 @@ This is intentional: the public repo must remain forkable and self-contained. An
 
 **Recent:** TDF export format via `ExportFormatFactory`. Data export API (`/api/data-export/{run_id}`).
 
-**Planned: `/api/data-export`** --- A future endpoint for bulk export of simulation artifacts (causal graphs, entity tensors, dialog corpora, convergence sets) in standardized formats. Primary consumers: SNAG-Bench Axis 2 (causal reasoning benchmarks) and Proteus (simulation-to-training pipeline). This endpoint will live in the dashboard API (`dashboards/api/server.py`) and serve read-only data from the existing runs database. No auth required for local use; the Pro-Cloud private wrapper will gate access through its own auth layer.
+**Planned: `/api/data-export`** --- A future endpoint for bulk export of simulation artifacts (causal graphs, entity tensors, dialog corpora, convergence sets) in standardized formats. Primary consumers: SNAG-Bench Axis 2 (causal reasoning benchmarks) and Proteus (simulation-to-training pipeline). This endpoint will live in the dashboard API (`dashboards/api/server.py`) and serve read-only data from the existing runs database. No auth required for local use; the hosted cloud layer gates access through its own auth.
 
-**Pro-Cloud boundary** --- `/api/usage` and `/api/budget` are not implemented here. These endpoints live in the Pro-Cloud private wrapper, which tracks usage locally (per-run `UsageRecord` table) and optionally forwards to the shared Billing service when `BILLING_SERVICE_URL` is configured. This repo exposes simulation data only.
+**Cloud boundary** --- `/api/usage` and `/api/budget` are not implemented in this repo. These endpoints live in a private hosted layer that tracks usage per-run and optionally forwards to a shared billing service. This repo exposes simulation data only.
 
-## Cloud Execution via Pro-Cloud
+## Cloud Execution
 
-For long-running simulations and persistent storage, a private hosted layer wraps this engine with production concerns:
-
-- **Persistent storage** --- Postgres replaces SQLite; results survive deploys
-- **Job queue** --- Celery + Redis for cancellable, deploy-surviving jobs
-- **Auth** --- JWT + API key with Postgres persistence (this repo's in-memory key scaffold is for local dev only)
-- **Budget enforcement** --- Pre-submission budget checks, per-run cost tracking, optional forwarding to shared Billing service
-- **Usage tracking** --- `UsageRecord` table records every run start/complete with cost and token counts
-- **Cloud deployment** --- Hosted infrastructure with networking to Billing, Auth, and Web services
-
-The cloud layer includes this repo as a git submodule and adds no runtime dependencies back into it. See the engine's API for simulation data; the cloud layer gates access and adds `/api/usage` + `/api/budget` endpoints.
+For long-running simulations and persistent storage, a private hosted layer wraps this engine with production concerns (persistent database, job queue, auth, budget enforcement, usage tracking). The cloud layer includes this repo as a submodule and adds no runtime dependencies back into it. See the engine's API for simulation data; the cloud layer gates access and adds usage + budget endpoints.
 
 ## Sample Training Data
 
@@ -190,10 +181,6 @@ Open-source engines for temporal AI. Render the past. Simulate the future. Score
 | **SNAG Bench** | Open Source | timepoint-snag-bench | Quality Certifier — measures Causal Resolution across renderings |
 | **Proteus** | Open Source | proteus | Settlement Layer — prediction markets that validate Rendered Futures |
 | **TDF** | Open Source | timepoint-tdf | Data Format — JSON-LD interchange across all services |
-| **Web App** | Private | — | Browser client at app.timepointai.com |
-| **iPhone App** | Private | — | iOS client — Synthetic Time Travel on mobile |
-| **Billing** | Private | — | Payment processing — Apple IAP + Stripe |
-| **Landing** | Private | — | Marketing site at timepointai.com |
 
 **The Timepoint Thesis** — a forthcoming paper formalizing the Rendered Past / Rendered Future framework, the mathematics of Causal Resolution, the TDF specification, and the Proof of Causal Convergence protocol. Follow [@seanmcdonaldxyz](https://x.com/seanmcdonaldxyz) for updates.
 
