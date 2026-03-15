@@ -192,8 +192,7 @@ cython_debug/
 /checkpoints
 /generation
 
-.claude/settings.local.json
-.claude/*.log
+.claude/
 
 # Large installer packages
 *.pkg
