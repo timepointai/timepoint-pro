@@ -1,0 +1,35 @@
+{
+  "frontier_size": 3,
+  "points": [
+    {
+      "run_id": "dry_1a474fa5b69a",
+      "quality": 0.6549499999999999,
+      "cost": 0.1146,
+      "causal_resolution": 0.36268752000000004,
+      "config_overrides": [
+        "llm_service.defaults.frequency_penalty=0.4581",
+        "llm_service.defaults.presence_penalty=0.0407"
+      ]
+    },
+    {
+      "run_id": "dry_8737100dc6c7",
+      "quality": 0.7621500000000001,
+      "cost": 0.1244,
+      "causal_resolution": 0.5678553066666667,
+      "config_overrides": [
+        "llm_service.defaults.frequency_penalty=0.1762",
+        "llm_service.defaults.presence_penalty=0.6987"
+      ]
+    },
+    {
+      "run_id": "dry_ea8099c8993d",
+      "quality": 0.91422,
+      "cost": 0.1289,
+      "causal_resolution": 0.84235456,
+      "config_overrides": [
+        "llm_service.defaults.frequency_penalty=0.4679",
+        "llm_service.defaults.presence_penalty=0.5347"
+      ]
+    }
+  ]
+}
