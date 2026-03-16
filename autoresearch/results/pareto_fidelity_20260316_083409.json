@@ -1,0 +1,75 @@
+{
+  "frontier_size": 7,
+  "points": [
+    {
+      "run_id": "dry_3831b0561afd",
+      "quality": 0.6864,
+      "cost": 0.118,
+      "causal_resolution": 0.42395538000000005,
+      "config_overrides": [
+        "autoresearch.compression_method=pca",
+        "autoresearch.n_components=5"
+      ]
+    },
+    {
+      "run_id": "dry_7b83fe9ef3a7",
+      "quality": 0.75898,
+      "cost": 0.1368,
+      "causal_resolution": 0.5618587866666667,
+      "config_overrides": [
+        "autoresearch.compression_method=pca",
+        "autoresearch.n_components=3"
+      ]
+    },
+    {
+      "run_id": "dry_c33cce171400",
+      "quality": 0.82715,
+      "cost": 0.1379,
+      "causal_resolution": 0.6608162399999999,
+      "config_overrides": [
+        "autoresearch.compression_method=nmf",
+        "autoresearch.n_components=5"
+      ]
+    },
+    {
+      "run_id": "dry_e2aef531ddd3",
+      "quality": 0.8564199999999998,
+      "cost": 0.1522,
+      "causal_resolution": 0.7465105366666667,
+      "config_overrides": [
+        "autoresearch.compression_method=nmf",
+        "autoresearch.n_components=2"
+      ]
+    },
+    {
+      "run_id": "dry_ddde2f812ae0",
+      "quality": 0.8589600000000001,
+      "cost": 0.1542,
+      "causal_resolution": 0.7301245333333335,
+      "config_overrides": [
+        "autoresearch.compression_method=pca",
+        "autoresearch.n_components=9"
+      ]
+    },
+    {
+      "run_id": "dry_e61f0290b751",
+      "quality": 0.87423,
+      "cost": 0.1585,
+      "causal_resolution": 0.7625063133333333,
+      "config_overrides": [
+        "autoresearch.compression_method=nmf",
+        "autoresearch.n_components=6"
+      ]
+    },
+    {
+      "run_id": "dry_f085ecc74357",
+      "quality": 0.8874099999999999,
+      "cost": 0.1687,
+      "causal_resolution": 0.7727395999999999,
+      "config_overrides": [
+        "autoresearch.compression_method=nmf",
+        "autoresearch.n_components=10"
+      ]
+    }
+  ]
+}
