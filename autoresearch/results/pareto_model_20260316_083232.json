@@ -1,0 +1,29 @@
+{
+  "frontier_size": 2,
+  "points": [
+    {
+      "run_id": "dry_151884eaa63e",
+      "quality": 0.65035,
+      "cost": 0.01,
+      "causal_resolution": 0.37390028,
+      "config_overrides": [
+        "llm_service.defaults.model=meta-llama/llama-3.1-8b-instruct",
+        "llm_service.defaults.temperature=0.6055",
+        "llm_service.defaults.top_p=0.9759",
+        "llm_service.defaults.max_tokens=2431"
+      ]
+    },
+    {
+      "run_id": "dry_f2f6150c1cc8",
+      "quality": 0.90757,
+      "cost": 0.0184,
+      "causal_resolution": 0.807297,
+      "config_overrides": [
+        "llm_service.defaults.model=meta-llama/llama-3.1-8b-instruct",
+        "llm_service.defaults.temperature=1.0421",
+        "llm_service.defaults.top_p=0.8192",
+        "llm_service.defaults.max_tokens=2479"
+      ]
+    }
+  ]
+}

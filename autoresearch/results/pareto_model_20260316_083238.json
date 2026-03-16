@@ -1,0 +1,77 @@
+{
+  "frontier_size": 6,
+  "points": [
+    {
+      "run_id": "dry_dc5d00edd26a",
+      "quality": 0.8670200000000001,
+      "cost": 0.01,
+      "causal_resolution": 0.7365631000000001,
+      "config_overrides": [
+        "llm_service.defaults.model=mistralai/mistral-large-latest",
+        "llm_service.defaults.temperature=0.4795",
+        "llm_service.defaults.top_p=0.7576",
+        "llm_service.defaults.max_tokens=1015"
+      ]
+    },
+    {
+      "run_id": "dry_f4c4e2dd6151",
+      "quality": 0.87783,
+      "cost": 0.01,
+      "causal_resolution": 0.7679170866666667,
+      "config_overrides": [
+        "llm_service.defaults.model=meta-llama/llama-3.1-8b-instruct",
+        "llm_service.defaults.temperature=0.7795",
+        "llm_service.defaults.top_p=0.8994",
+        "llm_service.defaults.max_tokens=1093"
+      ]
+    },
+    {
+      "run_id": "dry_fa5e91c41797",
+      "quality": 0.89564,
+      "cost": 0.0354,
+      "causal_resolution": 0.8050800000000001,
+      "config_overrides": [
+        "llm_service.defaults.model=meta-llama/llama-3.1-8b-instruct",
+        "llm_service.defaults.temperature=0.7795",
+        "llm_service.defaults.top_p=0.8994",
+        "llm_service.defaults.max_tokens=1093"
+      ]
+    },
+    {
+      "run_id": "dry_f446c7fe72e6",
+      "quality": 0.8970100000000001,
+      "cost": 0.2229,
+      "causal_resolution": 0.7954212666666667,
+      "config_overrides": [
+        "llm_service.defaults.model=meta-llama/llama-3.1-70b-instruct",
+        "llm_service.defaults.temperature=0.4300",
+        "llm_service.defaults.top_p=0.8504",
+        "llm_service.defaults.max_tokens=3874"
+      ]
+    },
+    {
+      "run_id": "dry_f7021564add5",
+      "quality": 0.9030400000000001,
+      "cost": 0.2427,
+      "causal_resolution": 0.81360391,
+      "config_overrides": [
+        "llm_service.defaults.model=deepseek/deepseek-chat",
+        "llm_service.defaults.temperature=0.5834",
+        "llm_service.defaults.top_p=0.6159",
+        "llm_service.defaults.max_tokens=6311"
+      ]
+    },
+    {
+      "run_id": "dry_fcb839175d0d",
+      "quality": 0.9062,
+      "cost": 0.2508,
+      "causal_resolution": 0.8163537066666667,
+      "config_overrides": [
+        "llm_service.defaults.model=deepseek/deepseek-chat",
+        "llm_service.defaults.temperature=0.5834",
+        "llm_service.defaults.top_p=0.6159",
+        "llm_service.defaults.max_tokens=6311"
+      ]
+    }
+  ]
+}
