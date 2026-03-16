@@ -23,6 +23,11 @@ llm_service:
   modes:
     mode: "production"  # production, dry_run, validation - automatically synced with llm.dry_run
 
+  # Free distillable mode - use $0 models with distillation rights
+  free_distillable:
+    enabled: false
+    default_model: "openrouter/hunter-alpha"
+
   # Default LLM parameters
   defaults:
     model: "meta-llama/llama-3.1-70b-instruct"

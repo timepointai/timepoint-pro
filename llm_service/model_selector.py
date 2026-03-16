@@ -466,6 +466,72 @@ MODEL_REGISTRY: dict[str, ModelProfile] = {
     # groq/llama-3.1-8b-instant and groq/mixtral-8x7b-32768 were also
     # previously removed.
     # =========================================================================
+    # =========================================================================
+    # FREE DISTILLABLE MODELS (OpenRouter) - $0 cost, distillation rights
+    # =========================================================================
+    "openrouter/hunter-alpha": ModelProfile(
+        model_id="openrouter/hunter-alpha",
+        display_name="Hunter Alpha (Free Distillable)",
+        provider="openrouter",
+        license="distillable",
+        capabilities={
+            ModelCapability.STRUCTURED_JSON,
+            ModelCapability.DIALOG_GENERATION,
+            ModelCapability.LOGICAL_REASONING,
+            ModelCapability.INSTRUCTION_FOLLOWING,
+            ModelCapability.VERY_LARGE_CONTEXT,
+            ModelCapability.HIGH_QUALITY,
+        },
+        context_tokens=1048576,
+        max_output_tokens=32000,
+        relative_speed=1.0,
+        relative_cost=0.0,
+        relative_quality=0.9,
+        training_data_unrestricted=True,
+        notes="Free distillable model, 1M context, text+image input",
+    ),
+    "openrouter/healer-alpha": ModelProfile(
+        model_id="openrouter/healer-alpha",
+        display_name="Healer Alpha (Free Distillable)",
+        provider="openrouter",
+        license="distillable",
+        capabilities={
+            ModelCapability.STRUCTURED_JSON,
+            ModelCapability.DIALOG_GENERATION,
+            ModelCapability.LOGICAL_REASONING,
+            ModelCapability.INSTRUCTION_FOLLOWING,
+            ModelCapability.LARGE_CONTEXT,
+        },
+        context_tokens=262144,
+        max_output_tokens=32000,
+        relative_speed=1.0,
+        relative_cost=0.0,
+        relative_quality=0.85,
+        training_data_unrestricted=True,
+        notes="Free distillable model, 262K context, multimodal input",
+    ),
+    "nvidia/nemotron-3-super-120b-a12b:free": ModelProfile(
+        model_id="nvidia/nemotron-3-super-120b-a12b:free",
+        display_name="Nemotron 3 Super 120B (Free Distillable)",
+        provider="nvidia",
+        license="nvidia-open",
+        capabilities={
+            ModelCapability.STRUCTURED_JSON,
+            ModelCapability.LOGICAL_REASONING,
+            ModelCapability.CAUSAL_REASONING,
+            ModelCapability.TEMPORAL_REASONING,
+            ModelCapability.INSTRUCTION_FOLLOWING,
+            ModelCapability.LARGE_CONTEXT,
+            ModelCapability.HIGH_QUALITY,
+        },
+        context_tokens=262144,
+        max_output_tokens=262144,
+        relative_speed=0.8,
+        relative_cost=0.0,
+        relative_quality=0.95,
+        training_data_unrestricted=True,
+        notes="Free distillable NVIDIA 120B MoE (12B active), strong reasoning",
+    ),
 }
 
 
@@ -852,12 +918,12 @@ class ModelSelector:
             elif prefer_speed:
                 score += profile.relative_speed * 0.5
             elif prefer_cost:
-                score += (1.0 / profile.relative_cost) * 0.5
+                score += (1.0 / max(profile.relative_cost, 0.01)) * 0.5
             else:
                 # Balanced scoring
                 score += profile.relative_quality * 0.2
                 score += profile.relative_speed * 0.15
-                score += (1.0 / profile.relative_cost) * 0.15
+                score += (1.0 / max(profile.relative_cost, 0.01)) * 0.15
 
             # Context window bonus (prefer more context headroom)
             if profile.context_tokens > min_context * 2:
@@ -949,6 +1015,23 @@ class ModelSelector:
             and profile.allows_commercial
             and profile.allows_synthetic_data
         ]
+
+    def select_free_distillable(self, action: ActionType, **kwargs) -> str:
+        """Select the best free distillable model for an action.
+
+        Returns only models with relative_cost=0.0 and training_data_unrestricted=True.
+        """
+        free_models = {
+            mid: profile
+            for mid, profile in MODEL_REGISTRY.items()
+            if profile.relative_cost == 0.0 and profile.training_data_unrestricted
+        }
+        if not free_models:
+            raise ValueError("No free distillable models available")
+
+        # Score against action requirements same as select_model but from free pool only
+        best = max(free_models.values(), key=lambda p: p.relative_quality)
+        return best.model_id
 
     def get_model_profile(self, model_id: str) -> ModelProfile | None:
         """Get profile for a specific model."""
