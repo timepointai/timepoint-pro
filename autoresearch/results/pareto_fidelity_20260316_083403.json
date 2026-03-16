@@ -1,0 +1,35 @@
+{
+  "frontier_size": 3,
+  "points": [
+    {
+      "run_id": "dry_9fb185ee2d04",
+      "quality": 0.81114,
+      "cost": 0.1082,
+      "causal_resolution": 0.61040796,
+      "config_overrides": [
+        "autoresearch.compression_method=svd",
+        "autoresearch.n_components=5"
+      ]
+    },
+    {
+      "run_id": "dry_a318e5a5ae8a",
+      "quality": 0.8122400000000001,
+      "cost": 0.11,
+      "causal_resolution": 0.63304621,
+      "config_overrides": [
+        "autoresearch.compression_method=pca",
+        "autoresearch.n_components=5"
+      ]
+    },
+    {
+      "run_id": "dry_f52c6a0cc910",
+      "quality": 0.8861999999999999,
+      "cost": 0.1266,
+      "causal_resolution": 0.7754763599999999,
+      "config_overrides": [
+        "autoresearch.compression_method=nmf",
+        "autoresearch.n_components=2"
+      ]
+    }
+  ]
+}

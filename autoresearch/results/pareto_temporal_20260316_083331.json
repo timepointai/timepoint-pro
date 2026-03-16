@@ -1,0 +1,95 @@
+{
+  "frontier_size": 6,
+  "points": [
+    {
+      "run_id": "dry_149e73994f9b",
+      "quality": 0.65295,
+      "cost": 0.1021,
+      "causal_resolution": 0.3713253,
+      "config_overrides": [
+        "temporal_mode.active_mode=directorial",
+        "temporal_mode.directorial.dramatic_tension=0.3886",
+        "temporal_mode.directorial.foreshadowing_probability=0.3378",
+        "temporal_mode.directorial.coincidence_boost_factor=1.1146",
+        "temporal_mode.cyclical.cycle_length=17",
+        "temporal_mode.cyclical.prophecy_accuracy=0.6872",
+        "temporal_mode.cyclical.destiny_weight=0.5355"
+      ]
+    },
+    {
+      "run_id": "dry_a6f328ac3e82",
+      "quality": 0.80246,
+      "cost": 0.1051,
+      "causal_resolution": 0.61737554,
+      "config_overrides": [
+        "temporal_mode.active_mode=portal",
+        "temporal_mode.directorial.dramatic_tension=0.5951",
+        "temporal_mode.directorial.foreshadowing_probability=0.1915",
+        "temporal_mode.directorial.coincidence_boost_factor=1.9380",
+        "temporal_mode.cyclical.cycle_length=13",
+        "temporal_mode.cyclical.prophecy_accuracy=0.6339",
+        "temporal_mode.cyclical.destiny_weight=0.7312"
+      ]
+    },
+    {
+      "run_id": "dry_adbb9f915626",
+      "quality": 0.81267,
+      "cost": 0.1288,
+      "causal_resolution": 0.6139904333333333,
+      "config_overrides": [
+        "temporal_mode.active_mode=forward",
+        "temporal_mode.directorial.dramatic_tension=0.1937",
+        "temporal_mode.directorial.foreshadowing_probability=0.5545",
+        "temporal_mode.directorial.coincidence_boost_factor=2.1331",
+        "temporal_mode.cyclical.cycle_length=5",
+        "temporal_mode.cyclical.prophecy_accuracy=0.6969",
+        "temporal_mode.cyclical.destiny_weight=0.1076"
+      ]
+    },
+    {
+      "run_id": "dry_e9fd0250ac93",
+      "quality": 0.87264,
+      "cost": 0.1319,
+      "causal_resolution": 0.74215023,
+      "config_overrides": [
+        "temporal_mode.active_mode=cyclical",
+        "temporal_mode.directorial.dramatic_tension=0.5369",
+        "temporal_mode.directorial.foreshadowing_probability=0.0239",
+        "temporal_mode.directorial.coincidence_boost_factor=1.4803",
+        "temporal_mode.cyclical.cycle_length=6",
+        "temporal_mode.cyclical.prophecy_accuracy=0.7111",
+        "temporal_mode.cyclical.destiny_weight=0.3268"
+      ]
+    },
+    {
+      "run_id": "dry_d6290b67f726",
+      "quality": 0.87476,
+      "cost": 0.1675,
+      "causal_resolution": 0.7666169166666666,
+      "config_overrides": [
+        "temporal_mode.active_mode=cyclical",
+        "temporal_mode.directorial.dramatic_tension=0.1230",
+        "temporal_mode.directorial.foreshadowing_probability=0.7428",
+        "temporal_mode.directorial.coincidence_boost_factor=2.9133",
+        "temporal_mode.cyclical.cycle_length=15",
+        "temporal_mode.cyclical.prophecy_accuracy=0.8816",
+        "temporal_mode.cyclical.destiny_weight=0.1964"
+      ]
+    },
+    {
+      "run_id": "dry_ef4025fad19a",
+      "quality": 0.89051,
+      "cost": 0.1741,
+      "causal_resolution": 0.79298496,
+      "config_overrides": [
+        "temporal_mode.active_mode=branching",
+        "temporal_mode.directorial.dramatic_tension=0.3647",
+        "temporal_mode.directorial.foreshadowing_probability=0.5541",
+        "temporal_mode.directorial.coincidence_boost_factor=1.8502",
+        "temporal_mode.cyclical.cycle_length=19",
+        "temporal_mode.cyclical.prophecy_accuracy=0.9119",
+        "temporal_mode.cyclical.destiny_weight=0.1420"
+      ]
+    }
+  ]
+}
