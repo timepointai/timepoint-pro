@@ -29,6 +29,12 @@ class TensorCompressor:
     @classmethod
     @track_mechanism("M6", "ttm_tensor_compression")
     def compress(cls, tensor: np.ndarray, method: str, **kwargs) -> np.ndarray:
+        # Check for PyTorch backend override
+        from tensor_backend import get_backend
+        if get_backend() == "torch":
+            from tensors_torch import compress_torch
+            return compress_torch(tensor, method, **kwargs)
+
         if method not in cls._compressors:
             raise ValueError(f"Unknown compression method: {method}")
         return cls._compressors[method](tensor, **kwargs)
