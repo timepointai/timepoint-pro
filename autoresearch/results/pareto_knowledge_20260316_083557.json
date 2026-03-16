@@ -1,0 +1,44 @@
+{
+  "frontier_size": 3,
+  "points": [
+    {
+      "run_id": "dry_4030c5529e6d",
+      "quality": 0.68827,
+      "cost": 0.1149,
+      "causal_resolution": 0.42578417999999996,
+      "config_overrides": [
+        "prospection.forecast_horizon_days=26",
+        "prospection.anxiety_thresholds.low=0.2670",
+        "prospection.anxiety_thresholds.high=0.7517",
+        "prospection.expectation_generation.max_expectations=2",
+        "prospection.behavioral_influence.anxiety_conservatism_multiplier=0.6150"
+      ]
+    },
+    {
+      "run_id": "dry_d3a08137c9f1",
+      "quality": 0.8323400000000001,
+      "cost": 0.1203,
+      "causal_resolution": 0.6871157333333333,
+      "config_overrides": [
+        "prospection.forecast_horizon_days=7",
+        "prospection.anxiety_thresholds.low=0.4598",
+        "prospection.anxiety_thresholds.high=0.7261",
+        "prospection.expectation_generation.max_expectations=10",
+        "prospection.behavioral_influence.anxiety_conservatism_multiplier=0.6768"
+      ]
+    },
+    {
+      "run_id": "dry_fe06758500de",
+      "quality": 0.8927,
+      "cost": 0.1352,
+      "causal_resolution": 0.7851234300000001,
+      "config_overrides": [
+        "prospection.forecast_horizon_days=7",
+        "prospection.anxiety_thresholds.low=0.3199",
+        "prospection.anxiety_thresholds.high=0.9328",
+        "prospection.expectation_generation.max_expectations=8",
+        "prospection.behavioral_influence.anxiety_conservatism_multiplier=0.9273"
+      ]
+    }
+  ]
+}
