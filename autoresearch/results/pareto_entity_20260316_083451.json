@@ -1,0 +1,110 @@
+{
+  "frontier_size": 7,
+  "points": [
+    {
+      "run_id": "dry_3adadb76da44",
+      "quality": 0.6743999999999999,
+      "cost": 0.1057,
+      "causal_resolution": 0.40982186666666665,
+      "config_overrides": [
+        "animism.level=0",
+        "animism.entity_generation.animal_probability=0.4956",
+        "animism.entity_generation.building_probability=0.0449",
+        "animism.entity_generation.abstract_probability=0.1624",
+        "circadian.energy_multipliers.night_penalty=2.4221",
+        "circadian.energy_multipliers.fatigue_accumulation=0.2989",
+        "circadian.energy_multipliers.base_fatigue_threshold=19"
+      ]
+    },
+    {
+      "run_id": "dry_5dba3ff8e053",
+      "quality": 0.72157,
+      "cost": 0.1118,
+      "causal_resolution": 0.48549306000000003,
+      "config_overrides": [
+        "animism.level=6",
+        "animism.entity_generation.animal_probability=0.2577",
+        "animism.entity_generation.building_probability=0.0627",
+        "animism.entity_generation.abstract_probability=0.1909",
+        "circadian.energy_multipliers.night_penalty=2.1717",
+        "circadian.energy_multipliers.fatigue_accumulation=0.9693",
+        "circadian.energy_multipliers.base_fatigue_threshold=18"
+      ]
+    },
+    {
+      "run_id": "dry_ae0866375676",
+      "quality": 0.7873600000000001,
+      "cost": 0.1134,
+      "causal_resolution": 0.6291144000000001,
+      "config_overrides": [
+        "animism.level=3",
+        "animism.entity_generation.animal_probability=0.4564",
+        "animism.entity_generation.building_probability=0.3464",
+        "animism.entity_generation.abstract_probability=0.1112",
+        "circadian.energy_multipliers.night_penalty=1.0206",
+        "circadian.energy_multipliers.fatigue_accumulation=0.7842",
+        "circadian.energy_multipliers.base_fatigue_threshold=17"
+      ]
+    },
+    {
+      "run_id": "dry_c105b51d3ad5",
+      "quality": 0.79529,
+      "cost": 0.128,
+      "causal_resolution": 0.6212704800000001,
+      "config_overrides": [
+        "animism.level=2",
+        "animism.entity_generation.animal_probability=0.1720",
+        "animism.entity_generation.building_probability=0.2197",
+        "animism.entity_generation.abstract_probability=0.1914",
+        "circadian.energy_multipliers.night_penalty=2.8610",
+        "circadian.energy_multipliers.fatigue_accumulation=0.4515",
+        "circadian.energy_multipliers.base_fatigue_threshold=19"
+      ]
+    },
+    {
+      "run_id": "dry_a23f921632e5",
+      "quality": 0.79921,
+      "cost": 0.1466,
+      "causal_resolution": 0.6131684666666666,
+      "config_overrides": [
+        "animism.level=3",
+        "animism.entity_generation.animal_probability=0.1862",
+        "animism.entity_generation.building_probability=0.1992",
+        "animism.entity_generation.abstract_probability=0.0980",
+        "circadian.energy_multipliers.night_penalty=2.6685",
+        "circadian.energy_multipliers.fatigue_accumulation=0.7640",
+        "circadian.energy_multipliers.base_fatigue_threshold=19"
+      ]
+    },
+    {
+      "run_id": "dry_a5404a1169cd",
+      "quality": 0.80258,
+      "cost": 0.1469,
+      "causal_resolution": 0.5903788666666666,
+      "config_overrides": [
+        "animism.level=4",
+        "animism.entity_generation.animal_probability=0.0896",
+        "animism.entity_generation.building_probability=0.2803",
+        "animism.entity_generation.abstract_probability=0.0470",
+        "circadian.energy_multipliers.night_penalty=2.3466",
+        "circadian.energy_multipliers.fatigue_accumulation=0.3740",
+        "circadian.energy_multipliers.base_fatigue_threshold=12"
+      ]
+    },
+    {
+      "run_id": "dry_f4200bf5a19b",
+      "quality": 0.8871999999999999,
+      "cost": 0.1473,
+      "causal_resolution": 0.7955399999999999,
+      "config_overrides": [
+        "animism.level=3",
+        "animism.entity_generation.animal_probability=0.2014",
+        "animism.entity_generation.building_probability=0.0094",
+        "animism.entity_generation.abstract_probability=0.1682",
+        "circadian.energy_multipliers.night_penalty=2.1909",
+        "circadian.energy_multipliers.fatigue_accumulation=0.5574",
+        "circadian.energy_multipliers.base_fatigue_threshold=19"
+      ]
+    }
+  ]
+}
