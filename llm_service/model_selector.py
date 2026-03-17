@@ -211,32 +211,7 @@ MODEL_REGISTRY: dict[str, ModelProfile] = {
         training_data_unrestricted=False,  # Llama license restricts training non-Llama models
         notes="Excellent general-purpose model, good balance",
     ),
-    "meta-llama/llama-3.1-405b-instruct": ModelProfile(
-        model_id="meta-llama/llama-3.1-405b-instruct",
-        display_name="Llama 3.1 405B",
-        provider="meta",
-        license="llama3.1",
-        capabilities={
-            ModelCapability.STRUCTURED_JSON,
-            ModelCapability.DIALOG_GENERATION,
-            ModelCapability.LOGICAL_REASONING,
-            ModelCapability.MATHEMATICAL,
-            ModelCapability.CAUSAL_REASONING,
-            ModelCapability.TEMPORAL_REASONING,
-            ModelCapability.INSTRUCTION_FOLLOWING,
-            ModelCapability.LARGE_CONTEXT,
-            ModelCapability.VERY_LARGE_CONTEXT,
-            ModelCapability.HIGH_QUALITY,
-            ModelCapability.LONG_FORM_TEXT,
-        },
-        context_tokens=128000,
-        max_output_tokens=16384,  # Llama 3.1 405B: OpenRouter supports up to 16k output
-        relative_speed=0.5,
-        relative_cost=3.0,
-        relative_quality=1.3,
-        training_data_unrestricted=False,  # Llama license restricts training non-Llama models
-        notes="Highest quality Llama, use for complex reasoning",
-    ),
+    # NOTE: meta-llama/llama-3.1-405b-instruct removed — discontinued on OpenRouter (404)
     # Llama 4 Scout (newer)
     "meta-llama/llama-4-scout": ModelProfile(
         model_id="meta-llama/llama-4-scout",
