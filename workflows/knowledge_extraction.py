@@ -402,6 +402,7 @@ def extract_knowledge_from_dialog(
         "groq/llama-3.1-70b-versatile",
         "groq/llama-3.1-8b-instant",
         "groq/mixtral-8x7b-32768",
+        "meta-llama/llama-3.1-405b-instruct",  # Removed from OpenRouter
     }
 
     # Get fallback chain for robust model selection
