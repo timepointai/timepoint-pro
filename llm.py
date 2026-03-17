@@ -681,7 +681,7 @@ class LLMClient:
 
         # Set model for ultra-complex tasks (405B for paid, same as default for free)
         if mode == "paid":
-            self.ultra_complex_model = "meta-llama/llama-3.1-405b-instruct"  # For >50k token tasks
+            self.ultra_complex_model = "meta-llama/llama-4-scout"  # For >50k token tasks
             self.complex_model = "meta-llama/llama-4-scout"  # Standard complex tasks
         else:
             self.ultra_complex_model = self.default_model

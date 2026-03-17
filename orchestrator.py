@@ -274,7 +274,7 @@ Schema:
                 )
             elif estimated_tokens > 50000:
                 # No override + ultra-large scenario - use Llama 405B with extended token limit
-                model = "meta-llama/llama-3.1-405b-instruct"
+                model = "meta-llama/llama-4-scout"
                 max_output_tokens = min(
                     int(estimated_tokens * 1.5), 100000
                 )  # 1.5x safety margin, cap at 100k
@@ -582,7 +582,7 @@ Return EXACTLY {remaining_count} entities. This is critical."""
                     retry_count += 1
                     if retry_count <= max_retries:
                         # Escalate to 405B on retry
-                        model = "meta-llama/llama-3.1-405b-instruct"
+                        model = "meta-llama/llama-4-scout"
                         max_tokens = min((remaining_count * 120) + 2000, 100000)
                         continue
 
@@ -608,7 +608,7 @@ Return EXACTLY {remaining_count} entities. This is critical."""
 
                 print(f"   ⚠️  Attempt {retry_count} failed: {e}")
                 print("   🚀 Escalating to Llama 405B...")
-                model = "meta-llama/llama-3.1-405b-instruct"
+                model = "meta-llama/llama-4-scout"
                 max_tokens = min((remaining_count * 120) + 2000, 100000)
                 time.sleep(2**retry_count)  # Exponential backoff
 
@@ -687,7 +687,7 @@ Return EXACTLY {count} timepoints. This is critical."""
                     )
                     retry_count += 1
                     if retry_count <= max_retries:
-                        model = "meta-llama/llama-3.1-405b-instruct"
+                        model = "meta-llama/llama-4-scout"
                         max_tokens = min((count * 100) + 2000, 100000)
                         continue
 
@@ -702,7 +702,7 @@ Return EXACTLY {count} timepoints. This is critical."""
 
                 print(f"   ⚠️  Attempt {retry_count} failed: {e}")
                 print("   🚀 Escalating to Llama 405B...")
-                model = "meta-llama/llama-3.1-405b-instruct"
+                model = "meta-llama/llama-4-scout"
                 max_tokens = min((count * 100) + 2000, 100000)
                 time.sleep(2**retry_count)
 

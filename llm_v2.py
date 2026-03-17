@@ -215,7 +215,7 @@ Return ONLY valid JSON with ALL fields populated, no other text."""
         max_retries = 3
         models_to_try = [
             model or self.default_model,
-            "meta-llama/llama-3.1-405b-instruct",  # Fallback to larger model
+            "meta-llama/llama-4-scout",  # Fallback to larger model
             "qwen/qwen-2.5-72b-instruct",  # Final fallback to different open-source provider
         ]
 
