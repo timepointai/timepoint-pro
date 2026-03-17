@@ -520,7 +520,7 @@ class TemporalConfig(BaseModel):
         description="Generate dialog in mini-simulations for realism assessment"
     )
     judge_model: Optional[str] = Field(
-        default="meta-llama/llama-3.1-405b-instruct",
+        default="meta-llama/llama-4-scout",
         description="LLM model to use for judging simulation realism"
     )
     judge_temperature: float = Field(

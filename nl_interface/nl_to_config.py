@@ -37,7 +37,7 @@ class NLConfigGenerator:
     def __init__(
         self,
         api_key: str | None = None,
-        model: str = "meta-llama/llama-3.1-405b-instruct",
+        model: str = "meta-llama/llama-4-scout",
         fallback_model: str = "meta-llama/llama-3.1-70b-instruct",
         temperature: float = 0.7,
         max_retries: int = 3,
