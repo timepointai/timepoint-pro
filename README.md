@@ -180,21 +180,23 @@ A small sample JSONL file is included at [`examples/sample_training_data.jsonl`]
 
 ## Timepoint Suite
 
-Open-source engines for temporal AI. Render the past. Simulate the future. Score the predictions. Accumulate the graph.
+Render the past. Simulate the future. Score the predictions. Accumulate the graph.
 
-| Service | URL | Repo | Role |
-|---------|-----|------|------|
-| **Flash** | [flash.timepointai.com](https://flash.timepointai.com) | [timepoint-flash](https://github.com/timepointai/timepoint-flash) | Reality Writer — renders grounded historical moments (Synthetic Time Travel) |
-| **Pro** | [pro.timepointai.com](https://pro.timepointai.com) | [**timepoint-pro**](https://github.com/timepointai/timepoint-pro) | **Rendering Engine — SNAG-powered simulation, TDF output, training data** |
-| **Clockchain** | [clockchain.timepointai.com](https://clockchain.timepointai.com) | [timepoint-clockchain](https://github.com/timepointai/timepoint-clockchain) | Temporal Causal Graph — Rendered Past + Rendered Future, growing 24/7 |
-| **SNAG Bench** | — | [timepoint-snag-bench](https://github.com/timepointai/timepoint-snag-bench) | Quality Certifier — measures Causal Resolution across renderings |
-| **Proteus** | [proteus.timepointai.com](https://proteus.timepointai.com) | [proteus](https://github.com/timepointai/proteus) | Settlement Layer — prediction markets that validate Rendered Futures |
-| **TDF** | — | [timepoint-tdf](https://github.com/timepointai/timepoint-tdf) | Data Format — JSON-LD interchange across all services |
-| **API Gateway** | [api.timepointai.com](https://api.timepointai.com) | — | Unified API gateway routing to all backend services |
-| **Web App** | [app.timepointai.com](https://app.timepointai.com) | — | Browser client for Synthetic Time Travel |
-| **Landing** | [timepointai.com](https://timepointai.com) | — | Marketing site |
-
-**The Timepoint Thesis** — a forthcoming paper formalizing the Rendered Past / Rendered Future framework, the mathematics of Causal Resolution, the TDF specification, and the Proof of Causal Convergence protocol. Follow [@seanmcdonaldxyz](https://x.com/seanmcdonaldxyz) for updates.
+| Service | Type | Repo | Role |
+|---------|------|------|------|
+| **Flash** | Open Source | timepoint-flash | Reality Writer — renders grounded historical moments |
+| **Clockchain** | Open Source | timepoint-clockchain | Temporal Causal Graph — Rendered Past + Rendered Future, growing 24/7 |
+| **Pro** | **Open Source** | **timepoint-pro** | **SNAG Simulation Engine — temporal simulation, TDF output, training data** |
+| **Proteus** | Open Source | proteus | Settlement Layer — prediction markets for Rendered Futures |
+| **TDF** | Open Source | timepoint-tdf | Data Format — JSON-LD interchange across all services |
+| **SNAG Bench** | Open Source | timepoint-snag-bench | Quality Certifier — measures Causal Resolution across renderings |
+| **Billing** | Private | timepoint-billing | Payment Processing — Apple IAP + Stripe |
+| **MCP** | Private | timepoint-mcp | MCP Server — AI agent access to Flash and Clockchain |
+| **Web App** | Private | timepoint-web-app | Browser client at app.timepointai.com |
+| **Landing** | Private | timepoint-landing | Marketing site at timepointai.com |
+| **iPhone App** | Private | timepoint-iphone-app | iOS client — Synthetic Time Travel on mobile |
+| **API Gateway** | Private | timepoint-api-gateway | Reverse proxy at api.timepointai.com |
+| **Skip Meetings** | Private | skipmeetingsai | Meeting intelligence SaaS powered by Flash |
 
 ## Author
 
