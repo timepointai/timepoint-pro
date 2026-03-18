@@ -1,0 +1,294 @@
+{
+  "scenario_description": "Simulate a realistic grant review panel deliberation for a competitive funding opportunity. Five panel members with distinct institutional roles, biases, and knowledge asymmetries evaluate a grant application across three phases: initial scoring review, deliberation with coalition formation, and final consensus voting.\n\nThe panel includes a Program Director who balances institutional priorities and budget constraints, a Senior Researcher who applies rigorous scientific standards and carries skepticism from past rejection patterns, a Young Investigator who champions innovation and emerging research topics, a Compliance Officer focused on regulatory adherence and risk mitigation, and an External Reviewer bringing fresh perspective and peer assessment norms.\n\nThe simulation tracks how information asymmetries (budget constraints known only to Program Director, rejection history known only to Senior Researcher) create power dynamics that shape the final recommendation. Alliance and opposition dynamics evolve through deliberation as reviewers form coalitions around competing evaluation criteria.\n\nThe template uses BRANCHING temporal mode to explore counterfactual outcomes: what happens with a diverse panel (varied biases) vs. an excellence-only panel (all scientific_rigor bias). This enables analysis of how panel composition affects funding decisions, surfacing institutional biases in peer review.\n\nInput parameters (caller provides via metadata overrides):\n- organization_profile: { name, mission, entity_type, history }\n- grant_opportunity: { funder, program, amount, deadline, focus_areas }\n- application_summary: { narrative, budget_justification, key_claims }\n\nOutputs include per-reviewer scores and rationale, panel consensus recommendation, key decision-driving arguments, information asymmetry report, and counterfactual branch outcomes comparing panel compositions.",
+  "world_id": "grant_review_panel",
+  "patch": {
+    "name": "Peer Review Crossfire",
+    "category": "corporate",
+    "tags": [
+      "grant",
+      "peer_review",
+      "panel",
+      "deliberation",
+      "branching",
+      "decision",
+      "knowledge_asymmetry",
+      "coalition",
+      "funding"
+    ],
+    "author": "timepoint-pro",
+    "version": "1.0",
+    "description": "Grant review panel simulation with branching panel composition counterfactuals"
+  },
+  "entities": {
+    "count": 5,
+    "types": [
+      "human"
+    ],
+    "initial_resolution": "dialog",
+    "animism_level": 0,
+    "envelope": {
+      "attack": 0.15,
+      "decay": 0.1,
+      "sustain": 0.85,
+      "release": 0.2
+    },
+    "adprs_envelopes": [
+      {
+        "A": 0.6,
+        "D": 3600000,
+        "P": 1.5,
+        "R": 0,
+        "S": 0.85,
+        "t0": "2026-01-01T09:00:00+00:00",
+        "baseline": 0.15
+      }
+    ]
+  },
+  "timepoints": {
+    "count": 3,
+    "start_time": null,
+    "resolution": "minute",
+    "before_count": 0,
+    "after_count": 0
+  },
+  "temporal": {
+    "mode": "branching",
+    "narrative_arc": null,
+    "dramatic_tension": 0.6,
+    "cycle_length": null,
+    "prophecy_accuracy": 0.5,
+    "enable_counterfactuals": true,
+    "portal_description": null,
+    "portal_year": null,
+    "origin_year": null,
+    "backward_steps": 15,
+    "exploration_mode": "adaptive",
+    "oscillation_complexity_threshold": 10,
+    "candidate_antecedents_per_step": 3,
+    "path_count": 5,
+    "coherence_threshold": 0.7,
+    "checkpoint_interval": 3,
+    "llm_scoring_weight": 0.3,
+    "historical_precedent_weight": 0.2,
+    "causal_necessity_weight": 0.3,
+    "entity_capability_weight": 0.2,
+    "max_backtrack_depth": 3,
+    "portal_relaxation_enabled": true,
+    "use_simulation_judging": false,
+    "simulation_forward_steps": 2,
+    "simulation_max_entities": 5,
+    "simulation_include_dialog": true,
+    "judge_model": "meta-llama/llama-4-scout",
+    "judge_temperature": 0.3,
+    "simulation_cache_results": true,
+    "fidelity_planning_mode": "hybrid",
+    "token_budget_mode": "soft",
+    "token_budget": 100000.0,
+    "fidelity_template": "balanced",
+    "custom_fidelity_schedule": null,
+    "custom_temporal_steps": null
+  },
+  "outputs": {
+    "formats": [
+      "json",
+      "markdown"
+    ],
+    "include_dialogs": true,
+    "include_relationships": true,
+    "include_knowledge_flow": true,
+    "export_ml_dataset": false,
+    "generate_narrative_exports": true,
+    "narrative_export_formats": [
+      "markdown",
+      "json",
+      "pdf"
+    ],
+    "narrative_detail_level": "comprehensive",
+    "enhance_narrative_with_llm": true
+  },
+  "variations": {
+    "enabled": false,
+    "count": 1,
+    "strategies": [
+      "vary_personalities"
+    ],
+    "deduplication_threshold": 0.9
+  },
+  "metadata": {
+    "simulation_type": "grant_review_panel",
+    "panel_members": [
+      {
+        "role": "Program Director",
+        "bias": "institutional_balance",
+        "private_knowledge": ["budget_constraints", "organizational_politics", "funding_priorities"],
+        "evaluation_weight": 1.2,
+        "description": "Senior administrator balancing institutional priorities, budget realities, and strategic alignment. Knows the real budget picture and political considerations that other reviewers don't see."
+      },
+      {
+        "role": "Senior Researcher",
+        "bias": "scientific_rigor",
+        "private_knowledge": ["rejection_history", "field_benchmarks", "methodological_standards"],
+        "evaluation_weight": 1.0,
+        "disposition": "skeptical",
+        "description": "Established scientist with deep domain expertise. Applies rigorous methodological standards and carries institutional memory of past failed grants in similar areas."
+      },
+      {
+        "role": "Young Investigator",
+        "bias": "innovation",
+        "private_knowledge": ["emerging_topics", "recent_literature", "new_methodologies"],
+        "evaluation_weight": 0.8,
+        "disposition": "advocate",
+        "description": "Early-career researcher who champions novel approaches and emerging research directions. Brings awareness of cutting-edge methods but less institutional experience."
+      },
+      {
+        "role": "Compliance Officer",
+        "bias": "compliance",
+        "private_knowledge": ["regulatory_requirements", "institutional_risk_factors", "audit_history"],
+        "evaluation_weight": 0.9,
+        "disposition": "cautious",
+        "description": "Regulatory specialist focused on IRB compliance, data management plans, budget justification rules, and institutional risk exposure."
+      },
+      {
+        "role": "External Reviewer",
+        "bias": "peer_assessment",
+        "private_knowledge": ["external_benchmarks", "cross_institutional_norms", "field_reputation"],
+        "evaluation_weight": 1.0,
+        "disposition": "neutral",
+        "description": "Outside expert bringing fresh perspective and awareness of how other institutions handle similar proposals. Less entangled in internal politics."
+      }
+    ],
+    "phases": [
+      {
+        "id": "initial_review",
+        "name": "Initial Review",
+        "duration_minutes": 20,
+        "description": "Panel members present individual scores and first impressions. Scoring criteria discussed. Each reviewer shares their preliminary rating with brief rationale.",
+        "activities": [
+          "scoring_criteria_alignment",
+          "first_impressions_sharing",
+          "preliminary_score_presentation",
+          "clarification_questions"
+        ]
+      },
+      {
+        "id": "deliberation",
+        "name": "Deliberation",
+        "duration_minutes": 30,
+        "description": "Open debate on application merits. Arguments and counter-arguments. Coalition formation as reviewers align on key issues. Information asymmetries begin to surface as private knowledge is selectively revealed.",
+        "activities": [
+          "merit_debate",
+          "counter_arguments",
+          "coalition_formation",
+          "information_revelation",
+          "score_revision"
+        ]
+      },
+      {
+        "id": "final_consensus",
+        "name": "Final Consensus",
+        "duration_minutes": 10,
+        "description": "Formal voting on recommendation. Dissenting opinions recorded. Final scores tabulated. Recommendation letter drafted with majority and minority views.",
+        "activities": [
+          "formal_voting",
+          "recommendation_drafting",
+          "dissent_recording",
+          "score_finalization"
+        ]
+      }
+    ],
+    "scoring_criteria": {
+      "scientific_merit": {"weight": 0.30, "description": "Quality of research question, methodology, and theoretical framework"},
+      "innovation": {"weight": 0.20, "description": "Novelty of approach, potential for breakthrough findings"},
+      "feasibility": {"weight": 0.20, "description": "Realistic timeline, appropriate methods, qualified team"},
+      "broader_impact": {"weight": 0.15, "description": "Societal relevance, training opportunities, outreach plans"},
+      "budget_justification": {"weight": 0.15, "description": "Appropriate resource allocation, cost-effectiveness"}
+    },
+    "scenario_branches": {
+      "diverse_panel": {
+        "id": "branch_diverse",
+        "description": "Default panel composition with varied biases (institutional_balance, scientific_rigor, innovation, compliance, peer_assessment). Represents typical review panel diversity.",
+        "expected_dynamics": "Balanced debate with competing priorities. Innovation advocate counters skeptic. Compliance officer raises risk flags. External reviewer provides calibration. Program Director mediates.",
+        "probability": 0.5
+      },
+      "excellence_only": {
+        "id": "branch_excellence",
+        "description": "All panelists share scientific_rigor bias. Simulates a panel composed entirely of established researchers focused on methodological excellence.",
+        "expected_dynamics": "Convergent criticism on methodology. Less attention to innovation or broader impact. Higher rejection rate. Groupthink risk. Budget considerations minimized.",
+        "probability": 0.5
+      }
+    },
+    "input_parameters": {
+      "organization_profile": {
+        "description": "Profile of the applicant's institution",
+        "schema": {
+          "name": "string — Institution name",
+          "mission": "string — Institutional mission statement",
+          "entity_type": "string — e.g., R1 university, liberal arts college, research institute",
+          "history": "string — Relevant funding and research history"
+        },
+        "default": {
+          "name": "Midwest State University",
+          "mission": "Advancing knowledge through inclusive research and education",
+          "entity_type": "R1 research university",
+          "history": "Moderate NIH/NSF funding portfolio. Two prior awards in related area, one not renewed."
+        }
+      },
+      "grant_opportunity": {
+        "description": "Details of the funding opportunity being reviewed",
+        "schema": {
+          "funder": "string — Funding agency (e.g., NIH, NSF, DOE)",
+          "program": "string — Specific program or mechanism",
+          "amount": "number — Requested funding amount in USD",
+          "deadline": "string — Submission deadline",
+          "focus_areas": "array — Priority research areas"
+        },
+        "default": {
+          "funder": "National Science Foundation",
+          "program": "CAREER Award",
+          "amount": 750000,
+          "deadline": "2026-07-15",
+          "focus_areas": ["computational biology", "machine learning", "genomics"]
+        }
+      },
+      "application_summary": {
+        "description": "Summary of the grant application under review",
+        "schema": {
+          "narrative": "string — Research narrative summary",
+          "budget_justification": "string — Budget justification summary",
+          "key_claims": "array — Central claims the proposal makes"
+        },
+        "default": {
+          "narrative": "Proposes novel deep learning architecture for multi-omics integration in rare disease diagnosis. Combines transformer-based feature extraction with causal inference framework. Plans to validate on three rare disease cohorts with clinical partners.",
+          "budget_justification": "PI salary (20%), one postdoc, two grad students, cloud computing costs, clinical partner subawards. Equipment: GPU cluster for model training.",
+          "key_claims": [
+            "Novel architecture outperforms existing methods by 15% on benchmark datasets",
+            "Causal framework enables interpretable predictions unlike black-box alternatives",
+            "Clinical validation pipeline ensures translational relevance",
+            "Open-source toolkit will benefit broader rare disease research community"
+          ]
+        }
+      }
+    },
+    "expected_outputs": {
+      "per_reviewer_scores": "Individual scores (1-10) per criterion with written rationale for each panelist",
+      "panel_consensus": "Final recommendation: fund, fund_with_revisions, not_recommended, or defer",
+      "decision_arguments": "Key arguments that drove the final recommendation, ranked by influence",
+      "information_asymmetry_report": "Analysis of how private knowledge (budget constraints, rejection history) affected the deliberation outcome",
+      "counterfactual_comparison": "Side-by-side outcomes from diverse_panel vs excellence_only branches"
+    },
+    "mechanisms_featured": [
+      "M3_knowledge_provenance_private_information",
+      "M7_causal_chains_deliberation_sequence",
+      "M11_dialog_synthesis_panel_debate",
+      "M12_counterfactual_branching_panel_composition",
+      "M13_relationship_evolution_coalition_dynamics",
+      "M15_prospection_outcome_modeling",
+      "M19_information_asymmetry_reviewer_knowledge"
+    ]
+  },
+  "economic_scenario": null,
+  "founder_profiles": null,
+  "max_cost_usd": null,
+  "enable_checkpoints": true,
+  "checkpoint_interval": 10
+}

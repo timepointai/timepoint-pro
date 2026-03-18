@@ -1,7 +1,7 @@
 {
   "version": "2.0.0",
   "description": "Timepoint Template Catalog - Verified templates only",
-  "last_updated": "2026-02-06",
+  "last_updated": "2026-03-18",
   "tiers": {
     "quick": {
       "description": "Fast validation tests",
@@ -50,10 +50,14 @@
   "patches": {
     "corporate": [
       "showcase/board_meeting",
+      "showcase/grant_review_panel",
       "showcase/vc_pitch_forward",
       "showcase/vc_pitch_branching",
       "showcase/vc_pitch_roadshow",
       "showcase/vc_pitch_strategies"
+    ],
+    "grant": [
+      "showcase/grant_review_panel"
     ],
     "historical": [
       "showcase/jefferson_dinner"
@@ -310,6 +314,16 @@
       "cost_estimate": "$0.10",
       "duration_estimate": "4min",
       "status": "verified"
+    },
+    "showcase/grant_review_panel": {
+      "name": "Grant Review Panel",
+      "description": "Grant review panel deliberation with branching panel composition counterfactuals and information asymmetry",
+      "mechanisms": ["M3", "M7", "M11", "M12", "M13", "M15", "M19"],
+      "tier": "standard",
+      "category": "showcase",
+      "cost_estimate": "$0.12",
+      "duration_estimate": "5min",
+      "status": "pending"
     }
   }
 }
