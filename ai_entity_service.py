@@ -8,6 +8,7 @@ rate limiting, caching, and both internal and public API endpoints.
 
 import hashlib
 import json
+import logging
 import re
 import time
 import uuid
@@ -33,6 +34,8 @@ except ImportError:
 from llm_v2 import LLMClient  # Use new centralized service
 from schemas import AIEntity
 from storage import GraphStore
+
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # Data Models
@@ -517,6 +520,9 @@ class AIEntityService:
         training_examples = entity.entity_metadata.get("training_examples", [])
 
         # Simple mock response that uses training data
+        logger.warning(
+            "\u26a0\ufe0f DRY_RUN MODE ACTIVE \u2014 returning mock LLM responses, NOT real API calls"
+        )
         response = "Based on my knowledge: "
         if training_examples:
             response += f"I have been trained on {len(training_examples)} examples. "

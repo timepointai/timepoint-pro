@@ -8,6 +8,7 @@ Phase 6: Public API
 """
 
 import hashlib
+import os
 import secrets
 from dataclasses import dataclass
 from datetime import datetime
@@ -241,9 +242,19 @@ def setup_test_api_keys() -> dict[str, str]:
     """
     Set up test API keys for development/testing.
 
+    Only runs when ENV=test or TESTING=true. Raises RuntimeError in production.
+
     Returns:
         Dict mapping user_id to API key
     """
+    _env = os.environ.get("ENV", "").lower()
+    _testing = os.environ.get("TESTING", "").lower()
+    if _env != "test" and _testing != "true":
+        raise RuntimeError(
+            "setup_test_api_keys() is not allowed outside of test environments. "
+            "Set ENV=test or TESTING=true to use this function."
+        )
+
     test_users = [
         ("test-user-alice", "Alice's key"),
         ("test-user-bob", "Bob's key"),

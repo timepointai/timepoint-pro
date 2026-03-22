@@ -8,6 +8,7 @@ Provides:
 """
 
 import hashlib
+import logging
 import re
 import time
 
@@ -16,6 +17,9 @@ from pydantic import BaseModel
 
 from llm_service.provider import LLMResponse
 from llm_service.response_parser import ResponseParser
+
+
+logger = logging.getLogger(__name__)
 
 
 class MockProvider:
@@ -46,6 +50,10 @@ class MockProvider:
             validation_expected_pattern: Expected response pattern
         """
         self.mode = mode
+        if mode == "dry_run":
+            logger.warning(
+                "\u26a0\ufe0f DRY_RUN MODE ACTIVE \u2014 returning mock LLM responses, NOT real API calls"
+            )
         self.validation_model = validation_model
         self.validation_system = validation_system
         self.validation_user = validation_user

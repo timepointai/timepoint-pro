@@ -4,8 +4,13 @@ Unit tests for the Tensor API (Phase 6).
 Tests API endpoints, authentication, and models independently.
 """
 
+import os
+
 import pytest
 from fastapi.testclient import TestClient
+
+# Allow test helper functions to run in test context
+os.environ.setdefault("TESTING", "true")
 
 from api.auth import (
     API_KEY_HEADER,

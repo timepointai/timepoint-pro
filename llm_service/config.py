@@ -4,8 +4,11 @@ Configuration management for LLM service
 Defines configuration structure and loading from Hydra config.
 """
 
+import logging
 from dataclasses import dataclass, field
 from enum import Enum
+
+logger = logging.getLogger(__name__)
 
 
 class ServiceMode(str, Enum):
@@ -119,6 +122,12 @@ class LLMServiceConfig:
     performance: PerformanceConfig = field(default_factory=PerformanceConfig)
     sessions: SessionConfig = field(default_factory=SessionConfig)
     validation_mode: ValidationModeConfig = field(default_factory=ValidationModeConfig)
+
+    def __post_init__(self):
+        if self.mode == ServiceMode.DRY_RUN:
+            logger.warning(
+                "\u26a0\ufe0f DRY_RUN MODE ACTIVE \u2014 returning mock LLM responses, NOT real API calls"
+            )
 
     @classmethod
     def from_hydra_config(cls, cfg: any) -> "LLMServiceConfig":
