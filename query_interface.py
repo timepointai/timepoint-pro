@@ -234,7 +234,18 @@ Return only valid JSON, no other text."""
         # Knowledge/thoughts queries
         if any(
             word in query_lower
-            for word in ["think", "feel", "believe", "opinion", "thought", "felt", "concerned"]
+            for word in [
+                "think",
+                "feel",
+                "believe",
+                "opinion",
+                "thought",
+                "felt",
+                "concerned",
+                "know",
+                "knew",
+                "knowledge",
+            ]
         ):
             info_type = "knowledge"
             confidence += 0.2
