@@ -167,7 +167,7 @@ Return only valid JSON, no other text."""
     def _parse_query_simple(self, query: str) -> QueryIntent:
         """Improved rule-based parsing fallback"""
         query_lower = query.lower()
-        self._get_all_entity_names()
+        all_entity_names = self._get_all_entity_names()
         timepoints = self.store.get_all_timepoints()
 
         # Improved entity detection - handle partial names and variations
@@ -198,6 +198,12 @@ Return only valid JSON, no other text."""
         for name_variant, entity_id in sorted_mappings:
             if name_variant in query_lower and entity_id not in found_entities:
                 found_entities.append(entity_id)
+
+        # Generic entity ID matching: check if any stored entity_id appears in the query
+        if not found_entities:
+            for eid in sorted(all_entity_names, key=len, reverse=True):
+                if eid.lower() in query_lower and eid not in found_entities:
+                    found_entities.append(eid)
 
         if found_entities:
             target_entity = found_entities[0]  # Primary entity
