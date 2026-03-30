@@ -1,14 +1,5 @@
 # Timepoint Pro Alpha
 
-## Changes 2026-03-02 — TDF package integration + branch protection
-
-- Replaced hand-rolled `TDFExporter` with canonical `timepoint-tdf` package (`from_pro` + `write_tdf_jsonl`)
-- `/api/data-export/{run_id}` now returns full payload (entities, dialogs, causal_edges, metadata)
-- Branch protection enforced on `main`: 1 approving review required, no force pushes
-- Codebase lint pass: 3898 issues auto-fixed via ruff
-
----
-
 **Synthetic time travel through social simulation.**
 
 **The first practical SNAG engine: Social Network Augmented Generation.**
@@ -191,7 +182,7 @@ Render the past. Simulate the future. Score the predictions. Accumulate the grap
 | **TDF** | Open Source | timepoint-tdf | Data Format — JSON-LD interchange across all services |
 | **SNAG Bench** | Open Source | timepoint-snag-bench | Quality Certifier — measures Causal Resolution across renderings |
 | **Billing** | Private | timepoint-billing | Payment Processing — Apple IAP + Stripe |
-| **MCP** | Private | timepoint-mcp | MCP Server — AI agent access to Flash and Clockchain |
+| **MCP** | Public | timepoint-mcp | MCP Server — AI agent access to Flash and Clockchain |
 | **Web App** | Private | timepoint-web-app | Browser client at app.timepointai.com |
 | **Landing** | Private | timepoint-landing | Marketing site at timepointai.com |
 | **iPhone App** | Private | timepoint-iphone-app | iOS client — Synthetic Time Travel on mobile |
@@ -204,3 +195,14 @@ Render the past. Simulate the future. Score the predictions. Accumulate the grap
 
 License: Apache 2.0
 Models: open-weight models via OpenRouter for simulation (see Training Data & Model Licensing for restrictions); commercial frontier models for coding, documented in git commit history.
+
+---
+
+## Changelog
+
+### 2026-03-02 — TDF package integration + branch protection
+
+- Replaced hand-rolled `TDFExporter` with canonical `timepoint-tdf` package (`from_pro` + `write_tdf_jsonl`)
+- `/api/data-export/{run_id}` now returns full payload (entities, dialogs, causal_edges, metadata)
+- Branch protection enforced on `main`: 1 approving review required, no force pushes
+- Codebase lint pass: 3898 issues auto-fixed via ruff
