@@ -47,6 +47,28 @@
     "M19": "Information Asymmetry - Enforced knowledge barriers between entities",
     "M20": "Clockchain Grounding - Anchor to canonical historical events"
   },
+  "mechanism_status": {
+    "M1": "active",
+    "M2": "active",
+    "M3": "active",
+    "M4": "active",
+    "M5": "active",
+    "M6": "active",
+    "M7": "active",
+    "M8": "active",
+    "M9": "active",
+    "M10": "active",
+    "M11": "active",
+    "M12": "active",
+    "M13": "active",
+    "M14": "active",
+    "M15": "active",
+    "M16": "active",
+    "M17": "active",
+    "M18": "active",
+    "M19": "active",
+    "M20": "interface_only"
+  },
   "patches": {
     "corporate": [
       "showcase/board_meeting",
