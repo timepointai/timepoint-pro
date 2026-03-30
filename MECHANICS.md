@@ -13,7 +13,7 @@ Knowledge Provenance: Entities can't magically know things. Knowledge has tracke
 Entity Simulation: On-demand entity generation, scene-level collective behavior, dialog synthesis with full context, relationship evolution tracking, prospection (entities modeling their futures), and animistic agency (objects/institutions that "want" things).
 Infrastructure: Intelligent model selection (M18) matches actions to optimal LLMs—math-heavy tasks use reasoning models, dialog uses conversational models, with automatic fallbacks and license compliance for commercial synthetic data.
 
-The 19 mechanisms are implementations of these ideas. The ideas are the value; the mechanisms are derivable.
+The 20 mechanisms are implementations of these ideas. The ideas are the value; the mechanisms are derivable.
 
 ---
 
@@ -42,6 +42,7 @@ The 19 mechanisms group into five pillars:
 | **Knowledge Provenance** | Track who knows what, from whom, when | M3, M4, M19 |
 | **Entity Simulation** | Generate and synthesize entity behavior | M9, M10, M11, M13, M15, M16 |
 | **Infrastructure** | Model selection, cost optimization | M18 |
+| **Entity Grounding** | Anchor entities to real-world facts | M20 |
 
 ---
 
@@ -1080,6 +1081,56 @@ python run_all_mechanism_tests.py --list-free-models  # Show available
 ```
 
 Note: Free models have more restrictive rate limits and availability may change without notice.
+
+---
+
+# Pillar 6: Entity Grounding
+
+Anchoring simulation entities to real-world facts eliminates hallucinated backgrounds.
+
+## M20: Clockchain Grounding
+
+Entities in temporal simulations often represent real people, organizations, or places. Without grounding, the LLM invents plausible-sounding but inaccurate details — wrong affiliations, fabricated quotes, anachronistic positions. M20 solves this by anchoring entities to canonical data from web search, X/Twitter, and the Clockchain temporal graph.
+
+### Interface (Public)
+
+The public repo defines the mechanism interface: data models (`GroundingProfile`, `GroundingRequest`, `GroundingResult`) and method signatures (`ground_entities`, `ground_entity`, `inject_grounding_as_exposure_events`, `enrich_entity_roster`, `check_grounding_status`). All methods raise `NotImplementedError`.
+
+```python
+from workflows.clockchain_grounding import M20GroundingMechanism, GroundingRequest
+
+mechanism = M20GroundingMechanism(store=graph_store)
+
+# Interface only — raises NotImplementedError
+# Actual implementation in timepoint-pro-cloud-private
+result = mechanism.ground_entities(GroundingRequest(
+    entity_names=["Marc Andreessen", "Julius Caesar"],
+    scene_context="VC pitch meeting in 2026",
+))
+```
+
+### Implementation (Cloud Layer)
+
+The actual grounding logic is proprietary and lives in `timepoint-pro-cloud-private`. The cloud layer's `GroundingAugmenter` service:
+
+1. Resolves entity names against Clockchain figures (skips already-grounded entities)
+2. Calls OpenRouter web search (Perplexity Sonar, xAI Grok) for real-world data
+3. Produces `GroundingProfile` objects with verified facts, affiliations, and citations
+4. Injects grounded facts as M3 ExposureEvents for causal provenance
+
+### Per-Mode Integration
+
+| Mode | Injection Point | What Gets Grounded |
+|------|----------------|-------------------|
+| FORWARD | `KnowledgeSeeder.seed_knowledge()` | Initial facts at start date |
+| DIRECTORIAL | `entity_roster.voice_guide` | Character voice + psychological profile |
+| PORTAL | `entity_roster` + `_score_antecedent` | Capabilities at both endpoints + historical precedent |
+| BRANCHING | `intervention.parameters` | Entity capability ceiling at branch points |
+| CYCLICAL | `_generate_archetype_cycle` | Domain facts for archetype cycle |
+
+### Status
+
+**Interface only.** The public repo contains the data models and method signatures. No grounding logic, no API calls, no search code. See `workflows/clockchain_grounding.py`.
 
 ---
 

@@ -25,7 +25,7 @@ Each mode has its own validation rules, fidelity allocation strategy, and genera
 ### Implemented
 
 **Core Infrastructure:**
-- **19 simulation mechanisms** (M1-M19) — See [MECHANICS.md](MECHANICS.md)
+- **20 simulation mechanisms** (M1-M20) — See [MECHANICS.md](MECHANICS.md)
 - **M18: Intelligent Model Selection** — Capability-based per-action model selection
 - **M19: Knowledge Extraction** — LLM-based semantic knowledge extraction from entities
 - **10 Open-Source Models** — All via OpenRouter, all permit commercial synthetic data

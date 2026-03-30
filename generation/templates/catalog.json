@@ -45,7 +45,11 @@
     "M17": "Modal Causality - FORWARD/PORTAL/BRANCHING modes",
     "M18": "Model Selection - Action-appropriate model chosen",
     "M19": "Information Asymmetry - Enforced knowledge barriers between entities",
-    "M20": "Clockchain Grounding - Anchor to canonical historical events"
+    "M20": {
+      "description": "Clockchain Grounding - Anchor to canonical historical events",
+      "status": "interface_only",
+      "module": "workflows/clockchain_grounding.py"
+    }
   },
   "patches": {
     "corporate": [
