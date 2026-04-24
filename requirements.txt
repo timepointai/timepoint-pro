@@ -35,6 +35,9 @@ fastapi>=0.115.0
 uvicorn>=0.32.0
 slowapi>=0.1.9
 
+# Model Context Protocol (MCP) — Streamable HTTP server at /mcp
+mcp>=1.18.0
+
 # HTML sanitization and security
 bleach>=6.1.0
 

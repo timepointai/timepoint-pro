@@ -29,6 +29,8 @@ from .deps import (
     get_settings,
     get_tensor_db,
 )
+from .mcp_server import get_mcp_app, get_mcp_session_manager
+from .middleware.bearer_auth import BearerAuthMiddleware
 from .middleware.rate_limit import (
     get_limiter,
     get_rate_limit_config,
@@ -77,7 +79,10 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"Warning: Usage database initialization failed: {e}")
 
-    yield
+    # Start MCP streamable HTTP session manager so the /mcp sub-app works.
+    async with get_mcp_session_manager().run():
+        print("MCP server session manager started (mounted at /mcp)")
+        yield
 
     # Shutdown
     print("Shutting down Tensor API")
@@ -250,6 +255,12 @@ See /simulations/batch/usage for current usage.
             tensor_count=tensor_count,
             rate_limiting=rate_config.enabled,
         )
+
+    # Mount the MCP (Model Context Protocol) server at /mcp behind the Bearer
+    # auth middleware.  This exposes the ``tp_pro_simulate`` tool to
+    # MCP-compatible agents.  The Bearer auth middleware rejects unauthorized
+    # requests with 401 before they reach the MCP dispatcher.
+    application.mount("/mcp", BearerAuthMiddleware(get_mcp_app()))
 
     return application
 
