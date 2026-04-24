@@ -173,6 +173,8 @@ A small sample JSONL file is included at [`examples/sample_training_data.jsonl`]
 
 Render the past. Simulate the future. Score the predictions. Accumulate the graph.
 
+For hosted URLs, addressable MCP surfaces (`flash.timepointai.com/mcp/`, `pro.timepointai.com/mcp/`, `mcp.timepointai.com/mcp`), and the full public API route map (`/api/v1/conductor/pro/*`, `/api/v1/falcon/packages/*`, etc.), see **[docs/timepoint-suite-ref.md](docs/timepoint-suite-ref.md)** — the canonical reference.
+
 | Service | Type | Repo | Role |
 |---------|------|------|------|
 | **Flash** | Open Source | timepoint-flash | Reality Writer — renders grounded historical moments |
